@@ -61,8 +61,6 @@ export const CUE = {
   DISABLE_RB3: 'disable-rb3',
   RB3E_GET_MODE: 'rb3e-get-mode',
   RB3E_GET_STATS: 'rb3e-get-stats',
-  GET_YARG_ENABLED: 'get-yarg-enabled',
-  GET_RB3_ENABLED: 'get-rb3-enabled',
   YARG_LISTENER_ENABLED: 'yarg-listener-enabled',
   YARG_LISTENER_DISABLED: 'yarg-listener-disabled',
   RB3E_LISTENER_ENABLED: 'rb3e-listener-enabled',
@@ -77,8 +75,6 @@ export const LIGHT = {
   SENDER_DISABLE: 'sender-disable',
   GET_SYSTEM_STATUS: 'get-system-status',
   GET_CUE_GROUPS: 'get-cue-groups',
-  ENABLE_CUE_GROUP: 'enable-cue-group',
-  DISABLE_CUE_GROUP: 'disable-cue-group',
   GET_NETWORK_INTERFACES: 'get-network-interfaces',
   START_TEST_EFFECT: 'start-test-effect',
   START_RB3_TEST_EFFECT: 'start-rb3-test-effect',
@@ -130,6 +126,7 @@ export const LIGHT = {
   SET_RB3_MOTION_GROUP_SELECTION_MODE: 'set-rb3-motion-group-selection-mode',
   START_YARG_MOTION_CUE_SIMULATION: 'start-yarg-motion-cue-simulation',
   START_AUDIO_MOTION_CUE_SIMULATION: 'start-audio-motion-cue-simulation',
+  GET_RUNNING_MOTION_CUE: 'get-running-motion-cue',
   START_RB3_MOTION_CUE_SIMULATION: 'start-rb3-motion-cue-simulation',
   STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
@@ -140,8 +137,6 @@ export const LIGHT = {
   CONSOLE_ENABLE: 'console-enable',
   CONSOLE_DISABLE: 'console-disable',
   CONSOLE_SEND_DMX: 'console-send-dmx',
-  CONSOLE_UPDATE_CHANNEL: 'console-update-channel',
-  CONSOLE_SET_HOME: 'console-set-home',
   CONSOLE_SET_FIXTURE_CONFIG: 'console-set-fixture-config',
 } as const
 
@@ -245,6 +240,20 @@ export const ALL_INVOKE_CHANNELS: readonly string[] = INVOKE_CHANNEL_GROUPS.flat
   Object.values(group),
 )
 
+/**
+ * Every renderer-to-main fire-and-forget channel, the keys of IpcSendMap. The preload forwards
+ * `send` on these alone, so an invoke-only channel cannot be sent to.
+ */
+export const ALL_SEND_CHANNELS = [
+  CUE.YARG_LISTENER_ENABLED,
+  CUE.YARG_LISTENER_DISABLED,
+  CUE.RB3E_LISTENER_ENABLED,
+  CUE.RB3E_LISTENER_DISABLED,
+  CUE.SET_LISTEN_CUE_DATA,
+  CUE.CUE_STYLE,
+  LIGHT.CONSOLE_SEND_DMX,
+] as const
+
 /** Main process -> renderer (one-way send). Use when main calls webContents.send(). */
 export const RENDERER_RECEIVE = {
   SENDER_START_FAILED: 'sender-start-failed',
@@ -253,6 +262,11 @@ export const RENDERER_RECEIVE = {
   YARG_ERROR: 'yarg-error',
   RB3_ERROR: 'rb3-error',
   CONTROLLERS_RESTARTED: 'controllers-restarted',
+  /**
+   * A settings file recovery happened while the app runs. Collect it with
+   * GET_CORRUPT_RECOVERY_EVENTS.
+   */
+  CONFIG_RECOVERY_QUEUED: 'config:recovery-queued',
   /**
    * Blackout was latched or released by a writer other than the sidebar, so every window can
    * follow. Main holds the authoritative state but answers SET_MASTER_OUTPUT only to the caller,
@@ -269,8 +283,12 @@ export const RENDERER_RECEIVE = {
   AUDIO_DISABLE: 'audio:disable',
   /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI. */
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
+  /** Broadcast on every YARG or RB3 listener start and stop, whatever caused it. */
+  LISTENER_ENABLED_CHANGED: 'listener:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
+  /** YARG enabled groups or per-cue disables changed (Preferences or a cue save, all windows). */
+  YARG_CUE_GROUPS_CHANGED: 'yarg:cue-groups-changed',
   /** Enabled audio cue groups or per-cue disables changed (Preferences → all windows). */
   AUDIO_CUE_GROUPS_CHANGED: 'audio:cue-groups-changed',
   /** YARG motion enabled groups or per-cue disables changed (Preferences → all windows). */
@@ -316,4 +334,6 @@ export const RENDERER_RECEIVE = {
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */
 export const RENDERER_SEND = {
   AUDIO_DATA: 'audio:data',
+  /** Whether the page holds unsaved changes, so a Quit can ask about it before closing anything. */
+  UNSAVED_CHANGES: 'window:unsaved-changes',
 } as const

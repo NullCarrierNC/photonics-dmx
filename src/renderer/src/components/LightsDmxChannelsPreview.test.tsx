@@ -4,7 +4,6 @@
  * after its base channels, with their live DMX value; a plain fixture renders only its base rows.
  */
 import { describe, expect, it, afterEach } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { render, screen, within, cleanup } from '@testing-library/react'
 import {
   ConfigStrobeType,

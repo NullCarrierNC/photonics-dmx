@@ -195,4 +195,41 @@ describe('CueSimulator', () => {
       sim.dispose()
     }
   })
+
+  describe('Stomp', () => {
+    /** Runs Stomp with keyframes at `keyframesAt` and reads whether the rig is lit at each time. */
+    async function stompLit(keyframesAt: number[], timesMs: number[]): Promise<boolean[]> {
+      const sim = await CueSimulator.create({
+        library: LIBRARY,
+        frontCount: 4,
+        backCount: 4,
+        venue: 'Large',
+        bpm: 0,
+      })
+      try {
+        sim.setCue('Stomp')
+        sim.loadScenario(keyframesAt.map((at) => ({ at, event: 'keyframe-next' })))
+        const timeline = await sim.run(Math.max(...timesMs) + 100)
+        return timesMs.map((t) =>
+          Object.values(sampleNearest(timeline, t).lights).some(
+            (light) =>
+              light !== null &&
+              light.opacity > 0 &&
+              light.intensity > 0 &&
+              light.red + light.green + light.blue > 0,
+          ),
+        )
+      } finally {
+        sim.dispose()
+      }
+    }
+
+    it('lights until the first keyframe, then turns off and on with each one', async () => {
+      expect(await stompLit([400, 800], [200, 600, 1000])).toEqual([true, false, true])
+    })
+
+    it('turns off on a keyframe that arrives in its first frame', async () => {
+      expect(await stompLit([0, 400], [200, 600])).toEqual([false, true])
+    })
+  })
 })

@@ -6,10 +6,20 @@
 
 import { LIGHT } from '../ipcChannels'
 import type { CueType } from '../../photonics-dmx/cues/types/cueTypes'
-import type { IpcErrorResult, IpcSuccessResult } from './common'
+import type {
+  IpcErrorResult,
+  IpcSuccessResult,
+  MotionCueChangePayload,
+  MotionRuntimeDomain,
+} from './common'
 
 export interface LightingInvokeMap {
   // ---- Light / senders / simulation ----
+  /** The motion cue a domain is running now: a simulation first, else the live handler's pick. */
+  [LIGHT.GET_RUNNING_MOTION_CUE]: {
+    request: { domain: MotionRuntimeDomain }
+    response: MotionCueChangePayload | IpcErrorResult
+  }
   [LIGHT.GET_SYSTEM_STATUS]: {
     request: void
     response:
@@ -30,14 +40,6 @@ export interface LightingInvokeMap {
   [LIGHT.GET_CUE_GROUPS]: {
     request: void
     response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
-  }
-  [LIGHT.ENABLE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.DISABLE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
   }
   [LIGHT.GET_NETWORK_INTERFACES]: {
     request: void

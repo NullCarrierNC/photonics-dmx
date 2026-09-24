@@ -308,6 +308,36 @@ describe('DmxPublisher blackout', () => {
     expect(dark[8]).toBe(200)
   })
 
+  it('parks the hardware strobe channel until released', () => {
+    const master = new MasterOutputState()
+    const strobeManager = new StrobeStateManager()
+    const { publisher, wire } = setup(
+      [
+        {
+          id: 'l1',
+          channels: { ...RGB_CHANNELS, strobeChannel: 7 },
+          isStrobeEnabled: true,
+          strobeValues: STROBE_VALUES,
+        },
+      ],
+      master,
+      strobeManager,
+    )
+    strobeManager.setActive('fast', 'net')
+    publisher.publish(
+      new Map<string, RGBIO>([['l1', rgbio({ red: 255, green: 255, blue: 255, intensity: 255 })]]),
+    )
+    expect(wire()[7]).toBe(STROBE_VALUES.fast)
+
+    master.setBlackout(true)
+    publisher.refreshOutput()
+    expect(wire()[7]).toBe(0)
+
+    master.setBlackout(false)
+    publisher.refreshOutput()
+    expect(wire()[7]).toBe(STROBE_VALUES.fast)
+  })
+
   it('restores the fader position when released', () => {
     const master = new MasterOutputState()
     master.setDimmerPercent(40)

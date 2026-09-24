@@ -1,16 +1,10 @@
-import React, { useCallback, useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { Rb3GameModeSchedulePayload } from '../../../shared/ipcTypes'
-import {
-  setListenCueData,
-  getMotionEnabled,
-  getRb3CueGroups,
-  getRb3MotionCueGroups,
-  getAvailableRb3MotionCues,
-  getActiveRb3MotionCue,
-} from '../ipcApi'
+import { setListenCueData, getRb3CueGroups } from '../ipcApi'
+import { useRunningMotionLabels } from '../hooks/useRunningMotionLabels'
 import { useAtom } from 'jotai'
 import { rb3eListenerEnabledAtom } from '../atoms'
 import { createLogger } from '../../../shared/logger'
@@ -59,10 +53,11 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   const [primaryGroupLabel, setPrimaryGroupLabel] = useState<string | null>(null)
   const [schedule, setSchedule] = useState<Rb3GameModeSchedulePayload | null>(null)
   const [remainingSec, setRemainingSec] = useState<number | null>(null)
-  // Active motion cue (mirrors the YARG preview's motion block).
-  const [motionEnabled, setMotionEnabled] = useState(false)
-  const [motionGroupLabel, setMotionGroupLabel] = useState<string | null>(null)
-  const [motionCueLabel, setMotionCueLabel] = useState<string | null>(null)
+  const {
+    motionEnabled,
+    groupLabel: motionGroupLabel,
+    cueLabel: motionCueLabel,
+  } = useRunningMotionLabels('rb3')
 
   // Listen for cue events when RB3E listener is enabled
   useEffect(() => {
@@ -121,77 +116,6 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
       removeIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, handleDeadline)
     }
   }, [rb3eListenerEnabled])
-
-  // Resolve the active motion cue's group + cue labels (mirrors the YARG preview).
-  const loadMotionLabels = useCallback(async () => {
-    try {
-      const enabled = await getMotionEnabled()
-      setMotionEnabled(enabled === true)
-      if (!enabled) {
-        setMotionGroupLabel(null)
-        setMotionCueLabel(null)
-        return
-      }
-      const ref = await getActiveRb3MotionCue()
-      if (ref && typeof ref === 'object' && 'groupId' in ref) {
-        const r = ref as { groupId: string; cueId: string }
-        const groups = await getRb3MotionCueGroups()
-        setMotionGroupLabel(groups?.find((g) => g.id === r.groupId)?.name ?? r.groupId)
-        const cues = await getAvailableRb3MotionCues(r.groupId)
-        setMotionCueLabel(cues.find((c) => c.id === r.cueId)?.name ?? r.cueId)
-      } else {
-        setMotionGroupLabel(null)
-        setMotionCueLabel(null)
-      }
-    } catch {
-      setMotionGroupLabel(null)
-      setMotionCueLabel(null)
-    }
-  }, [])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async; setState only after awaited IPC
-    void loadMotionLabels()
-    const onRefresh = () => void loadMotionLabels()
-    addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
-    addIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED, onRefresh)
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
-      removeIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED, onRefresh)
-    }
-  }, [loadMotionLabels])
-
-  useEffect(() => {
-    const applyMotionCueChange = async (payload: {
-      ref: { groupId: string; cueId: string } | null
-    }): Promise<void> => {
-      if (!payload.ref) {
-        setMotionGroupLabel(null)
-        setMotionCueLabel(null)
-        return
-      }
-      try {
-        const groups = await getRb3MotionCueGroups()
-        setMotionGroupLabel(
-          groups?.find((g) => g.id === payload.ref!.groupId)?.name ?? payload.ref.groupId,
-        )
-        const cues = await getAvailableRb3MotionCues(payload.ref.groupId)
-        setMotionCueLabel(cues.find((c) => c.id === payload.ref!.cueId)?.name ?? payload.ref.cueId)
-      } catch {
-        setMotionGroupLabel(payload.ref.groupId)
-        setMotionCueLabel(payload.ref.cueId)
-      }
-    }
-    const onMotionCueChange = (payload: {
-      ref: { groupId: string; cueId: string } | null
-    }): void => {
-      void applyMotionCueChange(payload)
-    }
-    addIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
-    }
-  }, [])
 
   // Tick the countdown once a second while a live deadline is armed. Date.now stays out of render
   // (an impure call there is disallowed); the seconds remaining are derived here and on each push.

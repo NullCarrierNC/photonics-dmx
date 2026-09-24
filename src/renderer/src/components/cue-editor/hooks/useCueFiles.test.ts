@@ -16,6 +16,11 @@ import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type { NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { useCueFiles } from './useCueFiles'
+import {
+  emitIpc,
+  ipcSubscribers,
+  resetIpcListenerStub,
+} from '@renderer/tests/helpers/ipcListenerStub'
 
 jest.mock(
   '../../../ipcApi',
@@ -25,15 +30,13 @@ jest.mock(
     ).ipcApiMock,
 )
 
-const mockListeners = new Map<string, (payload: unknown) => void>()
-const mockRemove = jest.fn()
-
-jest.mock('../../../utils/ipcHelpers', () => ({
-  addIpcListener: (channel: string, handler: (payload: unknown) => void) => {
-    mockListeners.set(channel, handler)
-  },
-  removeIpcListener: (channel: string, handler: unknown) => mockRemove(channel, handler),
-}))
+jest.mock(
+  '../../../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 function cueSummary(mode: string, groupId: string): NodeCueFileSummary {
   return {
@@ -91,8 +94,7 @@ const IMPORTED = {
 beforeEach(() => {
   resetIpcApiMock()
   window.localStorage.clear()
-  mockListeners.clear()
-  mockRemove.mockClear()
+  resetIpcListenerStub()
   jest.mocked(ipcApi.listNodeCueFiles).mockResolvedValue(CUE_LISTS)
   jest.mocked(ipcApi.listEffectFiles).mockResolvedValue(EFFECT_LISTS)
   jest.mocked(ipcApi.getNodeCueTypes).mockResolvedValue(CUE_TYPES)
@@ -168,14 +170,14 @@ describe('useCueFiles file lists from main', () => {
     const view = await renderLoaded()
 
     act(() =>
-      mockListeners.get(RENDERER_RECEIVE.NODE_CUES_CHANGED)!({
+      emitIpc(RENDERER_RECEIVE.NODE_CUES_CHANGED, {
         yarg: [],
         audio: [cueSummary('audio', 'rock')],
         rb3: [],
       }),
     )
     act(() =>
-      mockListeners.get(RENDERER_RECEIVE.EFFECTS_CHANGED)!({
+      emitIpc(RENDERER_RECEIVE.EFFECTS_CHANGED, {
         yarg: [],
         audio: [effectSummary('audio', 'pulse')],
       }),
@@ -184,10 +186,8 @@ describe('useCueFiles file lists from main', () => {
     expect(view.result.current.effectFiles.map((f) => f.path)).toEqual(['/fx/audio/pulse.json'])
 
     view.unmount()
-    expect(mockRemove.mock.calls.map(([channel]) => channel)).toEqual([
-      RENDERER_RECEIVE.NODE_CUES_CHANGED,
-      RENDERER_RECEIVE.EFFECTS_CHANGED,
-    ])
+    expect(ipcSubscribers(RENDERER_RECEIVE.NODE_CUES_CHANGED)).toEqual([])
+    expect(ipcSubscribers(RENDERER_RECEIVE.EFFECTS_CHANGED)).toEqual([])
   })
 })
 
@@ -218,6 +218,7 @@ describe('useCueFiles import', () => {
     jest.mocked(ipcApi.pickNodeCueImportFile).mockResolvedValue({
       success: false,
       error: 'User cancelled import.',
+      cancelled: true,
     })
     const view = await renderLoaded()
     await run(view, (h) => h.handleImport())

@@ -169,7 +169,7 @@ describe('FixtureChannelWriter', () => {
       ['unplanned', fixture()],
     ])
 
-    writerFor(wire).writeUnvisitedFixed(fixtures, new Set(['visited']))
+    writerFor(wire).writeUnvisited(fixtures, new Set(['visited']), null)
 
     expect(wire).toEqual({ 11: 6 })
   })

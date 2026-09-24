@@ -15,7 +15,7 @@ jest.mock('electron', () => ({
       )
     }),
   },
-  BrowserWindow: { getFocusedWindow: jest.fn(() => null) },
+  BrowserWindow: { getFocusedWindow: jest.fn(() => null), getAllWindows: jest.fn(() => [{}]) },
   globalShortcut: {
     register: jest.fn(() => true),
     unregister: jest.fn(),
@@ -24,13 +24,10 @@ jest.mock('electron', () => ({
 }))
 
 import { BrowserWindow, globalShortcut } from 'electron'
-import {
-  disposeBlackoutShortcut,
-  initBlackoutShortcut,
-  setBlackoutShortcut,
-} from '../blackoutShortcut'
+import { BlackoutShortcut } from '../blackoutShortcut'
 
 const getFocusedWindow = BrowserWindow.getFocusedWindow as jest.MockedFunction<() => unknown | null>
+const getAllWindows = BrowserWindow.getAllWindows as jest.MockedFunction<() => unknown[]>
 const register = globalShortcut.register as jest.MockedFunction<
   (accelerator: string, callback: () => void) => boolean
 >
@@ -50,30 +47,33 @@ function emit(event: string): void {
 }
 
 const toggle = jest.fn()
+let shortcut: BlackoutShortcut
 
 beforeEach(() => {
   jest.clearAllMocks()
+  shortcut = new BlackoutShortcut()
   appListeners.clear()
   jest.useFakeTimers()
   getFocusedWindow.mockReturnValue(null)
+  getAllWindows.mockReturnValue([{}])
   register.mockReturnValue(true)
 })
 
 afterEach(() => {
-  disposeBlackoutShortcut()
+  shortcut.dispose()
   jest.useRealTimers()
 })
 
 describe('blackoutShortcut', () => {
   it('never takes the key from the OS unless the preference asks for it', () => {
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'focused' })
+    shortcut.init(toggle, { key: 'escape', scope: 'focused' })
 
     expect(register).not.toHaveBeenCalled()
   })
 
   it('holds the key only while no Photonics window has focus', () => {
     getFocusedWindow.mockReturnValue(A_FOCUSED_WINDOW)
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
     expect(register).not.toHaveBeenCalled()
 
     getFocusedWindow.mockReturnValue(null)
@@ -84,7 +84,7 @@ describe('blackoutShortcut', () => {
   })
 
   it('hands back to the in-app listener when a window takes focus', () => {
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
     expect(register).toHaveBeenCalledTimes(1)
 
     getFocusedWindow.mockReturnValue(A_FOCUSED_WINDOW)
@@ -94,9 +94,32 @@ describe('blackoutShortcut', () => {
     expect(unregister).toHaveBeenCalledWith(ESCAPE)
   })
 
+  it('lets the key go once the last window closes', () => {
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
+    expect(register).toHaveBeenCalledTimes(1)
+
+    getAllWindows.mockReturnValue([])
+    emit('window-all-closed')
+    jest.runAllTimers()
+
+    expect(unregister).toHaveBeenCalledWith(ESCAPE)
+  })
+
+  it('takes the key again when a window opens in the background', () => {
+    getAllWindows.mockReturnValue([])
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
+    expect(register).not.toHaveBeenCalled()
+
+    getAllWindows.mockReturnValue([{}])
+    emit('browser-window-created')
+    jest.runAllTimers()
+
+    expect(register).toHaveBeenCalledWith(ESCAPE, expect.any(Function))
+  })
+
   it('does not grab the key while focus moves between two of our own windows', () => {
     getFocusedWindow.mockReturnValue(A_FOCUSED_WINDOW)
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
 
     // Leaving the cue editor for the main window is a blur immediately followed by a focus. The
     // blur alone would look like the app going to the background.
@@ -110,7 +133,7 @@ describe('blackoutShortcut', () => {
   })
 
   it('toggles blackout when the shortcut fires', () => {
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
 
     register.mock.calls[0]![1]()
 
@@ -118,14 +141,14 @@ describe('blackoutShortcut', () => {
   })
 
   it('registers the accelerator for the chosen key', () => {
-    initBlackoutShortcut(toggle, { key: 'backquote', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'backquote', scope: 'system-wide' })
 
     expect(register).toHaveBeenCalledWith(BACKQUOTE, expect.any(Function))
   })
 
   it('reports a refused registration once, not once per focus change', () => {
     register.mockReturnValue(false)
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
 
     for (let i = 0; i < 3; i++) {
       getFocusedWindow.mockReturnValue(A_FOCUSED_WINDOW)
@@ -142,7 +165,7 @@ describe('blackoutShortcut', () => {
 
   it('has nothing to release after a refused registration', () => {
     register.mockReturnValue(false)
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
 
     getFocusedWindow.mockReturnValue(A_FOCUSED_WINDOW)
     emit('browser-window-focus')
@@ -152,28 +175,28 @@ describe('blackoutShortcut', () => {
   })
 
   it('releases the key as soon as the preference turns it off', () => {
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
     expect(register).toHaveBeenCalledTimes(1)
 
-    setBlackoutShortcut({ key: 'escape', scope: 'focused' })
+    shortcut.set({ key: 'escape', scope: 'focused' })
 
     expect(unregister).toHaveBeenCalledWith(ESCAPE)
   })
 
   it('takes the key up when the preference turns it on', () => {
-    initBlackoutShortcut(toggle, { key: 'escape', scope: 'focused' })
+    shortcut.init(toggle, { key: 'escape', scope: 'focused' })
 
-    setBlackoutShortcut({ key: 'escape', scope: 'system-wide' })
+    shortcut.set({ key: 'escape', scope: 'system-wide' })
 
     expect(register).toHaveBeenCalledWith(ESCAPE, expect.any(Function))
   })
 
   describe('changing the key', () => {
     it('releases the key it was holding, not the one it is taking', () => {
-      initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+      shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
       expect(register).toHaveBeenCalledWith(ESCAPE, expect.any(Function))
 
-      setBlackoutShortcut({ key: 'backquote', scope: 'system-wide' })
+      shortcut.set({ key: 'backquote', scope: 'system-wide' })
 
       // Releasing the new accelerator instead would leave Escape held for the life of the process,
       // stolen from every other application and with nothing left that could give it back.
@@ -186,17 +209,17 @@ describe('blackoutShortcut', () => {
     })
 
     it('re-arms even though the scope did not change', () => {
-      initBlackoutShortcut(toggle, { key: 'escape', scope: 'system-wide' })
+      shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
 
-      setBlackoutShortcut({ key: 'backquote', scope: 'system-wide' })
+      shortcut.set({ key: 'backquote', scope: 'system-wide' })
 
       expect(register).toHaveBeenCalledTimes(2)
     })
 
     it('touches nothing while the OS hook is not armed', () => {
-      initBlackoutShortcut(toggle, { key: 'escape', scope: 'focused' })
+      shortcut.init(toggle, { key: 'escape', scope: 'focused' })
 
-      setBlackoutShortcut({ key: 'backquote', scope: 'focused' })
+      shortcut.set({ key: 'backquote', scope: 'focused' })
 
       expect(register).not.toHaveBeenCalled()
       expect(unregister).not.toHaveBeenCalled()
@@ -204,9 +227,9 @@ describe('blackoutShortcut', () => {
   })
 
   it('releases whichever key it holds on shutdown, and stops watching focus', () => {
-    initBlackoutShortcut(toggle, { key: 'backquote', scope: 'system-wide' })
+    shortcut.init(toggle, { key: 'backquote', scope: 'system-wide' })
 
-    disposeBlackoutShortcut()
+    shortcut.dispose()
 
     expect(unregister).toHaveBeenCalledWith(BACKQUOTE)
     expect(appListeners.get('browser-window-focus') ?? []).toHaveLength(0)

@@ -6,6 +6,22 @@
 
 /** @typedef {{ limit: number, allowances: Map<string, number>, malformed: string[] }} Baseline */
 
+/** Script and TypeScript sources, in every module flavour. */
+const SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/
+
+/**
+ * @param {string} path repo-relative, with forward slashes
+ * @returns {boolean} true for a source file that is neither a test nor a declaration file
+ */
+function isMeasuredSource(path) {
+  return (
+    SOURCE.test(path) &&
+    !/\.d\.[cm]?ts$/.test(path) &&
+    !/\.(?:test|spec)\.[^/]+$/.test(path) &&
+    !/(^|\/)(?:tests|__tests__)\//.test(path)
+  )
+}
+
 /**
  * @param {string} text contents of the baseline file
  * @returns {Baseline|null} null when the header line is missing or unparseable
@@ -97,22 +113,51 @@ function overLimitEntries(sizes, limit) {
 }
 
 /**
- * Files listed in the baseline that have grown past their allowance, which a rewrite must refuse
- * to launder.
+ * Files a rewrite would give more room than the baseline does: a listed file that grew past its
+ * entry, or an unlisted file now over the limit. A rewrite refuses both, so it only lowers or
+ * removes entries.
  * @param {Map<string, number>} sizes
  * @param {Baseline} baseline
+ * @param {number} [limit] the tool's own limit, which a header edited by hand cannot loosen
  * @returns {string[]}
  */
-function grownSinceBaseline(sizes, baseline) {
+function raisedByRewrite(sizes, baseline, limit = baseline.limit) {
   /** @type {string[]} */
-  const grown = []
-  for (const [path, cap] of baseline.allowances) {
-    const now = sizes.get(path)
-    if (now !== undefined && now > cap) {
-      grown.push(`${path} is ${now} lines, over its ${cap} line allowance`)
+  const raised = []
+  for (const [path, lines] of sizes) {
+    const cap = baseline.allowances.get(path)
+    if (cap === undefined) {
+      if (lines > limit) {
+        raised.push(`${path} is ${lines} lines, over the ${limit} line limit and not listed`)
+      }
+    } else if (lines > cap) {
+      raised.push(`${path} is ${lines} lines, over its ${cap} line allowance`)
     }
   }
-  return grown
+  return raised
+}
+
+/**
+ * The limit is the tool's, so a header that says otherwise was edited by hand to loosen it.
+ * @param {Baseline} baseline
+ * @param {number} limit
+ * @returns {string|null} what is wrong, or null when the header matches
+ */
+function limitMismatch(baseline, limit) {
+  return baseline.limit === limit
+    ? null
+    : `The budget file says limit ${baseline.limit}, but the limit is ${limit}`
+}
+
+/**
+ * The baseline a rewrite may not raise: the working file, or the committed one when the working
+ * file is gone, so deleting it cannot clear every allowance.
+ * @param {string|null} workingText
+ * @param {string|null} committedText
+ * @returns {string|null}
+ */
+function rewriteGuard(workingText, committedText) {
+  return workingText ?? committedText
 }
 
 /**
@@ -132,9 +177,12 @@ function renderBaseline(sizes, limit) {
 }
 
 module.exports = {
+  isMeasuredSource,
   parseBaseline,
   compareBudget,
   overLimitEntries,
-  grownSinceBaseline,
+  raisedByRewrite,
   renderBaseline,
+  limitMismatch,
+  rewriteGuard,
 }

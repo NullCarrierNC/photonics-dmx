@@ -3,12 +3,13 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../../controllers/ControllerManager'
-import { ipcSuccess } from '../ipcResult'
+import { ipcSuccess, restartAfterSave } from '../ipcResult'
 import { CONFIG, RIGS } from '../../../shared/ipcChannels'
 import {
   validateLightingConfiguration,
   validateDmxFixturesArray,
   validateDmxRigPayload,
+  validateRigId,
 } from '../inputValidation'
 import {
   buildRigExportFile,
@@ -46,14 +47,12 @@ export function registerLightsRigsConfigHandlers(
     if (!v.ok) {
       return { success: false, error: v.error }
     }
-    const config = controllerManager.getConfig()
-    await config.updateUserLights(v.value)
     // Template edits in MyLights cascade to rig snapshots so changes like adding a Strobe Channel
-    // reach the rig — and therefore the runtime publisher — without the user having to re-pick
-    // the fixture in LightsLayout. Restart controllers when at least one rig actually changed.
-    const rigsChanged = await config.syncRigsWithUserLights()
+    // reach the rig, and therefore the runtime publisher, without the user having to re-pick the
+    // fixture in LightsLayout. Restart controllers when at least one rig actually changed.
+    const rigsChanged = await controllerManager.getConfig().saveUserLights(v.value)
     if (rigsChanged) {
-      await controllerManager.restartControllers()
+      return restartAfterSave(() => controllerManager.restartControllers())
     }
     return ipcSuccess()
   })
@@ -72,10 +71,8 @@ export function registerLightsRigsConfigHandlers(
     if (!validation.ok) {
       return { success: false, error: validation.error }
     }
+    // The standalone layout only seeds the first rig at startup. No running controller reads it.
     await controllerManager.getConfig().updateLightingLayout(validation.value)
-
-    await controllerManager.restartControllers()
-
     return { success: true }
   })
 
@@ -88,7 +85,12 @@ export function registerLightsRigsConfigHandlers(
     }
   })
 
-  handleInvoke(ipcMain, CONFIG.GET_DMX_RIG, log, async (_, id: string) => {
+  handleInvoke(ipcMain, CONFIG.GET_DMX_RIG, log, async (_, data: unknown) => {
+    const validation = validateRigId(data)
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const id = validation.value
     try {
       return controllerManager.getConfig().getDmxRig(id)
     } catch (error) {
@@ -125,13 +127,17 @@ export function registerLightsRigsConfigHandlers(
 
     const isNowOrWasActive = rig.active || previousActiveState
     if (isNowOrWasActive) {
-      await controllerManager.restartControllers()
+      return restartAfterSave(() => controllerManager.restartControllers())
     }
-
     return { success: true }
   })
 
-  handleInvoke(ipcMain, CONFIG.DELETE_DMX_RIG, log, async (_, id: string) => {
+  handleInvoke(ipcMain, CONFIG.DELETE_DMX_RIG, log, async (_, data: unknown) => {
+    const validation = validateRigId(data)
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const id = validation.value
     const config = controllerManager.getConfig()
     const rig = config.getDmxRig(id)
     const wasActive = rig?.active ?? false
@@ -139,14 +145,13 @@ export function registerLightsRigsConfigHandlers(
     await config.deleteDmxRig(id)
 
     if (wasActive) {
-      await controllerManager.restartControllers()
+      return restartAfterSave(() => controllerManager.restartControllers())
     }
-
     return { success: true }
   })
 
   // Export a rig to a portable file (rig + the MyLights templates its lights reference). Built from
-  // the canonical saved rig (getDmxRig applies migration + template sync) so the snapshot is
+  // the canonical saved rig (migrated and template-synced on every write) so the snapshot is
   // self-consistent; the editor's unsaved edits are not included.
   handleInvoke(ipcMain, RIGS.EXPORT, log, async (_, rigId: unknown) => {
     if (typeof rigId !== 'string' || rigId.trim().length === 0) {
@@ -165,7 +170,7 @@ export function registerLightsRigsConfigHandlers(
       filters: [{ name: 'Photonics Rig Files', extensions: ['json'] }],
     })
     if (result.canceled || !result.filePath) {
-      return { success: false, error: 'User cancelled export.' }
+      return { success: false, error: 'User cancelled export.', cancelled: true }
     }
 
     await fs.writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf-8')
@@ -180,7 +185,7 @@ export function registerLightsRigsConfigHandlers(
       filters: [{ name: 'Photonics Rig Files', extensions: ['json'] }],
     })
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: false, error: 'User cancelled import.' }
+      return { success: false, error: 'User cancelled import.', cancelled: true }
     }
 
     const sourcePath = result.filePaths[0]

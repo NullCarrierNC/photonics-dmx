@@ -60,28 +60,36 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, cueData)
   }
 
-  // Listen for cue data
-  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: boolean) => {
-    // The YARG listener and RB3 cue mode expose the cue-mirror through separate handler refs;
-    // at most one is non-null at a time, so subscribing both covers whichever is active.
-    if (shouldListen) {
-      controllerManager.getCueHandler()?.addCueHandledListener(sendCueHandledData)
-      controllerManager.getRb3CueHandler()?.addCueHandledListener(sendCueHandledData)
-
-      // Also listen to ProcessorManager for RB3E direct mode
-      const processorManager = controllerManager.getProcessorManager()
-      if (processorManager) {
-        processorManager.on('cueHandled', sendCueHandledData)
-      }
-    } else {
-      controllerManager.getCueHandler()?.removeCueHandledListener(sendCueHandledData)
-      controllerManager.getRb3CueHandler()?.removeCueHandledListener(sendCueHandledData)
-
-      const processorManager = controllerManager.getProcessorManager()
-      if (processorManager) {
-        processorManager.off('cueHandled', sendCueHandledData)
-      }
+  // Windows following the cue-data mirror. It runs while any of them follows it, and it follows
+  // the listener coordinator, so it carries on through a listener switch and a controller restart.
+  const mirroring = new Set<number>()
+  const watched = new Set<number>()
+  let stopMirror: (() => void) | null = null
+  const syncMirror = (): void => {
+    if (mirroring.size > 0 && !stopMirror) {
+      stopMirror = controllerManager.getListenerLifecycle().yargRb3.onCueHandled(sendCueHandledData)
+    } else if (mirroring.size === 0 && stopMirror) {
+      stopMirror()
+      stopMirror = null
     }
+  }
+
+  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (event, shouldListen: unknown) => {
+    const windowId = event.sender.id
+    if (shouldListen === true) {
+      mirroring.add(windowId)
+    } else {
+      mirroring.delete(windowId)
+    }
+    if (!watched.has(windowId)) {
+      watched.add(windowId)
+      event.sender.once('destroyed', () => {
+        watched.delete(windowId)
+        mirroring.delete(windowId)
+        syncMirror()
+      })
+    }
+    syncMirror()
   })
 
   // Set cue style
@@ -94,15 +102,5 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       .getConfig()
       .setPreference('complex', style === 'complex')
       .catch((err) => log.error('Failed to save cue style preference:', err))
-  })
-
-  // Get YARG enabled state
-  handleInvoke(ipcMain, CUE.GET_YARG_ENABLED, log, () => {
-    return controllerManager.getIsYargEnabled()
-  })
-
-  // Get RB3 enabled state
-  handleInvoke(ipcMain, CUE.GET_RB3_ENABLED, log, () => {
-    return controllerManager.getIsRb3Enabled()
   })
 }

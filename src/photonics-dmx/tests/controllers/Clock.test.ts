@@ -109,6 +109,20 @@ describe('Clock', () => {
       c.destroy()
     })
 
+    it('still calls every other callback on a tick where one unregisters itself', () => {
+      const c = new Clock(10)
+      const second = jest.fn()
+      const first = jest.fn(() => c.offTick(first))
+      c.onTick(first)
+      c.onTick(second)
+      c.start()
+      jest.advanceTimersByTime(50)
+      expect(c.getTickCount()).toBeGreaterThanOrEqual(2)
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(second).toHaveBeenCalledTimes(c.getTickCount())
+      c.destroy()
+    })
+
     it('warns once when the tick callbacks overrun the interval', () => {
       // Real timers so performance.now() advances for a real busy-wait (fake timers can freeze it).
       jest.useRealTimers()

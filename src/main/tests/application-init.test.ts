@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 const createMainWindow = jest.fn()
+const getMainWindow = jest.fn<() => unknown>(() => null)
 const setControllerManager = jest.fn()
 const setupIpcHandlers = jest.fn()
 const setupMenu = jest.fn()
 const controllerInit = jest.fn<() => Promise<void>>()
 const controllerShutdown = jest.fn<() => Promise<void>>()
+const closeAllWindows = jest.fn(async () => {})
+const closeWindowsForQuit = jest.fn(async () => true)
+const isQuitting = jest.fn(() => false)
 
 jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test'), quit: jest.fn() },
@@ -16,8 +20,10 @@ jest.mock('../WindowManager', () => ({
   WindowManager: jest.fn(() => ({
     setControllerManager,
     createMainWindow,
-    hasWindows: () => true,
-    closeAllWindows: jest.fn(async () => {}),
+    getMainWindow,
+    closeAllWindows,
+    closeWindowsForQuit,
+    isQuitting,
   })),
 }))
 
@@ -25,7 +31,7 @@ jest.mock('../controllers/ControllerManager', () => ({
   ControllerManager: jest.fn(() => ({
     init: controllerInit,
     shutdown: controllerShutdown,
-    getConfig: () => ({ getPreference: jest.fn() }),
+    getConfig: () => ({ getPreference: jest.fn(), setRecoveryQueuedListener: jest.fn() }),
   })),
 }))
 
@@ -35,8 +41,11 @@ jest.mock('../menu', () => ({ setupMenu }))
 const initBlackoutShortcut = jest.fn()
 const disposeBlackoutShortcut = jest.fn()
 jest.mock('../blackoutShortcut', () => ({
-  initBlackoutShortcut,
-  disposeBlackoutShortcut,
+  BlackoutShortcut: jest.fn(() => ({
+    init: initBlackoutShortcut,
+    set: jest.fn(),
+    dispose: disposeBlackoutShortcut,
+  })),
 }))
 
 import { Application } from '../application'
@@ -95,7 +104,7 @@ describe('Application shutdown watchdog', () => {
     controllerShutdown.mockResolvedValue(undefined)
   })
 
-  it('gets the log onto disk before it forces the exit', async () => {
+  it('gets the log onto disk before it forces a failing exit', async () => {
     // The line saying why the app went is still buffered in the stream when the watchdog fires.
     const order: string[] = []
     controllerShutdown.mockImplementation(() => new Promise<void>(() => {}))
@@ -116,12 +125,66 @@ describe('Application shutdown watchdog', () => {
       await jest.advanceTimersByTimeAsync(5000)
 
       expect(order).toEqual(['flush', 'exit'])
-      expect(exit).toHaveBeenCalledWith(0)
+      expect(exit).toHaveBeenCalledWith(1)
     } finally {
       jest.clearAllTimers()
       jest.useRealTimers()
       exit.mockRestore()
       resetLogConfiguration()
     }
+  })
+})
+
+describe('Application activate', () => {
+  beforeEach(() => {
+    createMainWindow.mockReset()
+    getMainWindow.mockReset()
+  })
+
+  it('reopens the main window when only another window is open', () => {
+    getMainWindow.mockReturnValue(null)
+
+    new Application().handleActivate()
+
+    expect(createMainWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens no window while the app closes its windows to quit', () => {
+    getMainWindow.mockReturnValue(null)
+    isQuitting.mockReturnValue(true)
+
+    new Application().handleActivate()
+
+    expect(createMainWindow).not.toHaveBeenCalled()
+    isQuitting.mockReturnValue(false)
+  })
+
+  it('leaves an open main window where it is', () => {
+    getMainWindow.mockReturnValue({})
+
+    new Application().handleActivate()
+
+    expect(createMainWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('Application quit', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    controllerShutdown.mockReset()
+    controllerShutdown.mockResolvedValue(undefined)
+  })
+
+  it('answers whether every window closed for a Quit', async () => {
+    closeWindowsForQuit.mockResolvedValueOnce(false)
+
+    await expect(new Application().closeWindowsForQuit()).resolves.toBe(false)
+  })
+
+  it('closes the windows without asking any of them when it shuts down', async () => {
+    await new Application().shutdown()
+
+    expect(closeAllWindows).toHaveBeenCalledTimes(1)
+    expect(closeWindowsForQuit).not.toHaveBeenCalled()
   })
 })

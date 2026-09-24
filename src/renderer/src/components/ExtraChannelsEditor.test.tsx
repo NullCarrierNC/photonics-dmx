@@ -4,7 +4,6 @@
  * undefined normalisation (never persist []), the collision warning, and the STROBE-only picker.
  */
 import { describe, expect, it, jest } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { afterEach } from '@jest/globals'
 import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../../photonics-dmx/types'

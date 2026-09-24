@@ -55,14 +55,12 @@ const mockConfig = {
   getLightLibrary: jest.fn().mockReturnValue([]),
   getUserLights: jest.fn().mockReturnValue([]),
   getLightingLayout: jest.fn().mockReturnValue(null),
-  updateUserLights: jest.fn(async () => {}),
   getAllPreferences: jest.fn().mockReturnValue({}),
 }
 
 const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn(async () => {}),
-  refreshActiveRigs: jest.fn(),
   setMotionEnabledGlobal: jest.fn(),
   setActiveAudioMotionCueRef: jest.fn(),
   setActiveYargMotionCueRef: jest.fn(),
@@ -132,7 +130,7 @@ describe('CONFIG motion IPC (config-handlers)', () => {
     mockConfig.setPreference.mockImplementation(async () => {})
     mockConfig.updateCueDomain.mockImplementation(async () => {})
     handlers = captureHandlers()
-    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any, jest.fn())
   })
 
   describe('GET_MOTION_ENABLED / SET_MOTION_ENABLED', () => {
@@ -346,6 +344,22 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       )
     })
 
+    it('reports a saved rig as saved when the restart after it fails', async () => {
+      mockConfig.getDmxRig.mockReturnValue(null)
+      jest
+        .mocked(mockControllerManager.restartControllers)
+        .mockRejectedValueOnce(new Error('rig chain failed'))
+      const handler = handlers.get(CONFIG.SAVE_DMX_RIG)!
+
+      const result = await handler(
+        {},
+        { id: 'r1', name: 'My rig', active: true, config: validLayout },
+      )
+
+      expect(result).toEqual({ success: true, restartError: expect.stringContaining('rig chain') })
+      expect(mockConfig.saveDmxRig).toHaveBeenCalled()
+    })
+
     it('leaves the other rigs active when multiple active rigs are allowed', async () => {
       mockConfig.getDmxRig.mockReturnValue(null)
       mockConfig.getPreference.mockImplementation((key: unknown) =>
@@ -356,6 +370,30 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       expect(mockConfig.saveDmxRig).toHaveBeenCalledWith(expect.anything(), {
         deactivateOthers: false,
       })
+    })
+  })
+
+  describe('SAVE_LIGHT_LAYOUT', () => {
+    it('saves the standalone layout without restarting the controllers', async () => {
+      const updateLightingLayout = jest.fn(async () => {})
+      ;(mockConfig as Record<string, unknown>).updateLightingLayout = updateLightingLayout
+      const handler = handlers.get(CONFIG.SAVE_LIGHT_LAYOUT)!
+
+      const result = await handler(
+        {},
+        {
+          numLights: 0,
+          lightLayout: { id: 'default-layout', label: 'Default' },
+          strobeType: ConfigStrobeType.None,
+          frontLights: [],
+          backLights: [],
+          strobeLights: [],
+        },
+      )
+
+      expect(result).toEqual({ success: true })
+      expect(updateLightingLayout).toHaveBeenCalled()
+      expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
     })
   })
 })

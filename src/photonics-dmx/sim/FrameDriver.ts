@@ -37,6 +37,15 @@ export interface FrameTransient {
   keysNotes?: InstrumentNoteType[]
 }
 
+/** What the simulator's run loop drives, whatever the cue domain. */
+export interface SimDriver {
+  /** Send one frame built from the live state plus this frame's transient signals. */
+  dispatch(transient?: FrameTransient): Promise<void>
+  /** Stop every running cue, so the next frame starts the next cue fresh. */
+  stopCues(): void
+  shutdown(): void
+}
+
 const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
   [CueType.Strobe_Slow]: 'Strobe_Slow',
   [CueType.Strobe_Medium]: 'Strobe_Medium',
@@ -53,7 +62,7 @@ const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
  * Frames carry `trackMode: 'simulated'` + `simulationCueGroup`, pinning cue resolution to the
  * library under test (see {@link CueRegistry.getCueImplementationFromGroup}).
  */
-export class FrameDriver {
+export class FrameDriver implements SimDriver {
   constructor(
     private readonly handler: CueHandler,
     private readonly getState: () => FrameState,
@@ -65,6 +74,14 @@ export class FrameDriver {
     const state = this.getState()
     const cueIsStrobe = isStrobeCueType(state.cue)
     const frame = this.buildFrame(state, transient, cueIsStrobe)
+
+    // A strobe cue rides the dedicated strobe slot; everything else is a primary/secondary
+    // look. Strobe_Off carries no implementation (handled internally by the handler). The
+    // frame's timing events follow the cue without waiting on it, matching the listener.
+    const cueDispatched =
+      !cueIsStrobe || state.cue !== CueType.Strobe_Off
+        ? this.handler.handleCue(state.cue, frame)
+        : Promise.resolve()
 
     if (transient.beat === 'Strong') {
       this.handler.handleBeat()
@@ -83,14 +100,7 @@ export class FrameDriver {
         this.handler.handleKeyframePrevious()
         break
     }
-
-    // A strobe cue rides the dedicated strobe slot; everything else is a primary/secondary
-    // look. Strobe_Off carries no implementation (handled internally by the handler).
-    if (!cueIsStrobe) {
-      await this.handler.handleCue(state.cue, frame)
-    } else if (state.cue !== CueType.Strobe_Off) {
-      await this.handler.handleCue(state.cue, frame)
-    }
+    await cueDispatched
 
     for (const note of frame.drumNotes) {
       if (note !== DrumNoteType.None) {
@@ -114,6 +124,14 @@ export class FrameDriver {
     }
 
     this.handler.handleVocalNote(frame)
+  }
+
+  public stopCues(): void {
+    this.handler.stopActiveCue()
+  }
+
+  public shutdown(): void {
+    this.handler.shutdown()
   }
 
   private buildFrame(state: FrameState, transient: FrameTransient, cueIsStrobe: boolean): CueData {

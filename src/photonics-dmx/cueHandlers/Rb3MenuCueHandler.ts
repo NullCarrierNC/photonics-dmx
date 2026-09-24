@@ -16,6 +16,8 @@ export interface Rb3MenuCueDispatch {
 }
 
 const BASE_EFFECT_NAME = 'rb3-menu-base'
+/** How long one run of the base holds. The menu pump sets it afresh well inside this. */
+const BASE_HOLD_MS = 60_000
 const PER_LIGHT_EFFECT_PREFIX = 'rb3-menu-light-'
 
 const LAYER_BASE = 0
@@ -53,10 +55,14 @@ export class Rb3MenuCueHandler {
     }
     this.perLightCount = lights.length
 
+    // A persistent run starts again the moment it ends, so the hold keeps the base to one run per
+    // menu frame, and a running base is one clear() can remove.
     const base: Effect = getEffectSingleColor({
       lights,
       color: getColor('red', 'low'),
       duration: 10,
+      waitUntil: 'delay',
+      untilTime: BASE_HOLD_MS,
     })
     this.sequencer.setEffect(BASE_EFFECT_NAME, base, true)
 

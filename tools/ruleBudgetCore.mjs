@@ -3,6 +3,7 @@
  * `src/`, compare that to a budget file, and fail when the count has grown. `--write` records the
  * current count, which is how a budget comes down after a deliberate pass, and refuses to record a
  * higher one so the ratchet cannot be widened by rerunning the command the failure names.
+ * runCountBudget holds any other count to a budget file by the same rules.
  *
  * Rules that cannot go clean in one sitting are set to warn in the ESLint config and held here
  * instead, so the backlog is visible and cannot grow.
@@ -11,10 +12,18 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { tallyRuleReports } = require('./ruleReportsCore.cjs')
+const { budgetVerdict } = require('./countBudgetCore.cjs')
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** How many times the rule reports across src/. */
+/**
+ * How many times the rule reports across src/, a report an `eslint-disable` hides included, and
+ * where a disable gives no reason.
+ */
 function countReports(ruleId) {
   // Which files are linted is the flat config's to decide, so only src/ is named here.
   const args = [
@@ -42,31 +51,7 @@ function countReports(ruleId) {
       throw err
     }
   }
-  /** @type {Array<{ messages: Array<{ ruleId?: string | null }> }>} */
-  const fileReports = JSON.parse(raw)
-  let count = 0
-  for (const file of fileReports) {
-    for (const message of file.messages) {
-      if (message.ruleId === ruleId) {
-        count++
-      }
-    }
-  }
-  return count
-}
-
-/**
- * The budget a file records, from its first line.
- *
- * @param {string} file
- * @returns {number | null} The recorded budget, or null when there is none to read.
- */
-function readBudget(file) {
-  if (!existsSync(file)) {
-    return null
-  }
-  const first = parseInt(readFileSync(file, 'utf8').trim().split('\n')[0], 10)
-  return Number.isNaN(first) || first < 0 ? null : first
+  return tallyRuleReports(JSON.parse(raw), ruleId)
 }
 
 /**
@@ -79,49 +64,55 @@ function readBudget(file) {
  * @param {string} options.note One line written into the budget file saying how to lower it.
  */
 export function runRuleBudget({ ruleId, budgetFile, label, note }) {
-  const file = join(root, budgetFile)
-  const current = countReports(ruleId)
+  const { count, unjustified } = countReports(ruleId)
 
-  if (process.argv.includes('--write')) {
-    // A ratchet only holds if writing it can lower the number and never raise it. Otherwise the
-    // message a failing budget prints is also the way past the failure.
-    const previous = readBudget(file)
-    if (previous !== null && current > previous) {
-      console.error(`${label} count ${current} is above the recorded ${previous} (file ${file})`)
-      console.error(
-        `Refusing to raise the budget. Fix the new reports, or edit line 1 of ${file} by hand if the increase is intended.`,
-      )
-      process.exit(1)
+  if (unjustified.length > 0) {
+    for (const where of unjustified) {
+      console.error(`${where}: eslint-disable of ${ruleId} gives no reason`)
     }
+    console.error('Say why after `--` on the disable comment, or fix the report it hides.')
+    process.exit(1)
+  }
+
+  runCountBudget({
+    count,
+    budgetFile,
+    label,
+    counted: `\`npx eslint src\` messages for ${ruleId}, suppressed ones included.`,
+    note,
+  })
+}
+
+/**
+ * Hold a count, or several named counts, to the budget a file records, exiting the process with
+ * the result. countBudgetCore.cjs decides.
+ *
+ * @param {object} options
+ * @param {number} [options.count] The count now, for a budget of one count.
+ * @param {Map<string, number>} [options.counts] The counts now by name, for a budget of several.
+ * @param {string} options.budgetFile Path under metrics/, relative to the repository root.
+ * @param {string} options.label What the count is called on screen, e.g. "Explicit any".
+ * @param {string} options.counted What is counted, written into the budget file.
+ * @param {string} options.note One line written into the budget file saying how to lower it.
+ */
+export function runCountBudget({ count, counts, budgetFile, label, counted, note }) {
+  const file = join(root, budgetFile)
+  const verdict = budgetVerdict({
+    counts: counts ?? new Map([[label, count]]),
+    recordedText: existsSync(file) ? readFileSync(file, 'utf8') : null,
+    write: process.argv.includes('--write'),
+    label,
+    file,
+    counted,
+    note,
+  })
+  if (verdict.write !== undefined) {
     mkdirSync(dirname(file), { recursive: true })
-    const lines = [
-      String(current),
-      `Auto-generated: \`npx eslint src\` messages for ${ruleId}.`,
-      note,
-    ]
-    writeFileSync(file, `${lines.join('\n')}\n`, 'utf8')
-    console.log(`Wrote ${file} with count ${current}`)
-    process.exit(0)
+    writeFileSync(file, verdict.write, 'utf8')
   }
-
-  if (!existsSync(file)) {
-    console.error(`Missing ${file}. Run the same command with --write`)
-    process.exit(1)
+  for (const line of verdict.lines) {
+    if (verdict.ok) console.log(line)
+    else console.error(line)
   }
-
-  const budget = readBudget(file)
-  if (budget === null) {
-    console.error('Budget file must start with a non-negative integer on line 1')
-    process.exit(1)
-  }
-
-  if (current > budget) {
-    console.error(`${label} count ${current} exceeds budget ${budget} (file ${file})`)
-    console.error(
-      `Fix the new reports. --write will not raise the budget, so edit line 1 of ${file} by hand if the increase is intended.`,
-    )
-    process.exit(1)
-  }
-
-  console.log(`${label}: ${current} (budget ${budget}) - ok`)
+  process.exit(verdict.ok ? 0 : 1)
 }

@@ -2,7 +2,10 @@
  * Author-facing documentation for the audio event types and their properties, and the shared
  * class the editors render it with.
  */
-import type { AudioEventType } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  AudioEventExecutionPolicy,
+  AudioEventType,
+} from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 /** Documentation for each audio event type: what it does and when to use it. */
 export const AUDIO_EVENT_TYPE_DOCS: Record<
@@ -86,6 +89,31 @@ export const AUDIO_EVENT_PROPERTY_DOCS = {
     },
   },
 } as const
+
+/** What each audio event execution policy does when the event fires while its run is going. */
+export const AUDIO_EVENT_EXECUTION_POLICY_DOCS: Record<
+  AudioEventExecutionPolicy,
+  { label: string; description: string }
+> = {
+  'continuous': {
+    label: 'Continuous',
+    description:
+      'Starts another run every time, alongside any still going. Suits graphs that finish straight away. A graph that waits collects a run per trigger.',
+  },
+  'restart': {
+    label: 'Restart',
+    description: 'Cancels the run in flight and starts again from this event.',
+  },
+  'ignore-while-running': {
+    label: 'Ignore while running',
+    description: 'Drops the new trigger until the run in flight has finished.',
+  },
+  'latest-pending': {
+    label: 'Latest pending',
+    description:
+      'Keeps the newest trigger and starts it once the run in flight has finished. Triggers in between are dropped.',
+  },
+}
 
 /** Documentation for audio-trigger node properties. */
 export const AUDIO_TRIGGER_PROPERTY_DOCS = {

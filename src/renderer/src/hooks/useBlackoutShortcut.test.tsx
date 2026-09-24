@@ -8,6 +8,7 @@ import { claimEscape, resetEscapeClaims } from '../utils/escClaims'
 import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
 import type { BlackoutShortcutBinding, BlackoutShortcutKey } from '../../../shared/blackoutShortcut'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 const invoke = jest.fn() as jest.MockedFunction<
   (channel: string, data: unknown) => Promise<unknown>
@@ -34,10 +35,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   resetEscapeClaims()
   mockInvoke({ key: 'escape', scope: 'focused' })
-  Object.defineProperty(window, 'api', {
-    value: { invoke, send: jest.fn(), receive: jest.fn().mockReturnValue(jest.fn()) },
-    configurable: true,
-  })
+  installWindowApi(invoke)
 })
 
 afterEach(() => {
@@ -59,6 +57,8 @@ async function mount(binding: Partial<BlackoutShortcutBinding> = {}) {
     </Provider>,
   )
   await waitFor(() => expect(invoke).toHaveBeenCalledWith(CONFIG.GET_PREFS, undefined))
+  // A macrotask turn settles the whole promise chain the read sets the binding from.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
   return { ...utils, store }
 }
 

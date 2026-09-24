@@ -4,10 +4,11 @@ import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { EffectMode, EffectFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateEffectFile } from '../../photonics-dmx/cues/node/schema/validation'
-import { ipcError } from './ipcResult'
+import { validationRefusal } from './ipcResult'
 import { EFFECTS } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
+import { validateEffectSavePayload } from './inputValidation'
 
 const log = createLogger('effect-handlers')
 
@@ -17,12 +18,6 @@ const ensureLoader = (controllerManager: ControllerManager) => {
     throw new Error('Effect loader is not initialized.')
   }
   return loader
-}
-
-interface SavePayload {
-  mode: EffectMode
-  filename: string
-  content: EffectFile
 }
 
 interface ValidatePayload {
@@ -46,9 +41,14 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     return loader.readFile(filePath)
   })
 
-  handleInvoke(ipcMain, EFFECTS.SAVE, log, async (_event, payload: SavePayload) => {
+  handleInvoke(ipcMain, EFFECTS.SAVE, log, async (_event, data: unknown) => {
     const loader = ensureLoader(controllerManager)
-    return loader.saveFile(payload.mode, payload.filename, payload.content)
+    const validation = validateEffectSavePayload(data, loader.getModes())
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const { mode, filename, content } = validation.value
+    return loader.saveFile(mode, filename, content)
   })
 
   handleInvoke(ipcMain, EFFECTS.DELETE, log, async (_event, filePath: string) => {
@@ -57,26 +57,23 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
   })
 
   handleInvoke(ipcMain, EFFECTS.VALIDATE, log, async (_event, payload: ValidatePayload) => {
-    const loader = ensureLoader(controllerManager)
+    try {
+      const loader = ensureLoader(controllerManager)
 
-    if (payload.content) {
-      return validateEffectFile(payload.content)
-    }
-
-    if (payload.path) {
-      try {
-        const file = await loader.readFile(payload.path)
-        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
-        return validateEffectFile(file)
-      } catch (error) {
-        return {
-          valid: false,
-          errors: [ipcError(error).error],
-        }
+      if (payload.content) {
+        return validateEffectFile(payload.content)
       }
-    }
 
-    throw new Error('Validation payload must include either content or path.')
+      if (payload.path) {
+        // readFile rejects invalid JSON or schema, and the canonical validator runs on both
+        // branches.
+        return validateEffectFile(await loader.readFile(payload.path))
+      }
+
+      throw new Error('Validation payload must include either content or path.')
+    } catch (error) {
+      return validationRefusal(error)
+    }
   })
 
   handleInvoke(ipcMain, EFFECTS.IMPORT_PICK, log, async (_event, preferredMode?: EffectMode) => {
@@ -86,7 +83,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     })
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: false, error: 'User cancelled import.' }
+      return { success: false, error: 'User cancelled import.', cancelled: true }
     }
 
     const sourcePath = result.filePaths[0]
@@ -129,7 +126,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     })
 
     if (result.canceled || !result.filePath) {
-      return { success: false, error: 'User cancelled export.' }
+      return { success: false, error: 'User cancelled export.', cancelled: true }
     }
 
     await fs.copyFile(resolvedSource, result.filePath)

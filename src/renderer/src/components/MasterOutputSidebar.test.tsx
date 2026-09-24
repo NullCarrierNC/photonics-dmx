@@ -7,6 +7,8 @@ import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
 import { lightingPrefsAtom } from '../atoms'
 import { LIGHT, CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import { ToastStack } from './Toast'
 
 /**
  * The sidebar renders shared state that WindowShell keeps in step with main, so the two are
@@ -14,7 +16,12 @@ import * as ipcHelpers from '../utils/ipcHelpers'
  */
 function Sidebar() {
   useMasterOutputSync()
-  return <MasterOutputSidebar />
+  return (
+    <>
+      <MasterOutputSidebar />
+      <ToastStack />
+    </>
+  )
 }
 
 const invoke = jest.fn() as jest.MockedFunction<
@@ -38,10 +45,7 @@ function mockInvoke(state = { dimmerPercent: 100, blackout: false, strobeOutputE
 beforeEach(() => {
   jest.clearAllMocks()
   mockInvoke()
-  Object.defineProperty(window, 'api', {
-    value: { invoke, send: jest.fn(), receive: jest.fn().mockReturnValue(jest.fn()) },
-    configurable: true,
-  })
+  installWindowApi(invoke)
 })
 
 async function renderSidebar() {
@@ -83,8 +87,19 @@ describe('MasterOutputSidebar', () => {
     await waitFor(() => expect(setsMasterOutput()).toContainEqual({ dimmerPercent: 60 }))
     expect(savedPrefs()).toHaveLength(0)
 
-    fireEvent.mouseUp(fader)
+    fireEvent.pointerUp(fader)
     await waitFor(() => expect(savedPrefs()).toContainEqual({ masterDimmerPercent: 60 }))
+  })
+
+  it('writes nothing when a key that moves nothing comes up on the fader', async () => {
+    await renderSidebar()
+    const fader = screen.getByLabelText('Master dimmer') as HTMLInputElement
+
+    fireEvent.keyUp(fader, { key: 'Shift' })
+    fireEvent.keyUp(fader, { key: 'Tab' })
+    fireEvent.blur(fader)
+
+    expect(savedPrefs()).toHaveLength(0)
   })
 
   it('toggles blackout live and never persists it', async () => {
@@ -354,6 +369,63 @@ describe('MasterOutputSidebar', () => {
     fireEvent.click(screen.getByText('Blackout (Off)'))
 
     await waitFor(() => expect(getCallCount()).toBeGreaterThan(getCallsBefore))
+  })
+
+  it('says so when the dimmer level it persists is refused, and keeps the live level', async () => {
+    invoke.mockImplementation((channel: string, data: unknown) => {
+      if (channel === LIGHT.GET_MASTER_OUTPUT) {
+        return Promise.resolve({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
+      }
+      if (channel === LIGHT.SET_MASTER_OUTPUT) {
+        return Promise.resolve({
+          success: true,
+          state: {
+            dimmerPercent: 100,
+            blackout: false,
+            strobeOutputEnabled: true,
+            ...(data as object),
+          },
+        })
+      }
+      if (channel === CONFIG.SAVE_PREFS)
+        return Promise.resolve({ success: false, error: 'disk full' })
+      return Promise.resolve(undefined)
+    })
+    const { store } = await renderSidebar()
+    const fader = screen.getByLabelText('Master dimmer') as HTMLInputElement
+
+    fireEvent.change(fader, { target: { value: '30' } })
+    fireEvent.pointerUp(fader)
+
+    expect(await screen.findByText('Could not save the master dimmer level.')).toBeTruthy()
+    expect(fader.value).toBe('30')
+    expect(store.get(lightingPrefsAtom).masterDimmerPercent).toBe(100)
+  })
+
+  it('says so when the strobe gate it persists is refused', async () => {
+    invoke.mockImplementation((channel: string, data: unknown) => {
+      if (channel === LIGHT.GET_MASTER_OUTPUT) {
+        return Promise.resolve({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
+      }
+      if (channel === LIGHT.SET_MASTER_OUTPUT) {
+        return Promise.resolve({
+          success: true,
+          state: {
+            dimmerPercent: 100,
+            blackout: false,
+            strobeOutputEnabled: true,
+            ...(data as object),
+          },
+        })
+      }
+      if (channel === CONFIG.SAVE_PREFS) return Promise.reject(new Error('bridge gone'))
+      return Promise.resolve(undefined)
+    })
+    await renderSidebar()
+
+    fireEvent.click(screen.getByText('Strobes Enabled'))
+
+    expect(await screen.findByText('Could not save the strobe output setting.')).toBeTruthy()
   })
 
   it('toggles the strobe gate live and persists it', async () => {

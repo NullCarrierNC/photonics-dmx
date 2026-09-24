@@ -5,353 +5,570 @@ jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test') },
 }))
 
-// Stub electron so BrowserWindow lookups inside sendToAllWindows don't crash on prototype-stub tests.
+// The graph build seeds the bundled cues into appData, which a suite must not touch.
+jest.mock('../../utils/copyDefaultData', () => ({ copyDefaultData: jest.fn(async () => {}) }))
+
+// Broadcasts to the windows go nowhere under test.
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
   hasBrowserWindows: () => false,
   mainRuntimeBroadcaster: { emit: jest.fn() },
 }))
 
-import { ControllerManager, LifecycleAbortedError } from '../../controllers/ControllerManager'
-import type { ControllerGraph } from '../../controllers/ControllerGraph'
-import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import { LifecycleAbortedError } from '../../controllers/ControllerManager'
 import {
+  consoleModeStub,
   lifecycleAt,
   lifecycleBlockedOn,
   lifecycleShuttingDownOn,
+  listenerStub,
+  senderLifecycleStub,
+  stubConfig,
+  stubbedManager,
 } from '../controllers/lifecycleStub'
+import { CUE_DOMAIN_BINDINGS } from '../../controllers/cueDomainBindings'
 import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../shared/dmxOutputRefresh'
 
-type SenderManagerLike = {
-  enableSender: jest.Mock
-  shutdown?: jest.Mock
-  isSenderEnabled?: jest.Mock
+/** A promise and the call that settles it. */
+function barrier(): { wait: Promise<void>; release: () => void } {
+  let release!: () => void
+  const wait = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  return { wait, release }
 }
 
-function makeManagerForRestore(prefs: Record<string, unknown>): {
-  manager: ControllerManager
-  senderManager: SenderManagerLike
-} {
-  const senderManager: SenderManagerLike = {
-    enableSender: jest.fn().mockImplementation(() => Promise.resolve()),
-  }
-  const config = { getAllPreferences: () => prefs }
-  const sl = Object.create(SenderLifecycleController.prototype) as {
-    getConfig: () => typeof config
-    senderManager: SenderManagerLike
-    senderErrorHandler: (e: unknown) => void
-    senderErrorTrackingCallback: null
-  }
-  sl.getConfig = () => config
-  sl.senderManager = senderManager
-  sl.senderErrorHandler = () => {}
-  sl.senderErrorTrackingCallback = null
+const SNAPSHOT_NONE = { sacn: false, artnet: false, enttecpro: false, opendmx: false, ipc: false }
 
-  const manager = Object.create(ControllerManager.prototype) as any
-  manager.config = config
-  manager.senderLifecycle = sl
-  return { manager: manager as ControllerManager, senderManager }
-}
+describe('ControllerManager restart', () => {
+  it('refuses a restart outside running, console mode or failed', async () => {
+    const { manager } = stubbedManager({ lifecycle: lifecycleAt('initializing') })
 
-type RestartFake = Record<string, unknown> & {
-  lifecycle: ControllerLifecycle
-}
-
-function listenerStub() {
-  return {
-    yargRb3: {
-      getIsYargEnabled: jest.fn().mockReturnValue(false),
-      getIsRb3Enabled: jest.fn().mockReturnValue(false),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-    },
-    audio: {
-      getIsAudioEnabled: jest.fn().mockReturnValue(false),
-      disableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
-    },
-  }
-}
-
-/** A graph whose build/teardown steps are observable no-op mocks. */
-function restartGraph(): ControllerGraph {
-  return {
-    disposeChainsForRestart: jest.fn(),
-    disposeChainsForShutdown: jest.fn(),
-    disposeLoaders: jest.fn().mockImplementation(() => Promise.resolve()),
-    shutdownPublisher: jest.fn(),
-    shutdownPublisherSafe: jest.fn(),
-    shutdownDomainCueHandlerRefs: jest.fn(),
-    destroyClock: jest.fn(),
-    clearBuildRefs: jest.fn(),
-    getChains: jest.fn().mockReturnValue([]),
-  } as unknown as ControllerGraph
-}
-
-describe('ControllerManager lifecycle and sender restore', () => {
-  it('restartControllers throws when phase is not running, consoleMode, or failed', async () => {
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleAt('initializing'),
-    })
-    await expect(
-      ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager),
-    ).rejects.toThrow(/invalid lifecycle for restartControllers/)
+    await expect(manager.restartControllers()).rejects.toThrow(
+      /invalid lifecycle for restartControllers/,
+    )
   })
 
-  it('restartControllers sets failed phase when init throws after teardown', async () => {
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(() => Promise.reject(new Error('init failed'))),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
+  it('enters the failed phase when the rebuild after teardown throws', async () => {
+    const { manager, lifecycle } = stubbedManager({
+      init: () => Promise.reject(new Error('init failed')),
     })
 
-    await expect(
-      ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager),
-    ).rejects.toThrow('init failed')
+    await expect(manager.restartControllers()).rejects.toThrow('init failed')
 
-    expect(fake.lifecycle.phase).toBe('failed')
-    expect(fake.isInitialized).toBe(false)
+    expect(lifecycle.phase).toBe('failed')
+    expect(manager.getIsInitialized()).toBe(false)
   })
 
-  it('concurrent restartControllers shares one in-flight restart', async () => {
-    let release!: () => void
-    const barrier = new Promise<void>((r) => {
-      release = r
-    })
-    let initCount = 0
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(async function (this: RestartFake) {
-        initCount += 1
-        await barrier
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
+  it('shares one in-flight restart between overlapping callers', async () => {
+    const rebuild = barrier()
+    const { manager, init } = stubbedManager({
+      init: async (lifecycle) => {
+        await rebuild.wait
+        lifecycle.setPhase('running')
       },
     })
 
-    const p1 = ControllerManager.prototype.restartControllers.call(
-      fake as unknown as ControllerManager,
-    )
-    const p2 = ControllerManager.prototype.restartControllers.call(
-      fake as unknown as ControllerManager,
-    )
-    release()
-    await Promise.all([p1, p2])
+    const first = manager.restartControllers()
+    const second = manager.restartControllers()
+    rebuild.release()
+    await Promise.all([first, second])
 
-    expect(initCount).toBe(1)
+    expect(init).toHaveBeenCalledTimes(1)
   })
 
-  it('restart is enqueued behind an in-flight listener op before snapshotting enabled state', async () => {
-    let releaseOp!: () => void
-    const opBarrier = new Promise<void>((r) => {
-      releaseOp = r
-    })
-    const listeners = listenerStub()
-    const getIsYargEnabled = listeners.yargRb3.getIsYargEnabled as jest.Mock
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleBlockedOn(opBarrier),
-      listenerLifecycle: listeners,
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer: jest.fn(),
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
+  it('runs again with what was saved when a restart is requested once the rebuild began', async () => {
+    const rebuild = barrier()
+    const { manager, init } = stubbedManager({
+      init: async (lifecycle) => {
+        if (init.mock.calls.length === 1) await rebuild.wait
+        lifecycle.setPhase('running')
       },
     })
 
-    const p = ControllerManager.prototype.restartControllers.call(
-      fake as unknown as ControllerManager,
-    )
+    const first = manager.restartControllers()
+    for (let i = 0; i < 20 && init.mock.calls.length === 0; i++) await Promise.resolve()
+    expect(init).toHaveBeenCalledTimes(1)
+    const second = manager.restartControllers()
+    rebuild.release()
+    await Promise.all([first, second])
+
+    expect(init).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads which listeners run only once a listener op ahead of it settles', async () => {
+    const op = barrier()
+    const { manager, listeners } = stubbedManager({ lifecycle: lifecycleBlockedOn(op.wait) })
+
+    const restarting = manager.restartControllers()
     await Promise.resolve()
     await Promise.resolve()
-    // Teardown must not begin while a listener toggle is mid-flight: the enabled-state
-    // snapshot is read only after the op settles.
-    expect(getIsYargEnabled).not.toHaveBeenCalled()
+    expect(listeners.yargRb3.getIsYargEnabled).not.toHaveBeenCalled()
 
-    releaseOp()
-    await p
-    expect(getIsYargEnabled).toHaveBeenCalled()
+    op.release()
+    await restarting
+    expect(listeners.yargRb3.getIsYargEnabled).toHaveBeenCalled()
   })
 
-  it('restartControllers shuts down the domain cue handler refs during teardown', async () => {
-    const graph = restartGraph()
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph,
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer: jest.fn(),
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
+  it('shuts down the domain cue handler refs and resets the strobe state during teardown', async () => {
+    const { manager, graph } = stubbedManager()
 
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
+    await manager.restartControllers()
 
     expect(graph.shutdownDomainCueHandlerRefs).toHaveBeenCalledTimes(1)
+    expect(graph.resetStrobeState).toHaveBeenCalledTimes(1)
   })
 
   it('waits out an RB3 teardown already reporting disabled before disposing rig chains', async () => {
-    let releaseTeardown!: () => void
-    const teardown = new Promise<void>((r) => {
-      releaseTeardown = r
-    })
-    const graph = restartGraph()
+    const teardown = barrier()
     const listeners = listenerStub()
     // A runtime error has started tearing RB3 down: the flag already reads false, but the teardown
     // is still blacking out and closing the socket, and only disableRb3 waits for it.
-    ;(listeners.yargRb3.disableRb3 as jest.Mock).mockImplementation(() => teardown)
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph,
-      listenerLifecycle: listeners,
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
+    listeners.yargRb3.disableRb3.mockImplementation(() => teardown.wait)
+    const { manager, graph } = stubbedManager({ listeners })
 
-    const p = ControllerManager.prototype.restartControllers.call(
-      fake as unknown as ControllerManager,
-    )
-    await new Promise((r) => setImmediate(r))
+    const restarting = manager.restartControllers()
+    await new Promise((resolve) => setImmediate(resolve))
     expect(listeners.yargRb3.disableRb3).toHaveBeenCalledTimes(1)
     expect(graph.disposeChainsForRestart).not.toHaveBeenCalled()
 
-    releaseTeardown()
-    await p
+    teardown.release()
+    await restarting
 
     expect(graph.disposeChainsForRestart).toHaveBeenCalledTimes(1)
     expect(listeners.yargRb3.enableRb3).not.toHaveBeenCalled()
   })
 
-  it('getLifecyclePhase returns the current phase on a prototype-based stub', () => {
-    const stub = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleAt('restarting'),
+  it('rebuilds through its own graph build, loading the registries and reconciling groups', async () => {
+    const order: string[] = []
+    const step = (name: string) => jest.fn(async () => void order.push(name))
+    const registryInit = {
+      initializeCueRegistry: step('registry'),
+      initializeEffectLoader: step('effects'),
+      initializeNodeCueLoader: step('node cues'),
+    }
+    const config = Object.assign(stubConfig({ cueDomains: {} }), {
+      updateCueDomain: jest.fn(async () => {}),
     })
-    expect(ControllerManager.prototype.getLifecyclePhase.call(stub)).toBe('restarting')
+    const { manager, graph, listeners } = stubbedManager({ ownInit: { registryInit, config } })
+
+    await manager.restartControllers()
+
+    expect(manager.getLifecyclePhase()).toBe('running')
+    expect(graph.buildChains).toHaveBeenCalledTimes(1)
+    expect(order.filter((s) => s === 'registry')).toHaveLength(CUE_DOMAIN_BINDINGS.length)
+    expect(order.slice(-2)).toEqual(['effects', 'node cues'])
+    expect(listeners.audio.refreshAudioCueSelection).toHaveBeenCalled()
+    expect(graph.buildPrimaryYargHandler).toHaveBeenCalledTimes(1)
   })
 
-  it('restoreSenderOutputsFromPrefs restores enabled sACN sender with persisted mapping', async () => {
-    const { manager, senderManager } = makeManagerForRestore({
+  it('reports the phase its lifecycle holds', () => {
+    const { manager } = stubbedManager({ lifecycle: lifecycleAt('restarting') })
+
+    expect(manager.getLifecyclePhase()).toBe('restarting')
+  })
+
+  it('restores the senders the snapshot held once the rebuild is up, and says it restarted', async () => {
+    const senders = senderLifecycleStub()
+    const snapshot = { ...SNAPSHOT_NONE, sacn: true }
+    senders.getActiveOutputSenderSnapshotIfAny.mockReturnValue(snapshot)
+    const { manager, lifecycle, init } = stubbedManager({ senders })
+
+    await manager.restartControllers()
+
+    expect(senders.resetSenderForControllerRestart).toHaveBeenCalledTimes(1)
+    expect(init).toHaveBeenCalledTimes(1)
+    expect(senders.restoreRunningSenders).toHaveBeenCalledTimes(1)
+    expect(senders.restoreRunningSenders).toHaveBeenCalledWith(snapshot)
+    expect(lifecycle.phase).toBe('running')
+    // The restart announces itself once, for every window.
+    expect(jest.mocked(sendToAllWindows)).toHaveBeenCalledWith(
+      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
+      undefined,
+    )
+  })
+
+  it('carries the preview sender through the snapshot so it can be restored', async () => {
+    const senders = senderLifecycleStub()
+    senders.getActiveOutputSenderSnapshotIfAny.mockReturnValue({ ...SNAPSHOT_NONE, ipc: true })
+    const { manager } = stubbedManager({ senders })
+
+    await manager.restartControllers()
+
+    expect(senders.restoreRunningSenders).toHaveBeenCalledWith({
+      ...SNAPSHOT_NONE,
+      ipc: true,
+    })
+  })
+
+  it('stops and restarts audio when it was running', async () => {
+    const listeners = listenerStub()
+    listeners.audio.getIsAudioEnabled.mockReturnValue(true)
+    const { manager } = stubbedManager({ listeners })
+
+    await manager.restartControllers()
+
+    expect(listeners.audio.disableAudio).toHaveBeenCalledTimes(1)
+    expect(listeners.audio.enableAudio).toHaveBeenCalledTimes(1)
+    expect(listeners.audio.enableAudio).toHaveBeenCalledWith(true, expect.any(Function))
+  })
+
+  it('brings back the listener alone when a snapshot holds both it and audio', async () => {
+    const listeners = listenerStub()
+    listeners.audio.getIsAudioEnabled.mockReturnValue(true)
+    listeners.yargRb3.getIsYargEnabled.mockReturnValue(true)
+    const { manager } = stubbedManager({ listeners })
+
+    await manager.restartControllers()
+
+    expect(listeners.yargRb3.enableYarg).toHaveBeenCalledTimes(1)
+    expect(listeners.audio.enableAudio).not.toHaveBeenCalled()
+  })
+
+  it('leaves audio alone when it was not running', async () => {
+    const { manager, listeners } = stubbedManager()
+
+    await manager.restartControllers()
+
+    expect(listeners.audio.disableAudio).not.toHaveBeenCalled()
+    expect(listeners.audio.enableAudio).not.toHaveBeenCalled()
+  })
+
+  it('hands back to an open DMX console and returns to its phase', async () => {
+    const consoleMode = consoleModeStub()
+    consoleMode.getConsoleRestore.mockReturnValue({ yarg: false, rb3: false, audio: false })
+    const { manager, lifecycle } = stubbedManager({
+      lifecycle: lifecycleAt('consoleMode'),
+      consoleMode,
+    })
+
+    await manager.restartControllers()
+
+    expect(consoleMode.onControllersReinitializedWhileConsoleOpen).toHaveBeenCalled()
+    expect(lifecycle.phase).toBe('consoleMode')
+  })
+
+  it('returns to running when the console closes while the controllers restart', async () => {
+    const consoleMode = consoleModeStub()
+    consoleMode.getConsoleRestore.mockReturnValue({ yarg: false, rb3: false, audio: false })
+    const { manager, lifecycle } = stubbedManager({
+      lifecycle: lifecycleAt('consoleMode'),
+      consoleMode,
+      init: async () => {
+        consoleMode.getConsoleRestore.mockReturnValue(null)
+      },
+    })
+
+    await manager.restartControllers()
+
+    expect(lifecycle.phase).toBe('running')
+  })
+
+  it('aborts without rebuilding when a shutdown begins between teardown and rebuild', async () => {
+    const senders = senderLifecycleStub()
+    const { manager, lifecycle, init } = stubbedManager({ senders })
+    senders.resetSenderForControllerRestart.mockImplementation(async () => {
+      lifecycle.setPhase('shuttingDown')
+    })
+
+    await expect(manager.restartControllers()).rejects.toBeInstanceOf(LifecycleAbortedError)
+
+    // The phase stays shutting down so the shutdown can take it on to stopped.
+    expect(init).not.toHaveBeenCalled()
+    expect(lifecycle.phase).toBe('shuttingDown')
+  })
+
+  it('reopens no listener or sender when a shutdown begins during the rebuild', async () => {
+    const listeners = listenerStub()
+    listeners.yargRb3.getIsYargEnabled.mockReturnValue(true)
+    const { manager, lifecycle, senders } = stubbedManager({
+      listeners,
+      init: async (current) => {
+        current.setPhase('shuttingDown')
+      },
+    })
+
+    await expect(manager.restartControllers()).rejects.toBeInstanceOf(LifecycleAbortedError)
+
+    expect(listeners.yargRb3.enableYarg).not.toHaveBeenCalled()
+    expect(senders.restoreRunningSenders).not.toHaveBeenCalled()
+    expect(lifecycle.phase).toBe('shuttingDown')
+  })
+
+  it('runs every registered teardown on restart and on shutdown, less one taken back', async () => {
+    const { manager } = stubbedManager()
+    const kept = jest.fn()
+    const takenBack = jest.fn()
+    const unregister = manager.addOnControllerRestart(takenBack)
+    manager.addOnControllerRestart(kept)
+
+    await manager.restartControllers()
+    unregister()
+    await manager.shutdown()
+
+    expect(takenBack).toHaveBeenCalledTimes(1)
+    expect(kept).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('ControllerManager lifecycle queue', () => {
+  it('runs a listener toggle queued behind a restart once the restart finishes', async () => {
+    const rebuild = barrier()
+    const order: string[] = []
+    const listeners = listenerStub()
+    listeners.yargRb3.disableYarg.mockImplementation(async () => {
+      order.push('disable')
+    })
+    const { manager } = stubbedManager({
+      listeners,
+      init: async (lifecycle) => {
+        await rebuild.wait
+        order.push('restart')
+        lifecycle.setPhase('running')
+      },
+    })
+
+    const restarting = manager.restartControllers()
+    const disabling = manager.disableYarg()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(listeners.yargRb3.disableYarg).not.toHaveBeenCalled()
+
+    rebuild.release()
+    await Promise.all([restarting, disabling])
+
+    expect(order).toEqual(['restart', 'disable'])
+  })
+
+  it('disables YARG once an in-flight shutdown settles', async () => {
+    const shutdown = barrier()
+    const { manager, listeners } = stubbedManager({
+      lifecycle: lifecycleShuttingDownOn(shutdown.wait, 'running'),
+    })
+
+    const disabling = manager.disableYarg()
+    await Promise.resolve()
+    expect(listeners.yargRb3.disableYarg).not.toHaveBeenCalled()
+
+    shutdown.release()
+    await disabling
+
+    expect(listeners.yargRb3.disableYarg).toHaveBeenCalledTimes(1)
+  })
+
+  it('settles a listener toggle and a restart asked for in the same tick', async () => {
+    const order: string[] = []
+    const listeners = listenerStub()
+    listeners.yargRb3.enableYarg.mockImplementation(async () => {
+      order.push('toggle')
+    })
+    const { manager, lifecycle } = stubbedManager({
+      listeners,
+      init: async (current) => {
+        order.push('restart')
+        current.setPhase('running')
+      },
+    })
+
+    await Promise.all([manager.enableYarg(), manager.restartControllers()])
+
+    expect(order).toEqual(['toggle', 'restart'])
+    expect(lifecycle.isRestartInFlight()).toBe(false)
+  })
+
+  it('shares one shutdown between overlapping callers', async () => {
+    const senderShutdown = barrier()
+    const senders = senderLifecycleStub()
+    senders.shutdownSenderOnAppExit.mockImplementation(() => senderShutdown.wait)
+    const { manager, lifecycle } = stubbedManager({ senders })
+
+    const first = manager.shutdown()
+    const second = manager.shutdown()
+    senderShutdown.release()
+    await Promise.all([first, second])
+
+    expect(senders.shutdownSenderOnAppExit).toHaveBeenCalledTimes(1)
+    expect(lifecycle.phase).toBe('stopped')
+  })
+
+  it('runs a sender operation after the lifecycle op ahead of it, on the sender manager that op leaves', async () => {
+    const op = barrier()
+    const before = { id: 'before' }
+    const after = { id: 'after' }
+    let current = before
+    const senders = senderLifecycleStub()
+    senders.getSenderManager.mockImplementation(() => current)
+    const { manager } = stubbedManager({ lifecycle: lifecycleBlockedOn(op.wait), senders })
+    const run = jest.fn(async (sendersNow: unknown) => sendersNow)
+
+    const running = manager.runSenderOp(run as never)
+    await Promise.resolve()
+    expect(run).not.toHaveBeenCalled()
+    current = after
+    op.release()
+
+    await expect(running).resolves.toBe(after)
+  })
+})
+
+describe('ControllerManager console mode', () => {
+  it('enters console mode through its console controller and takes its phase', async () => {
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async (_rigId: string) => ({ success: true as const })),
+    }
+    const { manager, lifecycle } = stubbedManager({ consoleMode })
+
+    const result = await manager.enableConsoleMode('rig-1')
+
+    expect(consoleMode.enableConsoleMode).toHaveBeenCalledWith('rig-1')
+    expect(result).toEqual({ success: true })
+    expect(lifecycle.phase).toBe('consoleMode')
+  })
+
+  it('waits for a restart in flight and then enters console mode', async () => {
+    const teardown = barrier()
+    const listeners = listenerStub()
+    // Every restart awaits disableRb3, so holding it holds the teardown.
+    listeners.yargRb3.disableRb3.mockImplementation(() => teardown.wait)
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async (_rigId: string) => ({ success: true as const })),
+    }
+    const { manager, lifecycle } = stubbedManager({
+      listeners,
+      consoleMode,
+      // The manager's own init returns at once while the graph still counts as initialized.
+      init: async (current) => {
+        if (!manager.getIsInitialized()) current.setPhase('running')
+      },
+    })
+
+    const restart = manager.restartControllers()
+    await Promise.resolve()
+    expect(lifecycle.phase).toBe('restarting')
+    const entering = manager.enableConsoleMode('rig-1')
+    await Promise.resolve()
+    expect(consoleMode.enableConsoleMode).not.toHaveBeenCalled()
+    teardown.release()
+    await restart
+
+    await expect(entering).resolves.toEqual({ success: true })
+    expect(lifecycle.phase).toBe('consoleMode')
+  })
+
+  it('answers in plain words when the controllers cannot take the console', async () => {
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async (_rigId: string) => ({ success: true as const })),
+    }
+    const { manager } = stubbedManager({
+      lifecycle: lifecycleAt('shuttingDown'),
+      consoleMode,
+      init: async () => {},
+    })
+
+    const result = await manager.enableConsoleMode('rig-1')
+
+    expect(result).toEqual({ success: false, error: expect.stringMatching(/controllers/i) })
+    expect(result).not.toEqual({ success: false, error: expect.stringMatching(/phase=/) })
+    expect(consoleMode.enableConsoleMode).not.toHaveBeenCalled()
+  })
+
+  it('pauses a listener that a toggle queued ahead of it turns on', async () => {
+    const queue = barrier()
+    const listeners = listenerStub()
+    let yargOn = false
+    listeners.yargRb3.getIsYargEnabled.mockImplementation(() => yargOn)
+    listeners.yargRb3.enableYarg.mockImplementation(async () => {
+      yargOn = true
+    })
+    listeners.yargRb3.disableYarg.mockImplementation(async () => {
+      yargOn = false
+    })
+    const { manager, lifecycle } = stubbedManager({
+      lifecycle: lifecycleBlockedOn(queue.wait),
+      listeners,
+      ownConsoleMode: true,
+    })
+
+    const enablingYarg = manager.enableYarg()
+    const entering = manager.enableConsoleMode('rig-1')
+    queue.release()
+    await enablingYarg
+
+    await expect(entering).resolves.toEqual({ success: true })
+    expect(yargOn).toBe(false)
+    expect(lifecycle.phase).toBe('consoleMode')
+  })
+
+  it('leaves the phase shutting down when a shutdown starts while console mode comes up', async () => {
+    const entered = barrier()
+    const enable = barrier()
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async () => {
+        entered.release()
+        await enable.wait
+        return { success: true as const }
+      }),
+    }
+    const { manager, lifecycle } = stubbedManager({ consoleMode })
+
+    const enabling = manager.enableConsoleMode('rig-1')
+    await entered.wait
+    lifecycle.setPhase('shuttingDown')
+    enable.release()
+    await enabling
+
+    expect(lifecycle.phase).toBe('shuttingDown')
+  })
+
+  it('returns to running when console mode ends', async () => {
+    const consoleMode = {
+      ...consoleModeStub(),
+      disableConsoleMode: jest.fn(async () => ({ success: true as const })),
+    }
+    const { manager, lifecycle } = stubbedManager({
+      lifecycle: lifecycleAt('consoleMode'),
+      consoleMode,
+    })
+
+    const result = await manager.disableConsoleMode()
+
+    expect(consoleMode.disableConsoleMode).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ success: true })
+    expect(lifecycle.phase).toBe('running')
+  })
+
+  it('refuses to build the graph once a shutdown has begun', async () => {
+    const { manager } = stubbedManager({ lifecycle: lifecycleAt('shuttingDown') })
+    // The stand-in build is set aside so the manager's own init answers.
+    const own = Object.getPrototypeOf(manager).init as () => Promise<void>
+    ;(manager as unknown as { isInitialized: boolean }).isInitialized = false
+
+    await expect(own.call(manager)).rejects.toBeInstanceOf(LifecycleAbortedError)
+  })
+})
+
+/** A sender lifecycle over saved preferences, with its sender manager's enable watched. */
+function senderLifecycleWith(prefs: Record<string, unknown>) {
+  const lifecycle = new SenderLifecycleController(
+    () => ({ getAllPreferences: () => prefs }) as never,
+    { broadcaster: { emit: () => {} }, hasReceivers: () => false } as never,
+  )
+  const enableSender = jest
+    .spyOn(lifecycle.getSenderManager(), 'enableSender')
+    .mockImplementation(async () => {})
+  return { lifecycle, enableSender }
+}
+
+describe('SenderLifecycleController.restoreRunningSenders', () => {
+  it('restores an enabled sACN sender with its saved mapping', async () => {
+    const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: true,
         artNetEnabled: false,
@@ -366,80 +583,70 @@ describe('ControllerManager lifecycle and sender restore', () => {
       },
     })
 
-    await manager.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
-    expect(senderManager.enableSender).toHaveBeenCalledTimes(1)
-    expect(senderManager.enableSender).toHaveBeenCalledWith('sacn', 'sacn', {
+    expect(enableSender).toHaveBeenCalledTimes(1)
+    expect(enableSender).toHaveBeenCalledWith('sacn', 'sacn', {
       sender: 'sacn',
       universe: 42,
       networkInterface: '192.168.1.10',
       useUnicast: true,
       unicastDestination: '192.168.1.50',
-      maxOutputRate: 40,
-      minRefreshRate: 40,
+      maxOutputRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+      minRefreshRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
     })
   })
 
-  it('restoreSenderOutputsFromPrefs skips serial/network senders missing required persisted fields', async () => {
-    const { manager, senderManager } = makeManagerForRestore({
+  it('skips serial and network senders missing a required saved field', async () => {
+    const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: false,
         artNetEnabled: true,
         enttecProEnabled: true,
         openDmxEnabled: true,
       },
-      artNetConfig: {
-        host: '',
-        universe: 1,
-        net: 0,
-        subnet: 0,
-        subuni: 0,
-        port: 6454,
-      },
-      enttecProConfig: {
-        port: '',
-      },
-      openDmxConfig: {
-        port: '',
-        dmxSpeed: 40,
-      },
+      artNetConfig: { host: '', universe: 1, net: 0, subnet: 0, subuni: 0, port: 6454 },
+      enttecProConfig: { port: '' },
+      openDmxConfig: { port: '', dmxSpeed: 40 },
     })
 
-    await manager.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({
+      ...SNAPSHOT_NONE,
+      artnet: true,
+      enttecpro: true,
+      opendmx: true,
+    })
 
-    expect(senderManager.enableSender).not.toHaveBeenCalled()
+    expect(enableSender).not.toHaveBeenCalled()
   })
 
   it.each([
     [5, 5],
     [0, 1],
     [900, 44],
-  ])(
-    'restoreSenderOutputsFromPrefs brings a stored OpenDMX rate of %p into range as %p',
-    async (stored, restored) => {
-      const { manager, senderManager } = makeManagerForRestore({
-        dmxOutputConfig: {
-          sacnEnabled: false,
-          artNetEnabled: false,
-          enttecProEnabled: false,
-          openDmxEnabled: true,
-        },
-        openDmxConfig: { port: 'COM4', dmxSpeed: stored },
-      })
+  ])('brings a saved OpenDMX rate of %p into range as %p', async (stored, restored) => {
+    const { lifecycle, enableSender } = senderLifecycleWith({
+      dmxOutputConfig: {
+        sacnEnabled: false,
+        artNetEnabled: false,
+        enttecProEnabled: false,
+        openDmxEnabled: true,
+      },
+      openDmxConfig: { port: 'COM4', dmxSpeed: stored },
+    })
 
-      await manager.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, opendmx: true })
 
-      expect(senderManager.enableSender).toHaveBeenCalledWith('opendmx', 'opendmx', {
-        sender: 'opendmx',
-        devicePath: 'COM4',
-        dmxSpeed: restored,
-      })
-    },
-  )
+    expect(enableSender).toHaveBeenCalledWith('opendmx', 'opendmx', {
+      sender: 'opendmx',
+      devicePath: 'COM4',
+      dmxSpeed: restored,
+    })
+  })
 
-  it('restoreSenderOutputsFromPrefs leaves Art-Net off when the stored host is not an address', async () => {
+  it('leaves Art-Net off when the saved host is not an address', async () => {
     // The file is hand-editable, so the host is checked on the way out as well as on the way in.
-    const { manager, senderManager } = makeManagerForRestore({
+    const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: false,
         artNetEnabled: true,
@@ -456,33 +663,29 @@ describe('ControllerManager lifecycle and sender restore', () => {
       },
     })
 
-    await manager.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, artnet: true })
 
-    expect(senderManager.enableSender).not.toHaveBeenCalled()
+    expect(enableSender).not.toHaveBeenCalled()
   })
 
-  it('restoreSenderOutputsFromPrefs leaves sACN off when the stored universe is out of range', async () => {
-    const { manager, senderManager } = makeManagerForRestore({
+  it('leaves sACN off when the saved universe is out of range', async () => {
+    const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: true,
         artNetEnabled: false,
         enttecProEnabled: false,
         openDmxEnabled: false,
       },
-      sacnConfig: {
-        universe: 70000,
-        useUnicast: false,
-        unicastDestination: '',
-      },
+      sacnConfig: { universe: 70000, useUnicast: false, unicastDestination: '' },
     })
 
-    await manager.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
-    expect(senderManager.enableSender).not.toHaveBeenCalled()
+    expect(enableSender).not.toHaveBeenCalled()
   })
 
-  it('restoreSenderOutputsFromPrefs honors explicit active-sender snapshot over prefs', async () => {
-    const { manager, senderManager } = makeManagerForRestore({
+  it('restores only the senders that ran, whatever outputs the saved flags offer', async () => {
+    const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: true,
         artNetEnabled: true,
@@ -495,380 +698,27 @@ describe('ControllerManager lifecycle and sender restore', () => {
         useUnicast: false,
         unicastDestination: '',
       },
-      artNetConfig: {
-        host: '127.0.0.1',
-        universe: 1,
-        net: 0,
-        subnet: 0,
-        subuni: 0,
-        port: 6454,
-      },
-      enttecProConfig: {
-        port: '/dev/tty.usbserial-ENTTEC',
-      },
-      openDmxConfig: {
-        port: '/dev/tty.usbserial-OPEN',
-        dmxSpeed: 40,
-      },
+      artNetConfig: { host: '127.0.0.1', universe: 1, net: 0, subnet: 0, subuni: 0, port: 6454 },
+      enttecProConfig: { port: '/dev/tty.usbserial-ENTTEC' },
+      openDmxConfig: { port: '/dev/tty.usbserial-OPEN', dmxSpeed: 40 },
     })
 
-    await manager.restoreSenderOutputsFromPrefs({
-      sacn: true,
-      artnet: false,
-      enttecpro: false,
-      opendmx: false,
-      ipc: false,
-    })
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
-    expect(senderManager.enableSender).toHaveBeenCalledTimes(1)
-    expect(senderManager.enableSender).toHaveBeenCalledWith('sacn', 'sacn', {
+    expect(enableSender).toHaveBeenCalledTimes(1)
+    expect(enableSender).toHaveBeenCalledWith('sacn', 'sacn', {
       sender: 'sacn',
       universe: 11,
       networkInterface: '10.0.0.10',
       useUnicast: false,
       unicastDestination: undefined,
-      maxOutputRate: 40,
-      minRefreshRate: 40,
+      maxOutputRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+      minRefreshRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
     })
   })
 
-  it('restartControllers always performs post-init sender restore', async () => {
-    const setManualBuffer = jest.fn()
-    const resetSender = jest.fn().mockImplementation(() => Promise.resolve())
-    const restoreFromPrefs = jest.fn().mockImplementation(() => Promise.resolve())
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer,
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      consoleRestore: null,
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.dmxPublisher = { setManualBuffer }
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: resetSender,
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue({
-          sacn: true,
-          artnet: false,
-          enttecpro: false,
-          opendmx: false,
-          ipc: false,
-        }),
-        restoreSenderOutputsFromPrefs: restoreFromPrefs,
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
-
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
-
-    expect(resetSender).toHaveBeenCalledTimes(1)
-    const init = fake.init as jest.Mock
-    expect(init).toHaveBeenCalledTimes(1)
-    expect(restoreFromPrefs).toHaveBeenCalledTimes(1)
-    expect(restoreFromPrefs).toHaveBeenCalledWith({
-      sacn: true,
-      artnet: false,
-      enttecpro: false,
-      opendmx: false,
-      ipc: false,
-    })
-    expect(setManualBuffer).not.toHaveBeenCalled()
-    expect(fake.lifecycle.phase).toBe('running')
-    // Centralized restart broadcast (C-15): fired once here rather than by each IPC caller.
-    expect(jest.mocked(sendToAllWindows)).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
-  })
-
-  it('restartControllers passes ipc flag through snapshot so preview sender can be restored', async () => {
-    const restoreFromPrefs = jest.fn().mockImplementation(() => Promise.resolve())
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer: jest.fn(),
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue({
-          sacn: false,
-          artnet: false,
-          enttecpro: false,
-          opendmx: false,
-          ipc: true,
-        }),
-        restoreSenderOutputsFromPrefs: restoreFromPrefs,
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
-
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
-
-    expect(restoreFromPrefs).toHaveBeenCalledWith({
-      sacn: false,
-      artnet: false,
-      enttecpro: false,
-      opendmx: false,
-      ipc: true,
-    })
-  })
-
-  it('restartControllers disables and re-enables Audio when it was active', async () => {
-    const listeners = listenerStub()
-    const disableAudio = listeners.audio.disableAudio as jest.Mock
-    const enableAudio = listeners.audio.enableAudio as jest.Mock
-    ;(listeners.audio.getIsAudioEnabled as jest.Mock).mockReturnValue(true)
-
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listeners,
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer: jest.fn(),
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
-
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
-
-    expect(disableAudio).toHaveBeenCalledTimes(1)
-    expect(enableAudio).toHaveBeenCalledTimes(1)
-    expect(enableAudio).toHaveBeenCalledWith(true, expect.any(Function))
-  })
-
-  it('restartControllers brings back the listener alone when a snapshot holds both', async () => {
-    const listeners = listenerStub()
-    const enableAudio = listeners.audio.enableAudio as jest.Mock
-    const enableYarg = listeners.yargRb3.enableYarg as jest.Mock
-    ;(listeners.audio.getIsAudioEnabled as jest.Mock).mockReturnValue(true)
-    ;(listeners.yargRb3.getIsYargEnabled as jest.Mock).mockReturnValue(true)
-
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listeners,
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer: jest.fn(),
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
-
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
-
-    expect(enableYarg).toHaveBeenCalledTimes(1)
-    expect(enableAudio).not.toHaveBeenCalled()
-  })
-
-  it('restartControllers does not touch Audio when Audio was not enabled', async () => {
-    const listeners = listenerStub()
-    const disableAudio = listeners.audio.disableAudio as jest.Mock
-    const enableAudio = listeners.audio.enableAudio as jest.Mock
-
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listeners,
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer: jest.fn(),
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
-
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
-
-    expect(disableAudio).not.toHaveBeenCalled()
-    expect(enableAudio).not.toHaveBeenCalled()
-  })
-
-  it('restartControllers restores console phase when DMX console is open', async () => {
-    const setManualBuffer = jest.fn()
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-        setManualBuffer,
-      },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('consoleMode'),
-      consoleRestore: { yarg: false, rb3: false, audio: false },
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init: jest.fn().mockImplementation(function (this: RestartFake) {
-        this.dmxPublisher = { setManualBuffer }
-        this.isInitialized = true
-        this.lifecycle.setPhase('running')
-        return Promise.resolve()
-      }),
-      senderLifecycle: {
-        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue({
-          sacn: true,
-          artnet: false,
-          enttecpro: false,
-          opendmx: false,
-          ipc: false,
-        }),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-    })
-    Object.assign(fake, {
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: () => {
-          if (fake.consoleRestore != null) {
-            const pub = fake.dmxPublisher as { setManualBuffer: jest.Mock } | undefined
-            pub?.setManualBuffer({})
-          }
-        },
-        getConsoleRestore: () => ({ yarg: false, rb3: false, audio: false }),
-      },
-    })
-
-    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
-
-    expect(setManualBuffer).toHaveBeenCalledWith({})
-    expect(fake.lifecycle.phase).toBe('consoleMode')
-  })
-
-  it('repro flow: sender restore keeps same sACN universe across consecutive restarts', async () => {
-    const { manager, senderManager } = makeManagerForRestore({
+  it('restores the same sACN universe on each restart', async () => {
+    const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: true,
         artNetEnabled: false,
@@ -883,284 +733,20 @@ describe('ControllerManager lifecycle and sender restore', () => {
       },
     })
 
-    await manager.restoreSenderOutputsFromPrefs()
-    await manager.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
-    expect(senderManager.enableSender).toHaveBeenCalledTimes(2)
-    expect(senderManager.enableSender).toHaveBeenNthCalledWith(1, 'sacn', 'sacn', {
-      sender: 'sacn',
+    const restored = {
+      sender: 'sacn' as const,
       universe: 7,
       networkInterface: '10.0.0.12',
       useUnicast: false,
       unicastDestination: undefined,
-      maxOutputRate: 40,
-      minRefreshRate: 40,
-    })
-    expect(senderManager.enableSender).toHaveBeenNthCalledWith(2, 'sacn', 'sacn', {
-      sender: 'sacn',
-      universe: 7,
-      networkInterface: '10.0.0.12',
-      useUnicast: false,
-      unicastDestination: undefined,
-      maxOutputRate: 40,
-      minRefreshRate: 40,
-    })
-  })
-
-  it('ControllerManager enableConsoleMode delegates to ConsoleModeController and updates phase', async () => {
-    const enableConsoleMode = jest
-      .fn<(rigId: string) => Promise<{ success: true }>>()
-      .mockResolvedValue({ success: true })
-    const init = jest.fn().mockImplementation(() => Promise.resolve())
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      init,
-      lifecycle: lifecycleAt('running'),
-      consoleMode: { enableConsoleMode },
-    })
-    const result = await ControllerManager.prototype.enableConsoleMode.call(fake, 'rig-1')
-    expect(init).toHaveBeenCalled()
-    expect(enableConsoleMode).toHaveBeenCalledWith('rig-1')
-    expect(result).toEqual({ success: true })
-    expect((fake as { lifecycle: ControllerLifecycle }).lifecycle.phase).toBe('consoleMode')
-  })
-
-  it('ControllerManager disableConsoleMode returns to running phase when active', async () => {
-    const disableConsoleMode = jest
-      .fn<() => Promise<{ success: true }>>()
-      .mockResolvedValue({ success: true })
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleAt('consoleMode'),
-      consoleMode: { disableConsoleMode },
-    })
-    const result = await ControllerManager.prototype.disableConsoleMode.call(fake)
-    expect(disableConsoleMode).toHaveBeenCalledTimes(1)
-    expect(result).toEqual({ success: true })
-    expect((fake as { lifecycle: ControllerLifecycle }).lifecycle.phase).toBe('running')
-  })
-
-  it('init() throws LifecycleAbortedError when phase is shuttingDown', async () => {
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleAt('shuttingDown'),
-      isInitialized: false,
-    })
-    await expect(ControllerManager.prototype.init.call(fake)).rejects.toBeInstanceOf(
-      LifecycleAbortedError,
-    )
-  })
-
-  it('runRestartControllers aborts cleanly if shutdown begins between teardown and reinit', async () => {
-    const init = jest.fn().mockImplementation(() => Promise.resolve())
-    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      listenerLifecycle: listenerStub(),
-      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
-      cueHandler: { shutdown: jest.fn() },
-      rigChains: [],
-      clock: { destroy: jest.fn() },
-      dmxLightManager: {},
-      lightStateManager: {},
-      lightTransitionController: {},
-      sequencer: {},
-      isInitialized: true,
-      lifecycle: lifecycleAt('running'),
-
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      init,
-      senderLifecycle: {
-        // Simulate shutdown starting concurrently: after sender reset, an outside actor
-        // flips the phase to 'shuttingDown' (as ControllerManager.shutdown would).
-        resetSenderForControllerRestart: jest.fn().mockImplementation(function (this: RestartFake) {
-          fake.lifecycle.setPhase('shuttingDown')
-          return Promise.resolve()
-        }),
-        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
-        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      consoleMode: {
-        onControllersReinitializedWhileConsoleOpen: jest.fn(),
-        getConsoleRestore: jest.fn().mockReturnValue(null),
-      },
-    })
-
-    await expect(
-      ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager),
-    ).rejects.toBeInstanceOf(LifecycleAbortedError)
-
-    // init() must NOT run after shutdown begins; phase stays at 'shuttingDown' so the shutdown
-    // promise can complete the transition to 'stopped'.
-    expect(init).not.toHaveBeenCalled()
-    expect(fake.lifecycle.phase).toBe('shuttingDown')
-  })
-
-  it('a listener toggle queued behind a restart waits for the restart to finish', async () => {
-    let releaseRestart!: () => void
-    const restartBarrier = new Promise<void>((r) => {
-      releaseRestart = r
-    })
-    const order: string[] = []
-    const yargDisable = jest.fn().mockImplementation(() => {
-      order.push('disable')
-      return Promise.resolve()
-    })
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleAt('running'),
-      isInitialized: true,
-      runRestartControllers: jest.fn().mockImplementation(async () => {
-        await restartBarrier
-        order.push('restart')
-      }),
-      listenerLifecycle: { yargRb3: { disableYarg: yargDisable } },
-    })
-
-    const restartPromise = ControllerManager.prototype.restartControllers.call(
-      fake as unknown as ControllerManager,
-    )
-    const disablePromise = ControllerManager.prototype.disableYarg.call(
-      fake as unknown as ControllerManager,
-    )
-
-    await Promise.resolve()
-    await Promise.resolve()
-    // The restart holds the shared lifecycle queue; the toggle behind it must not run yet.
-    expect(yargDisable).not.toHaveBeenCalled()
-
-    releaseRestart()
-    await Promise.all([restartPromise, disablePromise])
-
-    expect(order).toEqual(['restart', 'disable'])
-    expect(yargDisable).toHaveBeenCalledTimes(1)
-  })
-
-  it('disableYarg awaits an in-flight shutdown before disabling', async () => {
-    let releaseShutdown!: () => void
-    const shutdownBarrier = new Promise<void>((r) => {
-      releaseShutdown = r
-    })
-    const yargDisable = jest.fn().mockImplementation(() => Promise.resolve())
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleShuttingDownOn(shutdownBarrier, 'running'),
-      listenerLifecycle: { yargRb3: { disableYarg: yargDisable } },
-    })
-
-    const disablePromise = ControllerManager.prototype.disableYarg.call(
-      fake as unknown as ControllerManager,
-    )
-
-    await Promise.resolve()
-    expect(yargDisable).not.toHaveBeenCalled()
-
-    releaseShutdown()
-    await disablePromise
-
-    expect(yargDisable).toHaveBeenCalledTimes(1)
-  })
-
-  it('a listener toggle then a restart in the same tick both settle without deadlock', async () => {
-    const order: string[] = []
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      lifecycle: lifecycleAt('running'),
-      isInitialized: true,
-      listenerLifecycle: {
-        yargRb3: {
-          enableYarg: jest.fn().mockImplementation(async () => {
-            order.push('toggle')
-          }),
-        },
-        audio: { disableAudio: jest.fn().mockImplementation(() => Promise.resolve()) },
-      },
-      runRestartControllers: jest.fn().mockImplementation(async () => {
-        order.push('restart')
-      }),
-    })
-
-    // Old code deadlocked here: the queued toggle awaited the restart memo while the restart
-    // awaited the op chain containing the toggle. jest's test timeout is the deadlock detector.
-    const pToggle = ControllerManager.prototype.enableYarg.call(
-      fake as unknown as ControllerManager,
-    )
-    const pRestart = ControllerManager.prototype.restartControllers.call(
-      fake as unknown as ControllerManager,
-    )
-    await Promise.all([pToggle, pRestart])
-
-    expect(order).toEqual(['toggle', 'restart'])
-    expect(fake.lifecycle.isRestartInFlight()).toBe(false)
-  })
-
-  it('shutdown.call against fresh stub uses the in-flight promise (no double shutdown)', async () => {
-    let releaseInner!: () => void
-    const inner = new Promise<void>((r) => {
-      releaseInner = r
-    })
-    const senderShutdown = jest.fn().mockImplementation(() => inner)
-    const stub = Object.create(ControllerManager.prototype) as Record<string, unknown> & {
-      lifecycle: ControllerLifecycle
-      isInitialized: boolean
-      listenerLifecycle: unknown
-      nodeCueLoader: null
-      effectLoader: null
-      cueHandler: null
-      rigChains: Array<{ rigId: string; dispose: jest.Mock }>
-      clock: { destroy: jest.Mock } | null
-      dmxLightManager: null
-      effectsController: null
-      dmxPublisher: { shutdown: jest.Mock }
-      senderLifecycle: { shutdownSenderOnAppExit: jest.Mock }
+      maxOutputRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+      minRefreshRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
     }
-    stub.lifecycle = lifecycleAt('running')
-    stub.isInitialized = true
-    stub.listenerLifecycle = {
-      yargRb3: {
-        disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-        disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      },
-      audio: { disableAudio: jest.fn().mockImplementation(() => Promise.resolve()) },
-    }
-    stub.nodeCueLoader = null
-    stub.effectLoader = null
-    stub.cueHandler = null
-    stub.rigChains = [
-      { rigId: 'merged', dispose: jest.fn().mockImplementation(() => Promise.resolve()) },
-    ]
-    stub.clock = { destroy: jest.fn() }
-    stub.dmxLightManager = null
-    stub.effectsController = null
-    stub.dmxPublisher = { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) }
-    stub.senderLifecycle = { shutdownSenderOnAppExit: senderShutdown }
-    ;(stub as Record<string, unknown>).graph = restartGraph()
-
-    const p1 = ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)
-    const p2 = ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)
-    releaseInner()
-    await Promise.all([p1, p2])
-
-    expect(senderShutdown).toHaveBeenCalledTimes(1)
-    expect(stub.lifecycle.phase).toBe('stopped')
-  })
-
-  it('addOnControllerRestart accumulates multiple listeners and unregister removes one', () => {
-    const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      graph: restartGraph(),
-      onControllerRestartListeners: [] as Array<() => void>,
-    })
-    const cm = fake as unknown as ControllerManager
-    const a = (): void => {}
-    const b = (): void => {}
-    const offA = cm.addOnControllerRestart(a)
-    cm.addOnControllerRestart(b)
-    // Both registrations coexist — a second consumer never overwrites the first.
-    expect(fake.onControllerRestartListeners).toEqual([a, b])
-    offA()
-    expect(fake.onControllerRestartListeners).toEqual([b])
+    expect(enableSender).toHaveBeenCalledTimes(2)
+    expect(enableSender).toHaveBeenNthCalledWith(1, 'sacn', 'sacn', restored)
+    expect(enableSender).toHaveBeenNthCalledWith(2, 'sacn', 'sacn', restored)
   })
 })

@@ -1,5 +1,6 @@
-import React from 'react'
-import type { Toast } from '../hooks/useToast'
+import React, { useEffect } from 'react'
+import { useAtomValue } from 'jotai'
+import { toastsAtom, useToast, type Toast } from '../hooks/useToast'
 
 interface ToastContainerProps {
   toasts: Toast[]
@@ -34,6 +35,37 @@ const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) =>
         </div>
       ))}
     </div>
+  )
+}
+
+/** Hides one toast once its time is up, counted from when it arrived. */
+const ToastExpiry: React.FC<{ toast: Toast; onExpire: (id: string) => void }> = ({
+  toast,
+  onExpire,
+}) => {
+  const { id, duration = 0 } = toast
+  useEffect(() => {
+    if (duration <= 0) return
+    const timer = setTimeout(() => onExpire(id), duration)
+    return () => clearTimeout(timer)
+  }, [id, duration, onExpire])
+  return null
+}
+
+/**
+ * The one toast stack a window shows, fed by every useToast in that window. Rendered once, by
+ * WindowShell, so toasts from two places stack in one live region.
+ */
+export const ToastStack: React.FC = () => {
+  const toasts = useAtomValue(toastsAtom)
+  const { hideToast } = useToast()
+  return (
+    <>
+      <ToastContainer toasts={toasts} onDismiss={hideToast} />
+      {toasts.map((toast) => (
+        <ToastExpiry key={toast.id} toast={toast} onExpire={hideToast} />
+      ))}
+    </>
   )
 }
 

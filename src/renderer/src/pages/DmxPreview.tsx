@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react'
-import { getDefaultStore, useAtom } from 'jotai'
-import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '@renderer/atoms'
-import { getActiveRigs } from '@renderer/ipcApi'
-import { createLogger } from '../../../shared/logger'
+import React from 'react'
+import { useAtom } from 'jotai'
+import { lightingPrefsAtom, previewRigIdAtom } from '@renderer/atoms'
+import { useActivePreviewRigs } from '@renderer/hooks/useActivePreviewRigs'
 import {
   LiveLightsDmxPreview,
   LiveLightsDmxChannelsPreview,
@@ -15,36 +14,13 @@ import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
 import { useCuePreviewInputPlatform } from '@renderer/hooks/useCuePreviewInputPlatform'
 
-const log = createLogger('DmxPreview')
-
 const DmxPreview: React.FC = () => {
   const [prefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
+  const activeRigs = useActivePreviewRigs()
   const { selectedRig, rigConfig } = useDmxPreview()
   const platform = useCuePreviewInputPlatform()
-
-  useEffect(() => {
-    if (advancedModeEnabled) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const activeRigs = await getActiveRigs()
-        if (cancelled) return
-        const orderedIds = activeRigs.map((r) => r.id)
-        const currentId = getDefaultStore().get(previewRigIdAtom)
-        const resolved = resolveLastUsedRigId(currentId, orderedIds)
-        if (resolved !== currentId) {
-          setSelectedRigId(resolved)
-        }
-      } catch (e) {
-        log.error('Failed to resolve preview rig when Advanced Mode is off', e)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [advancedModeEnabled, setSelectedRigId])
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -63,7 +39,11 @@ const DmxPreview: React.FC = () => {
       <DmxSettingsAccordion startOpen={true} />
 
       {advancedModeEnabled && (
-        <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+        <DmxRigSelector
+          rigs={activeRigs}
+          selectedRigId={selectedRigId}
+          onRigChange={setSelectedRigId}
+        />
       )}
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />

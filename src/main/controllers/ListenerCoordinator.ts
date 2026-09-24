@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener'
@@ -5,7 +6,7 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
-import { CueType, type PostProcessing } from '../../photonics-dmx/cues/types/cueTypes'
+import { CueType, type CueData, type PostProcessing } from '../../photonics-dmx/cues/types/cueTypes'
 import type { CueRuntime } from '../../photonics-dmx/cueHandlers/CueRuntime'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -15,6 +16,7 @@ import { createLogger } from '../../shared/logger'
 import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { buildDomainChainHandlers } from './cueRuntimeDomains'
 import type { RigChain } from './RigChain'
+import { clearAndBlackOutChains } from './chainBlackout'
 import type { ChainFanout } from './ChainFanout'
 const log = createLogger('ListenerCoordinator')
 
@@ -42,6 +44,8 @@ export interface ListenerCoordinatorDeps {
   setCueHandlerRef: (h: CueHandler | null) => void
   setRb3CueHandlerRef: (h: CueHandler | null) => void
   getRb3ProcessingMode: () => ProcessingMode
+  /** The Global DMX Publishing Rate, which RB3 direct-mode strobes slow to. */
+  getDmxOutputRateHz?: () => number
   /**
    * Wrap a domain's runtime before the listener or processor consumes it, so an additional
    * consumer can be teed onto the same cue stream. Returns the base runtime when absent.
@@ -59,8 +63,34 @@ export class ListenerCoordinator {
   private isRb3Enabled = false
   private rb3TeardownPromise: Promise<void> | null = null
   private readonly domainRuntimes: Partial<Record<NetCueMode, CueRuntime>> = {}
+  /** Every cue the primary handlers and the RB3 direct processor handle, whichever exist now. */
+  private readonly cueHandledEvents = new EventEmitter()
+  private readonly forwardCueHandled = (data: CueData): void => {
+    this.cueHandledEvents.emit('cueHandled', data)
+  }
 
   constructor(private readonly deps: ListenerCoordinatorDeps) {}
+
+  /**
+   * Follows every handled cue across listener switches and controller restarts, which replace the
+   * handlers that emit them. Returns the unsubscribe.
+   */
+  public onCueHandled(listener: (data: CueData) => void): () => void {
+    this.cueHandledEvents.on('cueHandled', listener)
+    return () => {
+      this.cueHandledEvents.off('cueHandled', listener)
+    }
+  }
+
+  /** Records whether a listener runs and tells every window, whatever started or stopped it. */
+  private setListenerEnabled(listener: 'yarg' | 'rb3', enabled: boolean): void {
+    if (listener === 'yarg') {
+      this.isYargEnabled = enabled
+    } else {
+      this.isRb3Enabled = enabled
+    }
+    this.deps.sendToAllWindows(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, { listener, enabled })
+  }
 
   public async enableYarg(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
@@ -104,14 +134,15 @@ export class ListenerCoordinator {
         }
         // A runtime socket error closes the socket, so the listener is off whatever the toggle
         // says. Clear the enabled flag too, so the UI reports it off and a re-enable can start
-        // it again.
+        // it again, and leave the rig dark as a disable does.
         const stopped = errorData.severity !== 'warning' && errorData.type === 'runtime-error'
         if (stopped) {
           this.yargListener = null
-          this.isYargEnabled = false
+          this.setListenerEnabled('yarg', false)
           this.deps.setVenuePostProcessing('Default')
           this.notifyRuntimeDisabled('yarg')
           this.clearChainHandlers('yarg')
+          void clearAndBlackOutChains(this.deps.getRigChains(), 'the YARG listener failing')
         }
         this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
           type: errorData.type,
@@ -124,7 +155,7 @@ export class ListenerCoordinator {
     )
     try {
       await this.yargListener.start()
-      this.isYargEnabled = true
+      this.setListenerEnabled('yarg', true)
       log.info('YARG listener enabled')
     } catch (err) {
       const code = (err as NodeJS.ErrnoException)?.code
@@ -136,7 +167,7 @@ export class ListenerCoordinator {
           : String(err)
       log.error('Failed to start YARG listener:', err)
       this.yargListener = null
-      this.isYargEnabled = false
+      this.setListenerEnabled('yarg', false)
       this.deps.setVenuePostProcessing('Default')
       this.notifyRuntimeDisabled('yarg')
       this.clearChainHandlers('yarg')
@@ -157,24 +188,12 @@ export class ListenerCoordinator {
     this.deps.setVenuePostProcessing('Default')
     this.notifyRuntimeDisabled('yarg')
     this.clearChainHandlers('yarg')
-    // Blackout via every chain's sequencer so a multi-rig setup doesn't leave secondary
-    // rigs lit while the primary fades out.
-    for (const chain of this.deps.getRigChains()) {
-      try {
-        chain.sequencer.removeAllEffects()
-        await chain.sequencer.blackout(0)
-      } catch (error) {
-        log.error(`Error clearing effects on rig ${chain.rigId} when disabling YARG:`, error)
-      }
-    }
-    log.info(
-      'ListenerCoordinator: Cleared running effects and blacked out every rig (disable YARG)',
-    )
+    await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling YARG')
     if (listenerClosing) {
       await listenerClosing
       this.yargListener = null
     }
-    this.isYargEnabled = false
+    this.setListenerEnabled('yarg', false)
   }
 
   /** Apply the optional runtime decorator for a domain, or pass the base runtime through. */
@@ -210,8 +229,10 @@ export class ListenerCoordinator {
       ...motion,
       getMotionEnabled: this.deps.getMotionEnabled,
       runtimeBroadcaster: this.deps.runtimeBroadcaster,
+      strobeState: this.deps.getChainFanout().strobeState,
       replaceExisting: true,
     })
+    primary?.addCueHandledListener(this.forwardCueHandled)
     if (domain === 'yarg') {
       this.cueHandler = primary
       this.deps.setCueHandlerRef(primary)
@@ -295,8 +316,10 @@ export class ListenerCoordinator {
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, { groupId: p }),
       onRb3GameModeScheduleChange: (p) =>
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, p),
+      getDmxOutputRateHz: this.deps.getDmxOutputRateHz,
     })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
+    this.processorManager.on('cueHandled', this.forwardCueHandled)
     const listener = new Rb3eNetworkListener()
     this.rb3eListener = listener
     listener.on('rb3-error', (errorData: { type: string; message: string }) => {
@@ -331,7 +354,7 @@ export class ListenerCoordinator {
         await this.rb3TeardownPromise
         return
       }
-      this.isRb3Enabled = true
+      this.setListenerEnabled('rb3', true)
       log.info(`RB3 listener enabled in ${mode} StageKit mode`)
     } catch (err) {
       const code = (err as NodeJS.ErrnoException)?.code
@@ -343,7 +366,7 @@ export class ListenerCoordinator {
           : String(err)
       log.error('Failed to start RB3E listener:', err)
       this.rb3eListener = null
-      this.isRb3Enabled = false
+      this.setListenerEnabled('rb3', false)
       this.processorManager.destroy()
       this.processorManager = null
       this.notifyRuntimeDisabled('rb3')
@@ -377,7 +400,7 @@ export class ListenerCoordinator {
     if (!this.isRb3Enabled && !this.rb3eListener && !this.processorManager) {
       return
     }
-    this.isRb3Enabled = false
+    this.setListenerEnabled('rb3', false)
     // Input, then cues, then output, as disableYarg does. The socket closes synchronously and
     // destroying the processors stops the keepalive and the menu pump generating frames of their
     // own, so the blackout below is the last word on the lights rather than something a late
@@ -396,17 +419,7 @@ export class ListenerCoordinator {
       }
     }
     if (options.blackout) {
-      for (const chain of this.deps.getRigChains()) {
-        try {
-          chain.sequencer.removeAllEffects()
-          await chain.sequencer.blackout(0)
-        } catch (error) {
-          log.error(`Error clearing effects on rig ${chain.rigId} when disabling RB3:`, error)
-        }
-      }
-      log.info(
-        'ListenerCoordinator: Cleared running effects and blacked out every rig (disable RB3)',
-      )
+      await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling RB3')
     }
     // Awaited last, so the blackout stays in the toggle's own tick.
     if (listenerClosing) {

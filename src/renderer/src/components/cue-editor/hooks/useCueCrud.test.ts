@@ -17,6 +17,7 @@ import * as ipcApi from '../../../ipcApi'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import type { UseCueCrudParams } from './useCueCrud'
 import type { EffectFile, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { getLastActiveMode, getLastFilePathForMode } from './useLastCueFilePath'
 
 const cueDoc = (cues?: Array<Record<string, unknown>>): EditorDocument =>
   ({
@@ -70,6 +71,7 @@ const setup = (
       setIsDirty,
       setCueKind,
       loadCueIntoFlow,
+      rememberLastFilePath: jest.fn(),
       refreshFiles: jest.fn(async () => undefined),
       refreshEffectFiles: jest.fn(async () => undefined),
     }),
@@ -175,6 +177,7 @@ function renderCrud(overrides: CrudOverrides = {}) {
     setIsDirty: jest.fn(),
     setCueKind: jest.fn(),
     loadCueIntoFlow: jest.fn(),
+    rememberLastFilePath: jest.fn(),
     refreshFiles: jest.fn(async () => undefined),
     refreshEffectFiles: jest.fn(async () => undefined),
     onError: jest.fn(),
@@ -247,6 +250,24 @@ describe('useCueCrud new files', () => {
     expect(crud.refreshEffectFiles).toHaveBeenCalled()
     expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['cue', null, '/cues/stage.json', 'yarg-cue'],
+    ['effect', effectDoc(), '/fx/stage.json', 'yarg-effect'],
+  ] as const)(
+    'remembers a new %s file as the one to reopen',
+    async (_kind, editorDoc, path, modeKey) => {
+      localStorage.clear()
+      const crud = renderCrud({ editorDoc })
+      await act(async () => {
+        await crud.result.current.handleCreateNewFile(NEW_FILE)
+      })
+
+      expect(crud.rememberLastFilePath).toHaveBeenCalledWith(path)
+      expect(getLastActiveMode()).toBe(modeKey)
+      expect(getLastFilePathForMode(modeKey)).toBe(path)
+    },
+  )
 
   it('refuses a group id another file of the same mode already uses', async () => {
     const crud = renderCrud({

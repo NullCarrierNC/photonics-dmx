@@ -78,10 +78,16 @@ function setupEffectMocks() {
     setEffectUnblockedName: jest.fn().mockReturnValue(true),
     addEffectUnblockedNameWithCallback: jest
       .fn()
-      .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
+      .mockImplementation((_n: string, _e: unknown, cb: () => void) => {
+        cb()
+        return true
+      }),
     setEffectUnblockedNameWithCallback: jest
       .fn()
-      .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
+      .mockImplementation((_n: string, _e: unknown, cb: () => void) => {
+        cb()
+        return true
+      }),
   } as any
   const lightManager = {
     getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0 }]),
@@ -199,12 +205,14 @@ describe('Node cue logic runtime', () => {
     const sequencer = {
       addEffect,
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
-      addEffectUnblockedNameWithCallback: jest
-        .fn()
-        .mockImplementation((_n, _e, cb: () => void) => cb()),
-      setEffectUnblockedNameWithCallback: jest
-        .fn()
-        .mockImplementation((_n, _e, cb: () => void) => cb()),
+      addEffectUnblockedNameWithCallback: jest.fn().mockImplementation((_n, _e, cb: () => void) => {
+        cb()
+        return true
+      }),
+      setEffectUnblockedNameWithCallback: jest.fn().mockImplementation((_n, _e, cb: () => void) => {
+        cb()
+        return true
+      }),
     } as any
 
     const lightManager = {
@@ -346,12 +354,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
@@ -425,12 +439,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
@@ -509,12 +529,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = {
         getLights: jest.fn(),
@@ -680,12 +706,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
@@ -748,12 +780,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
@@ -810,12 +848,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
@@ -877,12 +921,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = {
         getLightsInGroup: jest.fn().mockReturnValue(mockLights),
@@ -958,12 +1008,18 @@ describe('Node cue logic runtime', () => {
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
         setEffectUnblockedNameWithCallback: (
           _n: string,
           _e: unknown,
           cb: (cancelled: boolean) => void,
-        ) => cb(false),
+        ) => {
+          cb(false)
+          return true
+        },
       })
       const mockLightManager = {
         getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0, config: {} }]),

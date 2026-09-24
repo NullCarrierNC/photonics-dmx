@@ -12,6 +12,7 @@ import {
   getAudioCueDataPropertyMeta,
 } from '../../../../../../../photonics-dmx/constants/cueDataPropertyMeta'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface CueDataLogicEditorProps extends LogicEditorCommonProps {
   node: CueDataLogicNode
@@ -70,20 +71,14 @@ const CueDataLogicEditor: React.FC<CueDataLogicEditorProps> = ({
           ))}
         </select>
       </label>
-      <label className="flex flex-col font-medium">
-        Assign To Variable (optional)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo ?? ''}
-          onChange={(event) => updateNode({ assignTo: event.target.value || undefined })}>
-          <option value="">-- None --</option>
-          {availableVariables.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.type}, {v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Assign To Variable (optional)"
+        value={node.assignTo ?? ''}
+        onChange={(name) => updateNode({ assignTo: name || undefined })}
+        variables={availableVariables}
+        placeholder="-- None --"
+        showType
+      />
     </div>
   )
 }

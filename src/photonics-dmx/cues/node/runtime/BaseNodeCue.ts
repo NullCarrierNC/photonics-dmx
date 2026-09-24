@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import { EffectRegistry } from './EffectRegistry'
-import type { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
+import type { NodeCueDebugSwitch, NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
@@ -34,6 +34,7 @@ export abstract class BaseNodeCue implements INetCue {
   private readonly effectRegistry: EffectRegistry
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
   private readonly runtimeBroadcaster: RuntimeBroadcaster
+  private readonly debug?: NodeCueDebugSwitch
   private readonly states = new Map<ILightingController, NodeCueRunState>()
 
   constructor(
@@ -42,12 +43,14 @@ export abstract class BaseNodeCue implements INetCue {
     effectRegistry?: EffectRegistry,
     runtimeCallbacks?: NodeRuntimeCallbacks,
     runtimeBroadcaster?: RuntimeBroadcaster,
+    debug?: NodeCueDebugSwitch,
   ) {
     this.groupId = groupId
     this.compiledCue = compiledCue
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.runtimeCallbacks = runtimeCallbacks
     this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
+    this.debug = debug
   }
 
   // --- hooks for the genuine differences --------------------------------------
@@ -115,6 +118,7 @@ export abstract class BaseNodeCue implements INetCue {
         this.effectRegistry,
         this.definition.variables ?? [],
         this.runtimeCallbacks,
+        this.debug,
       )
     }
     return state

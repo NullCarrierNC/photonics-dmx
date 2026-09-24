@@ -1,9 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals'
+import { reconcileEnabledGroups } from '../../controllers/cueGroupReconcile'
 import {
-  reconcileEnabledGroups,
-  persistReconciledGroups,
-} from '../../controllers/cueGroupReconcile'
-import type { CueDomain, CueDomainPrefs } from '../../../services/configuration/cueDomainTypes'
+  reconcileAndApplyGroups,
+  type CueDomainRegistryBinding,
+} from '../../controllers/cueDomainBindings'
+import type { CueDomainPrefs } from '../../../services/configuration/cueDomainTypes'
+import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 
 describe('reconcileEnabledGroups', () => {
   it('auto-enables registered groups never seen before', () => {
@@ -17,10 +19,28 @@ describe('reconcileEnabledGroups', () => {
     expect(enabled).toEqual([])
   })
 
-  it('drops an enabled group that is no longer registered', () => {
-    const { enabled, known } = reconcileEnabledGroups(['a', 'stale'], ['a', 'stale'], ['a'])
+  it('keeps an enabled group that missed a load, and applies only what is registered', () => {
+    const { enabled, active, known } = reconcileEnabledGroups(['a', 'b'], ['a', 'b'], ['a'])
+    expect(enabled).toEqual(['a', 'b'])
+    expect(active).toEqual(['a'])
+    expect(known).toEqual(['a', 'b'])
+  })
+
+  it('leaves a disabled group disabled once it loads again after a missed load', () => {
+    const missed = reconcileEnabledGroups(['a'], ['a', 'b'], ['a'])
+    const back = reconcileEnabledGroups(missed.enabled, missed.known, ['a', 'b'])
+    expect(back.enabled).toEqual(['a'])
+  })
+
+  it('leaves an enabled group enabled once it loads again after a missed load', () => {
+    const missed = reconcileEnabledGroups(['a', 'b'], ['a', 'b'], ['a'])
+    const back = reconcileEnabledGroups(missed.enabled, missed.known, ['a', 'b'])
+    expect(back.enabled).toEqual(['a', 'b'])
+  })
+
+  it('drops an enabled id that was never a known group', () => {
+    const { enabled } = reconcileEnabledGroups(['a', 'stray'], ['a'], ['a'])
     expect(enabled).toEqual(['a'])
-    expect(known).toEqual(['a'])
   })
 
   it('enables everything on a fresh domain (empty enabled and known)', () => {
@@ -34,10 +54,11 @@ describe('reconcileEnabledGroups', () => {
     expect(known).toEqual(['x'])
   })
 
-  it('returns empty when nothing is registered', () => {
-    const { enabled, known } = reconcileEnabledGroups(['a'], ['a'], [])
-    expect(enabled).toEqual([])
-    expect(known).toEqual([])
+  it('applies nothing when nothing is registered, and remembers the selection', () => {
+    const { enabled, active, known } = reconcileEnabledGroups(['a'], ['a'], [])
+    expect(enabled).toEqual(['a'])
+    expect(active).toEqual([])
+    expect(known).toEqual(['a'])
   })
 
   it('does not duplicate a stored id that is also treated as new (stale knownGroups)', () => {
@@ -52,53 +73,72 @@ describe('reconcileEnabledGroups', () => {
   })
 })
 
-describe('persistReconciledGroups', () => {
-  const makeConfig = () => ({
-    updateCueDomain: jest.fn<(domain: CueDomain, patch: Partial<CueDomainPrefs>) => Promise<void>>(
-      async () => {},
-    ),
-  })
+describe('reconcileAndApplyGroups', () => {
+  function binding(
+    stored: { enabledGroups?: string[]; knownGroups?: string[] },
+    registered: string[],
+  ) {
+    const persist = jest.fn(async (_config: unknown, patch: Partial<CueDomainPrefs>) => {
+      Object.assign(stored, patch)
+    })
+    const setEnabled = jest.fn()
+    const fake = {
+      domain: 'yarg',
+      getRegisteredIds: () => registered,
+      setEnabled,
+      setDisabled: jest.fn(),
+      readStored: () => ({ ...stored, disabledCues: {} }),
+      persist,
+    } as unknown as CueDomainRegistryBinding
+    return { fake, persist, setEnabled }
+  }
+
+  const config = {} as ConfigurationManager
 
   it('skips the write when the reconcile matches the stored values', async () => {
-    const config = makeConfig()
-    const wrote = await persistReconciledGroups(
-      config,
-      'yarg',
-      { enabled: ['a', 'b'], known: ['a', 'b'] },
-      ['a', 'b'],
-      ['a', 'b'],
-    )
-    expect(wrote).toBe(false)
-    expect(config.updateCueDomain).not.toHaveBeenCalled()
+    const { fake, persist } = binding({ enabledGroups: ['a', 'b'], knownGroups: ['a', 'b'] }, [
+      'a',
+      'b',
+    ])
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).not.toHaveBeenCalled()
   })
 
   it('writes enabled and known in a single call when changed', async () => {
-    const config = makeConfig()
-    const wrote = await persistReconciledGroups(
-      config,
-      'yarg',
-      { enabled: ['a', 'b'], known: ['a', 'b'] },
-      ['a'],
-      ['a'],
-    )
-    expect(wrote).toBe(true)
-    expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
-    expect(config.updateCueDomain).toHaveBeenCalledWith('yarg', {
+    const { fake, persist, setEnabled } = binding({ enabledGroups: ['a'], knownGroups: ['a'] }, [
+      'a',
+      'b',
+    ])
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).toHaveBeenCalledTimes(1)
+    expect(persist).toHaveBeenCalledWith(config, {
       enabledGroups: ['a', 'b'],
       knownGroups: ['a', 'b'],
     })
+    expect(setEnabled).toHaveBeenCalledWith(['a', 'b'])
   })
 
   it('writes when only the known baseline changed', async () => {
-    const config = makeConfig()
-    const wrote = await persistReconciledGroups(
-      config,
-      'audio',
-      { enabled: ['a'], known: ['a', 'b'] },
-      ['a'],
+    const { fake, persist } = binding({ enabledGroups: ['a'], knownGroups: ['a'] }, ['a', 'c'])
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies only the registered groups of the selection', async () => {
+    const { fake, persist, setEnabled } = binding(
+      { enabledGroups: ['a', 'b'], knownGroups: ['a', 'b'] },
       ['a'],
     )
-    expect(wrote).toBe(true)
-    expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).not.toHaveBeenCalled()
+    expect(setEnabled).toHaveBeenCalledWith(['a'])
   })
 })

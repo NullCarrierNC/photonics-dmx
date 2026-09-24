@@ -8,10 +8,11 @@ import {
   createMockMovingHeadDmxLight,
   createMockLightingConfig,
 } from './testFixtures'
-import type { Clock } from '../../controllers/sequencer/Clock'
+import type { ClockSource } from '../../controllers/sequencer/Clock'
 import type { DmxLight, RGBIO } from '../../types'
 
-export class ManualTestClock {
+/** A clock the test advances by hand, one tick per `tick` call. */
+export class ManualTestClock implements ClockSource {
   private callbacks = new Set<(deltaTime: number) => void>()
   private currentTimeMs = 0
   private tickCount = 0
@@ -52,6 +53,10 @@ export class ManualTestClock {
 
   public getTickCount(): number {
     return this.tickCount
+  }
+
+  public destroy(): void {
+    this.callbacks.clear()
   }
 
   public tick(deltaMs: number): void {
@@ -96,6 +101,7 @@ const createLights = (
       id: `${group}-${startIndex + index + 1}`,
       group,
       position: startIndex + index + 1,
+      isStrobeEnabled: group === 'strobe',
     }),
   )
 }
@@ -121,7 +127,7 @@ export const createSequencerHarness = (options: SequencerHarnessOptions = {}): S
   const performanceSpy = jest
     .spyOn(performance, 'now')
     .mockImplementation(() => clock.getCurrentTimeMs())
-  const sequencer = new Sequencer(lightTransitionController, clock as unknown as Clock)
+  const sequencer = new Sequencer(lightTransitionController, clock)
 
   const frontLightIds = lightManager.getLights(['front'], ['all']).map((light) => light.id)
   const backLightIds = lightManager.getLights(['back'], ['all']).map((light) => light.id)

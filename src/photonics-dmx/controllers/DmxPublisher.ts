@@ -1,6 +1,5 @@
 import {
   RGBIO,
-  RgbDmxChannels,
   DmxRig,
   FixtureTypes,
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
@@ -12,7 +11,7 @@ import { DmxLightManager } from './DmxLightManager'
 import { blackoutUniverse, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
 import { scaleDmxValueByPercent } from '../helpers/brightnessScaling'
 import { resolveMovingHeadAxes, StrobePeakLatch } from './publisherLightOutput'
-import { FixtureChannelWriter, type LightOutput } from './fixtureChannelWriter'
+import { FixtureChannelWriter, strobeChannelChops, type LightOutput } from './fixtureChannelWriter'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import type {
@@ -24,7 +23,7 @@ import type {
 import { VenueFrameProcessor } from './VenueFrameProcessor'
 import { WireSlotGovernor } from './wireSlotGovernor'
 import { WireOutputDelay } from './WireOutputDelay'
-import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
+import { StrobeStateManager } from './StrobeStateManager'
 import { MASTER_DIMMER_MAX_PERCENT, MasterOutputState } from './MasterOutputState'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
@@ -186,7 +185,7 @@ export class DmxPublisher {
   constructor(
     senderManager: SenderManager,
     lightStateManager: LightStateManager | null,
-    strobeStateManager: StrobeStateManager = getStrobeStateManager(),
+    strobeStateManager: StrobeStateManager = new StrobeStateManager(),
     options: DmxPublisherOptions = {},
   ) {
     this._sender = senderManager
@@ -217,6 +216,19 @@ export class DmxPublisher {
     if (this._lightStateManager) {
       this._lightStateManager.onLightStatesUpdated(this.publish)
     }
+    this._strobeStateManager.on('change', this._onStrobeSlotChange)
+  }
+
+  /**
+   * The strobe slot drives the hardware strobe channels, so a slot change goes out even when no
+   * light changed. On the chain path it rides the flush a light update in the same tick queued.
+   */
+  private readonly _onStrobeSlotChange = (): void => {
+    if (this._chainSubscriptions.length > 0) {
+      this._schedulePublishFlush()
+      return
+    }
+    queueMicrotask(() => this.publish(this._lastPublishedLights))
   }
 
   /**
@@ -299,7 +311,6 @@ export class DmxPublisher {
     this._lastManualBuffer = buffer
     this._resetGovernorAllSlots()
 
-    // Normalise the input buffer once; broadcast to every enabled wire slot.
     const normalised = normaliseUniverseBuffer(buffer)
     const out =
       this._masterOutput.isBlackoutActive() || Object.keys(normalised).length === 0
@@ -308,6 +319,7 @@ export class DmxPublisher {
 
     const writeWires = (): void => {
       for (const wireId of this._sender.getEnabledWireSenders()) {
+        this._governor.markWritten(wireId, out)
         void this._wireDelay.send(wireId, out)
       }
     }
@@ -466,11 +478,12 @@ export class DmxPublisher {
     // covers the hardware strobe-speed channel, which is driven from `activeStrobeSlot` below. It
     // does NOT cover the opacity-driven flash: the blender has already folded that into the rgb /
     // intensity values arriving here, so those lights are zeroed individually in the light loop,
-    // which is what `suppressedStrobeLightIds` is for.
+    // which is what `suppressedStrobeLightIds` is for. A blackout disarms both as well.
     const masterPercent = this._masterOutput.getOutputPercent()
     const requestedStrobeSlot = this._strobeStateManager.getActive()
     const strobeSuppressed =
-      requestedStrobeSlot != null && !this._masterOutput.isStrobeOutputEnabled()
+      requestedStrobeSlot != null &&
+      (!this._masterOutput.isStrobeOutputEnabled() || this._masterOutput.isBlackoutActive())
     const activeStrobeSlot = strobeSuppressed ? null : requestedStrobeSlot
 
     // Strobe peak-hold state machine runs once per frame (across all rigs/lights).
@@ -543,15 +556,7 @@ export class DmxPublisher {
         }
         visitedLightIds.add(lightId)
 
-        const lightChannels = dmxLight.channels as RgbDmxChannels
-        const hasStrobeChannel = typeof lightChannels.strobeChannel === 'number'
-        // The "Strobe Channel?" runtime path is for RGB-family fixtures whose template declares an
-        // extra hardware strobe-speed channel. Dedicated STROBE fixtures are a separate device
-        // class (no RGB to latch, no per-cue `strobeValues` model) and are deliberately excluded.
-        const isRgbFamilyWithStrobeChannel =
-          hasStrobeChannel && dmxLight.fixture !== FixtureTypes.STROBE
-        const strobeChannelActive =
-          activeStrobeSlot != null && dmxLight.isStrobeEnabled && isRgbFamilyWithStrobeChannel
+        const strobeChannelActive = strobeChannelChops(dmxLight, activeStrobeSlot)
         // White Channel Mix Mode. Under `strobe-rgbw` either strobe mechanism counts — the flash
         // path (strobe set) or the hardware chop, whose colour the latch below resolves to the
         // flash peak. A fixture with no white emitter has no plan stage to apply this to.
@@ -635,10 +640,14 @@ export class DmxPublisher {
         )
       }
 
-      // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
-      // addressed this frame (pre-first-cue lights, or strobe-group lights excluded from cue
-      // targeting). Colour/mixable channels legitimately need a state, so only fixed writes fire.
-      this._channelWriter.writeUnvisitedFixed(manager.getAllDmxLights(), visitedLightIds)
+      // Unvisited-fixture pass: fixtures no light state addressed this frame (pre-first-cue
+      // lights, or strobe-group lights excluded from cue targeting) still get their pinned `fixed`
+      // channels and a chopping strobe channel.
+      this._channelWriter.writeUnvisited(
+        manager.getAllDmxLights(),
+        visitedLightIds,
+        activeStrobeSlot,
+      )
     }
 
     // 5. Release channels that stopped being addressed, then dispatch each wire slot through its
@@ -746,6 +755,7 @@ export class DmxPublisher {
         this._lightStateManager.removeAllListeners()
         this._lightStateManager = null
       }
+      this._strobeStateManager.off('change', this._onStrobeSlotChange)
       for (const sub of this._chainSubscriptions) {
         sub.lightStateManager.offLightStatesUpdated(sub.handler)
       }

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- the resolvers take an action field raw or already resolved */
 import {
   WaitCondition,
   TrackedLight,
@@ -12,7 +12,6 @@ import {
   LightTarget,
 } from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { createDefaultActionTiming } from '../../types/nodeCueTypes'
 import { VariableValue } from '../runtime/executionTypes'
 import {
   ResolvedActionTarget,
@@ -79,10 +78,14 @@ export class ActionEffectFactory {
     if (typeof timing.waitForTime === 'number') {
       return timing as ResolvedActionTiming
     }
-    // Otherwise treat as ValueSource
-    const defaults = createDefaultActionTiming()
+    // Otherwise treat as ValueSource. A condition from anything but a literal reads as 'none'.
+    const condition = (source: unknown): WaitCondition => {
+      if (typeof source === 'string') return source as WaitCondition
+      const literal = source as { source?: string; value?: unknown } | undefined
+      return literal?.source === 'literal' ? (String(literal.value) as WaitCondition) : 'none'
+    }
     return {
-      waitForCondition: timing.waitForCondition ?? defaults.waitForCondition,
+      waitForCondition: condition(timing.waitForCondition),
       waitForTime:
         timing.waitForTime?.source === 'literal' ? finiteOr(timing.waitForTime.value, 0) : 0,
       waitForConditionCount:
@@ -90,7 +93,7 @@ export class ActionEffectFactory {
           ? finiteOr(timing.waitForConditionCount.value, undefined)
           : undefined,
       duration: timing.duration?.source === 'literal' ? finiteOr(timing.duration.value, 200) : 200,
-      waitUntilCondition: timing.waitUntilCondition ?? defaults.waitUntilCondition,
+      waitUntilCondition: condition(timing.waitUntilCondition),
       waitUntilTime:
         timing.waitUntilTime?.source === 'literal' ? finiteOr(timing.waitUntilTime.value, 0) : 0,
       waitUntilConditionCount:

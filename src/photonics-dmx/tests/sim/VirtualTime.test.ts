@@ -65,3 +65,9 @@ describe('VirtualTime ownership', () => {
     expect(() => vt.install()).toThrow(/already installed/)
   })
 })
+
+describe('VirtualTime as a sequencer clock', () => {
+  it('reports its frame step as the tick interval', () => {
+    expect(new VirtualTime({ frameStepMs: 20 }).getIntervalMs()).toBe(20)
+  })
+})

@@ -3,7 +3,7 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
-import { ipcError } from '../ipcResult'
+import { ipcError, restartAfterSave } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   validateAudioCueType,
@@ -209,12 +209,8 @@ export function registerAudioMotionConfigHandlers(
     }
 
     await controllerManager.getConfig().setClockRate(rateValidation.value)
-
-    await controllerManager.restartControllers()
-
     log.info('Updated clock rate to:', rateValidation.value, 'ms')
-
-    return { success: true }
+    return restartAfterSave(() => controllerManager.restartControllers())
   })
 
   handleInvoke(ipcMain, CONFIG.GET_AUDIO_CONFIG, log, async () => {
@@ -287,8 +283,6 @@ export function registerAudioMotionConfigHandlers(
     } else {
       await controllerManager.disableAudio()
     }
-
-    sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled })
 
     return { success: true }
   })

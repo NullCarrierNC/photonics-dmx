@@ -1,12 +1,23 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
+import {
+  createFakeBrowserWindow as mockCreateFakeBrowserWindow,
+  type FakeBrowserWindow,
+} from './fakeBrowserWindow'
 
 jest.mock('electron', () => ({
-  BrowserWindow: Object.assign(jest.fn(), { getAllWindows: jest.fn(() => []) }),
+  BrowserWindow: jest.fn((options: Record<string, unknown>) =>
+    mockCreateFakeBrowserWindow(options),
+  ),
   shell: { openExternal: jest.fn() },
-  screen: { getAllDisplays: jest.fn(() => []), getPrimaryDisplay: jest.fn() },
+  screen: {
+    getAllDisplays: jest.fn(() => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }]),
+    getPrimaryDisplay: jest.fn(() => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })),
+  },
 }))
 jest.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
+jest.mock('../rendererSessionSecurity', () => ({ denyWebContentsWillNavigate: jest.fn() }))
 
+import { BrowserWindow } from 'electron'
 import { WindowManager } from '../WindowManager'
 
 /**
@@ -14,43 +25,36 @@ import { WindowManager } from '../WindowManager'
  * front the window this instance already has, which is only useful if a minimised or hidden one
  * comes back rather than nothing visible happening.
  */
-type Internals = Record<string, unknown>
-
-function fakeWindow(state: { destroyed?: boolean; minimized?: boolean } = {}) {
-  return {
-    isDestroyed: jest.fn(() => state.destroyed === true),
-    isMinimized: jest.fn(() => state.minimized === true),
-    restore: jest.fn(),
-    show: jest.fn(),
-    focus: jest.fn(),
-  }
+function builtWindows(): FakeBrowserWindow[] {
+  return (BrowserWindow as unknown as jest.Mock).mock.results.map(
+    (result) => result.value as FakeBrowserWindow,
+  )
 }
 
 describe('WindowManager.focusMainWindow', () => {
   let manager: WindowManager
-  let createMainWindow: jest.Mock
 
   beforeEach(() => {
+    jest.clearAllMocks()
     manager = new WindowManager()
-    createMainWindow = jest.fn()
-    ;(manager as unknown as Internals).createMainWindow = createMainWindow
   })
 
   it('shows and focuses the window that is already open', () => {
-    const window = fakeWindow()
-    ;(manager as unknown as Internals).mainWindow = window
+    manager.createMainWindow()
+    const [window] = builtWindows()
 
     manager.focusMainWindow()
 
     expect(window.show).toHaveBeenCalledTimes(1)
     expect(window.focus).toHaveBeenCalledTimes(1)
     expect(window.restore).not.toHaveBeenCalled()
-    expect(createMainWindow).not.toHaveBeenCalled()
+    expect(builtWindows()).toHaveLength(1)
   })
 
   it('brings a minimised window back before focusing it', () => {
-    const window = fakeWindow({ minimized: true })
-    ;(manager as unknown as Internals).mainWindow = window
+    manager.createMainWindow()
+    const [window] = builtWindows()
+    window.minimized = true
 
     manager.focusMainWindow()
 
@@ -59,20 +63,70 @@ describe('WindowManager.focusMainWindow', () => {
   })
 
   it('builds a window when there is none to front', () => {
-    ;(manager as unknown as Internals).mainWindow = null
-
     manager.focusMainWindow()
 
-    expect(createMainWindow).toHaveBeenCalledTimes(1)
+    expect(builtWindows()).toHaveLength(1)
   })
 
   it('builds a window when the one it holds has been destroyed', () => {
-    const window = fakeWindow({ destroyed: true })
-    ;(manager as unknown as Internals).mainWindow = window
+    manager.createMainWindow()
+    const [window] = builtWindows()
+    window.destroyed = true
 
     manager.focusMainWindow()
 
-    expect(createMainWindow).toHaveBeenCalledTimes(1)
+    expect(builtWindows()).toHaveLength(2)
     expect(window.focus).not.toHaveBeenCalled()
+  })
+
+  it('opens a main window for audio capture only when there is none', () => {
+    manager.ensureMainWindow()
+    manager.ensureMainWindow()
+
+    expect(builtWindows()).toHaveLength(1)
+    expect(builtWindows()[0].focus).not.toHaveBeenCalled()
+  })
+
+  it('opens no main window for audio capture while a Quit closes the windows', async () => {
+    await manager.closeWindowsForQuit()
+
+    manager.ensureMainWindow()
+
+    expect(builtWindows()).toHaveLength(0)
+  })
+
+  it('forgets the main window once it closes', () => {
+    manager.createMainWindow()
+    const [window] = builtWindows()
+
+    window.destroyed = true
+    window.emit('closed')
+
+    expect(manager.getMainWindow()).toBeNull()
+  })
+})
+
+describe.each([
+  ['Cue Editor', 'openCueEditorWindow'],
+  ['Audio Preview', 'openAudioPreviewWindow'],
+] as const)('WindowManager reopening the %s window', (_, open) => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('brings a minimised window back before focusing it', () => {
+    const manager = new WindowManager()
+    manager[open]()
+    const [window] = builtWindows()
+    window.minimized = true
+
+    manager[open]()
+
+    expect(builtWindows()).toHaveLength(1)
+    expect(window.restore).toHaveBeenCalledTimes(1)
+    expect(window.focus).toHaveBeenCalledTimes(1)
+    expect(window.restore.mock.invocationCallOrder[0]).toBeLessThan(
+      window.focus.mock.invocationCallOrder[0],
+    )
   })
 })

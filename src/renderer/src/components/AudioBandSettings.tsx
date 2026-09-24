@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { DraftNumberField } from './controls/DraftField'
 import {
   AUDIO_BAND_PRESETS,
   clonePresetBands,
@@ -12,6 +14,7 @@ import {
   AUDIO_BAND_GAIN_MIN,
   type AudioBandDefinition,
 } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const PRESET_OPTIONS = (() => {
   const copy = [...AUDIO_BAND_PRESETS]
@@ -35,7 +38,6 @@ const AudioBandSettings: React.FC = () => {
   const matchedPresetId = useMemo(() => matchAudioBandPresetId(bands), [bands])
 
   const handleSave = (updatedBands: AudioBandDefinition[]): void => {
-    if (isSaving) return
     void audio.save({ bands: updatedBands })
   }
 
@@ -48,12 +50,12 @@ const AudioBandSettings: React.FC = () => {
     audio.set({ bands: bands.map((b, i) => (i === index ? { ...b, gain: clamped } : b)) })
   }
 
-  const handleGainBlur = (): void => {
-    handleSave(bands)
-  }
+  // One release serves every gain slider, since a save writes all eight bands.
+  const gainRelease = useCommitOnRelease(() => handleSave(bands))
 
   const handleGainSliderChange = (index: number, e: React.ChangeEvent<HTMLInputElement>): void => {
     handleGainChange(index, parseFloat(e.target.value))
+    gainRelease.changed()
   }
 
   const handleResetGains = (): void => {
@@ -154,29 +156,24 @@ const AudioBandSettings: React.FC = () => {
                   step="0.1"
                   value={band.gain}
                   onChange={(e) => handleGainSliderChange(index, e)}
-                  onMouseUp={handleGainBlur}
-                  disabled={isSaving}
+                  {...gainRelease.props}
                   aria-label={`${band.name} gain multiplier`}
                   className="flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                   style={{
                     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((band.gain - AUDIO_BAND_GAIN_MIN) / (AUDIO_BAND_GAIN_MAX - AUDIO_BAND_GAIN_MIN)) * 100}%, #e5e7eb ${((band.gain - AUDIO_BAND_GAIN_MIN) / (AUDIO_BAND_GAIN_MAX - AUDIO_BAND_GAIN_MIN)) * 100}%, #e5e7eb 100%)`,
                   }}
                 />
-                <input
-                  type="number"
-                  min={String(AUDIO_BAND_GAIN_MIN)}
-                  max={String(AUDIO_BAND_GAIN_MAX)}
-                  step="0.1"
+                <DraftNumberField
                   value={band.gain}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || AUDIO_BAND_GAIN_MIN
-                    handleGainChange(
-                      index,
-                      Math.max(AUDIO_BAND_GAIN_MIN, Math.min(AUDIO_BAND_GAIN_MAX, value)),
-                    )
-                  }}
-                  onBlur={handleGainBlur}
+                  min={AUDIO_BAND_GAIN_MIN}
+                  max={AUDIO_BAND_GAIN_MAX}
+                  step={0.1}
+                  decimals={2}
+                  onCommit={(gain) =>
+                    handleSave(bands.map((b, i) => (i === index ? { ...b, gain } : b)))
+                  }
                   disabled={isSaving}
+                  aria-label={`${band.name} gain value`}
                   className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center disabled:opacity-50 shrink-0"
                 />
               </div>
@@ -201,6 +198,7 @@ const AudioBandSettings: React.FC = () => {
           Reset to Rhythm Game preset
         </button>
       </div>
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

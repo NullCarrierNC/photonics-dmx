@@ -3,7 +3,14 @@ import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 
 import type { LightingPreferences } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
+import {
+  getAppVersion,
+  getAudioConfig,
+  getAudioEnabled,
+  getCorruptRecoveryEvents,
+  getPrefs,
+  getValidationErrors,
+} from '../ipcApi'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import {
@@ -11,6 +18,7 @@ import {
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
+import type { ConfigRecoveryFile } from '../utils/configRecoveryMessages'
 const log = createLogger('useAppIpcListeners')
 
 export interface UseAppIpcListenersParams {
@@ -35,9 +43,7 @@ export interface UseAppIpcListenersParams {
   handleCueValidationErrors: (
     errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>,
   ) => void
-  handleConfigCorruptRecovered: (payload: {
-    files: { fileName: string; message?: string }[]
-  }) => void
+  handleConfigCorruptRecovered: (payload: { files: ConfigRecoveryFile[] }) => void
   handleAudioEnable: (config: AudioConfig) => void | Promise<void>
   handleAudioDisable: (payload: undefined) => void
   handleAudioConfigUpdate: (config: AudioConfig | undefined) => void
@@ -126,6 +132,21 @@ async function loadAndApplyPrefs(
   }
 }
 
+/** Collects the settings file recoveries main has queued and hands them to the toast handler. */
+async function collectConfigRecoveries(
+  p: UseAppIpcListenersParams,
+  isCancelled: () => boolean,
+): Promise<void> {
+  try {
+    const { files } = await getCorruptRecoveryEvents()
+    if (!isCancelled() && files.length > 0) {
+      p.handleConfigCorruptRecovered({ files })
+    }
+  } catch (error) {
+    log.error('Failed to fetch config corrupt recovery events:', error)
+  }
+}
+
 /**
  * Sets up IPC listeners for the main app window. Subscriptions register once; handlers always see
  * the latest props via a ref. Initial fetches (version, prefs, validation, corrupt recovery) run
@@ -170,14 +191,20 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
 
     void (async () => {
       try {
-        const { files } = await getCorruptRecoveryEvents()
-        if (!isCancelled() && files.length > 0) {
-          latest.current.handleConfigCorruptRecovered({ files })
+        // Main announces a start once, so a window opened while audio runs starts capture here.
+        if (!(await getAudioEnabled()) || isCancelled()) {
+          return
+        }
+        const config = await getAudioConfig()
+        if (config && !isCancelled()) {
+          await latest.current.handleAudioEnable(config)
         }
       } catch (error) {
-        log.error('Failed to fetch config corrupt recovery events:', error)
+        log.error('Failed to pick up running audio:', error)
       }
     })()
+
+    void collectConfigRecoveries(latest.current, isCancelled)
 
     return () => {
       cancelled = true
@@ -203,6 +230,9 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     }
     const onAudioDisable = () => p().handleAudioDisable(undefined)
     const onAudioConfigUpdate = (c: AudioConfig | undefined) => p().handleAudioConfigUpdate(c)
+    const onConfigRecoveryQueued = (): void => {
+      void collectConfigRecoveries(p(), () => false)
+    }
     addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
     addIpcListener(RENDERER_RECEIVE.YARG_ERROR, onYargError)
     addIpcListener(RENDERER_RECEIVE.RB3_ERROR, onRb3Error)
@@ -213,6 +243,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, onAudioEnable)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, onAudioDisable)
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudioConfigUpdate)
+    addIpcListener(RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED, onConfigRecoveryQueued)
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
@@ -225,6 +256,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, onAudioEnable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, onAudioDisable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudioConfigUpdate)
+      removeIpcListener(RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED, onConfigRecoveryQueued)
     }
   }, [latest])
 }

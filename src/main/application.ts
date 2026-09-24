@@ -3,12 +3,14 @@ import { WindowManager } from './WindowManager'
 import { setupIpcHandlers } from './ipc/index'
 import { ControllerManager } from './controllers/ControllerManager'
 import { setupMenu } from './menu'
-import { disposeBlackoutShortcut, initBlackoutShortcut } from './blackoutShortcut'
+import { BlackoutShortcut } from './blackoutShortcut'
 import { toggleMasterBlackout } from './ipc/master-output-handlers'
 import {
   normalizeBlackoutShortcutKey,
   normalizeBlackoutShortcutScope,
 } from '../services/configuration/configurationDefaults'
+import { RENDERER_RECEIVE } from '../shared/ipcChannels'
+import { sendToAllWindows } from './utils/windowUtils'
 import { createLogger } from '../shared/logger'
 
 const log = createLogger('Application')
@@ -18,6 +20,7 @@ export class Application {
   private controllerManager: ControllerManager
   private applicationShutdownPromise: Promise<void> | null = null
   private applicationShutdownCompleted = false
+  private readonly blackoutShortcut = new BlackoutShortcut()
 
   /**
    * Get any buffered log lines onto disk before a forced exit.
@@ -52,7 +55,14 @@ export class Application {
     this.windowManager.createMainWindow()
 
     // Set up IPC handlers
-    setupIpcHandlers(ipcMain, this.controllerManager, this.windowManager)
+    setupIpcHandlers(ipcMain, this.controllerManager, this.windowManager, (binding) =>
+      this.blackoutShortcut.set(binding),
+    )
+    this.controllerManager
+      .getConfig()
+      .setRecoveryQueuedListener(() =>
+        sendToAllWindows(RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED, undefined),
+      )
 
     // Set up application menu
     setupMenu()
@@ -62,7 +72,7 @@ export class Application {
     // treats a rejection from init as fatal, and a key binding is not worth the app over.
     try {
       const config = this.controllerManager.getConfig()
-      initBlackoutShortcut(
+      this.blackoutShortcut.init(
         () => {
           toggleMasterBlackout(this.controllerManager)
         },
@@ -89,8 +99,12 @@ export class Application {
     }
   }
 
+  /**
+   * A Dock click brings the main window back when it was closed, even with another window open. It
+   * opens nothing while a Quit closes the windows.
+   */
   public handleActivate(): void {
-    if (!this.windowManager.hasWindows()) {
+    if (!this.windowManager.getMainWindow() && !this.windowManager.isQuitting()) {
       this.windowManager.createMainWindow()
     }
   }
@@ -98,6 +112,14 @@ export class Application {
   /** A second launch hands the user back to the window this instance already has. */
   public handleSecondInstance(): void {
     this.windowManager.focusMainWindow()
+  }
+
+  /**
+   * Closes every window for a user's Quit, asking any page with unsaved changes first. False when
+   * the user stays on one, and the app then keeps running.
+   */
+  public closeWindowsForQuit(): Promise<boolean> {
+    return this.windowManager.closeWindowsForQuit()
   }
 
   public getControllerManager(): ControllerManager {
@@ -117,14 +139,14 @@ export class Application {
         // At error level so a packaged build, which records nothing below it, still says why the
         // app went, and flushed before going since the line is still buffered in the stream.
         log.error('Shutdown taking too long, forcing exit')
-        void Promise.resolve(this.flushLogs?.()).finally(() => process.exit(0))
+        void Promise.resolve(this.flushLogs?.()).finally(() => process.exit(1))
       }, 5000)
 
       try {
         // Ahead of the controllers, but never at their expense: letting go of a key matters far
         // less than closing senders, so a failure here must not abort the rest of the shutdown.
         try {
-          disposeBlackoutShortcut()
+          this.blackoutShortcut.dispose()
         } catch (error) {
           log.error('Failed to release the blackout shortcut:', error)
         }

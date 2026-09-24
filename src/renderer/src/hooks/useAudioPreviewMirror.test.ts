@@ -5,22 +5,23 @@ import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { useAudioPreviewMirror } from './useAudioPreviewMirror'
+import { renderHookWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import {
+  emitIpc,
+  ipcSubscribers,
+  resetIpcListenerStub,
+} from '@renderer/tests/helpers/ipcListenerStub'
 
-const mockHandlers = new Map<string, (payload: unknown) => void>()
-const mockCleanups = new Map<string, jest.Mock<() => void>>()
-
-jest.mock('../utils/ipcHelpers', () => ({
-  registerIpcListener: (channel: string, handler: (payload: unknown) => void) => {
-    mockHandlers.set(channel, handler)
-    const cleanup = jest.fn<() => void>()
-    mockCleanups.set(channel, cleanup)
-    return cleanup
-  },
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 beforeEach(() => {
-  mockHandlers.clear()
-  mockCleanups.clear()
+  resetIpcListenerStub()
   getDefaultStore().set(audioDataAtom, null)
 })
 
@@ -29,16 +30,25 @@ describe('useAudioPreviewMirror', () => {
     renderHook(() => useAudioPreviewMirror())
     const frame = { timestamp: 1 }
 
-    mockHandlers.get(RENDERER_RECEIVE.AUDIO_DATA_MIRROR)!(frame)
+    emitIpc(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, frame)
 
     expect(getDefaultStore().get(audioDataAtom)).toBe(frame)
   })
 
+  it('puts the frame in the store the window renders from', () => {
+    const { store } = renderHookWithProviders(() => useAudioPreviewMirror())
+    const frame = { timestamp: 2 }
+
+    emitIpc(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, frame)
+
+    expect(store.get(audioDataAtom)).toBe(frame)
+  })
+
   it('clears the frame when audio is disabled', () => {
     renderHook(() => useAudioPreviewMirror())
-    mockHandlers.get(RENDERER_RECEIVE.AUDIO_DATA_MIRROR)!({ timestamp: 1 })
+    emitIpc(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, { timestamp: 1 })
 
-    mockHandlers.get(RENDERER_RECEIVE.AUDIO_DISABLE)!(undefined)
+    emitIpc(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
 
     expect(getDefaultStore().get(audioDataAtom)).toBeNull()
   })
@@ -46,7 +56,7 @@ describe('useAudioPreviewMirror', () => {
   it('stops listening on unmount', () => {
     const { unmount } = renderHook(() => useAudioPreviewMirror())
     unmount()
-    expect(mockCleanups.get(RENDERER_RECEIVE.AUDIO_DATA_MIRROR)).toHaveBeenCalledTimes(1)
-    expect(mockCleanups.get(RENDERER_RECEIVE.AUDIO_DISABLE)).toHaveBeenCalledTimes(1)
+    expect(ipcSubscribers(RENDERER_RECEIVE.AUDIO_DATA_MIRROR)).toEqual([])
+    expect(ipcSubscribers(RENDERER_RECEIVE.AUDIO_DISABLE)).toEqual([])
   })
 })

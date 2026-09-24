@@ -7,7 +7,7 @@
 import { LIGHT } from '../ipcChannels'
 import type { FixtureConfig, SenderConfig } from '../../photonics-dmx/types'
 import type { MasterOutputSnapshot } from '../../photonics-dmx/controllers/MasterOutputState'
-import type { IpcErrorResult, IpcSuccessResult } from './common'
+import type { IpcErrorResult, IpcSavedResult, IpcSuccessResult } from './common'
 
 export interface SenderInvokeMap {
   [LIGHT.UPDATE_SACN_CONFIG]: {
@@ -72,26 +72,6 @@ export interface SenderInvokeMap {
     request: void
     response: IpcSuccessResult | IpcErrorResult
   }
-  [LIGHT.CONSOLE_UPDATE_CHANNEL]: {
-    request: {
-      rigId: string
-      lightId: string
-      fixtureId: string
-      channelName: string
-      channelNumber: number
-    }
-    response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.CONSOLE_SET_HOME]: {
-    request: {
-      rigId: string
-      lightId: string
-      fixtureId: string
-      panHome: number
-      tiltHome: number
-    }
-    response: IpcSuccessResult | IpcErrorResult
-  }
   [LIGHT.CONSOLE_SET_FIXTURE_CONFIG]: {
     request: {
       rigId: string
@@ -99,6 +79,6 @@ export interface SenderInvokeMap {
       fixtureId: string
       config: Partial<FixtureConfig>
     }
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
 }

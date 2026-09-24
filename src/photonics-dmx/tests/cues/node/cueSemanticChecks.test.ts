@@ -108,3 +108,82 @@ describe('the built-in event vocabulary check', () => {
     }
   })
 })
+
+describe('the built-in cue-called execution policy check', () => {
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  /** An audio file whose one cue runs a set-color from cue-called. */
+  const cueCalledFile = (waitUntil: string, executionPolicy?: string): Record<string, unknown> => ({
+    version: 1,
+    mode: 'audio',
+    group: { id: 'policy', name: 'Policy' },
+    cues: [
+      {
+        kind: 'lighting',
+        id: 'called',
+        cueTypeId: 'called',
+        name: 'Called',
+        nodes: {
+          events: [
+            {
+              id: 'ev',
+              type: 'event',
+              eventType: 'cue-called',
+              triggerMode: 'edge',
+              ...(executionPolicy && { executionPolicy }),
+            },
+          ],
+          actions: [
+            {
+              id: 'paint',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'red' },
+                brightness: { source: 'literal', value: 'high' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 },
+                waitUntilCondition: { source: 'literal', value: waitUntil },
+                waitUntilTime: { source: 'literal', value: 0 },
+              },
+            },
+          ],
+          logic: [],
+        },
+        connections: [{ from: 'ev', to: 'paint' }],
+        layout: { nodePositions: {} },
+      },
+    ],
+  })
+
+  it('warns when a continuous cue-called graph waits on a blocking action', () => {
+    const result = validateAudioNodeCueFile(cueCalledFile('beat'))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "the cue-called event starts a run on every audio frame and 'paint' waits",
+    )
+  })
+
+  it('stays quiet once the event has another policy, or nothing waits', () => {
+    for (const file of [
+      cueCalledFile('beat', 'ignore-while-running'),
+      cueCalledFile('beat', 'latest-pending'),
+      cueCalledFile('none'),
+    ]) {
+      const result = validateAudioNodeCueFile(file)
+      expect(result.valid && result.warnings).toEqual([])
+    }
+  })
+
+  it('rejects a policy it does not know', () => {
+    expect(validateAudioNodeCueFile(cueCalledFile('beat', 'sometimes')).valid).toBe(false)
+  })
+})

@@ -1,6 +1,7 @@
 import { describe, it, expect, jest } from '@jest/globals'
 import {
   CUE_DOMAIN_BINDINGS,
+  applyAllEnabledGroupsFromConfig,
   cueDomainBinding,
   reconcileAndApplyGroups,
   registerCueDomainBinding,
@@ -85,7 +86,7 @@ function removeBinding(domain: CueDomainRegistryBinding['domain']): void {
 describe('reconcileAndApplyGroups', () => {
   const config = {} as ConfigurationManager
 
-  it('auto-enables newly registered groups and drops deregistered ones', async () => {
+  it('auto-enables newly registered groups and applies only the registered ones', async () => {
     const binding = makeBinding('yarg', {
       registered: ['a', 'c'],
       enabled: ['a', 'b'],
@@ -94,9 +95,9 @@ describe('reconcileAndApplyGroups', () => {
 
     const reconciled = await reconcileAndApplyGroups(binding, config)
 
-    expect(reconciled.enabled).toEqual(['a', 'c'])
+    expect(reconciled.enabled).toEqual(['a', 'b', 'c'])
     expect(binding.applied.enabled).toEqual(['a', 'c'])
-    expect(binding.readStored(config).knownGroups).toEqual(['a', 'c'])
+    expect(binding.readStored(config).knownGroups).toEqual(['a', 'b', 'c'])
   })
 
   it('seeds an extra group into the enabled set', async () => {
@@ -120,5 +121,38 @@ describe('reconcileAndApplyGroups', () => {
 
     expect(persist).not.toHaveBeenCalled()
     expect(binding.applied.enabled).toEqual(['a'])
+  })
+})
+
+describe('applyAllEnabledGroupsFromConfig', () => {
+  const config = {} as ConfigurationManager
+
+  /** Runs the startup reconcile over these bindings alone, restoring the real table after. */
+  async function applyAllOver(
+    only: CueDomainRegistryBinding[],
+    refresh: () => void,
+  ): Promise<void> {
+    const list = CUE_DOMAIN_BINDINGS as unknown as CueDomainRegistryBinding[]
+    const real = list.splice(0, list.length, ...only)
+    try {
+      await applyAllEnabledGroupsFromConfig(config, refresh)
+    } finally {
+      list.splice(0, list.length, ...real)
+    }
+  }
+
+  it('applies every domain and finishes when a domain cannot save its selection', async () => {
+    const refused = makeBinding('yarg', { registered: ['a', 'b'] })
+    refused.persist = async () => {
+      throw new Error('Failed to save configuration')
+    }
+    const later = makeBinding('audio', { registered: ['c'] })
+    const refresh = jest.fn()
+
+    await applyAllOver([refused, later], refresh)
+
+    expect(refused.applied.enabled).toEqual(['a', 'b'])
+    expect(later.applied.enabled).toEqual(['c'])
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 })

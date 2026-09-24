@@ -1,6 +1,7 @@
 /**
  * Visual and motion cue policies share the same entry events (cue-started, cue-called, beat, etc.).
- * Motion differs only by useInitialClearPolicy (no setEffect clear on first submission).
+ * Motion and secondary lighting cues differ only by useInitialClearPolicy (no setEffect clear on
+ * first submission).
  */
 
 import { describe, expect, it } from '@jest/globals'
@@ -14,6 +15,7 @@ import { DrumNoteType, type CueData } from '../../../cues/types/cueTypes'
 import {
   cueGraphPolicy,
   motionCueGraphPolicy,
+  secondaryCueGraphPolicy,
 } from '../../../cues/node/runtime/GraphExecutionPolicy'
 import { monotonicNowMs } from '../../../../shared/time'
 
@@ -102,6 +104,15 @@ describe('GraphExecutionPolicy motion vs visual', () => {
     const types = nodes.map((n) => (n as NetEventNode).eventType)
     expect(types).toContain('cue-called')
     expect(types).not.toContain('cue-started')
+  })
+
+  it('only the primary lighting policy clears the sequencer on its first submission', () => {
+    expect(cueGraphPolicy('g', 'c').useInitialClearPolicy).toBe(true)
+    expect(secondaryCueGraphPolicy('g', 'c').useInitialClearPolicy).toBe(false)
+    expect(motionCueGraphPolicy('g', 'c').useInitialClearPolicy).toBe(false)
+    expect(secondaryCueGraphPolicy('g', 'c').entryEventTypes).toEqual(
+      cueGraphPolicy('g', 'c').entryEventTypes,
+    )
   })
 
   it('motion cue policy entryEventTypes includes cue-started and cue-called', () => {

@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
+import { realPathOf } from '../../../helpers/realPath'
 
 /**
  * Shared file-system plumbing for the node-cue and effect loaders.
@@ -55,6 +56,12 @@ export abstract class BaseNodeFileLoader<
   protected summaries: BaseListSummary<TMode, TSummary>
 
   /**
+   * What the last save of each file wrote and loaded, so the watcher's report of that same write
+   * does not load it a second time.
+   */
+  private readonly savedContents = new Map<string, string>()
+
+  /**
    * @param baseDir application base directory
    * @param subDir  segment under `node-data` that scopes this loader's roots,
    *                e.g. `'cues'` or `'effects'`.
@@ -72,6 +79,11 @@ export abstract class BaseNodeFileLoader<
       this.dirs[mode] = path.join(this.baseDir, 'node-data', subDir, mode)
       this.summaries[mode] = []
     }
+  }
+
+  /** The mode discriminants this loader handles, which IPC payloads are checked against. */
+  public getModes(): readonly TMode[] {
+    return this.modes
   }
 
   // ---- per-loader specifics -------------------------------------------------
@@ -208,19 +220,45 @@ export abstract class BaseNodeFileLoader<
     if (!mode || !isJsonFile(filePath)) {
       return
     }
+    if (await this.isOwnSave(filePath)) {
+      return
+    }
 
+    await this.loadFileRecordingErrors(mode, filePath)
+    this.emit('changed', this.getSummary())
+  }
+
+  /**
+   * Load one file, and when that fails record an error summary for it, so the editor flags the
+   * file.
+   */
+  protected async loadFileRecordingErrors(mode: TMode, filePath: string): Promise<void> {
     try {
       await this.loadFile(mode, filePath)
-      this.emit('changed', this.getSummary())
     } catch (error) {
-      // A watch-triggered load failure (invalid JSON / failed validation) must not pass
-      // silently: record an error summary for the file and emit it so the editor flags the
-      // file instead of showing the last good state as if nothing changed.
       this.onFileChangeError(filePath, error)
       const message = error instanceof Error ? error.message : String(error)
       this.updateSummary(this.makeErrorSummary(mode, filePath, message))
-      this.emit('changed', this.getSummary())
     }
+  }
+
+  /** Write a file a save produced, noting what was written for {@link isOwnSave}. */
+  protected async writeSavedFile(filePath: string, contents: string): Promise<void> {
+    await fs.mkdir(path.dirname(filePath), { recursive: true })
+    await fs.writeFile(filePath, contents, 'utf-8')
+    this.savedContents.set(path.resolve(filePath), contents)
+  }
+
+  /** Whether the file on disk is still exactly what the last save of it wrote and loaded. */
+  private async isOwnSave(filePath: string): Promise<boolean> {
+    const key = path.resolve(filePath)
+    const saved = this.savedContents.get(key)
+    if (saved === undefined) {
+      return false
+    }
+    this.savedContents.delete(key)
+    const onDisk = await fs.readFile(filePath, 'utf-8').catch(() => null)
+    return onDisk === saved
   }
 
   protected handleFileRemoved(filePath: string): void {
@@ -307,11 +345,15 @@ export abstract class BaseNodeFileLoader<
     return resolvedPath
   }
 
+  /**
+   * Whether a path lies in a directory once every link in either is followed, so a link inside a
+   * mode directory cannot lead a load or a save outside it.
+   */
   protected isPathWithinDir(targetPath: string, baseDir: string): boolean {
     const resolvedBase = this.resolvePath(baseDir)
-    const resolvedTarget = this.resolvePath(targetPath)
-    return (
-      resolvedTarget === resolvedBase || resolvedTarget.startsWith(`${resolvedBase}${path.sep}`)
-    )
+    const realBase = realPathOf(resolvedBase) ?? resolvedBase
+    const realTarget = realPathOf(this.resolvePath(targetPath))
+    if (realTarget === null) return false
+    return realTarget === realBase || realTarget.startsWith(`${realBase}${path.sep}`)
   }
 }

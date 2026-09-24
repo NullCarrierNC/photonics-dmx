@@ -13,7 +13,6 @@ import { CueHandler } from '../../cueHandlers/CueHandler'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { DrumNoteType, InstrumentNoteType } from '../../cues/types/cueTypes'
-import type { Clock } from '../../controllers/sequencer/Clock'
 
 describe('ChainFanout end-to-end (listener → fanout → per-chain handlers → per-chain sequencers)', () => {
   let chains: RigChain[] = []
@@ -27,7 +26,7 @@ describe('ChainFanout end-to-end (listener → fanout → per-chain handlers →
 
   function buildChains(): RigChain[] {
     const [rigA, rigB] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chainA = new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true })
     const chainB = new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false })
     chainA.cueHandlers.yarg = new CueHandler(chainA.dmxLightManager, chainA.sequencer)

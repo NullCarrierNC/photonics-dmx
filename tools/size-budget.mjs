@@ -7,16 +7,20 @@
  * room to grow back.
  */
 import { readdirSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join, dirname, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 const {
+  isMeasuredSource,
   parseBaseline,
   compareBudget,
-  grownSinceBaseline,
+  raisedByRewrite,
   renderBaseline,
+  limitMismatch,
+  rewriteGuard,
 } = require('./sizeBudgetCore.cjs')
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -27,19 +31,6 @@ const LIMIT = 600
 const REGENERATE = 'node tools/size-budget.mjs --write'
 
 /**
- * @param {string} path
- * @returns {boolean} true when the file is a test or declaration file
- */
-function isExcluded(path) {
-  return (
-    path.includes('/tests/') ||
-    path.endsWith('.d.ts') ||
-    /\.(test|spec)\.tsx?$/.test(path) ||
-    /(^|\/)__tests__\//.test(path)
-  )
-}
-
-/**
  * @returns {Map<string, number>} repo-relative posix path to line count, sorted by path
  */
 function measureSources() {
@@ -47,12 +38,12 @@ function measureSources() {
   /** @type {Map<string, number>} */
   const sizes = new Map()
   for (const entry of entries) {
-    if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) {
+    if (!entry.isFile()) {
       continue
     }
     const absolute = join(entry.parentPath ?? entry.path, entry.name)
     const rel = relative(root, absolute).split(sep).join('/')
-    if (isExcluded(rel)) {
+    if (!isMeasuredSource(rel)) {
       continue
     }
     const lines = readFileSync(absolute, 'utf8').split(/\r?\n/)
@@ -76,26 +67,43 @@ function fail(messages, advice) {
   process.exit(1)
 }
 
+/** @returns {string|null} the baseline at HEAD, or null outside a checkout or with no commits */
+function committedBaselineText() {
+  try {
+    return execFileSync('git', ['show', 'HEAD:metrics/size-budget.txt'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+  } catch {
+    return null
+  }
+}
+
 const sizes = measureSources()
 
 if (process.argv.includes('--write')) {
   mkdirSync(join(root, 'metrics'), { recursive: true })
 
-  // Regenerating must never launder a file that grew. Raising an allowance is a deliberate act, so
-  // it is done by editing the entry, not by running this.
-  if (existsSync(BUDGET_FILE)) {
-    const baseline = parseBaseline(readFileSync(BUDGET_FILE, 'utf8'))
+  // Regenerating only lowers or removes entries. An allowance is added or raised by editing the
+  // file by hand. A deleted file is guarded by the committed one.
+  const guard = rewriteGuard(
+    existsSync(BUDGET_FILE) ? readFileSync(BUDGET_FILE, 'utf8') : null,
+    committedBaselineText(),
+  )
+  if (guard !== null) {
+    const baseline = parseBaseline(guard)
     if (!baseline) {
       fail(
         [`Budget file must start with a \`limit <number>\` line: ${BUDGET_FILE}`],
-        'Fix the header, or delete the file to regenerate it from scratch.',
+        'Fix the header, or restore the file from git.',
       )
     }
-    const grown = grownSinceBaseline(sizes, baseline)
-    if (grown.length > 0) {
+    const raised = raisedByRewrite(sizes, baseline, LIMIT)
+    if (raised.length > 0) {
       fail(
-        grown,
-        `Refusing to raise an allowance. Shrink the file, or edit its entry in ${BUDGET_FILE} if the growth is intended.`,
+        raised,
+        `Refusing to add or raise an allowance. Shrink the file, or add or edit its entry in ${BUDGET_FILE} by hand if the size is intended.`,
       )
     }
   }
@@ -116,6 +124,10 @@ if (!baseline) {
     ['Budget file must start with a `limit <number>` line'],
     `Fix the header, or regenerate it with: ${REGENERATE}`,
   )
+}
+const mismatch = limitMismatch(baseline, LIMIT)
+if (mismatch) {
+  fail([mismatch], 'The limit is set in tools/size-budget.mjs, so put the header back to match it.')
 }
 if (baseline.malformed.length > 0) {
   fail(

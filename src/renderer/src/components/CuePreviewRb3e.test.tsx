@@ -14,17 +14,15 @@ import { rb3eListenerEnabledAtom } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import CuePreviewRb3e, { nextColorBanks } from './CuePreviewRb3e'
 import { defaultCueData, type CueData } from '../../../photonics-dmx/cues/types/cueTypes'
+import { emitIpc, resetIpcListenerStub } from '@renderer/tests/helpers/ipcListenerStub'
 
-// Capture registered IPC handlers so tests can push game-mode events.
-const mockHandlers: Record<string, Array<(p: unknown) => void>> = {}
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: (ch: string, h: (p: unknown) => void) => {
-    ;(mockHandlers[ch] ||= []).push(h)
-  },
-  removeIpcListener: (ch: string, h: (p: unknown) => void) => {
-    mockHandlers[ch] = (mockHandlers[ch] || []).filter((x) => x !== h)
-  },
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 jest.mock(
   '../ipcApi',
   () =>
@@ -102,7 +100,7 @@ const gameplayFrame = (p: Partial<CueData> = {}): CueData => ({
 
 async function fire(channel: string, payload?: unknown): Promise<void> {
   await act(async () => {
-    await Promise.all((mockHandlers[channel] || []).map((h) => h(payload)))
+    emitIpc(channel, payload)
   })
 }
 
@@ -112,7 +110,7 @@ function renderEnabled(): void {
 
 describe('CuePreviewRb3e game-mode display', () => {
   beforeEach(() => {
-    for (const k of Object.keys(mockHandlers)) delete mockHandlers[k]
+    resetIpcListenerStub()
     resetIpcApiMock()
     jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(true)
     jest.mocked(ipcApi.getActiveRb3MotionCue).mockResolvedValue(null as never)

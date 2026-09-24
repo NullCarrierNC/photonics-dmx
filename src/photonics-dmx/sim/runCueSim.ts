@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { CueSimulator, CueSimulatorOptions } from './CueSimulator'
-import { ScenarioEntry, SimLightSample, SimTimeline, VenueSize } from './types'
+import { ScenarioEntry, SimDomain, SimLightSample, SimTimeline, VenueSize } from './types'
 
 /**
  * CLI front-end for {@link CueSimulator}. Runs a cue headlessly under virtual time and prints
@@ -62,13 +62,25 @@ function asVenue(value: string | undefined, fallback: VenueSize): VenueSize {
   throw new Error(`Invalid venue '${value}'. Expected Large, Small or NoVenue.`)
 }
 
+function asDomain(value: string | undefined): SimDomain {
+  if (value === undefined) {
+    return 'yarg'
+  }
+  if (value === 'yarg' || value === 'rb3' || value === 'audio') {
+    return value
+  }
+  throw new Error(`Invalid domain '${value}'. Expected yarg, rb3 or audio.`)
+}
+
 const HELP = `Cue Simulation CLI
 
 Usage: npm run sim -- [options]
 
 Options:
   --library <id>      Cue library group id or filename (default: yarg-stagekit)
-  --cue <CueType>     Cue to simulate, e.g. Menu, Intro, Default (required)
+  --domain <domain>   yarg | rb3 | audio, the domain the library belongs to (default: yarg)
+  --cue <CueType>     Cue to simulate, e.g. Menu, Intro, Default, or an audio cue id (required)
+  --level <0-1>       Audio input level (default: 0.6)
   --venue <size>      Large | Small | NoVenue (default: Large)
   --bpm <n>           Beats per minute, 0 disables beats (default: 120)
   --front <n>         Front light count (default: 4)
@@ -172,6 +184,8 @@ async function main(): Promise<void> {
 
   const options: CueSimulatorOptions = {
     library: flags.library ?? 'yarg-stagekit',
+    domain: asDomain(flags.domain),
+    level: num(flags.level, 0.6),
     frontCount: num(flags.front, 4),
     backCount: num(flags.back, 4),
     strobeCount: num(flags.strobe, 0),

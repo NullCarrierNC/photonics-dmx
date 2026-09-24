@@ -22,9 +22,9 @@ export class LifecycleAbortedError extends Error {
  */
 const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
   initializing: ['running', 'failed', 'shuttingDown'],
-  running: ['restarting', 'consoleMode', 'shuttingDown'],
+  running: ['restarting', 'consoleMode', 'failed', 'shuttingDown'],
   restarting: ['running', 'failed', 'shuttingDown'],
-  consoleMode: ['running', 'restarting', 'shuttingDown'],
+  consoleMode: ['running', 'restarting', 'failed', 'shuttingDown'],
   failed: ['running', 'restarting', 'shuttingDown'],
   shuttingDown: ['stopped'],
   stopped: [],
@@ -38,12 +38,13 @@ const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
  * *does*; this owns when a transition is legal and what may run next.
  *
  * Concurrency rules the memos encode:
- * - Queued ops exclude each other, and additionally await any in-flight shutdown.
+ * - Queued ops exclude each other, and additionally await any in-flight shutdown. Every listener
+ *   toggle, audio included, and every restart is a queued op.
  * - `runExclusiveShutdown` runs off the queue and must never drain it, since queued ops await the
- *   shutdown memo and a shutdown waiting on the queue would deadlock against them.
- * - Off-queue callers (audio toggles) await restart and shutdown through `awaitInFlightWork`.
- *   A queued op must never call that: the restart is itself queued, so a queued op waiting behind
- *   it on the same queue would deadlock. Queued ops use `awaitShutdownWork`.
+ *   shutdown memo and a shutdown waiting on the queue would deadlock against them. The shutdown
+ *   waits out only the op already running past that wait (`awaitActiveOp`).
+ * - A restart request joins the one in flight until that restart starts rebuilding. After that the
+ *   rebuild has read its configuration, so the request gets one follow-up restart instead.
  */
 export class ControllerLifecycle {
   private phaseValue: LifecyclePhase = 'initializing'
@@ -55,8 +56,16 @@ export class ControllerLifecycle {
   private shutdownCompleted = false
   /** Set while a restart is in flight so overlapping callers share the one attempt. */
   private restartInFlight: Promise<void> | null = null
+  /** Set once the in-flight restart has started rebuilding from the configuration. */
+  private restartRebuildStarted = false
+  /** The restart queued behind the in-flight one, until it starts. */
+  private followUpRestart: Promise<void> | null = null
   /** Set while an initialisation is in flight so overlapping callers share the one attempt. */
   private initInFlight: Promise<void> | null = null
+  /** The queued op or restart running now, past any wait on a shutdown. */
+  private activeOp: Promise<unknown> | null = null
+  /** Set by an uncaught fault and cleared when the phase leaves `failed`. Refuses input enables. */
+  private faulted = false
 
   /**
    * @param broadcastPhase Called on every real phase transition so the renderer can disable
@@ -78,7 +87,38 @@ export class ControllerLifecycle {
       log.warn(`Unexpected lifecycle transition ${this.phaseValue} -> ${next}`)
     }
     this.phaseValue = next
+    if (next !== 'failed') this.faulted = false
     this.broadcastPhase(next)
+  }
+
+  /**
+   * Hold the graph `failed` after an uncaught fault, refusing input enables until a restart or
+   * init moves the phase on. Returns false, and changes nothing, once a shutdown has begun or while
+   * a fault is already held.
+   */
+  public markFaulted(): boolean {
+    if (this.isShuttingDown() || this.faulted) return false
+    this.setPhase('failed')
+    this.faulted = true
+    return true
+  }
+
+  /**
+   * Move to `next` unless a shutdown has begun, which owns every phase from then on. Work that was
+   * already under way when the shutdown started finishes without reopening the phase.
+   */
+  public setPhaseUnlessShuttingDown(next: LifecyclePhase): void {
+    if (this.isShuttingDown()) return
+    this.setPhase(next)
+  }
+
+  /** Whether a shutdown has begun, whether or not it has finished. */
+  public isShuttingDown(): boolean {
+    return (
+      this.phaseValue === 'shuttingDown' ||
+      this.phaseValue === 'stopped' ||
+      this.shutdownPromise !== null
+    )
   }
 
   public assertPhase(allowed: readonly LifecyclePhase[], context: string): void {
@@ -179,34 +219,47 @@ export class ControllerLifecycle {
   /**
    * Run a restart as a queued lifecycle op, memoized so overlapping callers share the one attempt
    * and the off-queue audio toggles can wait on it. The memo is assigned synchronously so a
-   * same-tick second call shares it, and cleared when the attempt settles either way.
+   * same-tick second call shares it, and cleared when the attempt settles either way. A caller
+   * that arrives once the in-flight restart has started rebuilding gets the follow-up restart.
    */
   public runSharedRestart(work: () => Promise<void>): Promise<void> {
     if (this.restartInFlight) {
-      return this.restartInFlight
+      return this.restartRebuildStarted ? this.queueFollowUpRestart(work) : this.restartInFlight
     }
-    this.restartInFlight = this.runOp(work).finally(() => {
+    this.restartRebuildStarted = false
+    this.restartInFlight = this.runOp(() => this.runActive(work)).finally(() => {
       this.restartInFlight = null
+      this.restartRebuildStarted = false
     })
     return this.restartInFlight
   }
 
-  /**
-   * Wait for any in-flight restart, shutdown or initialisation to settle before mutating audio
-   * lifecycle.
-   * Errors from the in-flight operation are swallowed here so that the caller can still attempt
-   * its own work; the operation that owns the promise is responsible for surfacing its error.
-   *
-   * Off-queue callers only. See the class comment for why a queued op must not call this.
-   */
-  public async awaitInFlightWork(): Promise<void> {
-    const pending = this.restartInFlight ?? this.shutdownPromise ?? this.initInFlight
-    if (!pending) return
-    try {
-      await pending
-    } catch {
-      // The owner already logged / rethrew; we just needed to wait.
+  /** The in-flight restart is rebuilding, so it has read the configuration it will run with. */
+  public markRestartRebuildStarted(): void {
+    if (this.restartInFlight) {
+      this.restartRebuildStarted = true
     }
+  }
+
+  /**
+   * One restart behind the in-flight one, shared by every caller until it starts. It clears its
+   * slot as it starts, so a caller arriving during its own rebuild opens the next follow-up.
+   */
+  private queueFollowUpRestart(work: () => Promise<void>): Promise<void> {
+    if (this.followUpRestart) {
+      return this.followUpRestart
+    }
+    const current = this.restartInFlight
+    this.followUpRestart = (async () => {
+      try {
+        await current
+      } catch {
+        // The in-flight restart's owner reports its failure. This one still runs.
+      }
+      this.followUpRestart = null
+      await this.runSharedRestart(work)
+    })()
+    return this.followUpRestart
   }
 
   /**
@@ -221,6 +274,46 @@ export class ControllerLifecycle {
     } catch {
       // The owner already logged / rethrew; we just needed to wait.
     }
+  }
+
+  /** Run `op` on the queue once any in-flight shutdown has settled, like every listener toggle. */
+  public runQueuedOp<T>(op: () => Promise<T>): Promise<T> {
+    return this.runOp(async () => {
+      await this.awaitShutdownWork()
+      return this.runActive(op)
+    })
+  }
+
+  /** Run an input enable as a queued op, refused while an uncaught fault is held. */
+  public runQueuedEnable<T>(op: () => Promise<T>): Promise<T> {
+    return this.runQueuedOp(async () => {
+      if (this.faulted) {
+        throw new Error('The lighting controllers stopped after an error. Restart them first.')
+      }
+      return op()
+    })
+  }
+
+  /**
+   * Wait for the queued op or restart that is running now to settle, so a shutdown tears down what
+   * it built. Ops still waiting on the queue or on the shutdown are not awaited, which is what
+   * keeps this from deadlocking. Errors are swallowed as the op's caller reports them.
+   */
+  public async awaitActiveOp(): Promise<void> {
+    if (!this.activeOp) return
+    try {
+      await this.activeOp
+    } catch {
+      // The op's caller reports its failure.
+    }
+  }
+
+  private runActive<T>(op: () => Promise<T>): Promise<T> {
+    const run = (async () => op())()
+    this.activeOp = run
+    return run.finally(() => {
+      if (this.activeOp === run) this.activeOp = null
+    })
   }
 
   /**

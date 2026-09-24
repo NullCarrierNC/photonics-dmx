@@ -96,10 +96,6 @@ export interface ILayerManager {
 
   // State management methods
   captureInitialStates(layer: number, lights: TrackedLight[]): Map<string, RGBIO>
-  captureFinalStates(layer: number, lights: TrackedLight[]): void
-  getLightState(layer: number, lightId: string): RGBIO | undefined
-  clearLayerStates(layer: number): void
-  clearLightLayerState(layer: number, lightId: string): void
   getLightTransitionController(): LightTransitionController
 
   // Per-light effect management
@@ -110,7 +106,6 @@ export interface ILayerManager {
   // Clear methods for immediate state reset
   clearAllActiveEffects(): void
   clearAllQueuedEffects(): void
-  clearAllLayerStates(): void
   clearAllLayerTracking(): void
 }
 
@@ -153,8 +148,6 @@ export interface ITransitionEngine {
     transition: EffectTransition,
     currentTime: number,
   ): void
-  getFinalState(lightId: string, layer: number): RGBIO | undefined
-  clearFinalStates(layer: number): void
   getLightTransitionController(): LightTransitionController
 }
 
@@ -195,13 +188,13 @@ export interface IEffectManager {
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   startNextEffectInQueue(layer: number, lightId: string): boolean
   /**
@@ -242,66 +235,66 @@ export interface ISongEventHandler {
   onKeysNote(noteType: InstrumentNoteType): void
   /** Vocal note edge: true = note-on (singing started), false = note-off (singing stopped). */
   onVocalNote(active: boolean): void
-  handleEvent(
-    eventType:
-      | 'beat'
-      | 'measure'
-      | 'keyframe'
-      | 'keyframe-first'
-      | 'keyframe-next'
-      | 'keyframe-previous'
-      | 'drum-kick'
-      | 'drum-red'
-      | 'drum-yellow'
-      | 'drum-blue'
-      | 'drum-green'
-      | 'drum-yellow-cymbal'
-      | 'drum-blue-cymbal'
-      | 'drum-green-cymbal'
-      | 'guitar-open'
-      | 'guitar-green'
-      | 'guitar-red'
-      | 'guitar-yellow'
-      | 'guitar-blue'
-      | 'guitar-orange'
-      | 'bass-open'
-      | 'bass-green'
-      | 'bass-red'
-      | 'bass-yellow'
-      | 'bass-blue'
-      | 'bass-orange'
-      | 'keys-open'
-      | 'keys-green'
-      | 'keys-red'
-      | 'keys-yellow'
-      | 'keys-blue'
-      | 'keys-orange'
-      | 'vocal-note'
-      | 'vocal-note-off'
-      | 'led-1'
-      | 'led-2'
-      | 'led-3'
-      | 'led-4'
-      | 'led-5'
-      | 'led-6'
-      | 'led-7'
-      | 'led-8'
-      | 'led-1-off'
-      | 'led-2-off'
-      | 'led-3-off'
-      | 'led-4-off'
-      | 'led-5-off'
-      | 'led-6-off'
-      | 'led-7-off'
-      | 'led-8-off'
-      | 'fog-on'
-      | 'fog-off',
-  ): void
+  handleEvent(eventType: SongEventCondition): void
 }
 
-/** The condition union accepted by {@link ISongEventHandler.handleEvent} — the single source shared by
- *  every layer that forwards a song event (sequencer, ChainFanout, CueRuntime). */
-export type SongEventCondition = Parameters<ISongEventHandler['handleEvent']>[0]
+/**
+ * The song events {@link ISongEventHandler.handleEvent} takes, shared by every layer that forwards
+ * one (sequencer, ChainFanout, CueRuntime).
+ */
+export type SongEventCondition =
+  | 'beat'
+  | 'measure'
+  | 'keyframe'
+  | 'keyframe-first'
+  | 'keyframe-next'
+  | 'keyframe-previous'
+  | 'drum-kick'
+  | 'drum-red'
+  | 'drum-yellow'
+  | 'drum-blue'
+  | 'drum-green'
+  | 'drum-yellow-cymbal'
+  | 'drum-blue-cymbal'
+  | 'drum-green-cymbal'
+  | 'guitar-open'
+  | 'guitar-green'
+  | 'guitar-red'
+  | 'guitar-yellow'
+  | 'guitar-blue'
+  | 'guitar-orange'
+  | 'bass-open'
+  | 'bass-green'
+  | 'bass-red'
+  | 'bass-yellow'
+  | 'bass-blue'
+  | 'bass-orange'
+  | 'keys-open'
+  | 'keys-green'
+  | 'keys-red'
+  | 'keys-yellow'
+  | 'keys-blue'
+  | 'keys-orange'
+  | 'vocal-note'
+  | 'vocal-note-off'
+  | 'led-1'
+  | 'led-2'
+  | 'led-3'
+  | 'led-4'
+  | 'led-5'
+  | 'led-6'
+  | 'led-7'
+  | 'led-8'
+  | 'led-1-off'
+  | 'led-2-off'
+  | 'led-3-off'
+  | 'led-4-off'
+  | 'led-5-off'
+  | 'led-6-off'
+  | 'led-7-off'
+  | 'led-8-off'
+  | 'fog-on'
+  | 'fog-off'
 
 /**
  * @interface ISystemEffectsController
@@ -313,17 +306,6 @@ export interface ISystemEffectsController {
   holdOcclusion(on: boolean): void
   isOcclusionHeld(): boolean
   setOnBlackoutCompleteCallback(callback: () => void): void
-}
-
-/**
- * @interface IDebugMonitor
- * @description Debug and monitoring functionality
- */
-export interface IDebugMonitor {
-  enableDebug(enable: boolean, refreshRateMs?: number): void
-  refreshDebugTable(): void
-  printLightLayerTable(): void
-  debugLightLayers(): void
 }
 
 /**
@@ -350,18 +332,24 @@ export interface ILightingController {
   ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
+  /**
+   * Submits unless the name is already running. Returns true when `onComplete` will be called
+   * later, on this effect or, for a name already running, when that run ends. Returns false when
+   * the submission was refused, and then `onComplete` is never called. It is never called during
+   * the submission itself.
+   */
   addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   removeEffect(name: string, layer: number): void
   removeAllEffects(): void
@@ -416,6 +404,12 @@ export interface ILightingController {
   updateMotionPatternConfig(name: string, config: ResolvedMotionPatternSetting): void
 
   /**
+   * Called after {@link removeAllEffects} has dropped every motion pattern, so a cue handler that
+   * still reports a motion cue learns its pattern is gone. Returns the unsubscribe.
+   */
+  onMotionPatternsCleared(listener: () => void): () => void
+
+  /**
    * Add an effect with a completion callback.
    * Callback is fired when the effect fully completes (including waitUntilTime) and no light is
    * running or queued under the name, so a submission queued behind a running effect of the same
@@ -466,10 +460,6 @@ export interface ILightingController {
   cancelBlackout(): void
   /** Whether a timed blackout is still fading. */
   isBlackoutActive(): boolean
-
-  // Debug methods
-  enableDebug(enable: boolean, refreshRateMs?: number): void
-  debugLightLayers(): void
 
   // Lifecycle methods
   shutdown(): void

@@ -171,14 +171,13 @@ const FixtureBeam = React.memo(function FixtureBeam({
   const { x: dx, y: dy, z: dz } = direction
   const color = useMemo(() => rgbToThreeColor({ r, g, b }), [r, g, b])
   const dir = useMemo(() => vec3({ x: dx, y: dy, z: dz }).normalize(), [dx, dy, dz])
+  // Keyed on the coordinates, since the parent builds a new position array every render. A colour
+  // or dimmer change then leaves the target, and its place in the scene, as it is.
+  const [px, py, pz] = position
   const targetPos = useMemo(() => {
     const d = 12
-    return new THREE.Vector3(
-      position[0] + dir.x * d,
-      position[1] + dir.y * d,
-      position[2] + dir.z * d,
-    )
-  }, [position, dir])
+    return new THREE.Vector3(px + dir.x * d, py + dir.y * d, pz + dir.z * d)
+  }, [px, py, pz, dir])
 
   const lightRef = useRef<THREE.SpotLight>(null)
 

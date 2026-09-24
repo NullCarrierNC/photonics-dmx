@@ -91,4 +91,14 @@ describe('useIpcPreviewSender', () => {
     expect(disableSender).not.toHaveBeenCalled()
     expect(enableSender).toHaveBeenCalledTimes(1)
   })
+
+  it('asks again for the next viewer after main refused the stream', async () => {
+    enableSender.mockResolvedValueOnce({ success: false, error: 'not initialized' } as never)
+    render(<Viewer />)
+    await act(async () => {})
+
+    render(<Viewer />)
+
+    expect(enableSender).toHaveBeenCalledTimes(2)
+  })
 })

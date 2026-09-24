@@ -25,6 +25,7 @@ import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { TrackedLight } from '../../../../types'
 import { fakeLightingController } from '../../../helpers/fakeLightingController'
+import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 
 function makeSequencerStub(): ILightingController {
   return fakeLightingController()
@@ -298,12 +299,48 @@ describe('AudioNodeCue level mode', () => {
     const cue = new AudioNodeCue('g1', compiled)
 
     await cue.execute(audioCueData(0.5), sequencer, lightManager)
-    expect(sequencer.addEffect).toHaveBeenCalledTimes(1)
-    const effectKey = (sequencer.addEffect as jest.Mock).mock.calls[0][0] as string
+    expect(sequencer.setEffect).toHaveBeenCalledTimes(1)
+    const effectKey = (sequencer.setEffect as jest.Mock).mock.calls[0][0] as string
     ;(sequencer.removeEffect as jest.Mock).mockClear()
 
     cue.stopAndClearEffects()
     expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 120)
+  })
+
+  it('draws a primary level effect and leaves motion running', async () => {
+    const def = {
+      kind: 'lighting',
+      id: 'level-primary',
+      cueTypeId: 'level-primary',
+      name: 'Level primary',
+      style: 'primary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [setColor('sc1', { source: 'literal', value: 'front' }, 10)],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    } as unknown as AudioLightingNodeCueDefinition
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const motionWiped = jest.fn()
+    h.sequencer.onMotionPatternsCleared(motionWiped)
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+
+    try {
+      await cue.execute(audioCueData(0.5), h.sequencer, h.lightManager)
+      h.advanceBy(20)
+
+      expect(motionWiped).not.toHaveBeenCalled()
+      expect(h.getLightState(h.frontLightIds[0])?.red ?? 0).toBeGreaterThan(0)
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
   })
 
   it('takes a secondary level effect off when the cue is replaced', async () => {
@@ -335,5 +372,58 @@ describe('AudioNodeCue level mode', () => {
 
     cue.onStop()
     expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 20)
+  })
+
+  it.each([
+    ['on layer 0', 0],
+    ['with no layer', undefined],
+  ] as const)('goes dark when the level drops and when the look ends, %s', async (_, layer) => {
+    const action = setColor('sc1', { source: 'literal', value: 'front' })
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-base',
+      cueTypeId: 'level-base',
+      name: 'Level base',
+      style: 'primary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [layer === undefined ? { ...action, layer: undefined } : action],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    }
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+    const red = (): number => h.getLightState(h.frontLightIds[0])?.red ?? 0
+    const advance = (ms: number): void => {
+      for (let t = 0; t < ms; t += 10) h.advanceBy(10)
+    }
+
+    try {
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      advance(50)
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      advance(50)
+      expect(red()).toBeGreaterThan(0)
+
+      await cue.execute(audioCueData(0), h.sequencer, h.lightManager)
+      advance(300)
+      expect(red()).toBe(0)
+
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      advance(50)
+      expect(red()).toBeGreaterThan(0)
+      cue.stopAndClearEffects()
+      advance(300)
+      expect(red()).toBe(0)
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
   })
 })

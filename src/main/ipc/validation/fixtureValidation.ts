@@ -9,7 +9,7 @@ import {
   isStorableBrightnessScale,
   isValidBrightnessScalePercent,
 } from '../../../photonics-dmx/helpers/brightnessScaling'
-import { isPlainObject } from './primitives'
+import { isNonEmptyString, isPlainObject } from './primitives'
 import { validateRigOutputs, validateRigMirrorFlag } from './senderValidation'
 
 const VALID_STROBE_TYPES = new Set<string>([
@@ -181,6 +181,14 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
     rig.mirrorVert = mirrorVert.value
   }
   return { ok: true, value: rig }
+}
+
+/** The id the rig read and delete channels take. */
+export function validateRigId(value: unknown): ValidationResult<string> {
+  if (!isNonEmptyString(value)) {
+    return { ok: false, error: 'Rig id must be a non-empty string' }
+  }
+  return { ok: true, value }
 }
 
 const FIXTURE_TYPE_VALUES = new Set<string>(Object.values(FixtureTypes))

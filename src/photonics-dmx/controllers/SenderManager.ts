@@ -35,8 +35,8 @@ export class SenderManager {
   private eventEmitter: EventEmitter
   private ipcSender: IpcSender | null = null
   private initializingSenders: Set<string> = new Set()
-  /** The start in flight for each sender still initializing, so a restart can wait it out. */
-  private readonly pendingEnables = new Map<string, Promise<void>>()
+  /** Each sender's enable, disable and restart run one at a time, in the order they were asked. */
+  private readonly senderOps = new Map<string, Promise<void>>()
   private failedDuringInit: Set<string> = new Set()
   private initializingSenderPorts: Map<string, number | null> = new Map()
   private onSenderEnabledCallback: ((senderId: string) => void) | null = null
@@ -74,21 +74,35 @@ export class SenderManager {
     senderType: 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc',
     config: SenderConfig,
   ): Promise<void> {
-    // Check if sender is already enabled or currently initializing
+    return this.queueSenderOp(id, () => this.enableNow(id, senderType, config))
+  }
+
+  private queueSenderOp(id: string, op: () => Promise<void>): Promise<void> {
+    // Both arms run the op, and a failed op settles its slot so the ones behind it still run.
+    const run = (this.senderOps.get(id) ?? Promise.resolve()).then(op, op)
+    const settled = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    this.senderOps.set(id, settled)
+    void settled.then(() => {
+      if (this.senderOps.get(id) === settled) {
+        this.senderOps.delete(id)
+      }
+    })
+    return run
+  }
+
+  private async enableNow(
+    id: string,
+    senderType: 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc',
+    config: SenderConfig,
+  ): Promise<void> {
     if (this.enabledSenders.has(id) || this.initializingSenders.has(id)) {
       log.warn(`Sender with ID "${id}" is already enabled or initializing.`)
-      return Promise.resolve()
+      return
     }
-
-    const enabling = this.startSender(id, senderType, config)
-    this.pendingEnables.set(id, enabling)
-    const settle = (): void => {
-      if (this.pendingEnables.get(id) === enabling) {
-        this.pendingEnables.delete(id)
-      }
-    }
-    enabling.then(settle, settle)
-    return enabling
+    await this.startSender(id, senderType, config)
   }
 
   private async startSender(
@@ -237,10 +251,15 @@ export class SenderManager {
   }
 
   /**
-   * Disables a sender by stopping it and removing its error handler.
+   * Disables a sender by stopping it and removing its error handler. A sender still starting is
+   * stopped once its start settles.
    * @param id The unique identifier for the sender to disable.
    */
-  public async disableSender(id: string): Promise<void> {
+  public disableSender(id: string): Promise<void> {
+    return this.queueSenderOp(id, () => this.disableNow(id))
+  }
+
+  private async disableNow(id: string): Promise<void> {
     if (id === 'ipc') {
       // Handle IPC sender separately
       if (this.ipcSender) {
@@ -259,8 +278,6 @@ export class SenderManager {
     const sender = this.enabledSenders.get(id)
     if (!sender) {
       log.warn(`No enabled sender with ID "${id}" found.`)
-      // Still remove from initializing set in case it was stuck there
-      this.initializingSenders.delete(id)
       return
     }
 
@@ -288,22 +305,16 @@ export class SenderManager {
    * @param id The unique string identifier for the sender.
    * @param config New configuration for the sender.
    */
-  public async restartSender(id: string, config: SenderConfig): Promise<void> {
-    const enabling = this.pendingEnables.get(id)
-    if (enabling) {
-      await enabling.catch(() => undefined)
-    }
-    if (this.enabledSenders.has(id)) {
+  public restartSender(id: string, config: SenderConfig): Promise<void> {
+    return this.queueSenderOp(id, async () => {
+      if (!this.enabledSenders.has(id)) {
+        log.warn(`Sender with ID "${id}" is not enabled, cannot restart.`)
+        return
+      }
       log.info(`Restarting sender with ID "${id}" with new configuration`)
-
-      // Disable the current sender
-      await this.disableSender(id)
-
-      // Re-enable with new configuration
-      await this.enableSender(id, config.sender || 'sacn', config)
-    } else {
-      log.warn(`Sender with ID "${id}" is not enabled, cannot restart.`)
-    }
+      await this.disableNow(id)
+      await this.enableNow(id, config.sender || 'sacn', config)
+    })
   }
 
   /**

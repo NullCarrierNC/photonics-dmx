@@ -21,6 +21,7 @@ import {
   isLightModified,
   isMovingHeadFixture,
   isPanTiltChannelName,
+  lightOnChannel,
 } from './dmxConsoleChannels'
 
 /** An RGB template whose colour channels sit one, two and three above its master dimmer. */
@@ -249,6 +250,40 @@ describe('getEffectiveChannelEntries', () => {
     const entries = getEffectiveChannelEntries(light(), [template()], { red: 240 })
 
     expect(Object.fromEntries(entries).red).toBe(240)
+  })
+})
+
+describe('lightOnChannel', () => {
+  const second = light({
+    id: 'l2',
+    name: 'Second',
+    channels: { masterDimmer: 20, red: 21, green: 22, blue: 23 } as DmxLight['channels'],
+  })
+  const config = layout({ frontLights: [light()], backLights: [second] })
+  const movingRed = { lightId: 'l1', channelName: 'red' }
+
+  it('names the light on a channel', () => {
+    expect(lightOnChannel(config, [template()], {}, 22, movingRed)?.name).toBe('Second')
+  })
+
+  it('finds nothing on a free channel', () => {
+    expect(lightOnChannel(config, [template()], {}, 40, movingRed)).toBeNull()
+  })
+
+  it('leaves out the channel being moved but counts the rest of its light', () => {
+    expect(lightOnChannel(config, [template()], {}, 11, movingRed)).toBeNull()
+    expect(lightOnChannel(config, [template()], {}, 12, movingRed)?.name).toBe('PAR')
+  })
+
+  it('counts a remapped channel where it is now', () => {
+    const overrides = { l2: { green: 40 } }
+    expect(lightOnChannel(config, [template()], overrides, 40, movingRed)?.name).toBe('Second')
+    expect(lightOnChannel(config, [template()], overrides, 22, movingRed)).toBeNull()
+  })
+
+  it('counts an added channel', () => {
+    const withExtra = template({ extraChannels: [{ type: 'white', channel: 5 }] })
+    expect(lightOnChannel(config, [withExtra], {}, 24, movingRed)?.name).toBe('Second')
   })
 })
 

@@ -16,6 +16,8 @@ export interface ControllerShutdownContext {
   listenerLifecycle: ListenerLifecycleController
   senderLifecycle: SenderLifecycleController
   setInitialized(value: boolean): void
+  /** The consumers registered to drop state tied to the engine, as a restart also runs them. */
+  teardownListeners(): ReadonlyArray<() => void>
 }
 
 /**
@@ -39,6 +41,17 @@ export async function runControllerShutdown(ctx: ControllerShutdownContext): Pro
   log.info('ControllerManager shutdown: starting')
 
   ctx.graph.shutdownPublisherSafe()
+  // A toggle or restart already under way may be binding a listener. Let it finish, so the
+  // listener it binds is one the disables below find.
+  await ctx.lifecycle.awaitActiveOp()
+
+  for (const listener of ctx.teardownListeners()) {
+    try {
+      listener()
+    } catch (err) {
+      log.error('Error running a shutdown teardown callback:', err)
+    }
+  }
 
   try {
     await ctx.listenerLifecycle.yargRb3.disableYarg()

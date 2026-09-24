@@ -1,11 +1,13 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach, beforeAll } from '@jest/globals'
-import { fireEvent, screen } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import Preferences from './Preferences'
 import { lightingPrefsAtom } from '../atoms'
+import { emitWindowApi, installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 jest.mock(
   '../ipcApi',
@@ -16,13 +18,7 @@ jest.mock(
 )
 
 beforeAll(() => {
-  Object.defineProperty(window, 'api', {
-    value: {
-      receive: jest.fn().mockReturnValue(jest.fn()),
-      invoke: jest.fn(),
-    },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 jest.mock('../components/ActiveRigsSettings', () => ({
@@ -44,10 +40,6 @@ jest.mock('../components/WhiteChannelMixModeSettings', () => ({
 jest.mock('../components/YargEnabledCueGroups', () => ({
   __esModule: true,
   default: () => <div data-testid="prefs-yarg-cues" />,
-}))
-jest.mock('../components/MotionMasterToggle', () => ({
-  __esModule: true,
-  default: () => <div data-testid="prefs-motion-master" />,
 }))
 jest.mock('../components/MotionEnabledCueGroups', () => ({
   __esModule: true,
@@ -90,6 +82,8 @@ jest.mock('../components/LagCompensationSettings', () => ({
   default: () => <div data-testid="prefs-lag-compensation" />,
 }))
 
+const motionMaster = () => screen.queryByRole('checkbox', { name: /Enable motion support/ })
+
 describe('Preferences', () => {
   beforeEach(() => {
     resetIpcApiMock()
@@ -109,7 +103,7 @@ describe('Preferences', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
     expect(screen.getByTestId('prefs-advanced-mode')).toBeInTheDocument()
-    expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
+    expect(motionMaster()).toBeNull()
     expect(screen.queryByTestId('prefs-cue-consistency')).toBeNull()
     expect(screen.queryByTestId('prefs-clock-rate')).toBeNull()
     // The blackout shortcut is not an advanced setting: it stays reachable either way.
@@ -130,7 +124,7 @@ describe('Preferences', () => {
     expect(screen.getByTestId('prefs-yarg-cues')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-motion-yarg')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-stagekit-yarg')).toBeInTheDocument()
-    expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
+    expect(motionMaster()).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'RB3' }))
     expect(screen.getByTestId('prefs-stagekit-rb3')).toBeInTheDocument()
@@ -139,11 +133,11 @@ describe('Preferences', () => {
     expect(screen.getByTestId('prefs-audio-inner')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-audio-cues')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-motion-audio')).toBeInTheDocument()
-    expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
+    expect(motionMaster()).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
     expect(screen.getByTestId('prefs-advanced-mode')).toBeInTheDocument()
-    expect(screen.getByTestId('prefs-motion-master')).toBeInTheDocument()
+    expect(motionMaster()).toBeInTheDocument()
     expect(screen.getByTestId('prefs-cue-consistency')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-clock-rate')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-esc-blackout')).toBeInTheDocument()
@@ -158,6 +152,46 @@ describe('Preferences', () => {
     const advancedMode = screen.getByTestId('prefs-advanced-mode')
 
     expect(lag.compareDocumentPosition(advancedMode)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
+  it('reads the motion master state once, however often the Advanced tab opens', async () => {
+    renderWithProviders(<Preferences />, {
+      seed: (set) => set(lightingPrefsAtom, { advancedModeEnabled: true }),
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'YARG' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
+    await act(async () => {})
+
+    expect(jest.mocked(ipcApi.getMotionEnabled)).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the motion master state main reports, and follows its announcements', async () => {
+    jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(false)
+    renderWithProviders(<Preferences />, {
+      seed: (set) => set(lightingPrefsAtom, { advancedModeEnabled: true }),
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
+
+    await waitFor(() => expect(motionMaster()).not.toBeChecked())
+
+    act(() => emitWindowApi(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, true))
+
+    expect(motionMaster()).toBeChecked()
+  })
+
+  it('turns motion off once main stores it', async () => {
+    renderWithProviders(<Preferences />, {
+      seed: (set) => set(lightingPrefsAtom, { advancedModeEnabled: true }),
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
+    await waitFor(() => expect(motionMaster()).toBeChecked())
+
+    fireEvent.click(motionMaster()!)
+
+    await waitFor(() => expect(motionMaster()).not.toBeChecked())
+    expect(jest.mocked(ipcApi.setMotionEnabled)).toHaveBeenCalledWith(false)
   })
 
   it('moves between tabs with the arrow keys, Home and End', () => {

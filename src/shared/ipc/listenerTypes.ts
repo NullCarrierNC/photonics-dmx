@@ -25,12 +25,4 @@ export interface ListenerInvokeMap {
     request: void
     response: Record<string, unknown> | null
   }
-  [CUE.GET_YARG_ENABLED]: {
-    request: void
-    response: boolean
-  }
-  [CUE.GET_RB3_ENABLED]: {
-    request: void
-    response: boolean
-  }
 }

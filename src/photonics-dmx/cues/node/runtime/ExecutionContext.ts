@@ -8,6 +8,7 @@ import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { VariableValue, NodeCompletionCallback, ContextCompletionCallback } from './executionTypes'
 import { monotonicNowMs } from '../../../../shared/time'
+import { clampTimerDelayMs } from './engineUtils'
 
 /**
  * A node that can hold the context open while it waits: an action (or the dummy one a delay
@@ -194,17 +195,15 @@ export class ExecutionContext {
   }
 
   /**
-   * Register a timer (e.g. from delay node) so it can be cleared on dispose.
+   * Run `onFire` once `delayMs` has passed, on a timer this context clears on dispose. The delay is
+   * clamped to what setTimeout honours.
    */
-  public addTimer(timerId: ReturnType<typeof setTimeout>): void {
+  public startTimer(onFire: () => void, delayMs: number): void {
+    const timerId = setTimeout(() => {
+      this.activeTimers.delete(timerId)
+      onFire()
+    }, clampTimerDelayMs(delayMs))
     this.activeTimers.add(timerId)
-  }
-
-  /**
-   * Unregister a timer (e.g. when delay callback runs).
-   */
-  public removeTimer(timerId: ReturnType<typeof setTimeout>): void {
-    this.activeTimers.delete(timerId)
   }
 
   /**

@@ -9,8 +9,10 @@ const ipcRenderer = {
 }
 jest.mock('electron', () => ({ contextBridge: { exposeInMainWorld }, ipcRenderer }))
 
+import type { IpcSendChannel } from '../shared/ipcTypes'
 import {
   ALL_INVOKE_CHANNELS,
+  ALL_SEND_CHANNELS,
   CHANNELS,
   CONFIG,
   CUE,
@@ -49,6 +51,7 @@ describe('preload IPC channel allowlist (M-11)', () => {
 
   it('allows EVERY channel of EVERY group (groups share key names, so a key-merged set loses values)', async () => {
     const groups = { NODE_CUES, EFFECTS, RIGS, WINDOW, SHELL, LIFECYCLE, CUE, LIGHT, CONFIG }
+    const sendOnly: readonly string[] = ALL_SEND_CHANNELS
     for (const [groupName, group] of Object.entries(groups)) {
       for (const channel of Object.values(group)) {
         // Completeness of the shared union constant...
@@ -57,16 +60,51 @@ describe('preload IPC channel allowlist (M-11)', () => {
           channel,
           allowed: true,
         })
-        // ...and of the live preload allowlist built from it.
-        await expect(api.invoke(channel, undefined)).resolves.toBe('ok')
+        // ...and of the live preload allowlist built from it, which leaves out the send channels.
+        if (!sendOnly.includes(channel)) {
+          await expect(api.invoke(channel, undefined)).resolves.toBe('ok')
+        }
       }
     }
+  })
+
+  it('rejects invoke on every send-only channel without reaching ipcRenderer', async () => {
+    ipcRenderer.invoke.mockClear()
+    for (const channel of ALL_SEND_CHANNELS) {
+      await expect(api.invoke(channel, undefined)).rejects.toThrow('Unknown IPC channel')
+    }
+    expect(ipcRenderer.invoke).not.toHaveBeenCalled()
   })
 
   it('rejects invoke on an unknown channel without reaching ipcRenderer', async () => {
     ipcRenderer.invoke.mockClear()
     await expect(api.invoke('evil:channel', {})).rejects.toThrow('Unknown IPC channel')
     expect(ipcRenderer.invoke).not.toHaveBeenCalled()
+  })
+
+  it('drops send on an invoke-only channel', () => {
+    ipcRenderer.send.mockClear()
+    api.send(CHANNELS.GET_PREFS, undefined)
+    expect(ipcRenderer.send).not.toHaveBeenCalled()
+  })
+
+  it('forwards send on every fire-and-forget channel', () => {
+    for (const channel of ALL_SEND_CHANNELS) {
+      ipcRenderer.send.mockClear()
+      api.send(channel, undefined)
+      expect(ipcRenderer.send).toHaveBeenCalledWith(channel, undefined)
+    }
+  })
+
+  it('lists every channel the send map types, and nothing else', () => {
+    type Listed = (typeof ALL_SEND_CHANNELS)[number]
+    type Complete = [IpcSendChannel] extends [Listed]
+      ? [Listed] extends [IpcSendChannel]
+        ? true
+        : false
+      : false
+    const complete: Complete = true
+    expect(complete).toBe(true)
   })
 
   it('drops send / sendToMain on unknown channels', () => {

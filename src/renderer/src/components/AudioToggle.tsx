@@ -1,4 +1,4 @@
-import { useAtom } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import { useCallback, useEffect, useId, useState } from 'react'
 import {
   yargListenerEnabledAtom,
@@ -7,14 +7,7 @@ import {
 } from '../atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import {
-  getAudioEnabled,
-  getAudioGameMode,
-  setAudioEnabled,
-  setAudioGameMode,
-  disableYarg,
-  disableRb3,
-} from '../ipcApi'
+import { getAudioGameMode, setAudioEnabled, setAudioGameMode } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('AudioToggle')
@@ -27,8 +20,8 @@ interface AudioToggleProps {
 
 const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
-  const [isYargEnabled, setIsYargEnabled] = useAtom(yargListenerEnabledAtom)
-  const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
+  const isYargEnabled = useAtomValue(yargListenerEnabledAtom)
+  const isRb3Enabled = useAtomValue(rb3eListenerEnabledAtom)
   const [isSaving, setIsSaving] = useState(false)
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
   const [gameModeSaving, setGameModeSaving] = useState(false)
@@ -44,52 +37,10 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   }, [])
 
   useEffect(() => {
-    // Initialize toggle state from runtime enabled state (not config)
-    const initializeState = async () => {
-      try {
-        const enabled = await getAudioEnabled()
-        setIsAudioEnabled(enabled)
-      } catch (error) {
-        log.error('Error initializing Audio toggle state:', error)
-      }
-    }
-
-    // Handle controllers restarted event - audio is disabled on restart
-    const handleControllersRestarted = () => {
-      log.info('Controllers restarted, audio disabled')
-      setIsAudioEnabled(false)
-    }
-
-    const handleAudioEnabledChanged = (payload: { enabled: boolean }) => {
-      setIsAudioEnabled(payload.enabled)
-    }
-
-    const handleGameModeUpdate = (payload: { enabled: boolean }) => {
+    return registerIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, (payload) => {
       setGameModeEnabled(payload.enabled)
-    }
-
-    const cleanupRestarted = registerIpcListener(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      handleControllersRestarted,
-    )
-    const cleanupEnabledChanged = registerIpcListener(
-      RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED,
-      handleAudioEnabledChanged,
-    )
-    const cleanupGameMode = registerIpcListener(
-      RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE,
-      handleGameModeUpdate,
-    )
-
-    // Initialize on mount
-    void initializeState()
-
-    return () => {
-      cleanupRestarted()
-      cleanupEnabledChanged()
-      cleanupGameMode()
-    }
-  }, [setIsAudioEnabled])
+    })
+  }, [])
 
   useEffect(() => {
     if (isAudioEnabled) {
@@ -111,18 +62,6 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
       if (!result.success) {
         log.error('Failed to save audio enabled state:', result.error)
         setIsAudioEnabled(!newState) // Revert on failure
-      } else {
-        // Disable YARG/RB3E when audio is enabled (mutual exclusion)
-        if (newState) {
-          if (isYargEnabled) {
-            setIsYargEnabled(false)
-            disableYarg()
-          }
-          if (isRb3Enabled) {
-            setIsRb3Enabled(false)
-            disableRb3()
-          }
-        }
       }
     } catch (error) {
       log.error('Failed to save audio enabled state:', error)

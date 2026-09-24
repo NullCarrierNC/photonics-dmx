@@ -311,7 +311,7 @@ describe('CueRegistry', () => {
       expect(registry.getCueImplementation(CueType.Cool_Automatic)).toBe(firstCue)
     })
 
-    it('should allow new randomization after consistency window expires', () => {
+    it('rolls a new group at a window of 0 when a cue is called again after another', () => {
       const registry = CueRegistry.getInstance()
       registry.reset()
 
@@ -319,24 +319,33 @@ describe('CueRegistry', () => {
       const group1: ICueGroup = {
         id: 'group1',
         name: 'group1',
-        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
+          [CueType.Verse, new MockCueImplementation('group1-verse')],
+        ]),
       }
       const group2: ICueGroup = {
         id: 'group2',
         name: 'group2',
-        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')],
+          [CueType.Verse, new MockCueImplementation('group2-verse')],
+        ]),
       }
       registry.registerGroup(group1)
       registry.registerGroup(group2)
       registry.setEnabledGroups(['group1', 'group2'])
       registry.setActiveGroups(['group1', 'group2'])
-
-      // Set consistency window to 0ms for testing (immediate expiration)
       registry.setCueConsistencyWindow(0)
 
-      // A 0ms window lets every call roll again, so two forced rolls land on different groups.
-      const roll = jest.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.99)
+      // The call in between makes the second Cool_Automatic a new call, so it rolls again.
+      const roll = jest
+        .spyOn(Math, 'random')
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0.99)
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      registry.getCueImplementation(CueType.Verse)
       const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
       roll.mockRestore()
 

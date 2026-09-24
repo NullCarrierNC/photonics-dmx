@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { DmxRig } from '../../../photonics-dmx/types'
-import { resolveLastUsedRigId } from '../atoms'
-import { getActiveRigs } from '../ipcApi'
 import { DmxRigSelectField } from './DmxRigSelectField'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('DmxRigSelector')
 
 interface DmxRigSelectorProps {
+  /** The active rigs to choose from, as useActivePreviewRigs loads them. */
+  rigs: DmxRig[]
   selectedRigId: string | null
   onRigChange: (rigId: string | null) => void
 }
@@ -14,38 +12,8 @@ interface DmxRigSelectorProps {
 /**
  * Component for selecting a DMX rig to preview.
  */
-const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigChange }) => {
-  const [availableRigs, setAvailableRigs] = useState<DmxRig[]>([])
-  const selectedRigIdRef = useRef(selectedRigId)
-  selectedRigIdRef.current = selectedRigId
-
-  useEffect(() => {
-    let cancelled = false
-    const loadActiveRigs = async () => {
-      try {
-        const activeRigs: DmxRig[] = await getActiveRigs()
-        if (cancelled) return
-        setAvailableRigs(activeRigs)
-        const orderedIds = activeRigs.map((r) => r.id)
-        const currentId = selectedRigIdRef.current
-        const resolved = resolveLastUsedRigId(currentId, orderedIds)
-        if (resolved !== currentId) {
-          onRigChange(resolved)
-        }
-      } catch (error) {
-        log.error('Failed to load active rigs:', error)
-      }
-    }
-
-    void loadActiveRigs()
-    return () => {
-      cancelled = true
-    }
-    // Load once per mount; selection is owned by the parent after that.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [])
-
-  if (availableRigs.length === 0) {
+const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ rigs, selectedRigId, onRigChange }) => {
+  if (rigs.length === 0) {
     return (
       <div className="mb-6">
         <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -60,7 +28,7 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigCha
       <DmxRigSelectField
         className=""
         label="Preview DMX Rig:"
-        rigs={availableRigs}
+        rigs={rigs}
         selectedRigId={selectedRigId}
         onChange={(id) => onRigChange(id || null)}
         selectClassName="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]"

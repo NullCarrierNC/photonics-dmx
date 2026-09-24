@@ -10,17 +10,19 @@ jest.mock('../../senders/EnttecProSender', () => ({ EnttecProSender: jest.fn() }
  */
 function controllableEnttec(): {
   speeds: number[]
+  built: Array<{ stop: jest.Mock }>
   settleStart: (index: number, outcome?: Error) => void
   startsBegun: () => number
 } {
   const speeds: number[] = []
+  const built: Array<{ stop: jest.Mock }> = []
   const settles: Array<(outcome?: Error) => void> = []
   jest.mocked(EnttecProSender).mockImplementation(((
     _port: string,
     options: { dmxSpeed: number },
   ) => {
     speeds.push(options.dmxSpeed)
-    return {
+    const sender = {
       start: jest.fn(
         () =>
           new Promise<void>((resolve, reject) => {
@@ -34,9 +36,12 @@ function controllableEnttec(): {
       getConfiguredPort: jest.fn(() => null),
       getUniverse: jest.fn(() => 0),
     }
+    built.push(sender)
+    return sender
   }) as never)
   return {
     speeds,
+    built,
     settleStart: (index, outcome) => settles[index](outcome),
     startsBegun: () => settles.length,
   }
@@ -199,5 +204,49 @@ describe('SenderManager.restartSender on a sender still starting', () => {
 
     expect(enttec.speeds).toEqual([40])
     expect(mgr.isSenderEnabled('enttecpro')).toBe(false)
+  })
+})
+
+describe('SenderManager toggled while a sender starts', () => {
+  const config = { sender: 'enttecpro' as const, devicePath: 'COM3', dmxSpeed: 40 }
+
+  it('stops a sender switched off during its start once the start completes', async () => {
+    const enttec = controllableEnttec()
+    const mgr = makeManager()
+
+    const enabling = mgr.enableSender('enttecpro', 'enttecpro', config)
+    await flush()
+    const disabling = mgr.disableSender('enttecpro')
+    await flush()
+    expect(mgr.isSenderEnabled('enttecpro')).toBe(true)
+
+    enttec.settleStart(0)
+    await Promise.all([enabling, disabling])
+
+    expect(mgr.isSenderEnabled('enttecpro')).toBe(false)
+    expect(enttec.built[0].stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs one sender after on, off and on again during a start', async () => {
+    const enttec = controllableEnttec()
+    const mgr = makeManager()
+
+    const toggles = [
+      mgr.enableSender('enttecpro', 'enttecpro', config),
+      mgr.disableSender('enttecpro'),
+      mgr.enableSender('enttecpro', 'enttecpro', config),
+    ]
+    await flush()
+    enttec.settleStart(0)
+    for (let i = 0; i < 10 && enttec.startsBegun() < 2; i += 1) {
+      await flush()
+    }
+    enttec.settleStart(1)
+    await Promise.all(toggles)
+
+    expect(mgr.getEnabledSenders()).toEqual(['enttecpro'])
+    expect(enttec.built).toHaveLength(2)
+    expect(enttec.built[0].stop).toHaveBeenCalledTimes(1)
+    expect(enttec.built[1].stop).not.toHaveBeenCalled()
   })
 })

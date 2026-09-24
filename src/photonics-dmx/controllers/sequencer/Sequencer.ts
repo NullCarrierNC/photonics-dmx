@@ -2,7 +2,6 @@ import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/Acti
 import { Effect, RGBIO, TrackedLight } from '../../types'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
 import { LightTransitionController } from './LightTransitionController'
-import { DebugMonitor } from './DebugMonitor'
 import { EffectManager } from './EffectManager'
 import { EffectTransformer } from './EffectTransformer'
 import { SongEventHandler } from './SongEventHandler'
@@ -17,7 +16,7 @@ import { LayerManager } from './LayerManager'
 import { SystemEffectsController } from './SystemEffectsController'
 import { TransitionEngine } from './TransitionEngine'
 import { MotionPatternEngine } from './MotionPatternEngine'
-import { Clock } from './Clock'
+import type { ClockSource } from './Clock'
 import { performance } from 'perf_hooks'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('Sequencer')
@@ -38,9 +37,9 @@ export class Sequencer implements ILightingController {
   private effectManager: EffectManager
   private eventHandler: SongEventHandler
   private systemEffectsController: SystemEffectsController
-  private debugMonitor: DebugMonitor
   private motionPatternEngine: MotionPatternEngine
-  private clock: Clock
+  private readonly motionPatternsClearedListeners = new Set<() => void>()
+  private clock: ClockSource
   private frameIndex: number = 0
   private readonly handleClockTick: (deltaTime: number) => void
 
@@ -50,7 +49,11 @@ export class Sequencer implements ILightingController {
    * @param clock The shared Clock instance for timing synchronization
    * @param rigLabel Rig name passed to the effect manager for warning attribution
    */
-  constructor(lightTransitionController: LightTransitionController, clock: Clock, rigLabel = '') {
+  constructor(
+    lightTransitionController: LightTransitionController,
+    clock: ClockSource,
+    rigLabel = '',
+  ) {
     this.clock = clock
     this.lightTransitionController = lightTransitionController
     this.effectTransformer = new EffectTransformer()
@@ -68,7 +71,6 @@ export class Sequencer implements ILightingController {
       rigLabel,
     )
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine)
-    this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager)
     this.motionPatternEngine = new MotionPatternEngine(this.lightTransitionController)
 
     // Bind frame processing to the shared clock
@@ -230,28 +232,38 @@ export class Sequencer implements ILightingController {
 
   /**
    * Add an effect only if not already running, with completion callback.
-   * If discarded, callback is fired immediately.
+   * @returns True when `onComplete` will be called, false when the submission was refused
    */
   public addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
-  ): void {
-    this.effectManager.addEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
+  ): boolean {
+    return this.effectManager.addEffectUnblockedNameWithCallback(
+      name,
+      effect,
+      onComplete,
+      isPersistent,
+    )
   }
 
   /**
    * Set an effect only if not already running, with completion callback.
-   * If discarded, callback is fired immediately.
+   * @returns True when `onComplete` will be called, false when the submission was refused
    */
   public setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
-  ): void {
-    this.effectManager.setEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
+  ): boolean {
+    return this.effectManager.setEffectUnblockedNameWithCallback(
+      name,
+      effect,
+      onComplete,
+      isPersistent,
+    )
   }
 
   /**
@@ -264,11 +276,21 @@ export class Sequencer implements ILightingController {
   }
 
   /**
-   * Removes all active effects
+   * Removes all active effects and motion patterns, then tells the pattern subscribers.
    */
   public removeAllEffects(): void {
     this.motionPatternEngine.removeAllPatterns()
     this.effectManager.removeAllEffects()
+    for (const listener of Array.from(this.motionPatternsClearedListeners)) {
+      listener()
+    }
+  }
+
+  public onMotionPatternsCleared(listener: () => void): () => void {
+    this.motionPatternsClearedListeners.add(listener)
+    return () => {
+      this.motionPatternsClearedListeners.delete(listener)
+    }
   }
 
   public addMotionPattern(
@@ -468,22 +490,6 @@ export class Sequencer implements ILightingController {
    */
   public holdOcclusion(on: boolean): void {
     this.systemEffectsController.holdOcclusion(on)
-  }
-
-  /**
-   * Enables or disables the real-time debug table
-   * @param enable Whether to enable the debug table
-   * @param refreshRateMs Optional refresh rate in milliseconds
-   */
-  public enableDebug(enable: boolean, refreshRateMs?: number): void {
-    this.debugMonitor.enableDebug(enable, refreshRateMs)
-  }
-
-  /**
-   * Prints detailed debug information about light layers
-   */
-  public debugLightLayers(): void {
-    this.debugMonitor.debugLightLayers()
   }
 
   /**

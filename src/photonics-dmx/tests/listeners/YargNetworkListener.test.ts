@@ -12,6 +12,7 @@ import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types
 import { BeatByte } from '../../listeners/YARG/yargTypes'
 import { buildYargPacket, buildYargShutdownPacket } from '../helpers/yargPacket'
 import { FRAME_KEEPALIVE_MS } from '../../listeners/YARG/yargFrameDispatch'
+import { resetLogConfiguration, setLogSink, setMinLogLevel } from '../../../shared/logger'
 
 function deserializePacket(listener: YargNetworkListener, buffer: Buffer): void {
   ;(listener as unknown as { deserializePacket(buf: Buffer): void }).deserializePacket(buffer)
@@ -126,6 +127,21 @@ describe('YargNetworkListener', () => {
     mockClose.mockImplementation(defaultMockClose)
   })
 
+  it('rejects a start still binding when it is stopped, and binds again on the next start', async () => {
+    let lateBind: (() => void) | undefined
+    mockBind.mockImplementationOnce((_port: number, callback: () => void) => {
+      lateBind = callback
+    })
+    const first = listener.start()
+
+    await listener.stop()
+    await expect(first).rejects.toThrow()
+    lateBind?.()
+    await listener.start()
+
+    expect(mockBind).toHaveBeenCalledTimes(2)
+  })
+
   it('second start after await stop re-binds the UDP port', async () => {
     await listener.start()
     await listener.stop()
@@ -209,10 +225,54 @@ describe('YargNetworkListener', () => {
       )
     })
 
+    it('warns once per unrecognised lighting cue value however many frames carry it', () => {
+      const warnings: string[] = []
+      setMinLogLevel('debug')
+      setLogSink((entry) => {
+        if (entry.level === 'warn') warnings.push(entry.message)
+      })
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      const perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      try {
+        for (let i = 0; i < 60; i++) {
+          listener.processCueData({ ...defaultCueData, lightingCue: 'Unknown (99)' })
+          jest.advanceTimersByTime(FRAME_KEEPALIVE_MS + 1)
+        }
+        listener.processCueData({ ...defaultCueData, lightingCue: 'Unknown (98)' })
+      } finally {
+        perfNowSpy.mockRestore()
+        jest.useRealTimers()
+        resetLogConfiguration()
+      }
+
+      expect(warnings.filter((w) => w.includes('Unknown (99)'))).toHaveLength(1)
+      expect(warnings.filter((w) => w.includes('Unknown (98)'))).toHaveLength(1)
+    })
+
     it('drops an unrecognised lighting cue value instead of dispatching it', () => {
       listener.processCueData({ ...defaultCueData, lightingCue: 'Unknown (99)' })
       const dispatched = (cueHandler.handleCue as jest.Mock).mock.calls.map((c) => c[0])
       expect(dispatched).not.toContain('Unknown (99)')
+    })
+  })
+
+  describe('timing events on a frame that carries a cue', () => {
+    it.each([
+      ['beat', { beat: 'Strong' }, 'handleBeat'],
+      ['measure', { beat: 'Measure' }, 'handleMeasure'],
+      ['keyframe', { keyframe: 'Next' }, 'handleKeyframeNext'],
+    ] as const)('dispatches the cue before the %s it arrives on', (_, timing, handlerName) => {
+      listener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Gameplay',
+        lightingCue: CueType.Verse,
+        ...timing,
+      })
+
+      const cueAt = cueHandler.handleCue.mock.invocationCallOrder[0]
+      const eventAt = cueHandler[handlerName].mock.invocationCallOrder[0]
+      expect(cueAt).toBeLessThan(eventAt)
     })
   })
 
@@ -349,6 +409,26 @@ describe('YargNetworkListener', () => {
         datagramVersion: 0,
       })
       expect(cueHandler.handleCue).not.toHaveBeenCalled()
+    })
+
+    it('fades the rig out when YARG quits during a song', () => {
+      listener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Gameplay',
+        lightingCue: CueType.Verse,
+      })
+      cueHandler.handleCue.mockClear()
+
+      deserializePacket(listener, buildYargShutdownPacket())
+
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(
+        CueType.Blackout_Slow,
+        expect.objectContaining({ lightingCue: CueType.Blackout_Slow }),
+      )
+      expect(cueHandler.resetSessionState.mock.invocationCallOrder[0]).toBeLessThan(
+        cueHandler.handleCue.mock.invocationCallOrder[0],
+      )
     })
 
     it('emits datagram-version-mismatch for non-zero versions below minimum supported', async () => {
@@ -704,7 +784,7 @@ describe('YargNetworkListener', () => {
 
       jest.advanceTimersByTime(FALLBACK_MS + 500)
 
-      expect(cueHandler.stopActiveStrobe).toHaveBeenCalledTimes(1)
+      expect(cueHandler.stopActiveStrobe).toHaveBeenCalled()
       const fallbackIndex = cueHandler.handleCue.mock.calls.findIndex(
         (c) => c[0] === CueType.Fallback,
       )
@@ -712,6 +792,36 @@ describe('YargNetworkListener', () => {
       expect(cueHandler.stopActiveStrobe.mock.invocationCallOrder[0]).toBeLessThan(
         cueHandler.handleCue.mock.invocationCallOrder[fallbackIndex]!,
       )
+    })
+
+    it('keeps a strobe the blackout run held back off while the Fallback plays', () => {
+      const blackoutWithStrobe = (): CueData =>
+        gameplayFrame(CueType.Blackout_Fast, { strobeState: 'Strobe_Fast' })
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      fbListener.processCueData(blackoutWithStrobe())
+      for (let elapsed = 0; elapsed <= FALLBACK_MS + 600; elapsed += 50) {
+        jest.advanceTimersByTime(50)
+        fbListener.processCueData(blackoutWithStrobe())
+      }
+      const calls = dispatchedCues()
+      const fallbackAt = calls.indexOf(CueType.Fallback)
+      expect(fallbackAt).toBeGreaterThanOrEqual(0)
+
+      expect(calls.slice(fallbackAt).filter((cue) => cue === CueType.Strobe_Fast)).toEqual([])
+    })
+
+    it('strobes again once a driving cue ends the Fallback', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast))
+      for (let elapsed = 0; elapsed <= FALLBACK_MS + 600; elapsed += 50) {
+        jest.advanceTimersByTime(50)
+        fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast))
+      }
+      cueHandler.handleCue.mockClear()
+
+      fbListener.processCueData(gameplayFrame(CueType.Chorus, { strobeState: 'Strobe_Fast' }))
+
+      expect(dispatchedCues()).toEqual([CueType.Chorus, CueType.Strobe_Fast])
     })
 
     it('does not fire at the menu', () => {
@@ -857,6 +967,74 @@ describe('YargNetworkListener', () => {
       jest.advanceTimersByTime(FALLBACK_MS - 500) // older than the window since Verse, but not since the blackout
 
       expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+  })
+
+  describe('strobe watchdog', () => {
+    let perfNowSpy: ReturnType<typeof jest.spyOn>
+    let wdListener: YargNetworkListener
+    let fallbackTime: number
+
+    beforeEach(async () => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      fallbackTime = 20000
+      wdListener = new YargNetworkListener(cueHandler, {
+        getFallbackCueTimeMs: () => fallbackTime,
+      })
+      await wdListener.start()
+    })
+
+    afterEach(async () => {
+      await wdListener.shutdown()
+      perfNowSpy.mockRestore()
+      jest.useRealTimers()
+    })
+
+    const strobeFrame = (overrides: Partial<CueData> = {}): CueData => ({
+      ...defaultCueData,
+      currentScene: 'Gameplay',
+      pauseState: 'Unpaused',
+      lightingCue: CueType.Verse,
+      strobeState: 'Strobe_Fastest',
+      ...overrides,
+    })
+
+    it.each([
+      ['in Practice', { currentScene: 'Practice' as const }, 20000],
+      ['while paused', { pauseState: 'Paused' as const }, 20000],
+      ['with Fallback Time 0', {}, 0],
+      ['in Gameplay with the default Fallback Time', {}, 20000],
+    ])('stops a strobe after 2 s of silence %s', (_, overrides, fallbackMs) => {
+      fallbackTime = fallbackMs
+      wdListener.processCueData(strobeFrame(overrides))
+      cueHandler.stopActiveStrobe.mockClear()
+
+      jest.advanceTimersByTime(2500)
+
+      expect(cueHandler.stopActiveStrobe).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves a strobe running while packets keep arriving', () => {
+      wdListener.processCueData(strobeFrame())
+      cueHandler.stopActiveStrobe.mockClear()
+
+      for (let elapsed = 0; elapsed < 6000; elapsed += 500) {
+        jest.advanceTimersByTime(500)
+        wdListener.processCueData(strobeFrame({ beat: elapsed % 1000 === 0 ? 'Strong' : 'Off' }))
+      }
+
+      expect(cueHandler.stopActiveStrobe).not.toHaveBeenCalled()
+    })
+
+    it('leaves a strobe running after 1.9 s of silence', () => {
+      wdListener.processCueData(strobeFrame())
+      cueHandler.stopActiveStrobe.mockClear()
+
+      jest.advanceTimersByTime(1900)
+
+      expect(cueHandler.stopActiveStrobe).not.toHaveBeenCalled()
     })
   })
 

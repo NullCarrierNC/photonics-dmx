@@ -2,8 +2,10 @@ import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import type { ControllerManager } from './ControllerManager'
 import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
 import { reconcileEnabledGroups, sameIds, type ReconciledCueGroups } from './cueGroupReconcile'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('cueDomainBindings')
@@ -30,6 +32,8 @@ export interface CueDomainRegistryBinding {
   setDisabled: (map: Record<string, string[]>) => void
   readStored: (config: ConfigurationManager) => StoredCueGroups
   persist: (config: ConfigurationManager, patch: Partial<CueDomainPrefs>) => Promise<void>
+  /** Broadcast to every window when the domain's enabled groups or disabled cues change. */
+  changedEvent?: (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
   /**
    * Registry-wide settings applied once at startup, before the node cue loader registers any
    * groups. Enabled and disabled state is not lasting here (it would apply to an empty registry);
@@ -42,6 +46,11 @@ export interface CueDomainRegistryBinding {
    * that set of registries from this one list.
    */
   applyConsistencyWindow?: (windowMs: number) => void
+  /**
+   * Runs after the enabled groups change at runtime, from the settings page or a cue file save, so
+   * a newly enabled group is selectable at once.
+   */
+  afterEnabledChange?: (controllerManager: ControllerManager) => void
 }
 
 /** Default storage: the domain's own slot under the `cueDomains` preference. */
@@ -78,6 +87,13 @@ const applyYargConsistencyWindow = (windowMs: number): void =>
 const applyRb3ConsistencyWindow = (windowMs: number): void =>
   getCueRegistry('rb3').setCueConsistencyWindow(windowMs)
 
+/** Activate every enabled lighting group, so one enabled at runtime joins cue selection. */
+function activateEnabledGroups(
+  registry: Pick<CueRegistry, 'setActiveGroups' | 'getEnabledGroups'>,
+) {
+  registry.setActiveGroups(registry.getEnabledGroups())
+}
+
 const bindings: CueDomainRegistryBinding[] = [
   {
     domain: 'yarg',
@@ -85,7 +101,9 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => CueRegistry.getInstance().setEnabledGroups(ids),
     setDisabled: (map) => CueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('yarg'),
+    changedEvent: RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED,
     applyConsistencyWindow: applyYargConsistencyWindow,
+    afterEnabledChange: () => activateEnabledGroups(CueRegistry.getInstance()),
     applyStartupSettings: (config) => {
       const registry = CueRegistry.getInstance()
       const enabledGroupIds = config.getPreference('cueDomains').yarg.enabledGroups ?? []
@@ -109,6 +127,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => CueRegistry.getInstance().setEnabledMotionGroups(ids),
     setDisabled: (map) => CueRegistry.getInstance().setDisabledMotionCues(map),
     ...cueDomainStorage('yargMotion'),
+    changedEvent: RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = CueRegistry.getInstance()
       registry.setMotionSelectionMode(config.getMotionGroupSelectionMode())
@@ -121,22 +140,15 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => AudioCueRegistry.getInstance().setEnabledGroups(ids),
     setDisabled: (map) => AudioCueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('audio'),
+    changedEvent: RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED,
+    afterEnabledChange: (controllerManager) => controllerManager.refreshAudioCueSelection(),
     applyStartupSettings: (config) => {
       const registry = AudioCueRegistry.getInstance()
-      const enabledGroupIds = config.getPreference('cueDomains').audio.enabledGroups
-      if (enabledGroupIds && enabledGroupIds.length > 0) {
-        registry.setEnabledGroups(enabledGroupIds)
-        log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
-      } else {
-        const allGroups = registry.getAllGroups()
-        registry.setEnabledGroups(allGroups)
-        if (allGroups.length > 0) {
-          config
-            .updateCueDomain('audio', { enabledGroups: allGroups })
-            .catch((err) => log.error('Failed to persist default audio enabled groups:', err))
-        }
-        log.info('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
-      }
+      // An empty selection is one the user chose, so it is applied as it is. First-run defaults
+      // come from the reconcile, which enables every group it has not seen before.
+      const enabledGroupIds = config.getPreference('cueDomains').audio.enabledGroups ?? []
+      registry.setEnabledGroups(enabledGroupIds)
+      log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
       registry.setDisabledCues(config.getPreference('cueDomains').audio.disabledCues)
     },
   },
@@ -146,6 +158,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => AudioCueRegistry.getInstance().setEnabledMotionGroups(ids),
     setDisabled: (map) => AudioCueRegistry.getInstance().setDisabledMotionCues(map),
     ...cueDomainStorage('audioMotion'),
+    changedEvent: RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = AudioCueRegistry.getInstance()
       registry.setMotionSelectionMode(config.getAudioMotionGroupSelectionMode())
@@ -159,7 +172,12 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => getCueRegistry('rb3').setEnabledGroups(ids),
     setDisabled: (map) => getCueRegistry('rb3').setDisabledCues(map),
     ...cueDomainStorage('rb3'),
+    changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
     applyConsistencyWindow: applyRb3ConsistencyWindow,
+    afterEnabledChange: (controllerManager) => {
+      activateEnabledGroups(getCueRegistry('rb3'))
+      controllerManager.refreshRb3CueSelection()
+    },
     applyStartupSettings: (config) => {
       const registry = getCueRegistry('rb3')
       applyRb3ConsistencyWindow(config.getPreference('cueConsistencyWindow'))
@@ -177,6 +195,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => getCueRegistry('rb3').setEnabledMotionGroups(ids),
     setDisabled: (map) => getCueRegistry('rb3').setDisabledMotionCues(map),
     ...cueDomainStorage('rb3Motion'),
+    changedEvent: RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = getCueRegistry('rb3')
       registry.setMotionSelectionMode(
@@ -211,6 +230,26 @@ export function cueDomainBinding(domain: CueDomain): CueDomainRegistryBinding {
   return binding
 }
 
+const domainQueues = new Map<CueDomain, Promise<unknown>>()
+
+/**
+ * Run one read-reconcile-persist-apply operation on a domain's groups after the ones already
+ * queued for it, so the settings handlers and a cue file save never apply a stale snapshot over
+ * each other. A failed operation does not block the next.
+ */
+export function serializeCueDomainOp<T>(domain: CueDomain, op: () => Promise<T>): Promise<T> {
+  const previous = domainQueues.get(domain) ?? Promise.resolve()
+  const run = previous.then(op, op)
+  domainQueues.set(
+    domain,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
+  return run
+}
+
 /**
  * Apply the cue consistency window to every registry that consumes it. Startup reaches each
  * registry through its own binding and a preference change reaches all of them through here, so
@@ -223,9 +262,10 @@ export function applyCueConsistencyWindow(windowMs: number): void {
 }
 
 /**
- * Reconcile a domain's stored group selection against its registry, persist the result as one write
- * (skipped when it already matches), and apply enabled plus disabled state. `seedEnabled` opts extra
- * ids in before reconciling, which is how saving a cue file enables its group.
+ * Reconcile a domain's stored group selection against its registry, apply enabled plus disabled
+ * state, and persist the result as one write (skipped when it already matches). The registry holds
+ * the reconciled state whether or not the write succeeds. `seedEnabled` opts extra ids in before
+ * reconciling, which is how saving a cue file enables its group.
  */
 export async function reconcileAndApplyGroups(
   binding: CueDomainRegistryBinding,
@@ -238,6 +278,8 @@ export async function reconcileAndApplyGroups(
     stored.knownGroups,
     binding.getRegisteredIds(),
   )
+  binding.setEnabled(reconciled.active)
+  binding.setDisabled(stored.disabledCues)
   const unchanged =
     sameIds(reconciled.enabled, stored.enabledGroups ?? []) &&
     sameIds(reconciled.known, stored.knownGroups ?? [])
@@ -247,8 +289,6 @@ export async function reconcileAndApplyGroups(
       knownGroups: reconciled.known,
     })
   }
-  binding.setEnabled(reconciled.enabled)
-  binding.setDisabled(binding.readStored(config).disabledCues)
   return reconciled
 }
 
@@ -257,8 +297,8 @@ export async function reconcileAndApplyGroups(
  * are registered. Node cue groups are registered in initializeNodeCueLoader(), and each
  * registerGroup() adds the group to enabled by default, which would overwrite a saved "disabled"
  * preference; running this after the loader ensures the persisted preference wins. Auto-enables
- * groups never seen before (vs the known set); user-disabled groups stay disabled because they
- * remain in the known set, and deregistered groups are dropped.
+ * groups never seen before (vs the known set). User-disabled groups stay disabled because they
+ * remain in the known set, including through a launch where their file fails to load.
  * @param refreshAudioCueSelection Called once at the end: audio selection reads the freshly-applied
  *   enabled/disabled state
  */
@@ -267,8 +307,14 @@ export async function applyAllEnabledGroupsFromConfig(
   refreshAudioCueSelection: () => void,
 ): Promise<void> {
   for (const binding of CUE_DOMAIN_BINDINGS) {
-    const reconciled = await reconcileAndApplyGroups(binding, config)
-    log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
+    try {
+      const reconciled = await reconcileAndApplyGroups(binding, config)
+      log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
+    } catch (error) {
+      // A refused save leaves the reconciled groups applied, and the next reconcile retries it, so
+      // the init carries on.
+      log.error(`${binding.domain} enabled groups failed to reconcile or save:`, error)
+    }
   }
   refreshAudioCueSelection()
 }

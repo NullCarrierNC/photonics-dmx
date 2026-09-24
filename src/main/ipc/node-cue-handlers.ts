@@ -3,14 +3,18 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
-import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
-import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
-import { ipcError } from './ipcResult'
-import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import {
+  cueDomainBinding,
+  reconcileAndApplyGroups,
+  serializeCueDomainOp,
+} from '../controllers/cueDomainBindings'
+import { ipcError, validationRefusal } from './ipcResult'
+import { NODE_CUES } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
+import { validateCueTypesPayload, validateNodeCueSavePayload } from './inputValidation'
 
 const log = createLogger('node-cue-handlers')
 
@@ -20,12 +24,6 @@ const ensureLoader = (controllerManager: ControllerManager) => {
     throw new Error('Node cue loader is not initialized.')
   }
   return loader
-}
-
-interface SavePayload {
-  mode: NodeCueMode
-  filename: string
-  content: NodeCueFile
 }
 
 interface ValidatePayload {
@@ -44,18 +42,21 @@ async function persistGroupEnableAfterNodeCueSave(
   // Saving a group opts it in: seed it into the enabled set, then reconcile against the registry so
   // other newly-registered groups are auto-enabled, deregistered ids are dropped, and the known
   // baseline is refreshed.
-  await reconcileAndApplyGroups(cueDomainBinding(domain), config, [groupId])
-
-  if (domain === 'audio') {
-    controllerManager.refreshAudioCueSelection()
-    sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
+  const binding = cueDomainBinding(domain)
+  await serializeCueDomainOp(domain, async () => {
+    await reconcileAndApplyGroups(binding, config, [groupId])
+    binding.afterEnabledChange?.(controllerManager)
+  })
+  if (binding.changedEvent) {
+    sendToAllWindows(binding.changedEvent, undefined)
   }
 }
 
 export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   handleInvoke(ipcMain, NODE_CUES.SET_DEBUG, log, async (_event, enabled: boolean) => {
-    NodeExecutionEngine.setDebugEnabled(Boolean(enabled))
-    return { success: true, enabled: NodeExecutionEngine.getDebugEnabled() }
+    const loader = ensureLoader(controllerManager)
+    loader.setDebugEnabled(Boolean(enabled))
+    return { success: true, enabled: loader.isDebugEnabled() }
   })
 
   handleInvoke(ipcMain, NODE_CUES.LIST, log, async () => {
@@ -73,14 +74,26 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return loader.readFile(filePath)
   })
 
-  handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, payload: SavePayload) => {
+  handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, data: unknown) => {
     const loader = ensureLoader(controllerManager)
+    const validation = validateNodeCueSavePayload(data, loader.getModes())
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const payload = validation.value
     const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
-    await persistGroupEnableAfterNodeCueSave(
-      controllerManager,
-      payload.mode,
-      payload.content.group.id,
-    )
+    try {
+      await persistGroupEnableAfterNodeCueSave(
+        controllerManager,
+        payload.mode,
+        payload.content.group.id,
+      )
+    } catch (error) {
+      // The file is written and loaded by now, so the save stands and the enable failure rides
+      // beside it.
+      log.error('Enabling the saved cue group failed:', error)
+      return { ...result, groupEnableError: ipcError(error).error }
+    }
     return result
   })
 
@@ -90,37 +103,33 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
   })
 
   handleInvoke(ipcMain, NODE_CUES.VALIDATE, log, async (_event, payload: ValidatePayload) => {
-    const loader = ensureLoader(controllerManager)
+    try {
+      const loader = ensureLoader(controllerManager)
 
-    if (payload.content) {
-      return validateNodeCueFile(payload.content)
-    }
-
-    if (payload.path) {
-      try {
-        const file = await loader.readFile(payload.path)
-        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
-        return validateNodeCueFile(file)
-      } catch (error) {
-        return {
-          valid: false,
-          errors: [ipcError(error).error],
-        }
+      if (payload.content) {
+        return validateNodeCueFile(payload.content)
       }
-    }
 
-    throw new Error('Validation payload must include either content or path.')
+      if (payload.path) {
+        // readFile rejects invalid JSON or schema, and the canonical validator runs on both
+        // branches.
+        return validateNodeCueFile(await loader.readFile(payload.path))
+      }
+
+      throw new Error('Validation payload must include either content or path.')
+    } catch (error) {
+      return validationRefusal(error)
+    }
   })
 
-  handleInvoke(
-    ipcMain,
-    NODE_CUES.GET_CUE_TYPES,
-    log,
-    async (_event, payload: { mode: NodeCueMode; kind?: NodeCueKind }) => {
-      const loader = ensureLoader(controllerManager)
-      return loader.getAvailableCueTypes(payload.mode, payload.kind)
-    },
-  )
+  handleInvoke(ipcMain, NODE_CUES.GET_CUE_TYPES, log, async (_event, data: unknown) => {
+    const loader = ensureLoader(controllerManager)
+    const validation = validateCueTypesPayload(data, loader.getModes())
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    return loader.getAvailableCueTypes(validation.value.mode, validation.value.kind)
+  })
 
   handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: NodeCueMode) => {
     const result = await dialog.showOpenDialog({
@@ -129,7 +138,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     })
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: false, error: 'User cancelled import.' }
+      return { success: false, error: 'User cancelled import.', cancelled: true }
     }
 
     const sourcePath = result.filePaths[0]
@@ -168,7 +177,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     })
 
     if (result.canceled || !result.filePath) {
-      return { success: false, error: 'User cancelled export.' }
+      return { success: false, error: 'User cancelled export.', cancelled: true }
     }
 
     await fs.copyFile(resolvedSource, result.filePath)

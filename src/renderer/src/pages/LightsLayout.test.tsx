@@ -50,7 +50,6 @@ jest.mock(
 const getDmxRigsMock = jest.mocked(ipcApi.getDmxRigs)
 const getDmxRigMock = jest.mocked(ipcApi.getDmxRig)
 const saveDmxRigMock = jest.mocked(ipcApi.saveDmxRig)
-jest.mock('../hooks/useConfirm', () => ({ useConfirm: () => async () => true }))
 // Presentational children are irrelevant to the save/dirty flow; stub them to keep the test focused.
 jest.mock('../components/LightLayoutPreview', () => ({ __esModule: true, default: () => null }))
 jest.mock('../components/Toast', () => ({ __esModule: true, default: () => null }))
@@ -192,6 +191,101 @@ describe('LightsLayout — unsaved-changes flag', () => {
     })
 
     await waitFor(() => expect(store.get(lightsLayoutHasUnsavedChangesAtom)).toBe(false))
+  })
+})
+
+describe('LightsLayout save confirmation', () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('hides the confirmation after three seconds and leaves no timer once the page closes', async () => {
+    jest.useFakeTimers()
+    const view = renderWithProviders(<LightsLayout />, {
+      seed: (set) => {
+        set(activeRigIdAtom, 'r1')
+        set(dmxRigsAtom, [initialRig])
+        set(activeDmxLightsConfigAtom, initialRig.config)
+        set(myDmxLightsAtom, [fixture])
+        set(lightingPrefsAtom, {})
+      },
+    })
+    await waitFor(() => expect(screen.getByText('Save Changes')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save Changes'))
+    })
+    await screen.findByText('Changes saved successfully!')
+    act(() => jest.advanceTimersByTime(3000))
+    expect(screen.queryByText('Changes saved successfully!')).toBeNull()
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save Changes'))
+    })
+    await screen.findByText('Changes saved successfully!')
+    view.unmount()
+
+    expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
+describe('LightsLayout save that answers after a rig switch', () => {
+  const otherRig: DmxRig = {
+    id: 'r2',
+    name: 'Rig B',
+    active: false,
+    config: {
+      numLights: 3,
+      lightLayout: { id: 'front', label: 'Front only' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [1, 2, 3].map(
+        (position) =>
+          ({
+            ...initialFront,
+            id: `b${position}`,
+            position,
+            channels: { masterDimmer: 100 + position * 4, red: 0, green: 0, blue: 0 },
+          }) as unknown as DmxLight,
+      ),
+      backLights: [],
+      strobeLights: [],
+    },
+  }
+
+  it('keeps the rig the user switched to in the editor and holds Save while it waits', async () => {
+    let answerSave!: () => void
+    saveDmxRigMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answerSave = () => resolve({ success: true })
+        }) as never,
+    )
+    getDmxRigsMock.mockImplementation(async () => [initialRig, otherRig])
+    getDmxRigMock.mockImplementation(async (id: string) => (id === 'r2' ? otherRig : initialRig))
+    const { store } = renderWithProviders(<LightsLayout />, {
+      seed: (set) => {
+        set(activeRigIdAtom, 'r1')
+        set(dmxRigsAtom, [initialRig, otherRig])
+        set(activeDmxLightsConfigAtom, initialRig.config)
+        set(myDmxLightsAtom, [fixture])
+        set(lightingPrefsAtom, {})
+      },
+    })
+    const save = await screen.findByText('Save Changes')
+
+    await act(async () => {
+      fireEvent.click(save)
+    })
+    expect(save).toBeDisabled()
+    act(() => {
+      store.set(activeRigIdAtom, 'r2')
+      store.set(activeDmxLightsConfigAtom, otherRig.config)
+    })
+    await act(async () => answerSave())
+
+    expect(store.get(activeRigIdAtom)).toBe('r2')
+    expect(store.get(activeDmxLightsConfigAtom)?.numLights).toBe(3)
+    await waitFor(() => expect(save).toBeEnabled())
   })
 })
 

@@ -1,21 +1,18 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
-import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import {
   cueDomainBinding,
   reconcileAndApplyGroups,
+  serializeCueDomainOp,
   type CueDomainRegistryBinding,
 } from '../../controllers/cueDomainBindings'
 import { ipcError } from '../ipcResult'
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { CONFIG } from '../../../shared/ipcChannels'
 import { validateOptionalStringArray, validateDisabledCuesMap } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
 import { handleInvoke } from '../handleInvoke'
 const log = createLogger('cue-selection-handlers')
-
-type ChangedEvent = (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
 
 interface CueGroupDomainSpec {
   /** Shared registry binding (registered-ids / setEnabled / setDisabled) for this domain. */
@@ -27,9 +24,6 @@ interface CueGroupDomainSpec {
     setDisabled: string
   }
   disabledLabel: string
-  changedEvent?: ChangedEvent
-  /** SET-enabled side effect (activate groups / refresh selection); runs after disabled is applied. */
-  afterSetEnabled?: (controllerManager: ControllerManager) => void
   /** SET-disabled side effect (refresh selection); runs after disabled is applied. */
   afterSetDisabled?: (controllerManager: ControllerManager) => void
 }
@@ -48,18 +42,7 @@ function registerCueGroupDomain(
   const { binding } = spec
   const { domain } = binding
 
-  // Serialize this domain's get/set handlers so a GET's read-reconcile-persist-apply sequence can't
-  // interleave with a concurrent SET and revert the registry to a stale snapshot. Each op waits for
-  // the previous to settle; failures don't poison the chain.
-  let opChain: Promise<unknown> = Promise.resolve()
-  const serialize = <T>(op: () => Promise<T>): Promise<T> => {
-    const run = opChain.then(op, op)
-    opChain = run.then(
-      () => undefined,
-      () => undefined,
-    )
-    return run
-  }
+  const serialize = <T>(op: () => Promise<T>): Promise<T> => serializeCueDomainOp(domain, op)
 
   handleInvoke(ipcMain, spec.channels.getEnabled, log, () =>
     serialize(async () => {
@@ -80,9 +63,9 @@ function registerCueGroupDomain(
         await config.updateCueDomain(domain, { enabledGroups: validation.value })
         binding.setEnabled(validation.value)
         binding.setDisabled(config.getPreference('cueDomains')[domain].disabledCues)
-        spec.afterSetEnabled?.(controllerManager)
-        if (spec.changedEvent) {
-          sendToAllWindows(spec.changedEvent, undefined)
+        binding.afterEnabledChange?.(controllerManager)
+        if (binding.changedEvent) {
+          sendToAllWindows(binding.changedEvent, undefined)
         }
         log.info(`Updated ${domain} enabled cue groups:`, validation.value)
         return { success: true }
@@ -114,8 +97,8 @@ function registerCueGroupDomain(
         await config.updateCueDomain(domain, { disabledCues: validation.value })
         binding.setDisabled(validation.value)
         spec.afterSetDisabled?.(controllerManager)
-        if (spec.changedEvent) {
-          sendToAllWindows(spec.changedEvent, undefined)
+        if (binding.changedEvent) {
+          sendToAllWindows(binding.changedEvent, undefined)
         }
         return { success: true }
       } catch (error) {
@@ -124,17 +107,6 @@ function registerCueGroupDomain(
       }
     }),
   )
-}
-
-/** Activate the enabled groups so a group enabled at runtime is immediately selectable (no restart). */
-function activateYargGroups(): void {
-  const registry = CueRegistry.getInstance()
-  registry.setActiveGroups(registry.getEnabledGroups())
-}
-
-function activateRb3Groups(): void {
-  const registry = getCueRegistry('rb3')
-  registry.setActiveGroups(registry.getEnabledGroups())
 }
 
 export function registerCueSelectionConfigHandlers(
@@ -151,7 +123,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_YARG_CUES,
       },
       disabledLabel: 'disabledYargCues',
-      afterSetEnabled: activateYargGroups,
     },
     {
       binding: cueDomainBinding('audio'),
@@ -162,8 +133,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_AUDIO_CUES,
       },
       disabledLabel: 'disabledAudioCues',
-      changedEvent: RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED,
-      afterSetEnabled: (cm) => cm.refreshAudioCueSelection(),
       afterSetDisabled: (cm) => cm.refreshAudioCueSelection(),
     },
     {
@@ -175,7 +144,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_YARG_MOTION_CUES,
       },
       disabledLabel: 'disabledYargMotionCues',
-      changedEvent: RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED,
     },
     {
       binding: cueDomainBinding('audioMotion'),
@@ -186,7 +154,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_AUDIO_MOTION_CUES,
       },
       disabledLabel: 'disabledAudioMotionCues',
-      changedEvent: RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED,
     },
     {
       binding: cueDomainBinding('rb3'),
@@ -197,11 +164,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_RB3_CUES,
       },
       disabledLabel: 'disabledRb3Cues',
-      changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
-      afterSetEnabled: (cm) => {
-        activateRb3Groups()
-        cm.refreshRb3CueSelection()
-      },
       afterSetDisabled: (cm) => cm.refreshRb3CueSelection(),
     },
     {
@@ -213,7 +175,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_RB3_MOTION_CUES,
       },
       disabledLabel: 'disabledRb3MotionCues',
-      changedEvent: RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED,
     },
   ]
 

@@ -12,7 +12,8 @@ const Status = () => {
       <div className="flex flex-col">
         <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">DMX Output</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          sACN support is enabled by default. Visit preferences to enable other output methods.
+          sACN output is enabled by default. Ticking another output method in Preferences starts it
+          straight away and adds its switch above.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           You will need to configure your lights in My Lights and Light Layout before they will be

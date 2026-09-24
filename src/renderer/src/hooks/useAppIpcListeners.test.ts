@@ -6,6 +6,7 @@ import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { useAppIpcListeners, type UseAppIpcListenersParams } from './useAppIpcListeners'
 import { useYargErrorHandler } from './useYargErrorHandler'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 jest.mock('../../../shared/logger', () => {
   const warn = jest.fn()
@@ -63,12 +64,7 @@ function minimalParams(over: Partial<UseAppIpcListenersParams> = {}): UseAppIpcL
 }
 
 beforeAll(() => {
-  Object.defineProperty(window, 'api', {
-    value: {
-      receive: jest.fn().mockReturnValue(jest.fn()),
-    },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 describe('useAppIpcListeners', () => {
@@ -113,6 +109,26 @@ describe('useAppIpcListeners', () => {
     const n0 = addSpy.mock.calls.length
     rerender(minimalParams())
     expect(addSpy.mock.calls.length).toBe(n0)
+  })
+
+  it('collects the recoveries main queues while the app runs', async () => {
+    let onRecoveryQueued: (() => void) | undefined
+    const addSpy = jest.spyOn(ipcHelpers, 'addIpcListener').mockImplementation((channel, cb) => {
+      if (channel === RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED) {
+        onRecoveryQueued = cb as () => void
+      }
+    })
+    const handleConfigCorruptRecovered = jest.fn()
+    renderHook(() => useAppIpcListeners(minimalParams({ handleConfigCorruptRecovered })))
+    await waitFor(() => expect(onRecoveryQueued).toBeDefined())
+    await waitFor(() => expect(getCorruptRecoveryEvents).toHaveBeenCalledTimes(1))
+    const files = [{ fileName: 'lights.json', reason: 'repairCopied' }]
+    getCorruptRecoveryEvents.mockResolvedValue({ files } as never)
+
+    onRecoveryQueued!()
+
+    await waitFor(() => expect(handleConfigCorruptRecovered).toHaveBeenCalledWith({ files }))
+    addSpy.mockRestore()
   })
 
   it('routes YARG_ERROR IPC warnings through the real App handler without disabling YARG', async () => {

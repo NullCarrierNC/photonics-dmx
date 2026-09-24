@@ -55,6 +55,7 @@ function setup(
     getIsInitialized: () => options.initialized ?? true,
     getIsRb3Enabled: () => options.rb3Enabled ?? false,
     getIsYargEnabled: () => options.yargEnabled ?? false,
+    getIsAudioEnabled: () => false,
     getVenueFrameProcessor: () => venueFrameProcessor,
     init: jest.fn(),
   })

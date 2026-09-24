@@ -6,6 +6,7 @@ import {
   EventRaiserNode,
   EventListenerNode,
   LogicNode,
+  ValueSource,
 } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import { validateSharedActionNodePayload } from './sharedActionNodeValidation'
@@ -166,6 +167,12 @@ export abstract class AbstractGraphBuilder {
       adjacency.set(conn.from, list)
     }
 
+    rejectSynchronousRaiseLoops(
+      { actionMap, logicMap, eventRaiserMap, eventListenerMap },
+      adjacency,
+      createError,
+    )
+
     // Validate actions and reachability from the entry points.
     const reachableActions = new Set<string>()
     const visited = new Set<string>()
@@ -206,6 +213,74 @@ export abstract class AbstractGraphBuilder {
       eventRaiserMap,
       eventListenerMap,
       adjacency,
+    }
+  }
+}
+
+/** Whether a timing value is the literal 'none', the only value that is certain not to wait. */
+const isLiteralNone = (value: ValueSource | undefined): boolean =>
+  value === undefined || (value.source === 'literal' && value.value === 'none')
+
+/**
+ * A listener starts a fresh context each time its event is raised, so the revisit guard cannot stop
+ * a listener that raises its own event before anything waits. Rejects a graph where a listener can
+ * reach a raiser of its own event, directly or through other listeners, along nodes that run
+ * synchronously: logic other than a delay, actions whose waits are both the literal 'none', and
+ * event raisers and listeners. Anything else, including compiler-specific nodes, is treated as
+ * waiting.
+ */
+function rejectSynchronousRaiseLoops(
+  maps: {
+    actionMap: Map<string, ActionNode>
+    logicMap: Map<string, LogicNode>
+    eventRaiserMap: Map<string, EventRaiserNode>
+    eventListenerMap: Map<string, EventListenerNode>
+  },
+  adjacency: Map<string, Connection[]>,
+  createError: (message: string) => Error,
+): void {
+  const { actionMap, logicMap, eventRaiserMap, eventListenerMap } = maps
+  const listenersByEvent = new Map<string, string[]>()
+  for (const listener of eventListenerMap.values()) {
+    if (!listener.eventName) continue
+    const ids = listenersByEvent.get(listener.eventName) ?? []
+    ids.push(listener.id)
+    listenersByEvent.set(listener.eventName, ids)
+  }
+
+  const runsSynchronously = (id: string): boolean => {
+    const action = actionMap.get(id)
+    if (action) {
+      return (
+        isLiteralNone(action.timing?.waitForCondition) &&
+        isLiteralNone(action.timing?.waitUntilCondition)
+      )
+    }
+    const logic = logicMap.get(id)
+    if (logic) return logic.logicType !== 'delay'
+    return eventRaiserMap.has(id) || eventListenerMap.has(id)
+  }
+
+  const next = (id: string): string[] => {
+    const targets = (adjacency.get(id) ?? []).map((edge) => edge.to)
+    const raisedEvent = eventRaiserMap.get(id)?.eventName
+    return raisedEvent ? [...targets, ...(listenersByEvent.get(raisedEvent) ?? [])] : targets
+  }
+
+  for (const listener of eventListenerMap.values()) {
+    if (!listener.eventName) continue
+    const seen = new Set<string>()
+    const pending = next(listener.id)
+    while (pending.length > 0) {
+      const id = pending.pop()!
+      if (id === listener.id) {
+        throw createError(
+          `Event listener '${listener.label ?? listener.id}' raises its own event '${listener.eventName}' with nothing in between that waits, so it would start itself again without end.`,
+        )
+      }
+      if (seen.has(id) || !runsSynchronously(id)) continue
+      seen.add(id)
+      pending.push(...next(id))
     }
   }
 }

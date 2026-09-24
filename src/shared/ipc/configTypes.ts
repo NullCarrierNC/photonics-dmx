@@ -13,25 +13,25 @@ import type {
   AudioConfig,
   AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import type { IpcErrorResult, IpcSuccessResult } from './common'
+import type { IpcErrorResult, IpcSavedResult, IpcSuccessResult } from './common'
 
 export interface ConfigInvokeMap {
   // ---- Config ----
   [CONFIG.GET_LIGHT_LIBRARY]: {
     request: void
-    response: DmxFixture[]
+    response: DmxFixture[] | IpcErrorResult
   }
   [CONFIG.GET_MY_LIGHTS]: {
     request: void
-    response: DmxFixture[]
+    response: DmxFixture[] | IpcErrorResult
   }
   [CONFIG.SAVE_MY_LIGHTS]: {
     request: DmxFixture[]
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.GET_LIGHT_LAYOUT]: {
     request: void
-    response: LightingConfiguration
+    response: LightingConfiguration | IpcErrorResult
   }
   [CONFIG.SAVE_LIGHT_LAYOUT]: {
     request: LightingConfiguration
@@ -39,23 +39,23 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DMX_RIGS]: {
     request: void
-    response: DmxRig[]
+    response: DmxRig[] | IpcErrorResult
   }
   [CONFIG.GET_DMX_RIG]: {
     request: string
-    response: DmxRig | undefined
+    response: DmxRig | undefined | IpcErrorResult
   }
   [CONFIG.GET_ACTIVE_RIGS]: {
     request: void
-    response: DmxRig[]
+    response: DmxRig[] | IpcErrorResult
   }
   [CONFIG.SAVE_DMX_RIG]: {
     request: DmxRig
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.DELETE_DMX_RIG]: {
     request: string
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.GET_APP_VERSION]: {
     request: void
@@ -71,7 +71,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_PREFS]: {
     request: void
-    response: AppPreferences
+    response: AppPreferences | IpcErrorResult
   }
   [CONFIG.SAVE_PREFS]: {
     request: Partial<AppPreferences>
@@ -91,7 +91,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.SET_CLOCK_RATE]: {
     request: number
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.GET_AUDIO_CONFIG]: {
     request: void

@@ -3,7 +3,6 @@ import {
   DmxFixture,
   DmxLight,
   DEFAULT_STROBE_CHANNEL_VALUES,
-  DMX_CHANNEL_MAX,
   ExtraChannel,
   FixtureTypes,
   RgbDmxChannels,
@@ -109,13 +108,6 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     message: string
   } | null>(null)
 
-  const activeTemplate = light
-    ? myLights.find((fixture) => fixture.id === light.fixtureId)
-    : undefined
-  const maxMasterDimmer = activeTemplate
-    ? maxMasterDimmerForTemplate(activeTemplate)
-    : DMX_CHANNEL_MAX
-
   useEffect(() => {
     if (light) {
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
@@ -162,19 +154,20 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   }, [light, myLights])
 
   /**
-   * Handles changes to the main Master Dimmer channel.
+   * Handles changes to the main Master Dimmer channel. Answers false when the master taken is not
+   * the one typed, so the box shows the one taken.
    */
-  const handleMasterDimmerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMasterDimmerChange = (asked: number): boolean => {
     if (!light || !localChannels) {
-      return
+      return false
     }
     const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
     if (!fixtureTemplate) {
       log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
-      return
+      return false
     }
 
-    const resolved = resolveMasterDimmer(fixtureTemplate, Number(e.target.value))
+    const resolved = resolveMasterDimmer(fixtureTemplate, asked)
     setMasterDimmerNotice(
       resolved.cappedMessage ? { lightId: light.id, message: resolved.cappedMessage } : null,
     )
@@ -187,6 +180,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     if (resolved.extraChannels) updatedLight.extraChannels = resolved.extraChannels
     else delete updatedLight.extraChannels
     onChange(updatedLight)
+    return resolved.master === asked
   }
 
   /**
@@ -396,12 +390,11 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
               <li key={channelName} className="flex justify-between items-center">
                 <span className="capitalize">{getDisplayName(channelName)}:</span>
                 {channelName === 'masterDimmer' ? (
-                  <input
-                    type="number"
+                  // No max here: the resolver holds an entry past the universe and says why.
+                  <DraftNumberField
                     min={1}
-                    max={maxMasterDimmer}
                     value={value || 1}
-                    onChange={handleMasterDimmerChange}
+                    onCommit={handleMasterDimmerChange}
                     className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                   />
                 ) : (

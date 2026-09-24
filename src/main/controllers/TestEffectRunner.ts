@@ -53,6 +53,8 @@ export interface TestCueDispatcher {
  */
 export class TestEffectRunner {
   private testEffectInterval: NodeJS.Timeout | null = null
+  /** Bumped by every start and stop, so only the latest start arms the interval once init lands. */
+  private startGeneration = 0
   private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large'
   private testBpm = 120
   private effectId: string | null = null
@@ -114,10 +116,8 @@ export class TestEffectRunner {
       `TestEffectRunner.startTestEffect effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
     )
 
-    if (this.testEffectInterval) {
-      clearInterval(this.testEffectInterval)
-      this.testEffectInterval = null
-    }
+    this.clearTestInterval()
+    const generation = ++this.startGeneration
 
     this.testVenueSize = venueSize ?? 'Large'
     this.testBpm = bpm ?? 120
@@ -128,26 +128,32 @@ export class TestEffectRunner {
     this.ctx
       .ensureInitialized()
       .then(() => {
-        this.startInternal()
+        // A later start or a stop supersedes this one while the init was pending.
+        if (generation === this.startGeneration) {
+          this.startInternal()
+        }
       })
       .catch((error: unknown) => {
         log.error('Error during initialization:', error)
       })
   }
 
-  public async stopTestEffect(): Promise<void> {
-    if (!this.testEffectInterval && !this.effectId) {
-      return
-    }
-
-    if (this.testEffectInterval) {
-      clearInterval(this.testEffectInterval)
-      this.testEffectInterval = null
-    }
+  /** Ends a running test effect without touching the rig, for a teardown disposing its chains. */
+  public cancel(): void {
+    this.startGeneration++
+    this.clearTestInterval()
     this.effectId = null
     this.testCueGroup = undefined
     this.rb3LedState = { ...RB3_LED_OFF }
     this.rb3LastColour = 'off'
+  }
+
+  public async stopTestEffect(): Promise<void> {
+    const running = this.testEffectInterval !== null || this.effectId !== null
+    this.cancel()
+    if (!running) {
+      return
+    }
 
     // Stop the active cue on every chain's handler and blackout every chain's sequencer
     // (not just the primary). Without this, secondary rigs would stay lit at the last
@@ -171,10 +177,23 @@ export class TestEffectRunner {
 
     const effectId = this.effectId
     if (!effectId) return
+    const cue = getCueTypeFromId(effectId)
+    if (cue === undefined) {
+      log.error('Cannot test effect: no cue for ID', effectId)
+      return
+    }
 
+    this.clearTestInterval()
     this.testEffectInterval = setInterval(() => {
-      this.testCue(effectId)
+      this.testCue(cue, effectId)
     }, 16)
+  }
+
+  private clearTestInterval(): void {
+    if (this.testEffectInterval) {
+      clearInterval(this.testEffectInterval)
+      this.testEffectInterval = null
+    }
   }
 
   private rb3LedPositions(): number[] {
@@ -186,13 +205,7 @@ export class TestEffectRunner {
     return positions
   }
 
-  private testCue(cueId: string): void {
-    const cue = getCueTypeFromId(cueId)
-    if (cue === undefined) {
-      log.error('\n Test Cue Error: no cue for ID ', cueId)
-      return
-    }
-
+  private testCue(cue: CueType, cueId: string): void {
     let strobe: StrobeState = 'Strobe_Off' as StrobeState
     if (cueId.indexOf('Strobe') > -1) {
       strobe = cueId as StrobeState

@@ -10,8 +10,9 @@ const COPYFILE_EXCL = fs.constants.COPYFILE_EXCL
 /**
  * Copies bundled default cues/effects into the app data directory.
  * JSON: writes when the destination is missing. If it exists and `bundled` is true, overwrites when
- * the bundled `cueVersion` is greater than the on-disk value (missing `cueVersion` is treated as 0).
- * JSON with `bundled` not true is never overwritten. Non-JSON files copy only when missing.
+ * the bundled `cueVersion` is greater than the on-disk value (missing `cueVersion` is treated as 0)
+ * and keeps a copy of the file it replaces. JSON with `bundled` not true is never overwritten.
+ * Non-JSON files copy only when missing.
  * In development, source is resources/defaults in the project;
  * in production, source is process.resourcesPath/defaults.
  */
@@ -59,6 +60,24 @@ async function quarantineCorruptFile(filePath: string): Promise<void> {
     log.error(`Seeded file ${filePath} would not parse, kept as ${asideName} and seeded again`)
   } catch (err) {
     log.error(`Could not move the unparsable ${filePath} aside, seeding over it:`, err)
+  }
+}
+
+/**
+ * Copy a seeded file aside before a newer shipped version replaces it, named
+ * `<name>.v<version>-<time>`. A file edited by hand still carries the shipped marker, and the copy
+ * keeps those edits. False when the copy could not be made, and the file then stays at its version.
+ */
+async function keepReplacedFile(filePath: string, version: number): Promise<boolean> {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const keptName = `${filePath}.v${version}-${stamp}`
+  try {
+    await fs.copyFile(filePath, keptName, COPYFILE_EXCL)
+    log.info(`Kept ${filePath} as ${keptName} before seeding a newer version`)
+    return true
+  } catch (err) {
+    log.error(`Could not keep a copy of ${filePath}, leaving it at version ${version}:`, err)
+    return false
   }
 }
 
@@ -119,7 +138,7 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
           }
           const sourceVersion = typeof sourceObj.cueVersion === 'number' ? sourceObj.cueVersion : 0
           const destVersion = typeof destObj.cueVersion === 'number' ? destObj.cueVersion : 0
-          if (sourceVersion > destVersion) {
+          if (sourceVersion > destVersion && (await keepReplacedFile(destPath, destVersion))) {
             await writeJsonAtomic(destPath, sourceObj)
           }
         }

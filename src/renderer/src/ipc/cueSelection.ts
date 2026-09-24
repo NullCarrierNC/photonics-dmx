@@ -126,12 +126,6 @@ export const getEnabledCueGroups = () => window.api.invoke(CONFIG.GET_ENABLED_CU
 export const setEnabledCueGroups = (groupIds: string[]) =>
   window.api.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, groupIds)
 
-export const enableCueGroup = (groupId: string) =>
-  window.api.invoke(LIGHT.ENABLE_CUE_GROUP, groupId)
-
-export const disableCueGroup = (groupId: string) =>
-  window.api.invoke(LIGHT.DISABLE_CUE_GROUP, groupId)
-
 export const getCueSourceGroup = (cueType: CueType) =>
   window.api.invoke(LIGHT.GET_CUE_SOURCE_GROUP, cueType)
 

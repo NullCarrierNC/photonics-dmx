@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { EditorState } from '@codemirror/state'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { Annotation, EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap } from '@codemirror/commands'
 import { json, jsonParseLinter } from '@codemirror/lang-json'
@@ -76,6 +76,11 @@ export type JsonValidationResult = {
   warnings?: string[]
 }
 
+/** Marks a document replace that brings in the definition from outside, which is not an edit. */
+const externalSync = Annotation.define<boolean>()
+
+const formatDefinition = (definition: unknown): string => JSON.stringify(definition, null, 2)
+
 export type NodeJsonEditorProps<
   K extends string,
   D extends { id: string },
@@ -98,9 +103,20 @@ export type NodeJsonEditorProps<
 /**
  * The JSON editor behind the cue and effect editors: edit one definition as text, validate it inside
  * its file, and apply it once it passes. Schema errors are pointed back at the spot in the text they
- * came from, and warnings are shown without blocking the save.
+ * came from, and warnings are shown without blocking the save. A different selected definition
+ * opens fresh, with nothing unsaved.
  */
-function NodeJsonEditor<K extends string, D extends { id: string }, F extends Record<K, D[]>>({
+function NodeJsonEditor<K extends string, D extends { id: string }, F extends Record<K, D[]>>(
+  props: NodeJsonEditorProps<K, D, F>,
+): JSX.Element {
+  return <DefinitionTextEditor key={props.selectedId} {...props} />
+}
+
+function DefinitionTextEditor<
+  K extends string,
+  D extends { id: string },
+  F extends Record<K, D[]>,
+>({
   definition,
   collectionKey,
   selectedId,
@@ -114,7 +130,16 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [hasEdits, setHasEdits] = useState(false)
+  const definitionText = useMemo(() => formatDefinition(definition), [definition])
+  /**
+   * The definition text the editor last took in, so a new object with the same content is ignored.
+   */
+  const [syncedText, setSyncedText] = useState(definitionText)
+  const initialTextRef = useRef(definitionText)
+  // The definition changed from outside while the text held unsaved edits.
+  const changedOutside = hasEdits && definitionText !== syncedText
   const [validationPassed, setValidationPassed] = useState(false)
+  const [validating, setValidating] = useState(false)
   const validationPassedRef = useRef(false)
   const [contentChangedAfterValidation, setContentChangedAfterValidation] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
@@ -123,6 +148,20 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
   useEffect(() => {
     onDirtyChange?.(hasEdits)
   }, [hasEdits, onDirtyChange])
+
+  /** Replace the text with `next` as the definition, leaving nothing unsaved. */
+  const takeDefinition = useCallback((view: EditorView, next: string) => {
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: next },
+      annotations: externalSync.of(true),
+    })
+    setSyncedText(next)
+    setHasEdits(false)
+    setValidationPassed(false)
+    setContentChangedAfterValidation(false)
+    setValidationErrors([])
+    setNotices([])
+  }, [])
 
   useEffect(() => {
     validationPassedRef.current = validationPassed
@@ -167,12 +206,21 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
     }
 
     const fileWithDefinition = buildFile(parsed)
+    const validatedText = view.state.doc.toString()
+    setValidating(true)
     let result: JsonValidationResult
     try {
       result = await validate(fileWithDefinition)
     } catch (e) {
+      setValidating(false)
       const message = e instanceof Error ? e.message : String(e)
       setValidationErrors([`Validation failed: ${message}`])
+      setValidationPassed(false)
+      return
+    }
+    setValidating(false)
+    // Text typed while the validation ran is not what it judged, so that text is validated again.
+    if (view.state.doc.toString() !== validatedText) {
       setValidationPassed(false)
       return
     }
@@ -239,6 +287,9 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
       lintGutter(),
       linter(jsonParseLinter()),
       EditorView.updateListener.of((update) => {
+        if (update.transactions.some((tr) => tr.annotation(externalSync))) {
+          return
+        }
         if (update.docChanged) {
           setHasEdits(true)
           if (validationPassedRef.current) {
@@ -250,10 +301,7 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
       }),
     ]
 
-    const initialState = EditorState.create({
-      doc: JSON.stringify(definition, null, 2),
-      extensions,
-    })
+    const initialState = EditorState.create({ doc: initialTextRef.current, extensions })
 
     const view = new EditorView({
       state: initialState,
@@ -265,7 +313,21 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
       view.destroy()
       viewRef.current = null
     }
-  }, [definition])
+  }, [])
+
+  // The definition can change from outside, from the metadata form above for one. Clean text takes
+  // the change. Unsaved text is kept, and the author is told and offered a reload.
+  useEffect(() => {
+    const view = viewRef.current
+    if (view && !hasEdits && definitionText !== syncedText) {
+      takeDefinition(view, definitionText)
+    }
+  }, [definitionText, hasEdits, syncedText, takeDefinition])
+
+  const handleReload = useCallback(() => {
+    const view = viewRef.current
+    if (view) takeDefinition(view, definitionText)
+  }, [definitionText, takeDefinition])
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col rounded-b-lg overflow-hidden bg-[#282c34]">
@@ -287,12 +349,27 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
           <button
             type="button"
             onClick={() => void handleValidate()}
+            disabled={validating}
             className="px-3 py-1.5 text-sm font-medium rounded text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400">
             Validate
           </button>
         )}
       </div>
       <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" />
+      {changedOutside && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-amber-100 bg-amber-900/50 border-t border-amber-800">
+          <span>
+            This definition changed outside the JSON editor. Reload to take the change and drop the
+            unsaved text.
+          </span>
+          <button
+            type="button"
+            onClick={handleReload}
+            className="px-2 py-1 rounded text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500">
+            Reload
+          </button>
+        </div>
+      )}
       {notices.length > 0 && (
         <div className="px-3 py-2 text-xs text-blue-100 bg-blue-900/50 border-t border-blue-800 overflow-auto max-h-24">
           {notices.map((msg, i) => (

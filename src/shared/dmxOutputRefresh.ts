@@ -5,7 +5,11 @@
 
 export const DMX_OUTPUT_REFRESH_RATE_HZ_MIN = 10
 export const DMX_OUTPUT_REFRESH_RATE_HZ_MAX = 44
-export const DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT = 40
+/**
+ * The network outputs' default refresh rate. It matches the publisher's default rate, the ceiling,
+ * so out of the box every frame the publisher makes goes out.
+ */
+export const DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT = DMX_OUTPUT_REFRESH_RATE_HZ_MAX
 
 /** Default OpenDMX USB send rate (Hz); used as `dmxSpeed` default for OpenDMX serial output. */
 export const OPEN_DMX_DEFAULT_REFRESH_RATE_HZ = 40

@@ -25,7 +25,6 @@ const mockConfig = {
   getLightLibrary: jest.fn().mockReturnValue([]),
   getUserLights: jest.fn().mockReturnValue([]),
   getLightingLayout: jest.fn().mockReturnValue(null),
-  updateUserLights: jest.fn().mockImplementation(() => Promise.resolve()),
   getAllPreferences: jest.fn().mockReturnValue({}),
   getPreference: jest.fn().mockReturnValue(undefined),
   updatePreferences: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -50,7 +49,6 @@ const mockMasterOutput = {
 const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn().mockImplementation(() => Promise.resolve()),
-  refreshActiveRigs: jest.fn(),
   setConsoleFixtureConfig: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
@@ -69,7 +67,6 @@ jest.mock('electron', () => ({
 jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWindows }))
 
 const mockSetBlackoutShortcut = jest.fn()
-jest.mock('../../blackoutShortcut', () => ({ setBlackoutShortcut: mockSetBlackoutShortcut }))
 
 // These registries are imported inside config-handlers; mock them to avoid side effects
 jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
@@ -133,7 +130,7 @@ describe('SAVE_DMX_RIG config propagation', () => {
     jest.clearAllMocks()
     mockConfig.saveDmxRig.mockImplementation(() => Promise.resolve())
     handlers = captureHandlers()
-    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any, mockSetBlackoutShortcut)
   })
 
   it('calls restartControllers when saving an active rig', async () => {
@@ -159,7 +156,6 @@ describe('SAVE_DMX_RIG config propagation', () => {
     const rig = makeRig('rig-1', false)
     await handler({}, rig)
     expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
-    expect(mockControllerManager.refreshActiveRigs).not.toHaveBeenCalled()
   })
 
   it('returns { success: true } on a valid save', async () => {
@@ -219,7 +215,7 @@ describe('DELETE_DMX_RIG propagation', () => {
     jest.clearAllMocks()
     mockConfig.deleteDmxRig.mockImplementation(() => Promise.resolve())
     handlers = captureHandlers()
-    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any, mockSetBlackoutShortcut)
   })
 
   it('calls restartControllers when deleting an active rig', async () => {
@@ -229,12 +225,11 @@ describe('DELETE_DMX_RIG propagation', () => {
     expect(mockControllerManager.restartControllers).toHaveBeenCalledTimes(1)
   })
 
-  it('does not call restartControllers or refreshActiveRigs when deleting an inactive rig', async () => {
+  it('does not call restartControllers when deleting an inactive rig', async () => {
     mockConfig.getDmxRig.mockReturnValue({ active: false })
     const handler = handlers.get(CONFIG.DELETE_DMX_RIG)!
     await handler({}, 'rig-1')
     expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
-    expect(mockControllerManager.refreshActiveRigs).not.toHaveBeenCalled()
   })
 
   it('returns { success: true } on a valid delete', async () => {
@@ -252,7 +247,7 @@ describe('SAVE_PREFS publisher hot-swap', () => {
     jest.clearAllMocks()
     mockControllerManager.getDmxPublisher.mockReturnValue(mockPublisher)
     handlers = captureHandlers()
-    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any, mockSetBlackoutShortcut)
   })
 
   it('persists a White Channel Mix Mode change and applies it without a restart', async () => {

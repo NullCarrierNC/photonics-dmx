@@ -90,10 +90,6 @@ describe('TransitionEngine', () => {
       getEffectQueue: jest.fn().mockReturnValue(new Map()),
       removeQueuedEffect: jest.fn(),
       getQueuedEffect: jest.fn(),
-      getLightState: jest.fn(),
-      clearLayerStates: jest.fn(),
-      clearLightLayerState: jest.fn(),
-      captureFinalStates: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
     // Create TransitionEngine instance with mocked dependencies
@@ -250,8 +246,6 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions()
 
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('test-light-1', 1)
-      // Only this light's state is cleared, not the whole layer (other lights may still run there).
-      expect(layerManager.clearLightLayerState).toHaveBeenCalledWith(1, 'test-light-1')
     })
 
     it('skips deferred removeLightLayer when a new effect is active on the next frame', () => {
@@ -631,33 +625,6 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions()
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledTimes(1)
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith(lightId, layer)
-    })
-  })
-
-  describe('getFinalState and clearFinalStates', () => {
-    it('should get and clear final states for specific layers', () => {
-      // Setup test data
-      const mockColor = createMockRGBIP({ red: 255 })
-      const lightId = 'test-light'
-      const layer = 1
-
-      // Mock the layerManager's getLightState method to return our test color
-      layerManager.getLightState.mockReturnValue(mockColor)
-
-      // Get the final state
-      const finalState = transitionEngine.getFinalState(lightId, layer)
-
-      // Verify the result matches our mock color
-      expect(finalState).toEqual(mockColor)
-
-      // Verify getLightState was called with correct parameters
-      expect(layerManager.getLightState).toHaveBeenCalledWith(layer, lightId)
-
-      // Clear the final states
-      transitionEngine.clearFinalStates(layer)
-
-      // Verify clearLayerStates was called with the layer
-      expect(layerManager.clearLayerStates).toHaveBeenCalledWith(layer)
     })
   })
 })

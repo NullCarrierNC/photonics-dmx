@@ -1,6 +1,7 @@
 import * as FakeTimers from '@sinonjs/fake-timers'
 import type { InstalledClock } from '@sinonjs/fake-timers'
 import { performance as nodePerformance } from 'perf_hooks'
+import type { ClockSource } from '../controllers/sequencer/Clock'
 
 /**
  * Coherent virtual clock for headless cue simulation.
@@ -25,7 +26,7 @@ export interface VirtualTimeOptions {
   frameStepMs?: number
 }
 
-export class VirtualTime {
+export class VirtualTime implements ClockSource {
   /**
    * The sinon clock and the `performance.now` patch are process-global, so exactly one VirtualTime
    * owns them at a time. The owner is tracked here so the next install can reclaim them from an
@@ -114,7 +115,15 @@ export class VirtualTime {
     }
   }
 
-  // ---- Clock-compatible surface consumed by Sequencer -----------------------
+  // ---- ClockSource surface consumed by Sequencer ---------------------------
+
+  public getIntervalMs(): number {
+    return this.frameStepMs
+  }
+
+  public destroy(): void {
+    this.subscribers.clear()
+  }
 
   public onTick(callback: (deltaMs: number) => void): void {
     this.subscribers.add(callback)

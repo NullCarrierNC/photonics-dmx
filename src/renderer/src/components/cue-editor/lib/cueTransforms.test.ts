@@ -135,3 +135,16 @@ describe.each(EFFECT_FILES)('effect file %s through the canvas and back', (_name
     expect(roundTripEffects(saved)).toEqual(saved)
   })
 })
+
+describe('an audio event through the canvas and back', () => {
+  it('keeps its execution policy', () => {
+    const [, original] = CUE_FILES.find(([name]) => name === 'audio/audio-motion-default.json')!
+    const file: NodeCueFile = structuredClone(original)
+    const event = file.cues[0]!.nodes.events[0]!
+    Object.assign(event, { executionPolicy: 'latest-pending' })
+
+    const saved = roundTripCues(file)
+
+    expect(saved.cues[0]!.nodes.events[0]).toMatchObject({ executionPolicy: 'latest-pending' })
+  })
+})

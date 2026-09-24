@@ -6,13 +6,14 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
 import { Sequencer } from '../../controllers/sequencer/Sequencer'
-import type { Clock } from '../../controllers/sequencer/Clock'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
+import { Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
+import { createRb3StreamHarness, type Rb3StreamHarness } from '../helpers/rb3StreamHarness'
 
 const WINDOW_MS = 2000
 
@@ -42,10 +43,7 @@ async function runStrobe(clockMs: number, type: 'fastest' | 'fast' | 'medium'): 
   )
   const clock = new ManualTestClock(clockMs)
   const lightStateManager = new LightStateManager()
-  const sequencer = new Sequencer(
-    new LightTransitionController(lightStateManager),
-    clock as unknown as Clock,
-  )
+  const sequencer = new Sequencer(new LightTransitionController(lightStateManager), clock)
   const rig = new Rb3StageKitRigProcessor('rig-a', lightManager, sequencer, { enabled: true })
 
   // A lit rig first, so a flash is something other than the colour underneath it.
@@ -119,5 +117,43 @@ describe('RB3 strobe against the frame it renders in', () => {
 
     expect(run.flashes).toBeGreaterThanOrEqual(32)
     expect(run.whiteAfterStop).toBe(false)
+  })
+})
+
+describe('RB3 strobe on the wire', () => {
+  let h: Rb3StreamHarness | null = null
+  afterEach(() => {
+    h?.cleanup()
+    h = null
+  })
+
+  it.each([40, 44])('sends every flash of the fastest strobe at %i Hz output', async (hz) => {
+    h = createRb3StreamHarness({ outputRateHz: hz, governorTimersOnTick: true })
+    h.gameState('InGame')
+    h.stageKit(0xff, Rb3RightChannel.BlueLeds)
+    await h.step(200)
+
+    const whiteOnWire = (buffer: Readonly<Record<number, number>>): boolean =>
+      buffer[2] > 200 && buffer[3] > 200 && buffer[4] > 200
+    const firstFrame = h.wire.frames.length
+    let rendered = 0
+    let lastRendered = false
+    h.stageKit(0, Rb3RightChannel.StrobeFastest)
+    await h.step(WINDOW_MS, () => {
+      const state = h?.lightState(0)
+      const lit = !!state && state.red > 200 && state.green > 200 && state.blue > 200
+      if (lit !== lastRendered) rendered++
+      lastRendered = lit
+    })
+
+    let sent = 0
+    let lastSent = false
+    for (const frame of h.wire.frames.slice(firstFrame)) {
+      const lit = whiteOnWire(frame.buffer)
+      if (lit !== lastSent) sent++
+      lastSent = lit
+    }
+    expect(rendered).toBeGreaterThanOrEqual(30)
+    expect(sent).toBe(rendered)
   })
 })

@@ -1,5 +1,7 @@
 import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioStrobeSettings: React.FC = () => {
   const audio = useAudioConfigFields({
@@ -9,6 +11,8 @@ const AudioStrobeSettings: React.FC = () => {
   })
   const { strobeEnabled, strobeTriggerThreshold, strobeProbability } = audio.values
   const commit = (): void => void audio.commit()
+  const thresholdRelease = useCommitOnRelease(commit)
+  const probabilityRelease = useCommitOnRelease(commit)
 
   const thresholdRangeStyle = {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeTriggerThreshold * 100}%, #e5e7eb ${strobeTriggerThreshold * 100}%, #e5e7eb 100%)`,
@@ -18,7 +22,8 @@ const AudioStrobeSettings: React.FC = () => {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeProbability}%, #e5e7eb ${strobeProbability}%, #e5e7eb 100%)`,
   } as const
 
-  const busy = !audio.loaded || audio.isSaving
+  // The controls stay live while a save is in flight, so keyboard focus stays on a slider.
+  const busy = !audio.loaded
   const strobeControlsDisabled = busy || !strobeEnabled
 
   return (
@@ -62,10 +67,11 @@ const AudioStrobeSettings: React.FC = () => {
               style={thresholdRangeStyle}
               value={strobeTriggerThreshold}
               disabled={strobeControlsDisabled}
-              onChange={(e) => audio.set({ strobeTriggerThreshold: Number(e.target.value) })}
-              onMouseUp={commit}
-              onTouchEnd={commit}
-              onBlur={commit}
+              onChange={(e) => {
+                audio.set({ strobeTriggerThreshold: Number(e.target.value) })
+                thresholdRelease.changed()
+              }}
+              {...thresholdRelease.props}
             />
             <input
               type="number"
@@ -106,10 +112,11 @@ const AudioStrobeSettings: React.FC = () => {
               style={probabilityRangeStyle}
               value={strobeProbability}
               disabled={strobeControlsDisabled}
-              onChange={(e) => audio.set({ strobeProbability: Number(e.target.value) })}
-              onMouseUp={commit}
-              onTouchEnd={commit}
-              onBlur={commit}
+              onChange={(e) => {
+                audio.set({ strobeProbability: Number(e.target.value) })
+                probabilityRelease.changed()
+              }}
+              {...probabilityRelease.props}
             />
             <input
               type="number"
@@ -131,6 +138,7 @@ const AudioStrobeSettings: React.FC = () => {
           </div>
         </div>
       </div>
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

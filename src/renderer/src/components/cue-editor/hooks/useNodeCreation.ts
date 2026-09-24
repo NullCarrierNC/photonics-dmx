@@ -26,6 +26,12 @@ type UseNodeCreationParams = {
 
 import { LOGIC_NODE_FACTORIES } from '../lib/logicNodeFactories'
 
+const NOTES_LABELS: Record<NotesVariant, string> = {
+  notes: 'Notes',
+  info: 'Info',
+  important: 'Important',
+}
+
 const useNodeCreation = ({
   nodes,
   setNodes,
@@ -127,7 +133,33 @@ const useNodeCreation = ({
     [nodes],
   )
 
-  const logicNodeFactories = LOGIC_NODE_FACTORIES
+  /**
+   * Adds a new node and marks the document dirty. A dropped node is centred on the drop point, and
+   * one added from a menu goes near its kind's default spot, either way clear of the nodes already
+   * there.
+   */
+  const placeNode = useCallback(
+    (
+      node: Omit<EditorNode, 'position'>,
+      dropAt: { x: number; y: number } | undefined,
+      defaultAt: { x: number; y: number },
+      nodeWidth = 150,
+    ) => {
+      const nodeHeight = 80
+      const position = dropAt
+        ? findAvailablePosition(
+            dropAt.x - nodeWidth / 2,
+            dropAt.y - nodeHeight / 2,
+            nodeWidth,
+            nodeHeight,
+            true,
+          )
+        : findAvailablePosition(defaultAt.x, defaultAt.y)
+      setNodes((nds) => [...nds, { ...node, position }])
+      setIsDirty(true)
+    },
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addEventNode = useCallback(
     (
@@ -135,106 +167,68 @@ const useNodeCreation = ({
       position?: { x: number; y: number },
     ) => {
       const nodeMode = activeMode
-      const newEventId = `event-${createId()}`
+      const id = `event-${createId()}`
       const defaultOption = option ?? getDefaultEventOption(nodeMode, cueKind)
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 80)
-      const newNode: EditorNode = {
-        id: newEventId,
-        type: 'event',
-        position: pos,
-        data: {
-          kind: 'event',
-          label:
-            nodeMode === 'audio' && defaultOption.value === 'audio-trigger'
-              ? 'Audio Trigger'
-              : defaultOption.label,
-          payload:
-            // RB3 nodes are YARG-shaped; only audio uses the threshold/triggerMode shape.
-            nodeMode !== 'audio'
-              ? {
-                  id: newEventId,
-                  type: 'event',
-                  eventType: defaultOption.value as NetEventNode['eventType'],
-                }
-              : defaultOption.value === 'audio-trigger'
-                ? buildDefaultAudioTrigger(newEventId)
-                : {
-                    id: newEventId,
-                    type: 'event',
-                    eventType: defaultOption.value as AudioEventNode['eventType'],
-                    threshold: 0.5,
-                    triggerMode: 'edge',
-                  },
+      const isAudioTrigger = nodeMode === 'audio' && defaultOption.value === 'audio-trigger'
+      placeNode(
+        {
+          id,
+          type: 'event',
+          data: {
+            kind: 'event',
+            label: isAudioTrigger ? 'Audio Trigger' : defaultOption.label,
+            payload:
+              // RB3 nodes are YARG-shaped. Only audio uses the threshold/triggerMode shape.
+              nodeMode !== 'audio'
+                ? { id, type: 'event', eventType: defaultOption.value as NetEventNode['eventType'] }
+                : isAudioTrigger
+                  ? buildDefaultAudioTrigger(id)
+                  : {
+                      id,
+                      type: 'event',
+                      eventType: defaultOption.value as AudioEventNode['eventType'],
+                      threshold: 0.5,
+                      triggerMode: 'edge',
+                    },
+          },
         },
-      }
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+        position,
+        { x: 120, y: 80 },
+      )
     },
-    [activeMode, cueKind, findAvailablePosition, setIsDirty, setNodes],
+    [activeMode, cueKind, placeNode],
   )
 
   const addActionNode = useCallback(
     (effectType: NodeEffectType, position?: { x: number; y: number }) => {
       const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType }
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(480, 160)
-      const newNode: EditorNode = {
-        id: action.id,
-        type: 'action',
-        position: pos,
-        data: {
-          kind: 'action',
-          label: effectType,
-          payload: action,
+      placeNode(
+        {
+          id: action.id,
+          type: 'action',
+          data: { kind: 'action', label: effectType, payload: action },
         },
-      }
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+        position,
+        { x: 480, y: 160 },
+      )
     },
-    [findAvailablePosition, setIsDirty, setNodes],
+    [placeNode],
   )
 
   const addLogicNode = useCallback(
     (logicType: LogicNode['logicType'], position?: { x: number; y: number }) => {
       const id = `logic-${createId()}`
-      const payload = logicNodeFactories[logicType](id)
-
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(320, 120)
-      const newNode: EditorNode = {
-        id,
-        type: 'logic',
-        position: pos,
-        data: {
-          kind: 'logic',
-          label: logicType,
-          payload,
+      placeNode(
+        {
+          id,
+          type: 'logic',
+          data: { kind: 'logic', label: logicType, payload: LOGIC_NODE_FACTORIES[logicType](id) },
         },
-      }
-
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+        position,
+        { x: 320, y: 120 },
+      )
     },
-    [findAvailablePosition, logicNodeFactories, setIsDirty, setNodes],
+    [placeNode],
   )
 
   const addEventRaiserNode = useCallback(
@@ -248,30 +242,13 @@ const useNodeCreation = ({
         inputs: [],
         outputs: [],
       }
-
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(320, 200)
-      const newNode: EditorNode = {
-        id,
-        type: 'event-raiser',
-        position: pos,
-        data: {
-          kind: 'event-raiser',
-          label: 'Raise Event',
-          payload,
-        },
-      }
-
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+      placeNode(
+        { id, type: 'event-raiser', data: { kind: 'event-raiser', label: 'Raise Event', payload } },
+        position,
+        { x: 320, y: 200 },
+      )
     },
-    [findAvailablePosition, setIsDirty, setNodes],
+    [placeNode],
   )
 
   const addEventListenerNode = useCallback(
@@ -284,30 +261,17 @@ const useNodeCreation = ({
         label: 'Listen Event',
         outputs: [],
       }
-
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 280)
-      const newNode: EditorNode = {
-        id,
-        type: 'event-listener',
-        position: pos,
-        data: {
-          kind: 'event-listener',
-          label: 'Listen Event',
-          payload,
+      placeNode(
+        {
+          id,
+          type: 'event-listener',
+          data: { kind: 'event-listener', label: 'Listen Event', payload },
         },
-      }
-
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+        position,
+        { x: 120, y: 280 },
+      )
     },
-    [findAvailablePosition, setIsDirty, setNodes],
+    [placeNode],
   )
 
   const addEffectRaiserNode = useCallback(
@@ -320,30 +284,17 @@ const useNodeCreation = ({
         label: 'Raise Effect',
         outputs: [],
       }
-
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 280)
-      const newNode: EditorNode = {
-        id,
-        type: 'effect-raiser',
-        position: pos,
-        data: {
-          kind: 'effect-raiser',
-          label: 'Raise Effect',
-          payload,
+      placeNode(
+        {
+          id,
+          type: 'effect-raiser',
+          data: { kind: 'effect-raiser', label: 'Raise Effect', payload },
         },
-      }
-
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+        position,
+        { x: 120, y: 280 },
+      )
     },
-    [findAvailablePosition, setIsDirty, setNodes],
+    [placeNode],
   )
 
   const addEffectListenerNode = useCallback(
@@ -355,73 +306,33 @@ const useNodeCreation = ({
         label: 'Effect Entry',
         outputs: [],
       }
-
-      const nodeWidth = 150
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 80)
-      const newNode: EditorNode = {
-        id,
-        type: 'effect-listener',
-        position: pos,
-        data: {
-          kind: 'effect-listener',
-          label: 'Effect Entry',
-          payload,
+      placeNode(
+        {
+          id,
+          type: 'effect-listener',
+          data: { kind: 'effect-listener', label: 'Effect Entry', payload },
         },
-      }
-
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+        position,
+        { x: 120, y: 80 },
+      )
     },
-    [findAvailablePosition, setIsDirty, setNodes],
+    [placeNode],
   )
 
   const addNotesNode = useCallback(
     (variant: NotesVariant = 'notes', position?: { x: number; y: number }) => {
-      const normalizedVariant = variant.toLowerCase() as NotesVariant
-      const label =
-        normalizedVariant === 'info'
-          ? 'Info'
-          : normalizedVariant === 'important'
-            ? 'Important'
-            : 'Notes'
+      const style = variant.toLowerCase() as NotesVariant
+      const label = NOTES_LABELS[style] ?? 'Notes'
       const id = `notes-${createId()}`
-      const payload: NotesNode = {
-        id,
-        type: 'notes',
-        label,
-        note: '',
-        style: normalizedVariant,
-      }
-
-      const nodeWidth = 240
-      const nodeHeight = 80
-      const centeredPosition = position
-        ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined
-      const pos = centeredPosition
-        ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(320, 240)
-      const newNode: EditorNode = {
-        id,
-        type: 'notes',
-        position: pos,
-        data: {
-          kind: 'notes',
-          label,
-          payload,
-        },
-      }
-
-      setNodes((nds) => [...nds, newNode])
-      setIsDirty(true)
+      const payload: NotesNode = { id, type: 'notes', label, note: '', style }
+      placeNode(
+        { id, type: 'notes', data: { kind: 'notes', label, payload } },
+        position,
+        { x: 320, y: 240 },
+        240,
+      )
     },
-    [findAvailablePosition, setIsDirty, setNodes],
+    [placeNode],
   )
 
   return {

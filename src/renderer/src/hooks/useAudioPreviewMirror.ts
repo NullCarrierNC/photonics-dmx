@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { getDefaultStore } from 'jotai'
+import { useStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -9,16 +9,17 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
  * (capture runs in the main app renderer).
  */
 export function useAudioPreviewMirror(): void {
+  const store = useStore()
   useEffect(() => {
     const cleanupMirror = registerIpcListener(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, (payload) => {
-      getDefaultStore().set(audioDataAtom, payload)
+      store.set(audioDataAtom, payload)
     })
     const cleanupDisable = registerIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, () => {
-      getDefaultStore().set(audioDataAtom, null)
+      store.set(audioDataAtom, null)
     })
     return () => {
       cleanupMirror()
       cleanupDisable()
     }
-  }, [])
+  }, [store])
 }

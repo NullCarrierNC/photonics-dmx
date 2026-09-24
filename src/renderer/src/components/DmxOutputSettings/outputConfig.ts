@@ -39,21 +39,6 @@ export function nextOutputConfig(
   return next
 }
 
-/** The config to save on first run, taken from the senders the backend reports running. */
-export function outputConfigFromRunningSenders(running: {
-  sacn: boolean
-  artnet: boolean
-  enttecpro: boolean
-  opendmx: boolean
-}): DmxOutputConfig {
-  return {
-    sacnEnabled: running.sacn,
-    artNetEnabled: running.artnet,
-    enttecProEnabled: running.enttecpro,
-    openDmxEnabled: running.opendmx,
-  }
-}
-
 /** The global publishing rate a field carries, held inside the range the DMX-512 wire allows. */
 export function parseGlobalPublishingRate(input: string): number {
   const parsed = parseInt(input, 10)

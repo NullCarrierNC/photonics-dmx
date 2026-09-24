@@ -1,62 +1,36 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getMotionEnabled, setMotionEnabled } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('MotionMasterToggle')
+import React, { useCallback, useState } from 'react'
+import { setMotionEnabled } from '../ipcApi'
+import { persistSetting } from '../ipc/persistPrefs'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 export interface MotionMasterToggleProps {
-  /** When false, downstream motion preference controls are dimmed (controlled by parent). */
-  onMotionEnabledChange?: (enabled: boolean) => void
+  /** The motion master state, which the parent reads from main and follows. */
+  enabled: boolean
+  /** Told the new state once main has stored it, so downstream motion controls follow. */
+  onMotionEnabledChange: (enabled: boolean) => void
 }
 
-const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({ onMotionEnabledChange }) => {
-  const [enabled, setEnabled] = useState(true)
+const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({
+  enabled,
+  onMotionEnabledChange,
+}) => {
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    getMotionEnabled()
-      .then((v) => {
-        if (!cancelled && typeof v === 'boolean') {
-          setEnabled(v)
-          onMotionEnabledChange?.(v)
-        }
-      })
-      .catch((err) => {
-        log.error('Failed to read the motion master state', err)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [onMotionEnabledChange])
-
-  useEffect(() => {
-    const onBroadcast = (value: boolean) => {
-      setEnabled(value)
-      onMotionEnabledChange?.(value)
-    }
-    addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onBroadcast)
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onBroadcast)
-    }
-  }, [onMotionEnabledChange])
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const onChange = useCallback(
     async (next: boolean) => {
       if (saving) return
       setSaving(true)
-      try {
-        const result = await setMotionEnabled(next)
-        if (result && typeof result === 'object' && 'success' in result && result.success) {
-          setEnabled(next)
-          onMotionEnabledChange?.(next)
-        }
-      } catch (e) {
-        log.error('Failed to set motion enabled', e)
-      } finally {
-        setSaving(false)
+      setSaveError(null)
+      const saved = await persistSetting(
+        () => setMotionEnabled(next),
+        'motion support',
+        setSaveError,
+      )
+      if (saved !== null) {
+        onMotionEnabledChange(next)
       }
+      setSaving(false)
     },
     [onMotionEnabledChange, saving],
   )
@@ -82,6 +56,7 @@ const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({ onMotionEnabled
           Enable motion support (YARG + audio)
         </span>
       </label>
+      <SaveErrorAlert message={saveError} />
     </div>
   )
 }

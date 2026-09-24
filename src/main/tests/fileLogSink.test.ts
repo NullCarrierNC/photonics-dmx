@@ -1,8 +1,48 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+
+// Streams are real, and a test can hand the sink one whose writes fail.
+jest.mock('fs', () => {
+  const actual = jest.requireActual('fs')
+  return { ...actual, createWriteStream: jest.fn(actual.createWriteStream) }
+})
+
 import { createFileLogSink } from '../logging/fileLogSink'
 import type { LogEntry } from '../../shared/logger'
+
+const actualFs = jest.requireActual<typeof fs>('fs')
+
+/** A real write stream on `filePath` whose every write fails the way a full disk fails it. */
+function failingWriteStream(filePath: string): fs.WriteStream {
+  return actualFs.createWriteStream(filePath, {
+    flags: 'a',
+    fs: {
+      open: actualFs.open,
+      close: actualFs.close,
+      write: (
+        _fd: number,
+        _buffer: Buffer,
+        _offset: number,
+        _length: number,
+        _position: number | null,
+        callback: (err: NodeJS.ErrnoException | null, written?: number) => void,
+      ) =>
+        callback(Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })),
+    },
+  })
+}
+
+/** Resolves 'settled' when `promise` does within the wait, or 'pending' when it has not. */
+function settlesWithin(promise: Promise<unknown>, ms: number): Promise<'settled' | 'pending'> {
+  let timer: NodeJS.Timeout | undefined
+  const timeout = new Promise<'pending'>((resolve) => {
+    timer = setTimeout(() => resolve('pending'), ms)
+  })
+  return Promise.race([promise.then(() => 'settled' as const), timeout]).finally(() =>
+    clearTimeout(timer),
+  )
+}
 
 const entry = (e: Partial<LogEntry> & Pick<LogEntry, 'message'>): LogEntry => ({
   level: e.level ?? 'info',
@@ -162,6 +202,48 @@ describe('createFileLogSink', () => {
     expect(written).toContain('error 0')
     expect(written).not.toContain('error 399')
     expect(written.length).toBeLessThan(1200)
+  })
+
+  describe('after a write stream error', () => {
+    const createWriteStreamMock = jest.mocked(fs.createWriteStream)
+
+    beforeEach(() => {
+      jest.spyOn(console, 'error').mockImplementation(() => {})
+      createWriteStreamMock.mockImplementationOnce((filePath) =>
+        failingWriteStream(String(filePath)),
+      )
+    })
+
+    afterEach(() => {
+      jest.restoreAllMocks()
+      createWriteStreamMock.mockImplementation(actualFs.createWriteStream)
+    })
+
+    const streamErrored = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30))
+
+    it('settles close()', async () => {
+      const t = new Date(2025, 3, 29, 10, 0, 0, 0).getTime()
+      const { sink, close } = createFileLogSink({ logsDir: tmpDir, clock: () => t })
+      sink(entry({ message: 'lost to the full disk' }))
+      await streamErrored()
+
+      expect(await settlesWithin(close(), 1000)).toBe('settled')
+    })
+
+    it('writes a later line to a fresh stream on the same day', async () => {
+      let t = new Date(2025, 3, 29, 10, 0, 0, 0).getTime()
+      const { sink, close } = createFileLogSink({ logsDir: tmpDir, clock: () => t })
+      sink(entry({ message: 'lost to the full disk' }))
+      await streamErrored()
+
+      t += 60_000
+      sink(entry({ message: 'after the disk freed up' }))
+      await close()
+
+      const written = fs.readFileSync(path.join(tmpDir, 'photonics-2025-04-29.log'), 'utf-8')
+      expect(written).toContain('after the disk freed up')
+      expect(written).not.toContain('lost to the full disk')
+    })
   })
 
   it('opens no further stream once it has been closed', async () => {

@@ -17,6 +17,8 @@ import { Effect, RGBIO } from '../../types'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { performance as perfHooks } from 'perf_hooks'
 import { fakeLightingController } from '../helpers/fakeLightingController'
+import { createRb3StreamHarness, type Rb3StreamHarness } from '../helpers/rb3StreamHarness'
+import { Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
 
 const MENU_BASE = 'rb3-menu-base'
 const menuLight = (i: number) => `rb3-menu-light-${i}`
@@ -283,13 +285,14 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(handled[handled.length - 1].ledBanks).toEqual({ red: 0, green: 0, blue: 0, yellow: 0 })
   })
 
-  it('DisableAll during the menu look leaves the rig alone', async () => {
+  it('DisableAll during the menu look keeps the menu look and leaves no strobe running', async () => {
     emitGameState(networkListener, 'InGame')
     emitGameState(networkListener, 'Menus')
     jest.advanceTimersByTime(1000)
     await Promise.resolve()
     await Promise.resolve()
     blackout.mockClear()
+    setEffect.mockClear()
 
     networkListener.emit('stagekit:data', {
       positions: [],
@@ -299,8 +302,57 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
       rightChannel: 0xff,
       timestamp: Date.now(),
     })
+    jest.advanceTimersByTime(1000)
 
     expect(blackout).not.toHaveBeenCalled()
+    expect(setEffect).toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
+  })
+
+  it('leaves the menu look once on a gameplay packet, and a late InGame leaves the song lit', async () => {
+    emitGameState(networkListener, 'Menus')
+    jest.advanceTimersByTime(1000)
+    await Promise.resolve()
+
+    networkListener.emit('stagekit:data', {
+      positions: [0, 1, 2, 3, 4, 5, 6, 7],
+      color: 'red',
+      fog: false,
+      leftChannel: 0xff,
+      rightChannel: 0x80,
+      timestamp: Date.now(),
+    })
+    expect(removeEffect).toHaveBeenCalledWith(MENU_BASE, 0)
+
+    blackout.mockClear()
+    setEffect.mockClear()
+    emitGameState(networkListener, 'InGame')
+    jest.advanceTimersByTime(3000)
+
+    expect(blackout).not.toHaveBeenCalled()
+    expect(setEffect).not.toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
+  })
+
+  it.each([
+    ['a bank clear', { color: 'red', leftChannel: 0, rightChannel: 0x80 }],
+    ['strobe off', { color: 'off', leftChannel: 0, rightChannel: 0x07, strobeEffect: 'off' }],
+    ['fog off', { color: 'off', leftChannel: 0, rightChannel: 0x02 }],
+    ['DisableAll', { color: 'off', leftChannel: 0, rightChannel: 0xff }],
+  ])('keeps the menu look through %s', async (_label, fields) => {
+    emitGameState(networkListener, 'Menus')
+    jest.advanceTimersByTime(1000)
+    await Promise.resolve()
+    setEffect.mockClear()
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      fog: false,
+      timestamp: Date.now(),
+      ...fields,
+    })
+    jest.advanceTimersByTime(1000)
+
+    expect(setEffect).toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
   })
 
   it('lights normally from a colour packet right after DisableAll', () => {
@@ -339,6 +391,21 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(handled).toHaveLength(1)
 
     emitScreenName(networkListener, 'song_select_screen')
+    expect(handled).toHaveLength(1)
+  })
+
+  it('a repeated main_hub_screen leaves the running Default menu alone', () => {
+    emitGameState(networkListener, 'InGame')
+    emitStageKit(networkListener)
+
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => {
+      handled.push(d)
+    })
+
+    emitScreenName(networkListener, 'main_hub_screen')
+    emitScreenName(networkListener, 'main_hub_screen')
+
     expect(handled).toHaveLength(1)
   })
 
@@ -411,6 +478,29 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
   })
 })
 
+describe('Rb3StageKitDirectProcessor strobe and DisableAll after Menus', () => {
+  let h: Rb3StreamHarness | null = null
+  afterEach(() => {
+    h?.cleanup()
+    h = null
+  })
+
+  it('leaves no strobe run writing to the rig', async () => {
+    h = createRb3StreamHarness()
+    h.gameState('Menus')
+    await h.step(1100)
+    h.stageKit(0, Rb3RightChannel.StrobeFast)
+    await h.step(300)
+
+    h.stageKit(0, Rb3RightChannel.DisableAll)
+    const setState = jest.spyOn(h.chain.sequencer, 'setState')
+    await h.step(2000)
+
+    expect(h.processor?.getStatus().hasActiveStrobeEffects).toBe(false)
+    expect(setState).not.toHaveBeenCalled()
+  })
+})
+
 describe('Rb3StageKitDirectProcessor DisableAll across multiple rigs', () => {
   it('turns off every active rig', () => {
     const networkListener = new EventEmitter()
@@ -470,6 +560,7 @@ describe('StageKit direct mode configuration', () => {
 describe('StageKit strobe watchdog', () => {
   let networkListener: EventEmitter
   let processor: Rb3StageKitDirectProcessor
+  let chainFanout: ChainFanout
   const WINDOW_MS = 2000
 
   /** A rig with a strobe fixture, so a strobe command produces a real effect to observe. */
@@ -510,7 +601,7 @@ describe('StageKit strobe watchdog', () => {
     networkListener = new EventEmitter()
     const lightManager = new DmxLightManager(makeStrobeRigConfig())
     const sequencer = fakeLightingController()
-    const chainFanout = new ChainFanout()
+    chainFanout = new ChainFanout()
     chainFanout.setChains([
       {
         rigId: 'strobe-rig',
@@ -576,6 +667,45 @@ describe('StageKit strobe watchdog', () => {
     const running = processor.getStatus().activeStrobeEffects
     expect(running).toHaveLength(1)
     expect(running[0]).toContain('fastest')
+  })
+
+  it('drives the hardware strobe slot while a strobe runs', () => {
+    emitStrobe('fast')
+    expect(chainFanout.strobeState.getActive()).toBe('fast')
+
+    emitStrobe('slow')
+    expect(chainFanout.strobeState.getActive()).toBe('slow')
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      strobeEffect: 'off',
+      timestamp: Date.now(),
+    })
+    expect(chainFanout.strobeState.getActive()).toBeNull()
+  })
+
+  it('frees the hardware strobe slot when the strobe is cut', () => {
+    emitStrobe('fastest')
+
+    jest.advanceTimersByTime(WINDOW_MS + 500)
+
+    expect(chainFanout.strobeState.getActive()).toBeNull()
+  })
+
+  it('frees the hardware strobe slot on DisableAll', () => {
+    emitStrobe('medium')
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
+
+    expect(chainFanout.strobeState.getActive()).toBeNull()
   })
 
   it('starts a fresh strobe after one is cut and the console asks again', () => {

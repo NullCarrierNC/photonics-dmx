@@ -13,18 +13,14 @@ const mockIpcMain = {
   on: jest.fn() as jest.MockedFunction<(...args: unknown[]) => void>,
 }
 
-const updateUserLights = jest.fn(async () => {}) as jest.MockedFunction<
-  (fixtures: unknown) => Promise<void>
->
-const syncRigsWithUserLights = jest.fn(async () => false) as jest.MockedFunction<
-  () => Promise<boolean>
+const saveUserLights = jest.fn(async () => false) as jest.MockedFunction<
+  (fixtures: unknown) => Promise<boolean>
 >
 const restartControllers = jest.fn(async () => {}) as jest.MockedFunction<() => Promise<void>>
 const getDmxRig = jest.fn() as jest.MockedFunction<(id: string) => unknown>
 const getUserLights = jest.fn(() => [] as unknown[]) as jest.MockedFunction<() => unknown[]>
 const mockGetConfig = jest.fn(() => ({
-  updateUserLights,
-  syncRigsWithUserLights,
+  saveUserLights,
   getDmxRig,
   getUserLights,
 }))
@@ -95,8 +91,7 @@ describe('registerLightsRigsConfigHandlers (SAVE_MY_LIGHTS)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    updateUserLights.mockResolvedValue(undefined)
-    syncRigsWithUserLights.mockResolvedValue(false)
+    saveUserLights.mockResolvedValue(false)
     restartControllers.mockResolvedValue(undefined)
   })
 
@@ -108,7 +103,7 @@ describe('registerLightsRigsConfigHandlers (SAVE_MY_LIGHTS)', () => {
     const r = await h(null, null)
 
     expect(r).toEqual({ success: false, error: 'bad fixtures' })
-    expect(updateUserLights).not.toHaveBeenCalled()
+    expect(saveUserLights).not.toHaveBeenCalled()
   })
 
   it('persists and returns success for valid myLights', async () => {
@@ -120,14 +115,14 @@ describe('registerLightsRigsConfigHandlers (SAVE_MY_LIGHTS)', () => {
     const r = await h(null, [])
 
     expect(r).toEqual({ success: true })
-    expect(updateUserLights).toHaveBeenCalledWith(fixtures)
+    expect(saveUserLights).toHaveBeenCalledWith(fixtures)
   })
 
-  it('returns ipcError when updateUserLights rejects', async () => {
+  it('returns ipcError when the save rejects', async () => {
     registerLightsRigsConfigHandlers(mockIpcMain as any, mockControllerManager as any)
     const fixtures = [{ id: 'a' }] as any
     validateDmx.mockReturnValue({ ok: true, value: fixtures })
-    updateUserLights.mockRejectedValue(new Error('disk full'))
+    saveUserLights.mockRejectedValue(new Error('disk full'))
 
     const h = getSaveMyLightsHandler()
     const r = await h(null, [])
@@ -138,26 +133,26 @@ describe('registerLightsRigsConfigHandlers (SAVE_MY_LIGHTS)', () => {
   it('restarts controllers when the rig sync reports changes', async () => {
     registerLightsRigsConfigHandlers(mockIpcMain as any, mockControllerManager as any)
     validateDmx.mockReturnValue({ ok: true, value: [{ id: 'a' }] as any })
-    syncRigsWithUserLights.mockResolvedValue(true)
+    saveUserLights.mockResolvedValue(true)
 
     const h = getSaveMyLightsHandler()
     const r = await h(null, [])
 
     expect(r).toEqual({ success: true })
-    expect(syncRigsWithUserLights).toHaveBeenCalledTimes(1)
+    expect(saveUserLights).toHaveBeenCalledTimes(1)
     expect(restartControllers).toHaveBeenCalledTimes(1)
   })
 
   it('does NOT restart controllers when rig sync reports no changes', async () => {
     registerLightsRigsConfigHandlers(mockIpcMain as any, mockControllerManager as any)
     validateDmx.mockReturnValue({ ok: true, value: [{ id: 'a' }] as any })
-    syncRigsWithUserLights.mockResolvedValue(false)
+    saveUserLights.mockResolvedValue(false)
 
     const h = getSaveMyLightsHandler()
     const r = await h(null, [])
 
     expect(r).toEqual({ success: true })
-    expect(syncRigsWithUserLights).toHaveBeenCalledTimes(1)
+    expect(saveUserLights).toHaveBeenCalledTimes(1)
     expect(restartControllers).not.toHaveBeenCalled()
   })
 })
@@ -236,7 +231,7 @@ describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
     getDmxRig.mockReturnValue(exampleRig)
     mockShowSaveDialog.mockResolvedValue({ canceled: true })
     const r = await getHandler(RIGS.EXPORT)(null, 'r1')
-    expect(r).toEqual({ success: false, error: 'User cancelled export.' })
+    expect(r).toEqual({ success: false, error: 'User cancelled export.', cancelled: true })
     expect(mockWriteFile).not.toHaveBeenCalled()
   })
 
@@ -261,14 +256,14 @@ describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
       rig: exampleRig,
       templates: file.templates,
     })
-    expect(updateUserLights).not.toHaveBeenCalled()
+    expect(saveUserLights).not.toHaveBeenCalled()
   })
 
   it('import-pick: returns the cancel error when dismissed', async () => {
     registerLightsRigsConfigHandlers(mockIpcMain as never, mockControllerManager as never)
     mockShowOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] })
     const r = await getHandler(RIGS.IMPORT_PICK)(null, undefined)
-    expect(r).toEqual({ success: false, error: 'User cancelled import.' })
+    expect(r).toEqual({ success: false, error: 'User cancelled import.', cancelled: true })
   })
 
   it('import-pick: rejects malformed JSON', async () => {

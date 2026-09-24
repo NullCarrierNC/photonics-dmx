@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
 import LightLayoutPreview from '../components/LightLayoutPreview'
 import { findSharedChannelNumbers } from '../components/lightChannelDisplay'
-import { useAtom, useSetAtom } from 'jotai'
-import ToastContainer from '../components/Toast'
+import { useAtom, useSetAtom, useStore } from 'jotai'
 
 import {
   ConfigStrobeType,
@@ -43,7 +42,9 @@ import { useLightsLayoutDrag } from './LightsLayout/useLightsLayoutDrag'
 import LightsLayoutCanvas from './LightsLayout/LightsLayoutCanvas'
 import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutActiveConfigSync'
 import { useToast } from '../hooks/useToast'
+import { useTimeout } from '../utils/useTimeout'
 import { useConfirm } from '../hooks/useConfirm'
+import { useUnloadGuard } from '../hooks/useUnloadGuard'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('LightsLayout')
 
@@ -56,7 +57,7 @@ const rigToolbarButton =
  * @returns React component
  */
 const LightsLayout = () => {
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
   const confirm = useConfirm()
   const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [myFixtures] = useAtom(myValidDmxLightsAtom)
@@ -92,6 +93,9 @@ const LightsLayout = () => {
 
   const [highlightedLight, setHighlightedLight] = useState<number | null>(null)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const store = useStore()
+  const hideSuccessMessage = useTimeout(() => setShowSuccessMessage(false), 3000)
 
   const [allPrimaryLights, setAllPrimaryLights] = useState<DmxLight[]>(() => {
     const front = activeConfig?.frontLights || []
@@ -327,15 +331,7 @@ const LightsLayout = () => {
     }
   }, [setLightsLayoutUnsaved])
 
-  useEffect(() => {
-    if (!isDirty) return
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [isDirty])
+  useUnloadGuard(isDirty)
 
   const tryConfirmUnsaved = useCallback(async () => {
     if (!isDirty) return true
@@ -415,29 +411,34 @@ const LightsLayout = () => {
         return
       }
 
-      // getDmxRigs() returns the backend-canonical rigs: migration + template-sync run on read
-      // and materialize defaults (e.g. strobeValues/config) and recomputed channels that the
+      // getDmxRigs() returns the backend-canonical rigs: migration + template-sync run on every
+      // rig write and materialize defaults (e.g. strobeValues/config) and recomputed channels that the
       // editor's raw config omits. Adopt that shape for both atoms so the editor baseline and the
       // saved rig the dirty check compares stay identical; the unsaved indicator then reflects
       // real edits only. Fall back to the local objects if the re-read fails or the rig is gone.
+      // The editor takes the answer only while it still shows the saved rig, since the user can
+      // pick another rig while main restarts.
+      const applyToEditor = (config: LightingConfiguration): void => {
+        if (store.get(activeRigIdAtom) === updatedRig.id) setActiveLightsConfig(config)
+      }
       try {
         const freshRigs = await getDmxRigs()
-        const freshRig = freshRigs.find((r) => r.id === activeRigId)
+        const freshRig = freshRigs.find((r) => r.id === updatedRig.id)
         if (freshRig) {
           setRigs(freshRigs)
-          setActiveLightsConfig(freshRig.config)
+          applyToEditor(freshRig.config)
         } else {
-          setActiveLightsConfig(updatedConfig)
-          setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
+          applyToEditor(updatedConfig)
+          setRigs((prev) => prev.map((r) => (r.id === updatedRig.id ? updatedRig : r)))
         }
       } catch (err) {
-        log.error('Failed to refresh rigs after save; using local config', err)
-        setActiveLightsConfig(updatedConfig)
-        setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
+        log.error('Failed to refresh rigs after save, using local config', err)
+        applyToEditor(updatedConfig)
+        setRigs((prev) => prev.map((r) => (r.id === updatedRig.id ? updatedRig : r)))
       }
 
       setShowSuccessMessage(true)
-      setTimeout(() => setShowSuccessMessage(false), 3000)
+      hideSuccessMessage.set()
     } catch (error) {
       log.error('Failed to save rig:', error)
       showToast('Failed to save rig.', 'error', 5000)
@@ -457,7 +458,6 @@ const LightsLayout = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       {pendingImport !== null && (
         <ImportRigModal
           key={pendingImport.sourceBasename}
@@ -570,8 +570,12 @@ const LightsLayout = () => {
 
           {/* Save Button */}
           <button
-            onClick={() => void handleSaveChanges()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mt-4 mb-10">
+            onClick={() => {
+              setIsSaving(true)
+              void handleSaveChanges().finally(() => setIsSaving(false))
+            }}
+            disabled={isSaving}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 mt-4 mb-10">
             Save Changes
           </button>
         </>

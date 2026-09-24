@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 11,
+  "cueVersion": 12,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -5116,7 +5116,7 @@
             "label": "Notes",
             "title": "Cue called -> toggle",
             "style": "notes",
-            "note": "Publishes stompState=0 and holds the rig black, then publishes stompState=1 and lights the five groups together. One keyframe per state, looped via cue-called."
+            "note": "Publishes stompState=1 and lights the five groups together, then publishes stompState=0 and holds the rig black. One keyframe per state, looped via cue-called."
           },
           {
             "id": "cue-skv2-stomp-note-2",
@@ -5139,14 +5139,6 @@
       "connections": [
         {
           "from": "cue-skv2-stomp-called",
-          "to": "cue-skv2-stomp-setoff"
-        },
-        {
-          "from": "cue-skv2-stomp-setoff",
-          "to": "cue-skv2-stomp-off"
-        },
-        {
-          "from": "cue-skv2-stomp-off",
           "to": "cue-skv2-stomp-seton"
         },
         {
@@ -5168,6 +5160,14 @@
         {
           "from": "cue-skv2-stomp-seton",
           "to": "cue-skv2-stomp-inner"
+        },
+        {
+          "from": "cue-skv2-stomp-inner",
+          "to": "cue-skv2-stomp-setoff"
+        },
+        {
+          "from": "cue-skv2-stomp-setoff",
+          "to": "cue-skv2-stomp-off"
         }
       ],
       "layout": {
@@ -5176,37 +5176,37 @@
             "x": 468,
             "y": 4
           },
-          "cue-skv2-stomp-setoff": {
-            "x": 502,
-            "y": 120
-          },
-          "cue-skv2-stomp-off": {
-            "x": 458,
-            "y": 240
-          },
-          "cue-skv2-stomp-seton": {
-            "x": 494,
-            "y": 372
-          },
           "cue-skv2-stomp-fq1": {
             "x": 280,
-            "y": 552
+            "y": 300
           },
           "cue-skv2-stomp-fq4": {
             "x": 766,
-            "y": 576
+            "y": 324
           },
           "cue-skv2-stomp-bq1": {
             "x": 682,
-            "y": 830
+            "y": 578
           },
           "cue-skv2-stomp-bq4": {
             "x": 266,
-            "y": 758
+            "y": 506
           },
           "cue-skv2-stomp-inner": {
             "x": 434,
-            "y": 986
+            "y": 734
+          },
+          "cue-skv2-stomp-off": {
+            "x": 458,
+            "y": 996
+          },
+          "cue-skv2-stomp-seton": {
+            "x": 494,
+            "y": 120
+          },
+          "cue-skv2-stomp-setoff": {
+            "x": 502,
+            "y": 886
           },
           "cue-skv2-stomp-note-1": {
             "x": 340.17732273906836,
@@ -5232,7 +5232,7 @@
           "name": "stompState",
           "type": "number",
           "scope": "cue-group",
-          "initialValue": 0,
+          "initialValue": 1,
           "isParameter": false
         }
       ]

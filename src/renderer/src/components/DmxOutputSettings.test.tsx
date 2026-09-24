@@ -9,7 +9,9 @@ import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import {
+  enttecProComPortAtom,
   lightingPrefsAtom,
+  openDmxComPortAtom,
   senderArtNetEnabledAtom,
   senderEnttecProEnabledAtom,
   senderOpenDmxEnabledAtom,
@@ -38,6 +40,8 @@ const updateEnttecConfigMock = jest.mocked(ipcApi.updateEnttecConfig)
 const getNetworkInterfacesMock = jest.mocked(ipcApi.getNetworkInterfaces)
 
 import DmxOutputSettings from './DmxOutputSettings'
+import { ToastStack } from './Toast'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../shared/dmxOutputRefresh'
 
 type OutputConfig = NonNullable<LightingPreferences['dmxOutputConfig']>
 type SettingsPrefs = NonNullable<LightingPreferences['dmxSettingsPrefs']>
@@ -67,15 +71,22 @@ function expansion(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
 type RunningSenders = { sacn?: boolean; artnet?: boolean; enttecpro?: boolean; opendmx?: boolean }
 
 async function renderPanel(prefs: LightingPreferences = {}, running: RunningSenders = {}) {
-  const { store } = renderWithProviders(<DmxOutputSettings />, {
-    seed: (set) => {
-      set(lightingPrefsAtom, prefs)
-      set(senderSacnEnabledAtom, running.sacn ?? false)
-      set(senderArtNetEnabledAtom, running.artnet ?? false)
-      set(senderEnttecProEnabledAtom, running.enttecpro ?? false)
-      set(senderOpenDmxEnabledAtom, running.opendmx ?? false)
+  // The window's toast stack renders beside the panel, as WindowShell renders it in the app.
+  const { store } = renderWithProviders(
+    <>
+      <DmxOutputSettings />
+      <ToastStack />
+    </>,
+    {
+      seed: (set) => {
+        set(lightingPrefsAtom, prefs)
+        set(senderSacnEnabledAtom, running.sacn ?? false)
+        set(senderArtNetEnabledAtom, running.artnet ?? false)
+        set(senderEnttecProEnabledAtom, running.enttecpro ?? false)
+        set(senderOpenDmxEnabledAtom, running.opendmx ?? false)
+      },
     },
-  })
+  )
   // The network interface list is fetched on mount, so waiting on it settles the first render.
   await waitFor(() => expect(getNetworkInterfacesMock).toHaveBeenCalled())
   return store
@@ -101,6 +112,53 @@ describe('DmxOutputSettings sender checkboxes', () => {
 
     expect((screen.getByLabelText('sACN') as HTMLInputElement).checked).toBe(true)
     expect((screen.getByLabelText('ArtNet') as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('holds a box while its flag saves, so a second click saves and starts nothing more', async () => {
+    let finishSave!: (result: { success: true }) => void
+    savePrefsMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve
+        }),
+    )
+    await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalledTimes(1))
+    expect(screen.getByLabelText('sACN')).toBeDisabled()
+    fireEvent.click(screen.getByLabelText('sACN'))
+    await act(async () => finishSave({ success: true }))
+
+    await waitFor(() => expect(screen.getByLabelText('sACN')).not.toBeDisabled())
+    expect(savePrefsMock).toHaveBeenCalledTimes(1)
+    expect(enableSenderMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps both flags when a second box is ticked before the first one saves', async () => {
+    const finishes: Array<() => void> = []
+    savePrefsMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishes.push(() => resolve({ success: true }))
+        }),
+    )
+    const store = await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+    fireEvent.click(screen.getByLabelText('ArtNet'))
+    for (let i = 0; i < 2; i++) {
+      await waitFor(() => expect(finishes.length).toBeGreaterThan(i))
+      await act(async () => finishes[i]())
+    }
+
+    await waitFor(() =>
+      expect(store.get(lightingPrefsAtom).dmxOutputConfig).toEqual(
+        outputConfig({ sacnEnabled: true, artNetEnabled: true }),
+      ),
+    )
+    const lastSaved = savePrefsMock.mock.calls.at(-1)![0].dmxOutputConfig
+    expect(lastSaved).toEqual(outputConfig({ sacnEnabled: true, artNetEnabled: true }))
   })
 
   it('offers every sender the panel can drive', async () => {
@@ -218,7 +276,7 @@ describe('DmxOutputSettings sender startup payloads', () => {
         networkInterface: '',
         unicastDestination: '',
         useUnicast: false,
-        refreshRateHz: 40,
+        refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
       }),
     )
   })
@@ -240,7 +298,7 @@ describe('DmxOutputSettings sender startup payloads', () => {
         subnet: 0,
         subuni: 0,
         port: 6454,
-        refreshRateHz: 40,
+        refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
       }),
     )
   })
@@ -280,18 +338,13 @@ describe('DmxOutputSettings sender startup payloads', () => {
   })
 })
 
-describe('DmxOutputSettings first run', () => {
-  it('seeds a missing saved config from the senders the backend reports running', async () => {
+describe('DmxOutputSettings on mount', () => {
+  it('writes no output config over one it has not read yet', async () => {
     const store = await renderPanel({}, { sacn: true, opendmx: true })
+    await act(async () => {})
 
-    await waitFor(() =>
-      expect(savePrefsMock).toHaveBeenCalledWith({
-        dmxOutputConfig: outputConfig({ sacnEnabled: true, openDmxEnabled: true }),
-      }),
-    )
-    expect(store.get(lightingPrefsAtom).dmxOutputConfig).toEqual(
-      outputConfig({ sacnEnabled: true, openDmxEnabled: true }),
-    )
+    expect(savePrefsMock).not.toHaveBeenCalled()
+    expect(store.get(lightingPrefsAtom).dmxOutputConfig).toBeUndefined()
   })
 
   it('leaves a saved config alone', async () => {
@@ -305,6 +358,23 @@ describe('DmxOutputSettings first run', () => {
 function commit(field: Element, value: string): void {
   fireEvent.change(field, { target: { value } })
   fireEvent.blur(field)
+}
+
+/** Holds the first prefs write open, answering every later one at once, until released. */
+function holdFirstPrefsWrite(): () => Promise<void> {
+  let release: (() => void) | undefined
+  savePrefsMock
+    .mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return { success: true }
+    })
+    .mockImplementation(async () => ({ success: true }))
+  return async () => {
+    await waitFor(() => expect(release).toBeDefined())
+    await act(async () => release?.())
+  }
 }
 
 describe('DmxOutputSettings global publishing rate', () => {
@@ -350,6 +420,17 @@ describe('DmxOutputSettings global publishing rate', () => {
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({ globalDmxPublishingRateHz: 44 }),
     )
+  })
+
+  it('shows the stored rate again when the save is refused', async () => {
+    savePrefsMock.mockResolvedValue({ success: false, error: 'read only' } as never)
+    await renderPanel(advanced({ globalDmxPublishingRateHz: 30 }))
+    const field = screen.getByRole('spinbutton') as HTMLInputElement
+
+    commit(field, '20')
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    await waitFor(() => expect(field.value).toBe('30'))
   })
 
   it('says nothing when the committed rate is the one already stored', async () => {
@@ -554,6 +635,55 @@ describe('DmxOutputSettings Enttec Pro refresh rate', () => {
   })
 })
 
+describe('DmxOutputSettings serial ports', () => {
+  it('hands the Enttec Pro toggle a port only once it is stored', async () => {
+    const release = holdFirstPrefsWrite()
+    const store = await renderPanel({
+      dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
+      dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
+      enttecProConfig: { port: 'COM7', dmxSpeed: 40 },
+    })
+
+    commit(screen.getByPlaceholderText('COM3'), 'COM9')
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect(store.get(enttecProComPortAtom)).toBe('COM7')
+
+    await release()
+    await waitFor(() => expect(store.get(enttecProComPortAtom)).toBe('COM9'))
+  })
+
+  it('hands the OpenDMX toggle a port only once it is stored', async () => {
+    const release = holdFirstPrefsWrite()
+    const store = await renderPanel({
+      dmxOutputConfig: outputConfig({ openDmxEnabled: true }),
+      dmxSettingsPrefs: expansion({ openDmxExpanded: true }),
+      openDmxConfig: { port: 'COM5', dmxSpeed: 30 },
+    })
+
+    commit(screen.getByPlaceholderText('COM4'), 'COM8')
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect(store.get(openDmxComPortAtom)).toBe('COM5')
+
+    await release()
+    await waitFor(() => expect(store.get(openDmxComPortAtom)).toBe('COM8'))
+  })
+
+  it('keeps the stored port for the toggle when the port save is refused', async () => {
+    savePrefsMock.mockResolvedValueOnce({ success: false, error: 'disk full' })
+    const store = await renderPanel({
+      dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
+      dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
+      enttecProConfig: { port: 'COM7', dmxSpeed: 40 },
+    })
+
+    commit(screen.getByPlaceholderText('COM3'), 'COM9')
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    await act(async () => {})
+    expect(store.get(enttecProComPortAtom)).toBe('COM7')
+  })
+})
+
 describe('DmxOutputSettings sACN configuration', () => {
   const sacnOpen = (over: LightingPreferences = {}): LightingPreferences => ({
     dmxOutputConfig: outputConfig({ sacnEnabled: true }),
@@ -576,7 +706,7 @@ describe('DmxOutputSettings sACN configuration', () => {
           networkInterface: '',
           unicastDestination: '',
           useUnicast: false,
-          refreshRateHz: 40,
+          refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
         },
       }),
     )
@@ -634,6 +764,27 @@ describe('DmxOutputSettings sACN configuration', () => {
     expect(updateSacnConfigMock).not.toHaveBeenCalled()
   })
 
+  it('commits the universe then the rate from one round-trip without either clobbering the other', async () => {
+    const releaseFirst = holdFirstPrefsWrite()
+    const store = await renderPanel(sacnOpen(), { sacn: true })
+
+    commit(universeInput(), '9')
+    commit(refreshInput(), '20')
+    await releaseFirst()
+
+    const saved = () =>
+      savePrefsMock.mock.calls.filter((c) => 'sacnConfig' in c[0]).map((c) => c[0].sacnConfig)
+    await waitFor(() => expect(saved()).toHaveLength(2))
+    expect(saved()[1]).toEqual(expect.objectContaining({ universe: 9, refreshRateHz: 20 }))
+    await waitFor(() => expect(updateSacnConfigMock).toHaveBeenCalledTimes(2))
+    expect(updateSacnConfigMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ universe: 9, refreshRateHz: 20 }),
+    )
+    expect(store.get(lightingPrefsAtom).sacnConfig).toEqual(
+      expect.objectContaining({ universe: 9, refreshRateHz: 20 }),
+    )
+  })
+
   it('offers the loaded network interfaces alongside auto-detect', async () => {
     networkResult = {
       success: true,
@@ -678,7 +829,7 @@ describe('DmxOutputSettings ArtNet configuration', () => {
           subnet: 0,
           subuni: 0,
           port: 6454,
-          refreshRateHz: 40,
+          refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
         },
       }),
     )
@@ -693,6 +844,27 @@ describe('DmxOutputSettings ArtNet configuration', () => {
       expect(updateArtNetConfigMock).toHaveBeenCalledWith(
         expect.objectContaining({ host: '10.0.0.9' }),
       ),
+    )
+  })
+
+  it('commits the host then the port from one round-trip without either clobbering the other', async () => {
+    const releaseFirst = holdFirstPrefsWrite()
+    const store = await renderPanel(artNetOpen(), { artnet: true })
+
+    commit(screen.getByPlaceholderText('127.0.0.1'), '10.0.0.2')
+    commit(screen.getByLabelText('Port'), '6455')
+    await releaseFirst()
+
+    const saved = () =>
+      savePrefsMock.mock.calls.filter((c) => 'artNetConfig' in c[0]).map((c) => c[0].artNetConfig)
+    await waitFor(() => expect(saved()).toHaveLength(2))
+    expect(saved()[1]).toEqual(expect.objectContaining({ host: '10.0.0.2', port: 6455 }))
+    await waitFor(() => expect(updateArtNetConfigMock).toHaveBeenCalledTimes(2))
+    expect(updateArtNetConfigMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ host: '10.0.0.2', port: 6455 }),
+    )
+    expect(store.get(lightingPrefsAtom).artNetConfig).toEqual(
+      expect.objectContaining({ host: '10.0.0.2', port: 6455 }),
     )
   })
 })

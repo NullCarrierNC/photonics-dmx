@@ -1,9 +1,7 @@
-/** @type {import('jest').Config} */
-module.exports = {
+/** What both projects share: TypeScript through ts-jest and the `@renderer/*` alias. */
+const shared = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  silent: true,
-  roots: ['<rootDir>/src'],
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
@@ -14,6 +12,34 @@ module.exports = {
   },
   testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  // Mirror the `@renderer/*` path alias from tsconfig.web.json so renderer component/unit tests
+  // can import modules that use it (ts-jest does not apply tsconfig `paths` at runtime).
+  moduleNameMapper: {
+    '^@renderer/(.*)$': '<rootDir>/src/renderer/src/$1',
+  },
+}
+
+const commonSetup = '<rootDir>/src/photonics-dmx/tests/jest.setup.ts'
+
+/** @type {import('jest').Config} */
+module.exports = {
+  silent: true,
+  // The renderer project adds the DOM matchers, and everything else runs without them.
+  projects: [
+    {
+      ...shared,
+      displayName: 'engine',
+      roots: ['<rootDir>/src'],
+      testPathIgnorePatterns: ['/node_modules/', '<rootDir>/src/renderer/'],
+      setupFilesAfterEnv: [commonSetup],
+    },
+    {
+      ...shared,
+      displayName: 'renderer',
+      roots: ['<rootDir>/src/renderer'],
+      setupFilesAfterEnv: [commonSetup, '<rootDir>/src/renderer/src/tests/setup.ts'],
+    },
+  ],
   // `npm test` stays fast; `npm run test:coverage` runs `jest --coverage` (V8 provider).
   collectCoverage: false,
   coverageProvider: 'v8',
@@ -34,16 +60,10 @@ module.exports = {
   // test happens to import. Ratchet upward as coverage improves.
   coverageThreshold: {
     global: {
-      statements: 74,
-      branches: 78,
-      functions: 70,
-      lines: 74,
+      statements: 77,
+      branches: 80,
+      functions: 73,
+      lines: 77,
     },
-  },
-  setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],
-  // Mirror the `@renderer/*` path alias from tsconfig.web.json so renderer component/unit tests
-  // can import modules that use it (ts-jest does not apply tsconfig `paths` at runtime).
-  moduleNameMapper: {
-    '^@renderer/(.*)$': '<rootDir>/src/renderer/src/$1',
   },
 }

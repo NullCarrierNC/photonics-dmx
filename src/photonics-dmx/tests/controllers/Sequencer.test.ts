@@ -26,7 +26,6 @@ jest.mock('../../controllers/sequencer/TransitionEngine')
 jest.mock('../../controllers/sequencer/SystemEffectsController')
 jest.mock('../../controllers/sequencer/EffectManager')
 jest.mock('../../controllers/sequencer/SongEventHandler')
-jest.mock('../../controllers/sequencer/DebugMonitor')
 jest.mock('../../controllers/sequencer/Clock')
 
 describe('Sequencer', () => {

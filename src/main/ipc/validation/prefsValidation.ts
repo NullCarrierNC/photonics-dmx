@@ -17,6 +17,7 @@ import { validateStoredUsbSenderConfigs } from './usbSenderConfigValidation'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import { clampClockRateMs } from '../../../shared/clockRate'
 import { clampLagCompensationMs } from '../../../shared/lagCompensation'
+import { CUE_CONSISTENCY_WINDOW_MS_MAX } from '../../../shared/cueConsistencyWindow'
 import { BLACKOUT_SHORTCUT_KEYS, BLACKOUT_SHORTCUT_SCOPES } from '../../../shared/blackoutShortcut'
 import {
   isPlainObject,
@@ -349,7 +350,8 @@ export function validatePreferencesPayload(
   }
 
   if ('cueConsistencyWindow' in cleaned) {
-    const v = validateNumberInRange(cleaned.cueConsistencyWindow, 0, 600000, 'cueConsistencyWindow')
+    const max = CUE_CONSISTENCY_WINDOW_MS_MAX
+    const v = validateNumberInRange(cleaned.cueConsistencyWindow, 0, max, 'cueConsistencyWindow')
     if (!v.ok) return v
     cleaned.cueConsistencyWindow = Math.round(v.value)
   }

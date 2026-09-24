@@ -83,3 +83,9 @@ export const SET_EFFECT_UNBLOCKED_NAME: SubmissionPolicy = {
   verb: { imperative: 'set', progressive: 'setting' },
   blackoutCancelLog: 'Cancelling blackout for setEffect',
 }
+
+/**
+ * What became of a submission: it was applied, it was refused because an effect of the same name
+ * is already running, or a gate refused it (a blackout, or an effect with no transitions).
+ */
+export type SubmissionOutcome = 'applied' | 'duplicate-name' | 'refused'

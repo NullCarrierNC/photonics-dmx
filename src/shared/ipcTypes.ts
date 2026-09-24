@@ -66,6 +66,7 @@ export type { Rb3GameModeSchedulePayload } from '../photonics-dmx/processors/Rb3
 
 export type {
   IpcErrorResult,
+  IpcSavedResult,
   IpcSuccessResult,
   LifecyclePhase,
   DmxValuesPayload,

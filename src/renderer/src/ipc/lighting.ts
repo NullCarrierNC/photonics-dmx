@@ -3,6 +3,15 @@
  */
 import type { FixtureConfig } from '../../../photonics-dmx/types'
 import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
+import type { MotionRuntimeDomain } from '../../../shared/ipc/common'
+
+// ---------------------------------------------------------------------------
+// Motion runtime
+// ---------------------------------------------------------------------------
+
+/** The motion cue a domain is running now (a simulation first, else the live handler's pick). */
+export const getRunningMotionCue = (domain: MotionRuntimeDomain) =>
+  window.api.invoke(LIGHT.GET_RUNNING_MOTION_CUE, { domain })
 
 // ---------------------------------------------------------------------------
 // Stage kit
@@ -45,14 +54,6 @@ export const disableConsole = () => window.api.invoke(LIGHT.CONSOLE_DISABLE, und
 
 export const sendConsoleDmx = (buffer: Record<number, number>) =>
   window.api.send(LIGHT.CONSOLE_SEND_DMX, buffer)
-
-export const updateConsoleChannel = (payload: {
-  rigId: string
-  lightId: string
-  fixtureId: string
-  channelName: string
-  channelNumber: number
-}) => window.api.invoke(LIGHT.CONSOLE_UPDATE_CHANNEL, payload)
 
 export const setConsoleFixtureConfig = (payload: {
   rigId: string

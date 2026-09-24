@@ -138,6 +138,7 @@ export class ControllerGraph {
    * never drives a fresh sequencer.
    */
   public buildChains(): void {
+    this.disposePreviousBuild()
     const config = this.deps.getConfig()
     const activeRigs = config.getActiveRigs()
 
@@ -195,7 +196,8 @@ export class ControllerGraph {
     // pref is absent so the governor never throttles a sender below what it could output.
     const globalDmxRateHz =
       config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
-    this.dmxPublisher = new DmxPublisher(this.deps.getSenderManager(), null, undefined, {
+    const { strobeState } = this.deps.chainFanout
+    this.dmxPublisher = new DmxPublisher(this.deps.getSenderManager(), null, strobeState, {
       outputRateHz: globalDmxRateHz,
       whiteChannelMixMode: normalizeWhiteChannelMixMode(
         config.getPreference('whiteChannelMixMode'),
@@ -248,6 +250,7 @@ export class ControllerGraph {
       getMotionCueMinimumHoldMs: () => readMotionPrefs(config, 'yarg').minimumHoldMs,
       getMotionCueProbabilityPercent: () => readMotionPrefs(config, 'yarg').probabilityPercent,
       runtimeBroadcaster: mainRuntimeBroadcaster,
+      strobeState: this.deps.chainFanout.strobeState,
     })
     yargHandler.setMotionEnabled(config.getPreference('motionEnabled') ?? true)
     yargHandler.setManualMotionRef(readMotionPrefs(config, 'yarg').activeCueRef)
@@ -272,21 +275,9 @@ export class ControllerGraph {
       getMotionCueProbabilityPercent: () => readMotionPrefs(config, domain).probabilityPercent,
       getActiveMotionCueRef: () => readMotionPrefs(config, domain).activeCueRef,
       runtimeBroadcaster: mainRuntimeBroadcaster,
+      strobeState: this.deps.chainFanout.strobeState,
       replaceExisting: false,
     })
-  }
-
-  /**
-   * Refresh which rigs are active for DMX output without restarting controllers.
-   * Use this when only the active-rig set changes so senders stay running.
-   */
-  public refreshActiveRigs(): void {
-    if (!this.dmxPublisher) {
-      return
-    }
-    const activeRigs = this.deps.getConfig().getActiveRigs()
-    this.dmxPublisher.updateActiveRigs(activeRigs)
-    log.info('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
   }
 
   /** Apply the motion master toggle to every chain's YARG and RB3 handlers. */
@@ -356,6 +347,11 @@ export class ControllerGraph {
     }
   }
 
+  /** Clear the strobe state every chain shares, which outlives a restart along with the fanout. */
+  public resetStrobeState(): void {
+    this.deps.chainFanout.strobeState.reset()
+  }
+
   /**
    * Dispose every rig chain, tolerating per-chain failures. The shared clock is destroyed
    * separately so a chain tearing down can't take ticks away from any sibling chain.
@@ -414,6 +410,19 @@ export class ControllerGraph {
       }
       this.clock = null
     }
+  }
+
+  /**
+   * Tear down whatever an earlier build left standing, so a retry after a failed start drives one
+   * clock, one set of chains and one publisher. A restart has already torn these down, so for it
+   * and for a first build this does nothing.
+   */
+  private disposePreviousBuild(): void {
+    if (!this.clock && this.rigChains.length === 0 && !this.dmxPublisher) return
+    this.disposeChainsForShutdown()
+    this.shutdownPublisherSafe()
+    this.destroyClock()
+    this.clearBuildRefs()
   }
 
   /** Null the per-build shorthand refs after the chains they point into are gone. */

@@ -13,6 +13,8 @@ import type {
 } from '../../controllers/sequencer/interfaces'
 import type { EffectTransition } from '../../types'
 import { createMockTrackedLight } from '../helpers/testFixtures'
+import { createSequencerHarness } from '../helpers/sequencerHarness'
+import { getEffectSingleColor } from '../../effects/effectSingleColor'
 
 type WaitKind = 'waitFor' | 'waitUntil'
 
@@ -114,4 +116,33 @@ describe('SongEventHandler reap after a song event', () => {
       expect(transitionEngine.reapCompletedEffects).not.toHaveBeenCalled()
     },
   )
+})
+
+describe('a transition that waits for and until the same event', () => {
+  it('takes one event to start and another to finish', () => {
+    const h = createSequencerHarness({ frontCount: 1, backCount: 0 })
+    const done = jest.fn()
+    h.sequencer.addEffectWithCallback(
+      'on-beats',
+      getEffectSingleColor({
+        color: { red: 255, green: 0, blue: 0, intensity: 255, opacity: 1, blendMode: 'replace' },
+        duration: 0,
+        waitFor: 'beat',
+        waitUntil: 'beat',
+        lights: h.lightManager.getLights(['front'], 'all'),
+        layer: 1,
+      }),
+      done,
+    )
+    h.advanceBy(10)
+
+    h.sequencer.onBeat()
+    h.advanceBy(10)
+    expect(done).not.toHaveBeenCalled()
+
+    h.sequencer.onBeat()
+    h.advanceBy(10)
+    expect(done).toHaveBeenCalledTimes(1)
+    h.cleanup()
+  })
 })

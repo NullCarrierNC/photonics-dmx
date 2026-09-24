@@ -7,9 +7,18 @@ const updateDocumentFromFlow = jest.fn()
 const updateEffectDocumentFromFlow = jest.fn()
 const layoutGraph = jest.fn()
 
+/** The graph the canvas holds, as flowToNodesAndConnections reads it back. */
+const canvasGraph = {
+  nodes: { logic: [{ id: 'node-1' }, { id: 'unsaved-node' }] },
+  connections: [{ from: 'node-1', to: 'unsaved-node' }],
+  layoutPositions: { 'node-1': { x: 0, y: 0 }, 'unsaved-node': { x: 50, y: 50 } },
+}
+const flowToNodesAndConnections = jest.fn((..._args: unknown[]) => canvasGraph)
+
 jest.mock('../lib/cueTransforms', () => ({
   updateDocumentFromFlow: (...args: unknown[]) => updateDocumentFromFlow(...args),
   updateEffectDocumentFromFlow: (...args: unknown[]) => updateEffectDocumentFromFlow(...args),
+  flowToNodesAndConnections: (...args: unknown[]) => flowToNodesAndConnections(...args),
 }))
 
 jest.mock('../lib/graphLayout', () => ({
@@ -285,7 +294,7 @@ describe('useCueJsonEditor', () => {
   })
 
   describe('handleGraphPrettify', () => {
-    it('applies layout positions and viewport, then marks the document dirty', () => {
+    it('lays out the graph on the canvas, unsaved nodes included, then marks the document dirty', () => {
       layoutGraph.mockReturnValue({
         nodePositions: { 'node-1': { x: 120, y: 240 } },
         viewport: { x: 10, y: 20, zoom: 1.25 },
@@ -294,11 +303,16 @@ describe('useCueJsonEditor', () => {
 
       act(() => rendered.result.current.handleGraphPrettify())
 
+      expect(flowToNodesAndConnections).toHaveBeenLastCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        'cue',
+      )
       expect(layoutGraph).toHaveBeenCalledWith(
         'cue-1',
-        cueDefinition?.nodes,
-        cueDefinition?.connections,
-        {},
+        canvasGraph.nodes,
+        canvasGraph.connections,
+        canvasGraph.layoutPositions,
       )
       expect(setNodes).toHaveBeenCalledTimes(1)
       const updater = setNodes.mock.calls[0][0] as (nodes: Node[]) => Node[]
@@ -347,11 +361,16 @@ describe('useCueJsonEditor', () => {
 
       act(() => rendered.result.current.handleGraphPrettify())
 
+      expect(flowToNodesAndConnections).toHaveBeenLastCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        'effect',
+      )
       expect(layoutGraph).toHaveBeenCalledWith(
         'fx-1',
-        effectDefinition?.nodes,
-        effectDefinition?.connections,
-        {},
+        canvasGraph.nodes,
+        canvasGraph.connections,
+        canvasGraph.layoutPositions,
       )
       expect(setNodes).toHaveBeenCalledTimes(1)
       expect(reactFlowInstance.setViewport).toHaveBeenCalledWith({ x: 5, y: 10, zoom: 1.5 })

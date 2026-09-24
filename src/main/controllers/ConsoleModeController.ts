@@ -3,20 +3,23 @@ import {
   LightingConfiguration,
   DmxRig,
   DmxLight,
-  DmxFixture,
   FixtureTypes,
   FixtureConfig,
   clampMergeMovingHeadFixtureConfig,
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
-import { rawDmxToLogicalHomePercent } from '../../photonics-dmx/helpers/movingHeadCalibration'
 import { createLogger } from '../../shared/logger'
+import { restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
 
 const log = createLogger('ConsoleModeController')
 
 type ListenerChannelSnapshot = { yarg: boolean; rb3: boolean }
 
 type ConsoleListenerSnapshot = { yarg: boolean; rb3: boolean; audio: boolean }
+
+/** The console page's answer when the controllers are between phases and cannot take the wire. */
+export const CONSOLE_UNAVAILABLE_MESSAGE =
+  'The lighting controllers are restarting or shutting down. Try the console again in a moment.'
 
 export interface ConsoleModeControllerDeps {
   getConfig: () => ConfigurationManager
@@ -27,10 +30,10 @@ export interface ConsoleModeControllerDeps {
   } | null
   getListenerSnapshot: () => ListenerChannelSnapshot
   getIsAudioEnabled: () => boolean
+  /** The three pauses run while console entry holds the lifecycle queue, so they must not queue. */
   pauseYarg: () => Promise<void>
   pauseRb3: () => Promise<void>
   pauseAudio: () => Promise<void>
-  refreshActiveRigs: () => void
   restartControllers: () => Promise<void>
 }
 
@@ -119,143 +122,12 @@ export class ConsoleModeController {
     this.deps.getDmxPublisher()?.setManualBuffer(buffer)
   }
 
-  public async updateConsoleChannel(payload: {
-    rigId: string
-    lightId: string
-    fixtureId: string
-    channelName: string
-    channelNumber: number
-  }): Promise<{ success: true } | { success: false; error: string }> {
-    const { rigId, lightId, fixtureId, channelName, channelNumber } = payload
-    if (!Number.isFinite(channelNumber) || channelNumber < 1 || channelNumber > 512) {
-      return { success: false, error: 'Channel number must be between 1 and 512' }
-    }
-    const rig = this.deps.getConfig().getDmxRig(rigId)
-    if (!rig) {
-      return { success: false, error: 'Rig not found' }
-    }
-    const light = this.findLightInRig(rig, lightId)
-    if (!light) {
-      return { success: false, error: 'Light not found in rig' }
-    }
-    const channels = light.channels as unknown as Record<string, number>
-    if (!Object.prototype.hasOwnProperty.call(channels, channelName)) {
-      return { success: false, error: `Unknown channel: ${channelName}` }
-    }
-    const updatedLight: DmxLight = {
-      ...light,
-      channels: { ...channels, [channelName]: channelNumber } as unknown as DmxLight['channels'],
-    }
-    const newConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    const updatedRig: DmxRig = { ...rig, config: newConfig }
-    await this.deps.getConfig().saveDmxRig(updatedRig)
-
-    const userLights = this.deps.getConfig().getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
-      return { success: false, error: 'Fixture template not found in My Lights' }
-    }
-    const fixture = userLights[fi]
-    const fch = fixture.channels as unknown as Record<string, number>
-    if (!Object.prototype.hasOwnProperty.call(fch, channelName)) {
-      return { success: false, error: `Channel ${channelName} not on fixture template` }
-    }
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      channels: { ...fch, [channelName]: channelNumber } as unknown as DmxFixture['channels'],
-    }
-    await this.deps.getConfig().updateUserLights(newUserLights)
-
-    this.deps.refreshActiveRigs()
-    return { success: true }
-  }
-
-  public async setConsoleHome(payload: {
-    rigId: string
-    lightId: string
-    fixtureId: string
-    panHome: number
-    tiltHome: number
-  }): Promise<{ success: true } | { success: false; error: string }> {
-    const { rigId, lightId, fixtureId, panHome, tiltHome } = payload
-    if (!Number.isFinite(panHome) || !Number.isFinite(tiltHome)) {
-      return { success: false, error: 'panHome and tiltHome must be finite numbers' }
-    }
-    const panClamped = Math.max(0, Math.min(255, Math.round(panHome)))
-    const tiltClamped = Math.max(0, Math.min(255, Math.round(tiltHome)))
-    const rig = this.deps.getConfig().getDmxRig(rigId)
-    if (!rig) {
-      return { success: false, error: 'Rig not found' }
-    }
-    const light = this.findLightInRig(rig, lightId)
-    if (!light) {
-      return { success: false, error: 'Light not found in rig' }
-    }
-    if (light.fixture !== FixtureTypes.RGBMH) {
-      return { success: false, error: 'Light is not a moving head fixture' }
-    }
-    const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
-    const newConfig: FixtureConfig = {
-      ...baseConfig,
-      panHome: rawDmxToLogicalHomePercent(
-        panClamped,
-        baseConfig.panMin,
-        baseConfig.panMax,
-        baseConfig.invertPan,
-      ),
-      tiltHome: rawDmxToLogicalHomePercent(
-        tiltClamped,
-        baseConfig.tiltMin,
-        baseConfig.tiltMax,
-        baseConfig.invertTilt,
-      ),
-    }
-    const updatedLight: DmxLight = { ...light, config: newConfig }
-    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    await this.deps.getConfig().saveDmxRig({ ...rig, config: newRigConfig })
-
-    const userLights = this.deps.getConfig().getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
-      return { success: false, error: 'Fixture template not found in My Lights' }
-    }
-    const fixture = userLights[fi]
-    if (fixture.fixture !== FixtureTypes.RGBMH) {
-      return { success: false, error: 'Fixture template is not a moving head' }
-    }
-    const fBase: FixtureConfig = normalizeFixtureConfig(fixture.config)
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      config: {
-        ...fBase,
-        panHome: rawDmxToLogicalHomePercent(
-          panClamped,
-          fBase.panMin,
-          fBase.panMax,
-          fBase.invertPan,
-        ),
-        tiltHome: rawDmxToLogicalHomePercent(
-          tiltClamped,
-          fBase.tiltMin,
-          fBase.tiltMax,
-          fBase.invertTilt,
-        ),
-      },
-    }
-    await this.deps.getConfig().updateUserLights(newUserLights)
-
-    this.deps.refreshActiveRigs()
-    return { success: true }
-  }
-
   public async setConsoleFixtureConfig(payload: {
     rigId: string
     lightId: string
     fixtureId: string
     config: Partial<FixtureConfig>
-  }): Promise<{ success: true } | { success: false; error: string }> {
+  }): Promise<IpcSavedResult | { success: false; error: string }> {
     const { rigId, lightId, fixtureId, config: patch } = payload
     const rig = this.deps.getConfig().getDmxRig(rigId)
     if (!rig) {
@@ -271,31 +143,31 @@ export class ConsoleModeController {
     if (light.fixtureId !== fixtureId) {
       return { success: false, error: 'Fixture id does not match this light' }
     }
+    // Both the rig and its fixture template are checked before either is written, so a refusal
+    // leaves neither half changed.
+    const fixture = this.deps
+      .getConfig()
+      .getUserLights()
+      .find((f) => f.id === fixtureId)
+    if (!fixture) {
+      return { success: false, error: 'Fixture template not found in My Lights' }
+    }
+    if (fixture.fixture !== FixtureTypes.RGBMH) {
+      return { success: false, error: 'Fixture template is not a moving head' }
+    }
+
     const baseConfig = normalizeFixtureConfig(light.config)
     const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
     const updatedLight: DmxLight = { ...light, config: newConfig }
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
     await this.deps.getConfig().saveDmxRig({ ...rig, config: newRigConfig })
 
-    const userLights = this.deps.getConfig().getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
-      return { success: false, error: 'Fixture template not found in My Lights' }
-    }
-    const fixture = userLights[fi]
-    if (fixture.fixture !== FixtureTypes.RGBMH) {
-      return { success: false, error: 'Fixture template is not a moving head' }
-    }
-    const fBase = normalizeFixtureConfig(fixture.config)
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      config: clampMergeMovingHeadFixtureConfig(fBase, patch),
-    }
-    await this.deps.getConfig().updateUserLights(newUserLights)
+    await this.deps.getConfig().updateUserLight(fixtureId, (stored) => ({
+      ...stored,
+      config: clampMergeMovingHeadFixtureConfig(normalizeFixtureConfig(stored.config), patch),
+    }))
 
-    await this.deps.restartControllers()
-    return { success: true }
+    return restartAfterSave(() => this.deps.restartControllers())
   }
 
   private findLightInRig(rig: DmxRig, lightId: string): DmxLight | null {

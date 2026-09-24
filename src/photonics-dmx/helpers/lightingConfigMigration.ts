@@ -221,7 +221,12 @@ export type MigrateLightingConfigurationOptions = {
 
 /**
  * Normalizes persisted rig lighting config: optionally renames legacy `front-back` to `two-rows`,
- * and sets `mount` on each fixture when missing.
+ * sets `mount` on each fixture when missing, and brings a `numLights` above the front and back
+ * light count down to that count.
+ *
+ * The Lights Layout editor writes `numLights` as the front and back light count, and on open adds
+ * lights until the rig has that many. A rig with no lights keeps its count, which the editor builds
+ * that many lights from.
  */
 export function migrateLightingConfiguration(
   config: LightingConfiguration,
@@ -244,6 +249,13 @@ export function migrateLightingConfiguration(
     changed = true
   }
 
+  const primaryCount = config.frontLights.length + config.backLights.length
+  const numLights =
+    primaryCount > 0 && config.numLights > primaryCount ? primaryCount : config.numLights
+  if (numLights !== config.numLights) {
+    changed = true
+  }
+
   if (!changed) {
     return { config, changed: false }
   }
@@ -251,6 +263,7 @@ export function migrateLightingConfiguration(
   return {
     config: {
       ...config,
+      numLights,
       lightLayout,
       frontLights: front.lights,
       backLights: back.lights,

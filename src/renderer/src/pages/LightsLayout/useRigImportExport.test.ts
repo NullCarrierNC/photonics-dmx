@@ -168,6 +168,7 @@ describe('useRigImportExport export', () => {
     jest.mocked(ipcApi.exportRig).mockResolvedValue({
       success: false,
       error: 'User cancelled export.',
+      cancelled: true,
     })
     const view = renderRigs()
     await run(view, (h) => h.handleExport())
@@ -199,6 +200,7 @@ describe('useRigImportExport import', () => {
     jest.mocked(ipcApi.pickRigImportFile).mockResolvedValue({
       success: false,
       error: 'User cancelled import.',
+      cancelled: true,
     })
     const view = renderRigs()
     await run(view, (h) => h.handleImport())
@@ -247,6 +249,27 @@ describe('useRigImportExport commit', () => {
     return view
   }
 
+  it('imports one rig when the import is confirmed twice while it saves', async () => {
+    const view = await pickedView()
+    let answerSave: (value: unknown) => void = () => {}
+    jest.mocked(ipcApi.saveDmxRig).mockReturnValue(
+      new Promise((resolve) => {
+        answerSave = resolve
+      }) as never,
+    )
+
+    await act(async () => {
+      void view.result.current.commitPendingImport('Club')
+      void view.result.current.commitPendingImport('Club')
+    })
+    await act(async () => {
+      answerSave({ success: true })
+    })
+
+    expect(ipcApi.saveMyLights).toHaveBeenCalledTimes(1)
+    expect(ipcApi.saveDmxRig).toHaveBeenCalledTimes(1)
+  })
+
   it('saves new templates before the rig, then selects the saved rig', async () => {
     const view = await pickedView()
     jest.mocked(ipcApi.getDmxRigs).mockImplementation(async () => [RIG_A, RIG_B, savedRig()])
@@ -294,6 +317,26 @@ describe('useRigImportExport commit', () => {
 })
 
 describe('useRigImportExport duplicate', () => {
+  it('duplicates once when Duplicate is clicked twice while it saves', async () => {
+    const view = renderRigs()
+    let answerSave: (value: unknown) => void = () => {}
+    jest.mocked(ipcApi.saveDmxRig).mockReturnValue(
+      new Promise((resolve) => {
+        answerSave = resolve
+      }) as never,
+    )
+
+    await act(async () => {
+      void view.result.current.handleDuplicate()
+      void view.result.current.handleDuplicate()
+    })
+    await act(async () => {
+      answerSave({ success: true })
+    })
+
+    expect(ipcApi.saveDmxRig).toHaveBeenCalledTimes(1)
+  })
+
   it('duplicates the active rig and selects the copy', async () => {
     jest.mocked(ipcApi.getDmxRigs).mockImplementation(async () => [RIG_A, RIG_B, savedRig()])
     const view = renderRigs()

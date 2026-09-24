@@ -1,23 +1,14 @@
 /** @jest-environment jsdom */
-import { describe, expect, it, jest, beforeAll } from '@jest/globals'
+import { describe, expect, it, beforeAll } from '@jest/globals'
 import { screen } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import LeftMenu from './LeftMenu'
 import { currentPageAtom, lightingPrefsAtom } from '../atoms'
 import { Pages } from '../types'
-
-jest.mock('../hooks/useConfirm', () => ({
-  useConfirm: () => async () => true,
-}))
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 beforeAll(() => {
-  Object.defineProperty(window, 'api', {
-    value: {
-      receive: jest.fn().mockReturnValue(jest.fn()),
-      invoke: jest.fn(),
-    },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 function renderLeftMenu(advancedModeEnabled: boolean) {

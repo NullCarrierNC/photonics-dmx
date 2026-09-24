@@ -4,8 +4,10 @@
  * covers its IPC wiring, its wording and the save-failure paths.
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { emitIpc, ipcSubscribers } from '@renderer/tests/helpers/ipcListenerStub'
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import {
   CueGroupsPanel,
   type CueGroupRowData,
@@ -13,7 +15,17 @@ import {
   type CueRowData,
 } from './CueGroupsPanel'
 
+jest.mock(
+  '../../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
+
 type Domain = CueGroupsDomain<CueGroupRowData, CueRowData>
+
+const CHANGED = RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED
 
 interface Seed {
   groups?: CueGroupRowData[]
@@ -116,6 +128,28 @@ describe('CueGroupsPanel', () => {
     expect(domain.setDisabled).toHaveBeenCalledWith({})
   })
 
+  it('keeps both groups when a second is ticked before the first one saves', async () => {
+    const domain = fakeDomain()
+    let releaseFirst: (() => void) | undefined
+    domain.setEnabled.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve
+      })
+      return { success: true }
+    })
+    renderPanel(domain)
+    await groupCheckboxes()
+
+    fireEvent.click(groupCheckbox('Alpha'))
+    fireEvent.click(groupCheckbox('Beta'))
+    await waitFor(() => expect(releaseFirst).toBeDefined())
+    await act(async () => releaseFirst?.())
+
+    await waitFor(() => expect(groupCheckbox('Beta')).toBeChecked())
+    expect(groupCheckbox('Alpha')).toBeChecked()
+    expect(domain.setEnabled).toHaveBeenLastCalledWith(['alpha', 'beta'])
+  })
+
   it('keeps the disabled cues of a group that is turned off', async () => {
     const domain = fakeDomain({ enabled: ['alpha', 'beta'], disabled: { alpha: ['a1'] } })
     renderPanel(domain)
@@ -213,6 +247,48 @@ describe('CueGroupsPanel', () => {
       expect((await screen.findByRole('alert')).textContent).toContain(message)
     },
   )
+
+  it('hears an enable made elsewhere before writing the next toggle', async () => {
+    let stored = ['alpha']
+    const domain = Object.assign(fakeDomain(), { changedEvent: CHANGED })
+    domain.getEnabled.mockImplementation(async () => [...stored])
+    renderPanel(domain)
+    await groupCheckboxes()
+
+    stored = ['alpha', 'beta']
+    await act(async () => emitIpc(CHANGED, undefined))
+    await waitFor(() => expect(groupCheckbox('Beta')).toBeChecked())
+
+    fireEvent.click(groupCheckbox('Alpha'))
+    await waitFor(() => expect(groupCheckbox('Alpha')).not.toBeChecked())
+    expect(domain.setEnabled).toHaveBeenLastCalledWith(['beta'])
+  })
+
+  it('keeps an open group open when the selection changes elsewhere', async () => {
+    const domain = Object.assign(fakeDomain({ enabled: ['alpha'], cues: { alpha: ['a1'] } }), {
+      changedEvent: CHANGED,
+    })
+    renderPanel(domain)
+    await groupCheckboxes()
+    fireEvent.click(expandButton('Alpha'))
+    expect(await screen.findByRole('checkbox', { name: 'Cue a1' })).toBeChecked()
+
+    domain.getDisabled.mockResolvedValue({ alpha: ['a1'] })
+    await act(async () => emitIpc(CHANGED, undefined))
+
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Cue a1' })).not.toBeChecked())
+    expect(domain.getCues).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops listening once it unmounts', async () => {
+    const view = renderPanel(Object.assign(fakeDomain(), { changedEvent: CHANGED }))
+    await groupCheckboxes()
+    expect(ipcSubscribers(CHANGED)).toHaveLength(1)
+
+    view.unmount()
+
+    expect(ipcSubscribers(CHANGED)).toHaveLength(0)
+  })
 
   it('retries a failed group toggle from its row', async () => {
     const domain = fakeDomain({ enabled: ['alpha'] })

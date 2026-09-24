@@ -54,4 +54,16 @@ describe('YargFallbackSettings', () => {
     expect(save).not.toHaveBeenCalled()
     expect(field).toHaveValue(20)
   })
+
+  it('shows the saved time again when the save is refused', async () => {
+    save.mockResolvedValue({ success: false, error: 'read only' } as never)
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '30' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith(30000))
+    await waitFor(() => expect(field).toHaveValue(20))
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the fallback time.')
+  })
 })

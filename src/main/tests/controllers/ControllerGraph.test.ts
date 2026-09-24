@@ -12,8 +12,13 @@ import { VenueFrameProcessor } from '../../../photonics-dmx/controllers/VenueFra
 import { MasterOutputState } from '../../../photonics-dmx/controllers/MasterOutputState'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import type { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
+import { SenderManager } from '../../../photonics-dmx/controllers/SenderManager'
+import type { Clock } from '../../../photonics-dmx/controllers/sequencer/Clock'
 
-function makeGraph(prefs: Record<string, unknown> = {}): ControllerGraph {
+function makeGraph(
+  prefs: Record<string, unknown> = {},
+  senderManager?: SenderManager,
+): ControllerGraph {
   const config = {
     getPreference: (key: string) => prefs[key],
     getActiveRigs: () => [],
@@ -23,7 +28,9 @@ function makeGraph(prefs: Record<string, unknown> = {}): ControllerGraph {
     isRb3Enabled: () => false,
     isYargEnabled: () => false,
     isAudioEnabled: () => false,
-    getSenderManager: jest.fn() as unknown as ControllerGraphDeps['getSenderManager'],
+    getSenderManager: (senderManager
+      ? () => senderManager
+      : jest.fn()) as unknown as ControllerGraphDeps['getSenderManager'],
     chainFanout: new ChainFanout(),
     venueFrameProcessor: new VenueFrameProcessor(),
     masterOutput: new MasterOutputState(),
@@ -148,9 +155,33 @@ describe('ControllerGraph teardown steps', () => {
     graph.destroyClock()
   })
 
-  it('refreshActiveRigs is a no-op without a publisher', () => {
-    const graph = makeGraph()
-    expect(() => graph.refreshActiveRigs()).not.toThrow()
+  it('a second build disposes the clock, chains and publisher of the first', () => {
+    jest.useFakeTimers()
+    const senderManager = new SenderManager({
+      broadcaster: { emit: () => {} },
+      hasReceivers: () => false,
+    })
+    const graph = makeGraph({ clockRate: 10 }, senderManager)
+    try {
+      graph.buildChains()
+      const clock = (graph as unknown as { clock: Clock }).clock
+      const publisher = graph.getDmxPublisher()!
+      const chain = graph.getChains()[0]
+      const destroyClock = jest.spyOn(clock, 'destroy')
+      const shutdownPublisher = jest.spyOn(publisher, 'shutdown')
+      const disposeChain = jest.spyOn(chain, 'dispose')
+
+      graph.buildChains()
+
+      expect(destroyClock).toHaveBeenCalled()
+      expect(shutdownPublisher).toHaveBeenCalled()
+      expect(disposeChain).toHaveBeenCalled()
+    } finally {
+      graph.disposeChainsForShutdown()
+      graph.shutdownPublisherSafe()
+      graph.destroyClock()
+      jest.useRealTimers()
+    }
   })
 
   it('fans motion toggles and manual refs out to every chain handler', () => {

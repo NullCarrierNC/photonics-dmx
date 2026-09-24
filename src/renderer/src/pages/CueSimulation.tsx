@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { getDefaultStore, useAtom } from 'jotai'
+import { useAtom } from 'jotai'
 import {
   audioListenerEnabledAtom,
   lightingPrefsAtom,
   previewRigIdAtom,
   rb3eListenerEnabledAtom,
   yargListenerEnabledAtom,
-  resolveLastUsedRigId,
 } from '@renderer/atoms'
+import { useActivePreviewRigs } from '@renderer/hooks/useActivePreviewRigs'
 import { EffectSelector } from '../../../photonics-dmx/types'
 import type { PostProcessing } from '../../../photonics-dmx/cues/types/cueTypes'
 import EffectsDropdown from '../components/EffectSelector'
@@ -32,12 +32,8 @@ import {
   startTestEffect,
   startRb3TestEffect,
   stopTestEffect,
-  getPrefs,
   getCueGroups,
   getRb3CueGroups,
-  getAvailableCues,
-  getAvailableRb3Cues,
-  getActiveRigs,
   simulateBeat,
   simulateKeyframe,
   simulateMeasure,
@@ -46,20 +42,13 @@ import {
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
-import { useDebouncedSave } from '@renderer/hooks/useDebouncedSave'
-import { persistPrefs } from '../ipc/persistPrefs'
-import type { AppPreferences } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
-
-type SimulationSettings = NonNullable<AppPreferences['simulationSettings']>
-
-/** How long the selections have to stop changing before they are stored. */
-const SETTINGS_QUIET_MS = 500
 import {
   instrumentNotePayload,
   simulationContext,
   type SimulationContext,
 } from './CueSimulation/simulationPayload'
+import { useSimulationSettings, type GroupOrigin } from './CueSimulation/useSimulationSettings'
 
 const log = createLogger('CueSimulation')
 
@@ -82,6 +71,8 @@ const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
+  // A live listener owns the rig chains, and main refuses every simulation while one runs.
+  const liveInput = isRb3Enabled ? 'RB3E' : isYargEnabled ? 'YARG' : null
   const [lightingPrefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
   const venuePostProcessingEnabled = lightingPrefs.venuePostProcessingEnabled ?? true
@@ -92,6 +83,7 @@ const CueSimulation: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
+  const activeRigs = useActivePreviewRigs()
   const { selectedRig, rigConfig } = useDmxPreview()
   const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large')
   const [selectedBpm, setSelectedBpm] = useState<number>(120)
@@ -119,16 +111,6 @@ const CueSimulation: React.FC = () => {
   useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null)
   useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null)
 
-  // Track initialization phases
-  const isInitialMount = useRef(true)
-  const isFullyInitialized = useRef(false)
-  const isLoadingFromPrefs = useRef(false)
-  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
-  // The effect to restore and the group it belongs to. Carrying the group is what makes the
-  // restore independent of when the load flag clears: the group arrives as a state update, so by
-  // the time the effects below run the flag has already gone false and cannot be used to tell a
-  // restored group apart from one the user picked.
-  const savedEffectRef = useRef<{ groupId: string; effectId: string } | null>(null)
   const postProcessingSimulationActiveRef = useRef(false)
 
   useEffect(() => {
@@ -143,30 +125,9 @@ const CueSimulation: React.FC = () => {
   // reported, so clear the picker rather than leave it naming an effect nothing is showing.
   useEffect(() => {
     if (venuePostProcessingEnabled) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when the preference turns off
     setSelectedPostProcessing('Default')
   }, [venuePostProcessingEnabled])
-
-  useEffect(() => {
-    if (advancedModeEnabled) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const activeRigs = await getActiveRigs()
-        if (cancelled) return
-        const orderedIds = activeRigs.map((r) => r.id)
-        const currentId = getDefaultStore().get(previewRigIdAtom)
-        const resolved = resolveLastUsedRigId(currentId, orderedIds)
-        if (resolved !== currentId) {
-          setSelectedRigId(resolved)
-        }
-      } catch (e) {
-        log.error('Failed to resolve preview rig when Advanced Mode is off', e)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [advancedModeEnabled, setSelectedRigId])
 
   // Cleanup effect: stop any running test effects when component unmounts
   useEffect(() => {
@@ -187,157 +148,34 @@ const CueSimulation: React.FC = () => {
     }
   }, [])
 
-  // Load saved simulation settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        isLoadingFromPrefs.current = true
-        const prefs = await getPrefs()
-        const savedSettings = prefs.simulationSettings
-
-        if (savedSettings) {
-          // Load all saved settings
-          if (savedSettings.registryType) {
-            setSelectedRegistryType(savedSettings.registryType)
-          }
-          if (savedSettings.venueSize) {
-            setSelectedVenueSize(savedSettings.venueSize)
-          }
-          if (savedSettings.bpm) {
-            setSelectedBpm(savedSettings.bpm)
-          }
-          if (savedSettings.instrument) {
-            setSelectedInstrument(savedSettings.instrument)
-          }
-          if (savedSettings.groupId) {
-            try {
-              const allGroups = await fetchCueGroupsForRegistry(
-                savedSettings.registryType ?? 'YARG',
-              )
-              const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
-              if (group && isYargVisualCueGroup(group)) {
-                if (savedSettings.effectId) {
-                  savedEffectRef.current = {
-                    groupId: savedSettings.groupId,
-                    effectId: savedSettings.effectId,
-                  }
-                }
-                setSelectedGroupId(savedSettings.groupId)
-                setSelectedGroup(group.name)
-              }
-            } catch (error) {
-              log.error('Error fetching group details during load:', error)
-            }
-          }
-        }
-      } catch (error) {
-        log.error('Error loading simulation settings:', error)
-      } finally {
-        isLoadingFromPrefs.current = false
-      }
-    }
-
-    void loadSettings()
-  }, [])
-
-  // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
-  // the write waits for the clicking to stop and still goes out if the page is left first.
-  const writeSimulationSettings = useCallback(
-    (settings: SimulationSettings) =>
-      persistPrefs({ simulationSettings: settings }, 'the simulation settings', (message) =>
-        setSettingsSaveError(message),
-      ),
-    [],
-  )
-  const settingsSaver = useDebouncedSave(writeSimulationSettings, { quietMs: SETTINGS_QUIET_MS })
-
-  useEffect(() => {
-    if (isLoadingFromPrefs.current) {
-      return
-    }
-    setSettingsSaveError(null)
-    settingsSaver.saveSoon({
+  // The page remembers what was last simulated.
+  const settings = useSimulationSettings(
+    {
       registryType: selectedRegistryType,
       groupId: selectedGroupId,
-      effectId: selectedEffect?.id || null,
+      effect: selectedEffect,
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       instrument: selectedInstrument,
-    })
-  }, [
-    settingsSaver,
-    selectedRegistryType,
-    selectedGroupId,
-    selectedEffect?.id,
-    selectedVenueSize,
-    selectedBpm,
-    selectedInstrument,
-  ])
+    },
+    {
+      setRegistryType: setSelectedRegistryType,
+      setVenueSize: setSelectedVenueSize,
+      setBpm: setSelectedBpm,
+      setInstrument: setSelectedInstrument,
+      setEffect: setSelectedEffect,
+    },
+  )
+  const { groupShown, releaseHeldGroup } = settings
 
-  // Load saved effect after group is loaded and effects are available
-  useEffect(() => {
-    const loadSavedEffect = (): void => {
-      const saved = savedEffectRef.current
-      if (!saved || saved.groupId !== selectedGroupId) {
-        return
-      }
-
-      // Wait for effects to be loaded by EffectsDropdown
-      const checkForEffects = async (retries = 10) => {
-        try {
-          const availableEffects =
-            selectedRegistryType === 'RB3E'
-              ? await getAvailableRb3Cues(selectedGroupId)
-              : await getAvailableCues(selectedGroupId)
-          if (availableEffects && availableEffects.length > 0) {
-            const savedEffect = availableEffects.find(
-              (e: EffectSelector) => e.id === saved.effectId,
-            )
-            if (savedEffect) {
-              setSelectedEffect(savedEffect)
-            }
-            // Either it was restored or this group no longer offers it. Done either way.
-            savedEffectRef.current = null
-          } else if (retries > 0) {
-            // Effects not loaded yet, retry after a short delay
-            setTimeout(() => void checkForEffects(retries - 1), 200)
-          } else {
-            savedEffectRef.current = null
-          }
-        } catch (error) {
-          log.error('Error loading saved effect:', error)
-          savedEffectRef.current = null
-        }
-      }
-      // Settles after the first attempt: the retry chain carries on through a timer.
-      void checkForEffects()
-    }
-
-    loadSavedEffect()
-  }, [selectedGroupId, selectedRegistryType])
-
-  // Moving to a different group than the saved effect belongs to abandons the restore.
-  useEffect(() => {
-    const saved = savedEffectRef.current
-    if (saved && saved.groupId !== selectedGroupId) {
-      savedEffectRef.current = null
-    }
-  }, [selectedGroupId])
-
-  // Simulation uses cueGroup in the simulate payload; we do not set global active groups here.
-  useEffect(() => {
-    if (selectedGroupId) {
-      if (isInitialMount.current) {
-        isInitialMount.current = false
-      }
-      isFullyInitialized.current = true
-    }
-  }, [selectedGroupId])
-
-  const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
-    log.info('Effect selected:', effect)
-    setSelectedEffect(effect)
-  }, [])
+  const handleEffectSelect = useCallback(
+    async (effect: EffectSelector) => {
+      log.info('Effect selected:', effect)
+      releaseHeldGroup()
+      setSelectedEffect(effect)
+    },
+    [releaseHeldGroup],
+  )
 
   const handleTestEffect = async () => {
     if (!selectedEffect) {
@@ -389,33 +227,24 @@ const CueSimulation: React.FC = () => {
   const simulationContextNow = (): SimulationContext =>
     simulationContext(selectedVenueSize, selectedBpm, selectedGroupId, selectedEffect)
 
-  const handleSimulateBeat = async () => {
+  // A lamp lights only for an event main ran, and its useTimeoutEffect turns it off again.
+  const simulateSongEvent = async (
+    kind: string,
+    simulate: (context: SimulationContext) => Promise<boolean>,
+    lightLamp: (on: boolean) => void,
+  ) => {
     try {
-      await simulateBeat(simulationContextNow())
-      // Simply turn on the indicator, the useTimeoutEffect will reset it
-      setShowBeatIndicator(true)
+      if ((await simulate(simulationContextNow())) === true) lightLamp(true)
+      else log.warn(`Main refused the simulated ${kind}`)
     } catch (error) {
-      log.error('Error simulating a beat:', error)
+      log.error(`Error simulating a ${kind}:`, error)
     }
   }
-
-  const handleSimulateKeyframe = async () => {
-    try {
-      await simulateKeyframe(simulationContextNow())
-      setShowKeyframeIndicator(true)
-    } catch (error) {
-      log.error('Error simulating a keyframe:', error)
-    }
-  }
-
-  const handleSimulateMeasure = async () => {
-    try {
-      await simulateMeasure(simulationContextNow())
-      setShowMeasureIndicator(true)
-    } catch (error) {
-      log.error('Error simulating a measure:', error)
-    }
-  }
+  const handleSimulateBeat = () => simulateSongEvent('beat', simulateBeat, setShowBeatIndicator)
+  const handleSimulateKeyframe = () =>
+    simulateSongEvent('keyframe', simulateKeyframe, setShowKeyframeIndicator)
+  const handleSimulateMeasure = () =>
+    simulateSongEvent('measure', simulateMeasure, setShowMeasureIndicator)
 
   const handleSimulateInstrumentNote = async (noteType: string) => {
     try {
@@ -429,6 +258,7 @@ const CueSimulation: React.FC = () => {
 
   const handleRegistryChange = (type: CueRegistryType) => {
     if (type === selectedRegistryType) return
+    releaseHeldGroup()
     // Switching registry invalidates the current group/effect (different registries, different
     // group ids); clear so the selector re-inits against the newly chosen registry.
     setSelectedRegistryType(type)
@@ -443,7 +273,7 @@ const CueSimulation: React.FC = () => {
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
   const handleGroupChange = useCallback(
-    async (groupIds: string[]) => {
+    async (groupIds: string[], origin: GroupOrigin) => {
       // Handle group selection - only single groups are supported
       if (groupIds.length === 1) {
         const groupId = groupIds[0]
@@ -458,6 +288,7 @@ const CueSimulation: React.FC = () => {
             setSelectedGroupId('')
             return
           }
+          groupShown(groupId, origin)
           setSelectedGroupId(groupId)
           const displayName = group.name
           // Only update state if the selection actually changed
@@ -479,7 +310,7 @@ const CueSimulation: React.FC = () => {
         setSelectedEffect(null)
       }
     },
-    [setSelectedGroup, selectedRegistryType],
+    [setSelectedGroup, selectedRegistryType, groupShown],
   )
 
   // Fetch current group info when selected group changes
@@ -531,9 +362,9 @@ const CueSimulation: React.FC = () => {
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Cue Simulation</h1>
 
-      {settingsSaveError && (
+      {settings.saveError && (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400" role="alert">
-          {settingsSaveError}
+          {settings.saveError}
         </p>
       )}
 
@@ -545,7 +376,11 @@ const CueSimulation: React.FC = () => {
       <CueSimulationAbout isOpen={isAboutOpen} onToggle={() => setIsAboutOpen(!isAboutOpen)} />
 
       {advancedModeEnabled && (
-        <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+        <DmxRigSelector
+          rigs={activeRigs}
+          selectedRigId={selectedRigId}
+          onRigChange={setSelectedRigId}
+        />
       )}
 
       <div className="my-6">
@@ -586,13 +421,15 @@ const CueSimulation: React.FC = () => {
               <div>
                 <CueRegistrySelector
                   onRegistryChange={handleRegistryChange}
-                  onGroupChange={(groupIds) => void handleGroupChange(groupIds)}
+                  onGroupChange={(groupIds, origin) => void handleGroupChange(groupIds, origin)}
                   selectedVenueSize={selectedVenueSize}
                   onVenueSizeChange={setSelectedVenueSize}
                   selectedBpm={selectedBpm}
                   onBpmChange={setSelectedBpm}
                   selectedGroupId={selectedGroupId}
+                  preferredGroupId={settings.heldGroupId}
                   selectedRegistryType={selectedRegistryType}
+                  ready={settings.restored}
                 />
               </div>
               <div className="lg:w-64">
@@ -625,18 +462,13 @@ const CueSimulation: React.FC = () => {
 
       {!isAudioReactiveEnabled && (
         <>
-          {isRb3Enabled && (
+          {liveInput && (
             <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
-              RB3E is enabled and owns the lights. Disable RB3E to simulate cues.
-            </div>
-          )}
-          {isYargEnabled && !isRb3Enabled && (
-            <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
-              YARG is enabled and owns venue post-processing. Disable YARG to simulate effects here.
+              {liveInput} is enabled and owns the lights. Disable {liveInput} to simulate cues.
             </div>
           )}
           <CueSimulationActions
-            disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
+            disabled={!selectedEffect || !selectedGroupId || liveInput !== null}
             onTestEffect={() => void handleTestEffect()}
             onStopTestEffect={() => void handleStopTestEffect()}
             onSimulateBeat={() => void handleSimulateBeat()}
@@ -644,14 +476,14 @@ const CueSimulation: React.FC = () => {
             onSimulateKeyframe={() => void handleSimulateKeyframe()}
             showSongSimulation={selectedRegistryType !== 'RB3E'}
           />
-          {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
+          {selectedRegistryType === 'RB3E' && !liveInput && <StageKitLedPanel />}
           {/* RB3 mode has no instrument-note song events — LED state drives it instead. */}
           {selectedRegistryType !== 'RB3E' && (
             <CueSimulationInstrument
               selectedInstrument={selectedInstrument}
               onInstrumentChange={setSelectedInstrument}
               onSimulateNote={(noteType) => void handleSimulateInstrumentNote(noteType)}
-              disabled={!selectedGroupId || isRb3Enabled}
+              disabled={!selectedGroupId || liveInput !== null}
             />
           )}
           {/* Post-processing is a YARG venue signal, so RB3 mode has nothing to drive it, and the
@@ -660,11 +492,14 @@ const CueSimulation: React.FC = () => {
             <CueSimulationPostProcessing
               selectedState={selectedPostProcessing}
               onStateChange={(state) => void handlePostProcessingChange(state)}
-              disabled={isRb3Enabled || isYargEnabled}
+              disabled={liveInput !== null}
             />
           )}
           {advancedModeEnabled && (
-            <CueSimulationMotion platform={selectedRegistryType === 'RB3E' ? 'rb3' : 'yarg'} />
+            <CueSimulationMotion
+              platform={selectedRegistryType === 'RB3E' ? 'rb3' : 'yarg'}
+              disabled={liveInput !== null}
+            />
           )}
         </>
       )}

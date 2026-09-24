@@ -1,6 +1,20 @@
 appId: rocks.photonics
 productName: Photonics
 asar: true
+# Fuses baked into the Electron binary. Off: running it as plain Node, NODE_OPTIONS and --inspect,
+# each a way to run other code with the app's own permissions, and the extra privileges file://
+# pages get, since the renderer loads from the photonics:// scheme instead. On: the archive
+# integrity check and loading the app from app.asar alone. tools/packaged-files-check.mjs reads
+# them back. enableCookieEncryption stays at Electron's default, since it keys cookies from the
+# macOS keychain, which can prompt on an unsigned build. Once set here, the check holds it on.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+  resetAdHocDarwinSignature: true
 directories:
   buildResources: build
 # Everything the app loads at runtime resolves under out/, which the build writes. package.json is
@@ -40,11 +54,9 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    NSCameraUsageDescription: Application requests access to the device's camera.
     NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-    NSCameraUseContinuityCameraDeviceType: true
   notarize: false
   hardenedRuntime: true
 dmg:

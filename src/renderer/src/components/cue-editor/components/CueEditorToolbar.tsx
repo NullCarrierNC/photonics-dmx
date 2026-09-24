@@ -13,7 +13,7 @@ type CueEditorToolbarProps = {
   onImport: () => void
   onExport: () => void
   onDelete: () => void
-  hasEditorDoc: boolean
+  canSave: boolean
   hasFile: boolean
   newFileLabel: string
   importLabel: string
@@ -45,7 +45,7 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
   onImport,
   onExport,
   onDelete,
-  hasEditorDoc,
+  canSave,
   hasFile,
   newFileLabel,
   importLabel,
@@ -135,9 +135,9 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
       </div>
       <div className="flex gap-2">
         <button
-          className={`${primaryButton} ${!hasEditorDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`${primaryButton} ${!canSave ? 'opacity-50 cursor-not-allowed' : ''}`}
           onClick={onSave}
-          disabled={!hasEditorDoc}>
+          disabled={!canSave}>
           Save
         </button>
         <button className={secondaryButton} onClick={onNewFile}>

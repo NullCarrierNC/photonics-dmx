@@ -10,9 +10,10 @@ import {
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
+import { isActiveGameplayPacket } from './rb3GameplayEvidence'
 import { Rb3GameModeManager, Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { createLogger } from '../../shared/logger'
-import { Rb3StrobeWatchdog, DEFAULT_STROBE_WATCHDOG_MS } from './rb3StrobeWatchdog'
+import { StrobeWatchdog, DEFAULT_STROBE_WATCHDOG_MS } from './strobeWatchdog'
 
 const log = createLogger('rb3-cue')
 
@@ -98,7 +99,7 @@ export class Rb3StageKitCueProcessor {
   private listener: EventEmitter | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
   private readonly keepaliveMs: number | null
-  private readonly strobeWatchdog: Rb3StrobeWatchdog
+  private readonly strobeWatchdog: StrobeWatchdog
   private readonly menuDispatch: Rb3MenuCueDispatch | null
   // Menu-look pump: an immediate first frame (enterMenu already set inMenu), no restart on a
   // repeated start, frames gated on inMenu so a stale tick never paints over gameplay.
@@ -124,7 +125,7 @@ export class Rb3StageKitCueProcessor {
   ) {
     this.keepaliveMs =
       options.keepaliveMs === undefined ? DEFAULT_KEEPALIVE_MS : options.keepaliveMs
-    this.strobeWatchdog = new Rb3StrobeWatchdog(
+    this.strobeWatchdog = new StrobeWatchdog(
       options.strobeWatchdogMs ?? DEFAULT_STROBE_WATCHDOG_MS,
       () => this.cutStrobe(),
     )
@@ -282,7 +283,7 @@ export class Rb3StageKitCueProcessor {
       // or fog turning on) pulls the processor out of the menu. End-of-song teardown traffic —
       // DisableAll, strobe/fog off, bank clears — leaves the menu look running, and a lost or
       // late InGame game-state event no longer keeps the song's opening packets from rendering.
-      if (!this.isActiveGameplayPacket(data)) return
+      if (!isActiveGameplayPacket(data)) return
       this.exitMenu()
     }
     this.started = true // a real packet is gameplay evidence; the keepalive may run
@@ -322,18 +323,6 @@ export class Rb3StageKitCueProcessor {
 
     this.emitEdges(before)
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
-  }
-
-  /** A packet that lights something: a colour bank with LEDs set, a strobe turning on, or fog on. */
-  private isActiveGameplayPacket(data: StageKitData): boolean {
-    if (
-      (COLOUR_BANKS as readonly string[]).includes(data.color) &&
-      (data.leftChannel & 0xff) !== 0
-    ) {
-      return true
-    }
-    if (data.strobeEffect && data.strobeEffect !== 'off') return true
-    return data.rightChannel === Rb3RightChannel.FogOn
   }
 
   /** Snapshot the current aggregate LED mask + fog, taken before a packet mutates state. */

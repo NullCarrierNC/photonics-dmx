@@ -18,6 +18,7 @@ import { monotonicNowMs } from '../../../shared/time'
 import { MIN_SUPPORTED_DATAGRAM_VERSION, MAX_KNOWN_DATAGRAM_VERSION } from './yargTypes'
 import { parseYargPacket } from './yargPacketParser'
 import { computeInstrumentRisingEdges, shouldForwardFrame } from './yargFrameDispatch'
+import { DEFAULT_STROBE_WATCHDOG_MS, StrobeWatchdog } from '../../processors/strobeWatchdog'
 
 const log = createLogger('YargNetworkListener')
 
@@ -30,14 +31,7 @@ export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
   private cueHandler: CueRuntime
 
-  //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false
-
-  // Batch logging
-  //  private logBuffer: Record<string, any>[] = [];
-  //  private flushThreshold = 50; // Flush after every 50 messages
-  // private flushIntervalMs = 5000; // Also flush every 5 seconds
-  private flushTimer: NodeJS.Timeout | null = null
 
   /** Last forwarded frame (used for strobe edge detection and fallback context). */
   private lastData: CueData | null = null
@@ -50,6 +44,9 @@ export class YargNetworkListener extends EventEmitter {
 
   /** One-shot latch for newer-than-known datagram version warnings. */
   private newerVersionWarningEmitted = false
+
+  /** Unknown lighting cue values already warned about this session, each warned about once. */
+  private readonly unknownCuesWarned = new Set<string>()
 
   // Track the last scene to detect transitions
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
@@ -71,6 +68,11 @@ export class YargNetworkListener extends EventEmitter {
   private lastFallbackFireAt = 0
   /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
   private fallbackTimer: NodeJS.Timeout | null = null
+  /** Stops a strobe once YARG has been silent for the window, in every scene and setting. */
+  private readonly strobeWatchdog = new StrobeWatchdog(DEFAULT_STROBE_WATCHDOG_MS, () => {
+    log.info('YARG: strobe stopped after YARG went silent')
+    this.cueHandler.stopActiveStrobe()
+  })
 
   // --- Venue post-processing ---
   /** Receives the venue effect YARG is applying on screen, on change only. */
@@ -91,26 +93,6 @@ export class YargNetworkListener extends EventEmitter {
     this.onVenuePostProcessing = options?.onVenuePostProcessing ?? ((): void => {})
 
     log.info('YargNetworkListener initialized.')
-
-    /*
-    // Initialize the flush timer
-    this.flushTimer = setInterval(() => {
-      if (this.logBuffer.length > 0) {
-        this.flushLogBuffer();
-      }
-    }, this.flushIntervalMs);
-
-    // Ensure logs are flushed on application exit
-    process.on('exit', () => this.flushLogBuffer());
-    process.on('SIGINT', () => {
-      this.flushLogBuffer();
-      process.exit();
-    });
-    process.on('SIGTERM', () => {
-      this.flushLogBuffer();
-      process.exit();
-    });
-    */
   }
 
   public start(): Promise<void> {
@@ -129,14 +111,19 @@ export class YargNetworkListener extends EventEmitter {
       this.setupServerEvents()
     }
 
+    const sock = this.server
     return new Promise<void>((resolve, reject) => {
       this.startBindReject = reject
       this.newerVersionWarningEmitted = false
+      this.unknownCuesWarned.clear()
       this.resetSessionInputState()
-      this.server!.bind(PORT, () => {
+      sock.bind(PORT, () => {
+        // A stop while the bind was pending has already rejected this start and closed the socket.
+        if (this.server !== sock) return
         this.startBindReject = null
         this.listening = true
         this.startFallbackPolling()
+        this.strobeWatchdog.start()
         log.info(`YargNetworkListener started and listening on port ${PORT}`)
         resolve()
       })
@@ -151,7 +138,12 @@ export class YargNetworkListener extends EventEmitter {
     const sock = this.server
     this.server = null
     this.listening = false
+    if (this.startBindReject) {
+      this.startBindReject(new Error('YargNetworkListener stopped before it started listening'))
+      this.startBindReject = null
+    }
     this.stopFallbackPolling()
+    this.strobeWatchdog.stop()
     this.publishPostProcessing('Default')
     if (!sock) {
       return Promise.resolve()
@@ -278,6 +270,7 @@ export class YargNetworkListener extends EventEmitter {
   /** Reset dispatch and handler edge baselines at YARG session boundaries. */
   private resetSessionInputState(): void {
     this.cueHandler.resetSessionState()
+    this.strobeWatchdog.setStrobeRunning(false)
     this.lastData = null
     this.lastReceivedData = null
     this.lastForwardedAt = 0
@@ -312,15 +305,25 @@ export class YargNetworkListener extends EventEmitter {
       const result = parseYargPacket(buffer, this.getMinSupportedDatagramVersion())
 
       switch (result.kind) {
-        case 'shutdown':
+        case 'shutdown': {
           log.info('YARG shutdown notification (datagram version 0)')
+          const last = this.lastData
           this.resetSessionInputState()
+          // The game has gone, so nothing will replace the running look or reach the Fallback.
+          // Fade it out as a chart blackout would.
+          if (last) {
+            void this.cueHandler.handleCue(CueType.Blackout_Slow, {
+              ...last,
+              lightingCue: CueType.Blackout_Slow,
+            })
+          }
           this.emit('yarg-error', {
             type: 'yarg-shutdown',
             message: 'YARG Has Shutdown',
             datagramVersion: 0,
           })
           return
+        }
         case 'reject':
           if (result.reason === 'header') {
             log.warn(`Invalid YARG packet: ${result.detail}`)
@@ -356,6 +359,7 @@ export class YargNetworkListener extends EventEmitter {
    */
   public processCueData(YargCueData: CueData): void {
     const now = monotonicNowMs()
+    this.strobeWatchdog.packetSeen()
     const forward = shouldForwardFrame(
       this.lastReceivedData,
       YargCueData,
@@ -376,27 +380,6 @@ export class YargNetworkListener extends EventEmitter {
     const showsVenue =
       YargCueData.currentScene === 'Gameplay' || YargCueData.currentScene === 'Practice'
     this.publishPostProcessing(showsVenue ? YargCueData.postProcessing : 'Default')
-
-    switch (YargCueData.beat) {
-      case 'Strong':
-        this.cueHandler.handleBeat()
-        break
-      case 'Measure':
-        this.cueHandler.handleMeasure()
-        break
-    }
-
-    switch (YargCueData.keyframe) {
-      case 'First':
-        this.cueHandler.handleKeyframeFirst()
-        break
-      case 'Next':
-        this.cueHandler.handleKeyframeNext()
-        break
-      case 'Previous':
-        this.cueHandler.handleKeyframePrevious()
-        break
-    }
 
     const cueType = YargCueData.lightingCue
     if (cueType && isCueType(cueType)) {
@@ -424,7 +407,8 @@ export class YargNetworkListener extends EventEmitter {
         }
         this.inNonDrivingRun = nonDriving
       }
-    } else {
+    } else if (!this.unknownCuesWarned.has(YargCueData.lightingCue)) {
+      this.unknownCuesWarned.add(YargCueData.lightingCue)
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
 
@@ -443,7 +427,10 @@ export class YargNetworkListener extends EventEmitter {
       YargCueData.strobeState !== 'Strobe_Off' &&
       (activeStrobeStates as string[]).includes(YargCueData.strobeState)
 
-    if (currentHasActiveStrobe) {
+    // While the Fallback plays, the chart is in a run of blackouts that holds any strobe back, and
+    // the strobe stays held until a driving cue ends the Fallback.
+    const strobeDispatched = currentHasActiveStrobe && !this.fallbackActive
+    if (strobeDispatched) {
       let strobeCueType: CueType
       switch (YargCueData.strobeState) {
         case 'Strobe_Slow':
@@ -462,8 +449,32 @@ export class YargNetworkListener extends EventEmitter {
           strobeCueType = CueType.Strobe_Slow
       }
       void this.cueHandler.handleCue(strobeCueType, YargCueData)
-    } else if (previousHadActiveStrobe) {
+    } else if (previousHadActiveStrobe && !currentHasActiveStrobe) {
       void this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
+    }
+    this.strobeWatchdog.setStrobeRunning(strobeDispatched)
+
+    // After the cues, so a transition they submit to wait for this frame's beat, measure or
+    // keyframe starts on it.
+    switch (YargCueData.beat) {
+      case 'Strong':
+        this.cueHandler.handleBeat()
+        break
+      case 'Measure':
+        this.cueHandler.handleMeasure()
+        break
+    }
+
+    switch (YargCueData.keyframe) {
+      case 'First':
+        this.cueHandler.handleKeyframeFirst()
+        break
+      case 'Next':
+        this.cueHandler.handleKeyframeNext()
+        break
+      case 'Previous':
+        this.cueHandler.handleKeyframePrevious()
+        break
     }
 
     const noteEdges = computeInstrumentRisingEdges(this.lastData, YargCueData)
@@ -495,69 +506,62 @@ export class YargNetworkListener extends EventEmitter {
   }
 
   /**
-   * Handle scene transitions, particularly Menu -> Gameplay to clear menu lighting
+   * Handle scene transitions. Gameplay reached from any other scene, or seen on the first frame of
+   * a session (a controller restart or a listener enabled mid-song), starts a song: the rig blacks
+   * out to clear whatever the previous screen lit, and the song's group selection begins.
    * @param currentScene The current scene from the YARG packet
    */
   private handleSceneTransition(
     currentScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice',
   ): void {
-    // Check if we have a scene change
     if (this.lastScene !== null && this.lastScene !== currentScene) {
       log.info(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
+    }
 
-      // Handle Menu -> Gameplay transition (song start)
-      if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
-        log.info('YARG: Song starting - triggering blackout to clear menu lighting')
-        // Reset the fallback window so it starts fresh from song start.
-        this.lastCueReceivedAt = monotonicNowMs()
-        this.fallbackActive = false
-        this.inNonDrivingRun = false
-        this.cueHandler.notifySongStart()
-        // Trigger a fast blackout to clear any menu lighting
-        void this.cueHandler.handleCue(CueType.Blackout_Fast, {
-          datagramVersion: 0,
-          platform: 'Unknown',
-          currentScene: currentScene,
-          pauseState: 'Unpaused',
-          venueSize: 'NoVenue',
-          beatsPerMinute: 0,
-          songSection: 'None',
-          guitarNotes: [],
-          bassNotes: [],
-          drumNotes: [],
-          keysNotes: [],
-          vocalNote: 0,
-          harmony0Note: 0,
-          harmony1Note: 0,
-          harmony2Note: 0,
-          lightingCue: 'Blackout_Fast',
-          postProcessing: 'Default',
-          fogState: false,
-          strobeState: 'Strobe_Off',
-          performer: 0,
-          trackMode: 'tracked',
-          beat: 'Off',
-          keyframe: 'Off',
-          bonusEffect: false,
-        })
-      }
+    if (currentScene === 'Gameplay' && this.lastScene !== 'Gameplay') {
+      log.info('YARG: Song starting - triggering blackout to clear the previous lighting')
+      // Reset the fallback window so it starts fresh from song start.
+      this.lastCueReceivedAt = monotonicNowMs()
+      this.fallbackActive = false
+      this.inNonDrivingRun = false
+      // Trigger a fast blackout to clear the previous lighting. The song-start notice follows it
+      // because it ends the chart-blackout hold that blackout arms, so a strobe the chart opens
+      // with plays.
+      void this.cueHandler.handleCue(CueType.Blackout_Fast, {
+        datagramVersion: 0,
+        platform: 'Unknown',
+        currentScene: currentScene,
+        pauseState: 'Unpaused',
+        venueSize: 'NoVenue',
+        beatsPerMinute: 0,
+        songSection: 'None',
+        guitarNotes: [],
+        bassNotes: [],
+        drumNotes: [],
+        keysNotes: [],
+        vocalNote: 0,
+        harmony0Note: 0,
+        harmony1Note: 0,
+        harmony2Note: 0,
+        lightingCue: 'Blackout_Fast',
+        postProcessing: 'Default',
+        fogState: false,
+        strobeState: 'Strobe_Off',
+        performer: 0,
+        trackMode: 'tracked',
+        beat: 'Off',
+        keyframe: 'Off',
+        bonusEffect: false,
+      })
+      this.cueHandler.notifySongStart()
+    }
 
-      // Handle Gameplay -> other (song end)
-      if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
-        this.fallbackActive = false
-        this.cueHandler.notifySongEnd()
-      }
+    if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
+      this.fallbackActive = false
+      this.cueHandler.notifySongEnd()
     }
 
     // Update the last scene
     this.lastScene = currentScene
-  }
-
-  public async destroy(): Promise<void> {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer)
-      this.flushTimer = null
-    }
-    return this.stop()
   }
 }

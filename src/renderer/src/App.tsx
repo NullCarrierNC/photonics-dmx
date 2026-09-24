@@ -5,6 +5,7 @@ import {
   currentPageAtom,
   dmxLightsLibraryAtom,
   dmxRigsAtom,
+  dmxRigsLoadedAtom,
   isSenderErrorAtom,
   lightingPrefsAtom,
   myDmxLightsAtom,
@@ -37,8 +38,6 @@ import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
 import { useYargErrorHandler } from './hooks/useYargErrorHandler'
-import ToastContainer from './components/Toast'
-import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
@@ -52,6 +51,7 @@ import {
   getSystemStatus,
 } from './ipcApi'
 import { registerIpcListener } from './utils/ipcHelpers'
+import { configRecoveryMessages, type ConfigRecoveryFile } from './utils/configRecoveryMessages'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('App')
@@ -68,6 +68,7 @@ export const App = (): JSX.Element => {
   const setMyLights = useSetAtom(myDmxLightsAtom)
   const setLightLibrary = useSetAtom(dmxLightsLibraryAtom)
   const setDmxRigs = useSetAtom(dmxRigsAtom)
+  const setDmxRigsLoaded = useSetAtom(dmxRigsLoadedAtom)
   const [, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [currentPage] = useAtom(currentPageAtom)
   const { isDarkMode, toggleDarkMode } = useDarkMode()
@@ -85,7 +86,7 @@ export const App = (): JSX.Element => {
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
 
   // Audio capture manager ref (created once, persists for app lifetime)
   const audioCaptureManagerRef = useRef<AudioCaptureManager | null>(null)
@@ -144,13 +145,10 @@ export const App = (): JSX.Element => {
   )
 
   const handleConfigCorruptRecovered = useCallback(
-    (payload: { files: { fileName: string; message?: string }[] }): void => {
-      const list = payload.files.map((f) => f.fileName).join(', ')
-      showToast(
-        `A local settings file was invalid. Defaults were restored; your original file was saved as a backup. (${list})`,
-        'warning',
-        10000,
-      )
+    (payload: { files: ConfigRecoveryFile[] }): void => {
+      for (const message of configRecoveryMessages(payload.files)) {
+        showToast(message, 'warning', 10000)
+      }
     },
     [showToast],
   )
@@ -316,11 +314,11 @@ export const App = (): JSX.Element => {
     [setPrefs],
   )
 
-  // After a controller restart the main process auto-restores senders from preferences and may
-  // mutate rigs via template-sync (see `syncRigsWithUserLights` in the main process). Sync the
-  // renderer atoms so the UI reflects the actual runtime state without waiting on a navigation.
+  // The running senders are read on mount, and again after a controller restart, which restores
+  // senders from preferences and may mutate rigs via template-sync (see `syncRigsWithUserLights` in
+  // the main process), so the UI reflects the actual runtime state without waiting on a navigation.
   useEffect(() => {
-    const handleControllersRestarted = () => {
+    const readSenders = (): void => {
       getSystemStatus()
         .then((status) => {
           if (status?.success && status.senderStatus) {
@@ -328,14 +326,18 @@ export const App = (): JSX.Element => {
           }
         })
         .catch((err) => {
-          log.error('App: failed to sync sender status after restart', err)
+          log.error('App: failed to read which senders are running', err)
         })
+    }
+    const handleControllersRestarted = () => {
+      readSenders()
 
       getDmxRigs()
         .then((rigs) => setDmxRigs(rigs || []))
         .catch((err) => log.error('App: failed to refresh DMX rigs after restart', err))
     }
 
+    readSenders()
     return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
   }, [setDmxRigs])
 
@@ -397,13 +399,14 @@ export const App = (): JSX.Element => {
       try {
         const rigs = await getDmxRigs()
         setDmxRigs(rigs || [])
+        setDmxRigsLoaded(true)
       } catch (error) {
         log.error('Failed to load DMX rigs:', error)
       }
     }
 
     void loadDmxRigs()
-  }, [setDmxRigs])
+  }, [setDmxRigs, setDmxRigsLoaded])
 
   useAppIpcListeners({
     setAppVer,
@@ -497,8 +500,6 @@ export const App = (): JSX.Element => {
         </div>
       </div>
       <MasterOutputSidebar />
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
-      <ConfirmModalHost />
     </div>
   )
 }

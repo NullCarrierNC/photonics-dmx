@@ -4,6 +4,7 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { AudioGameModeConfig } from '../../../shared/ipcTypes'
 import { getAudioGameMode, setAudioGameMode } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { DraftNumberField } from './controls/DraftField'
 const log = createLogger('AudioGameModeSettings')
 
 const CUE_DURATION_ABS_MIN = 5
@@ -70,23 +71,20 @@ const AudioGameModeSettings: React.FC = () => {
     }
   }
 
-  const clampDuration = (value: number) =>
-    Math.min(CUE_DURATION_ABS_MAX, Math.max(CUE_DURATION_ABS_MIN, value))
-
-  const commitCueDurationMin = () => {
-    const v = clampDuration(cueDurationMin)
-    setCueDurationMin(v)
-    const maxC = clampDuration(cueDurationMax)
-    setCueDurationMax(Math.max(v, maxC))
-    void persist({ cueDurationMin: v, cueDurationMax: Math.max(v, maxC) })
+  // The boxes hold each value inside the absolute range, and the window keeps max at or above min.
+  const commitCueDurationMin = (min: number) => {
+    const max = Math.max(min, cueDurationMax)
+    setCueDurationMin(min)
+    setCueDurationMax(max)
+    void persist({ cueDurationMin: min, cueDurationMax: max })
   }
 
-  const commitCueDurationMax = () => {
-    const v = clampDuration(cueDurationMax)
-    const minC = clampDuration(cueDurationMin)
-    setCueDurationMax(Math.max(minC, v))
-    setCueDurationMin(minC)
-    void persist({ cueDurationMin: minC, cueDurationMax: Math.max(minC, v) })
+  /** Answers false when the maximum was raised to the minimum, so the box shows the one taken. */
+  const commitCueDurationMax = (typed: number): boolean => {
+    const max = Math.max(cueDurationMin, typed)
+    setCueDurationMax(max)
+    void persist({ cueDurationMin, cueDurationMax: max })
+    return max === typed
   }
 
   if (loading) {
@@ -114,32 +112,30 @@ const AudioGameModeSettings: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Minimum
             </label>
-            <input
-              type="number"
+            <DraftNumberField
               min={CUE_DURATION_ABS_MIN}
               max={CUE_DURATION_ABS_MAX}
               step={1}
               className="w-full sm:w-32 p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
               value={cueDurationMin}
               disabled={saving}
-              onChange={(e) => setCueDurationMin(Number(e.target.value))}
-              onBlur={commitCueDurationMin}
+              onCommit={commitCueDurationMin}
+              aria-label="Minimum cue duration"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Maximum
             </label>
-            <input
-              type="number"
+            <DraftNumberField
               min={CUE_DURATION_ABS_MIN}
               max={CUE_DURATION_ABS_MAX}
               step={1}
               className="w-full sm:w-32 p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
               value={cueDurationMax}
               disabled={saving}
-              onChange={(e) => setCueDurationMax(Number(e.target.value))}
-              onBlur={commitCueDurationMax}
+              onCommit={commitCueDurationMax}
+              aria-label="Maximum cue duration"
             />
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
   WizardBeamPreview,
 } from './MovingHeadCalibrationWizard/WizardBeamPreview'
 import { enableConsole, disableConsole, sendConsoleDmx, setConsoleFixtureConfig } from '../ipcApi'
+import { leaveConsole } from '../utils/leaveConsole'
 import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
@@ -29,20 +30,6 @@ import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('MovingHeadCalibrationWizard')
-
-/**
- * Hands console mode back. Nothing in the wizard can wait on this, so a refusal or a rejection is
- * reported here rather than at the call site.
- */
-const leaveConsole = (): void => {
-  disableConsole()
-    .then((result) => {
-      if (!result.success) {
-        log.error('Main refused to leave DMX console mode:', result.error)
-      }
-    })
-    .catch((error) => log.error('Failed to leave DMX console mode:', error))
-}
 
 const STEP_TITLES = [
   'Pan range',

@@ -7,6 +7,14 @@ import * as ipcApi from '../ipcApi'
 import MotionEnabledCueGroups from './MotionEnabledCueGroups'
 
 jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
+
+jest.mock(
   '../ipcApi',
   () =>
     jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(

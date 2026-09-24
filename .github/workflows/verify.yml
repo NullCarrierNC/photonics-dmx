@@ -12,18 +12,25 @@ jobs:
   source-checks:
     name: lint, format, typecheck, and audit (windows)
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The whole history, so coverage:check can find the commit this change starts from.
+          fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22.x
           cache: npm
 
       - name: Verify lockfile matches package.json
         run: npm run lockfile:check
+
+      - name: Every override still narrows a dependency
+        run: npm run overrides:check
 
       - name: Install dependencies
         run: npm ci
@@ -45,14 +52,27 @@ jobs:
       - name: Explicit any budget
         run: npm run any:budget
 
+      - name: Type escape budget
+        run: npm run type-escape:budget
+
+      - name: Knip budget
+        run: npm run knip:budget
+
       - name: File size budget
         run: npm run size:budget
 
       - name: Referenced paths are tracked
         run: npm run paths:check
 
+      # The branch as it stood before the push, or the target of a pull request, so a threshold
+      # lowered on development itself is still held to what development had.
+      - name: Coverage settings do not loosen
+        run: npm run coverage:check
+        env:
+          COVERAGE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+
       - name: Security audit
-        run: npm audit --audit-level=high
+        run: npm run audit:check
 
   test:
     name: test
@@ -64,12 +84,13 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [22.x]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -84,6 +105,7 @@ jobs:
     name: all checks passed
     needs: [source-checks, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     steps:
       - name: Check all jobs passed

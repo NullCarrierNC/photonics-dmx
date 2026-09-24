@@ -5,8 +5,11 @@ const {
   parseBaseline,
   compareBudget,
   overLimitEntries,
-  grownSinceBaseline,
+  raisedByRewrite,
   renderBaseline,
+  limitMismatch,
+  rewriteGuard,
+  isMeasuredSource,
 } = require('../../../../tools/sizeBudgetCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -26,6 +29,33 @@ const baselineText = (limit: number, entries: Array<[number, string]>): string =
 
 const sizesOf = (entries: Record<string, number>): Map<string, number> =>
   new Map(Object.entries(entries))
+
+describe('isMeasuredSource', () => {
+  it('measures every script and TypeScript extension', () => {
+    for (const ext of ['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs']) {
+      expect(isMeasuredSource(`src/main/real/huge.${ext}`)).toBe(true)
+    }
+  })
+
+  it('leaves out a test file by its suffix, whatever its extension', () => {
+    expect(isMeasuredSource('src/main/huge.test.ts')).toBe(false)
+    expect(isMeasuredSource('src/main/huge.spec.tsx')).toBe(false)
+    expect(isMeasuredSource('src/main/huge.test.js')).toBe(false)
+    expect(isMeasuredSource('src/main/huge.spec.mjs')).toBe(false)
+  })
+
+  it('leaves out anything under a tests folder', () => {
+    expect(isMeasuredSource('src/main/tests/helpers/huge.ts')).toBe(false)
+    expect(isMeasuredSource('src/main/__tests__/huge.js')).toBe(false)
+  })
+
+  it('leaves out declaration files and files that are not source', () => {
+    expect(isMeasuredSource('src/env.d.ts')).toBe(false)
+    expect(isMeasuredSource('src/env.d.mts')).toBe(false)
+    expect(isMeasuredSource('src/data/huge.json')).toBe(false)
+    expect(isMeasuredSource('src/styles/app.css')).toBe(false)
+  })
+})
 
 describe('parseBaseline', () => {
   it('reads the limit and every entry, ignoring the header notes', () => {
@@ -96,20 +126,55 @@ describe('compareBudget', () => {
   })
 })
 
-describe('grownSinceBaseline', () => {
+describe('raisedByRewrite', () => {
   const baseline = parseBaseline(baselineText(600, [[700, 'src/a.ts']])) as Baseline
 
   it('names a listed file that grew, so a rewrite can refuse to launder it', () => {
-    expect(grownSinceBaseline(sizesOf({ 'src/a.ts': 750 }), baseline)).toHaveLength(1)
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 750 }), baseline)).toHaveLength(1)
+  })
+
+  it('names an unlisted file over the limit, so a rewrite can refuse to list it', () => {
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 700, 'src/b.ts': 601 }), baseline)).toEqual([
+      expect.stringContaining('src/b.ts'),
+    ])
   })
 
   it('stays silent for a file that shrank or held steady', () => {
-    expect(grownSinceBaseline(sizesOf({ 'src/a.ts': 700 }), baseline)).toEqual([])
-    expect(grownSinceBaseline(sizesOf({ 'src/a.ts': 10 }), baseline)).toEqual([])
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 700 }), baseline)).toEqual([])
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 10 }), baseline)).toEqual([])
+  })
+
+  it('stays silent for an unlisted file at the limit', () => {
+    expect(raisedByRewrite(sizesOf({ 'src/b.ts': 600 }), baseline)).toEqual([])
   })
 
   it('stays silent for a listed file that no longer exists', () => {
-    expect(grownSinceBaseline(sizesOf({}), baseline)).toEqual([])
+    expect(raisedByRewrite(sizesOf({}), baseline)).toEqual([])
+  })
+})
+
+describe('the ratchet against edits made by hand', () => {
+  it('holds an unlisted file to the tool limit when the header was raised', () => {
+    const loosened = parseBaseline(baselineText(2000, [])) as Baseline
+
+    expect(raisedByRewrite(sizesOf({ 'src/b.ts': 700 }), loosened, 600)).toEqual([
+      expect.stringContaining('src/b.ts'),
+    ])
+  })
+
+  it('reports a header limit other than the tool limit', () => {
+    expect(limitMismatch(parseBaseline(baselineText(2000, [])) as Baseline, 600)).toEqual(
+      expect.stringContaining('2000'),
+    )
+    expect(limitMismatch(parseBaseline(baselineText(600, [])) as Baseline, 600)).toBeNull()
+  })
+
+  it('guards a rewrite with the committed baseline when the file is gone', () => {
+    const committed = baselineText(600, [[700, 'src/a.ts']])
+
+    expect(rewriteGuard(null, committed)).toBe(committed)
+    expect(rewriteGuard('working', committed)).toBe('working')
+    expect(rewriteGuard(null, null)).toBeNull()
   })
 })
 

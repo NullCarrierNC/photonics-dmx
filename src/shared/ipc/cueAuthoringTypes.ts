@@ -42,7 +42,8 @@ export interface CueAuthoringInvokeMap {
   }
   [NODE_CUES.SAVE]: {
     request: { mode: NodeCueMode; filename: string; content: NodeCueFile }
-    response: { success: true; path: string } | IpcErrorResult
+    /** `groupEnableError` says the file saved but opting its group in failed. */
+    response: { success: true; path: string; groupEnableError?: string } | IpcErrorResult
   }
   [NODE_CUES.DELETE]: {
     request: string

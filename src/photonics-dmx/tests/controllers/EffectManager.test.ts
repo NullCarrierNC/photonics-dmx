@@ -69,15 +69,11 @@ describe('EffectManager', () => {
       getAllLayers: jest.fn().mockReturnValue([]),
       getLightTransitionController: jest.fn().mockReturnValue(lightTransitionController),
       setLayerLastUsed: jest.fn(),
-      getLightState: jest.fn(),
-      clearLayerStates: jest.fn(),
-      captureFinalStates: jest.fn(),
       resetLayerTracking: jest.fn(),
       captureInitialStates: jest.fn().mockReturnValue(new Map()),
       // New bulk clear methods
       clearAllActiveEffects: jest.fn(),
       clearAllQueuedEffects: jest.fn(),
-      clearAllLayerStates: jest.fn(),
       clearAllLayerTracking: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
@@ -88,8 +84,6 @@ describe('EffectManager', () => {
       handleTransitioning: jest.fn(),
       handleWaitingUntil: jest.fn(),
       getLightTransitionController: jest.fn().mockReturnValue(lightTransitionController),
-      getFinalState: jest.fn(),
-      clearFinalStates: jest.fn(),
       setEffectManager: jest.fn(),
     } as unknown as jest.Mocked<TransitionEngine>
 
@@ -593,6 +587,45 @@ describe('EffectManager', () => {
       expect(layerManager.clearAllActiveEffects.mock.calls.length).toBe(
         fullClearCallCountAfterFirst,
       )
+    })
+  })
+
+  describe('unblocked submissions with a completion callback', () => {
+    const flash = (): Effect => ({
+      id: 'flash',
+      description: 'Flash',
+      transitions: [
+        {
+          lights: [createMockTrackedLight()],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+        },
+      ],
+    })
+
+    it('holds the callback for the run already using the name', () => {
+      const lightMap = new Map([['test-light-1', { name: 'flash', layer: 1 }]])
+      layerManager.getActiveEffects.mockReturnValue(new Map([[1, lightMap]]) as never)
+      const onComplete = jest.fn()
+
+      expect(effectManager.addEffectUnblockedNameWithCallback('flash', flash(), onComplete)).toBe(
+        true,
+      )
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+
+    it('reports a blackout refusal and never calls back', () => {
+      systemEffects.isBlackoutActive.mockReturnValue(true)
+      const onComplete = jest.fn()
+
+      expect(effectManager.setEffectUnblockedNameWithCallback('flash', flash(), onComplete)).toBe(
+        false,
+      )
+      expect(onComplete).not.toHaveBeenCalled()
     })
   })
 
@@ -1223,27 +1256,25 @@ describe('EffectManager', () => {
       // Call removeEffect
       effectManager.removeEffect(effectName, layer)
 
-      // Verify effect was removed (removeEffect calls removeEffectByLayer which calls removeActiveEffect for each light)
       expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(layer, 'test-light-1')
     })
 
-    it('gives up the layer once however many lights are running the effect', () => {
-      // removeEffectByLayer clears the whole layer and starts each light's queued successor, so
-      // calling it per matching light re-entered the map being iterated. A successor sharing the
-      // name was then seen by that same loop and removed in turn, draining the queue.
+    it('removes every light running the name and leaves other names on the layer', () => {
       const effectName = 'test-effect'
       const layer = 1
       const lightMap = new Map()
       for (const lightId of ['light-1', 'light-2', 'light-3']) {
         lightMap.set(lightId, { name: effectName, layer, lightId })
       }
+      lightMap.set('light-4', { name: 'other-effect', layer, lightId: 'light-4' })
       layerManager.getActiveEffects.mockReturnValue(new Map([[layer, lightMap]]))
-      const removeByLayer = jest.spyOn(effectManager, 'removeEffectByLayer')
 
       effectManager.removeEffect(effectName, layer)
 
-      expect(removeByLayer).toHaveBeenCalledTimes(1)
-      removeByLayer.mockRestore()
+      for (const lightId of ['light-1', 'light-2', 'light-3']) {
+        expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(layer, lightId)
+      }
+      expect(layerManager.removeActiveEffect).not.toHaveBeenCalledWith(layer, 'light-4')
     })
 
     it('should not remove an effect if name does not match', () => {
@@ -1292,7 +1323,6 @@ describe('EffectManager', () => {
       // Verify bulk clear methods were called
       expect(layerManager.clearAllActiveEffects).toHaveBeenCalled()
       expect(layerManager.clearAllQueuedEffects).toHaveBeenCalled()
-      expect(layerManager.clearAllLayerStates).toHaveBeenCalled()
       expect(layerManager.clearAllLayerTracking).toHaveBeenCalled()
 
       // Since we can't easily test the internal implementation, let's just verify that

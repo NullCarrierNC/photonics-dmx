@@ -335,7 +335,7 @@ export function seedMissingRequiredPrefs(prefs: AppPreferences): AppPreferences 
   return seeded as unknown as AppPreferences
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value)
 }
 

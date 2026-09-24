@@ -6,6 +6,7 @@ import { useMasterOutputSync } from './useMasterOutputSync'
 import { masterOutputAtom } from '../state/masterOutput'
 import { LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 const invoke = jest.fn() as jest.MockedFunction<
   (channel: string, data: unknown) => Promise<unknown>
@@ -16,10 +17,7 @@ const FULL = { dimmerPercent: 100, blackout: false, strobeOutputEnabled: true }
 beforeEach(() => {
   jest.clearAllMocks()
   invoke.mockImplementation(() => Promise.resolve(FULL))
-  Object.defineProperty(window, 'api', {
-    value: { invoke, send: jest.fn(), receive: jest.fn().mockReturnValue(jest.fn()) },
-    configurable: true,
-  })
+  installWindowApi(invoke)
 })
 
 const Harness = () => {

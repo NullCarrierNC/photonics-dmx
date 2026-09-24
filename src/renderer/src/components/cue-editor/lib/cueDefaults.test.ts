@@ -1,13 +1,10 @@
 import { describe, expect, it } from '@jest/globals'
-import { createDefaultCue, createDefaultFile } from './cueDefaults'
+import { createBlankCue, createDefaultFile } from './cueDefaults'
 import type { NetNodeCueDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 describe('cueDefaults rb3 platform', () => {
   it('creates an rb3 motion cue with no cueType and a set-position action', () => {
-    const cue = createDefaultCue('rb3', 'motion') as Extract<
-      NetNodeCueDefinition,
-      { kind: 'motion' }
-    >
+    const cue = createBlankCue('rb3', 'motion') as Extract<NetNodeCueDefinition, { kind: 'motion' }>
     expect(cue.kind).toBe('motion')
     expect(cue).not.toHaveProperty('cueType')
     expect(cue.nodes.actions[0].effectType).toBe('set-position')
@@ -23,7 +20,7 @@ describe('cueDefaults rb3 platform', () => {
     expect(file.cues[0].kind).toBe('motion')
   })
   it('creates a YARG-shaped lighting cue fixed to CueType.RB3', () => {
-    const cue = createDefaultCue('rb3', 'lighting') as Extract<
+    const cue = createBlankCue('rb3', 'lighting') as Extract<
       NetNodeCueDefinition,
       { kind: 'lighting' }
     >
@@ -42,5 +39,15 @@ describe('cueDefaults rb3 platform', () => {
     const cue = file.cues[0] as Extract<NetNodeCueDefinition, { kind: 'lighting' }>
     expect(cue.cueType).toBe('RB3')
     expect(cue.style).toBe('primary')
+  })
+})
+
+describe('cueDefaults audio platform', () => {
+  it('gives each new audio lighting cue its own cue type id', () => {
+    const first = createBlankCue('audio', 'lighting') as { cueTypeId: string }
+    const second = createBlankCue('audio', 'lighting') as { cueTypeId: string }
+
+    expect(first.cueTypeId).toMatch(/^custom-audio-cue-/)
+    expect(second.cueTypeId).not.toBe(first.cueTypeId)
   })
 })

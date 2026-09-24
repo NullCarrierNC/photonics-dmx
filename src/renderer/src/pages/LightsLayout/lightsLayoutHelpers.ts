@@ -148,6 +148,17 @@ export function createDefaultDmxRig(): DmxRig {
 }
 
 /**
+ * The name New Rig gives a rig: "Rig N", counting on from the rigs there are and skipping any
+ * number a rig already carries (compared without case), so a delete never leads to a repeat.
+ */
+export function newRigName(existingNames: readonly string[]): string {
+  const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()))
+  let n = existingNames.length + 1
+  while (taken.has(`rig ${n}`)) n += 1
+  return `Rig ${n}`
+}
+
+/**
  * Re-exported from the shared rig import/export core (its canonical home) so existing callers here
  * keep importing it from `lightsLayoutHelpers`.
  */

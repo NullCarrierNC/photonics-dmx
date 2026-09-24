@@ -27,6 +27,9 @@ export {
   validateCueGroupSelectionMode,
   validateStageKitPriority,
   validateCueType,
+  validateTestEffectPayload,
+  validateSimulationContextPayload,
+  validateInstrumentNotePayload,
   validateAudioCueType,
   validateCueRefPayload,
   validateDisabledCuesMap,
@@ -38,6 +41,7 @@ export {
   validateRigMirrorFlag,
   validateRigOutputs,
   validateHost,
+  validateSerialDevicePath,
   validateSenderEnablePayload,
   validateMasterOutputPayload,
 } from './validation/senderValidation'
@@ -46,7 +50,14 @@ export {
   validateLightingConfiguration,
   validateDmxRigPayload,
   validateDmxFixturesArray,
+  validateRigId,
 } from './validation/fixtureValidation'
+
+export {
+  validateNodeCueSavePayload,
+  validateEffectSavePayload,
+  validateCueTypesPayload,
+} from './validation/cueFileValidation'
 
 export { validateOpenablePath, validatePathUnderAllowedRoots } from './validation/pathValidation'
 
@@ -55,6 +66,7 @@ export {
   validateStoredArtNetConfig,
   validateStoredSacnConfig,
 } from './validation/prefsValidation'
+export { validatePreferencesSave } from './validation/prefsSaveValidation'
 
 export {
   validateAudioConfigPayload,

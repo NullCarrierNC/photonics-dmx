@@ -84,6 +84,11 @@ describe('LagCompensationSettings', () => {
     })
   })
 
+  it('says the master controls skip the delay and the lights then hold for it', () => {
+    renderWith()
+    expect(screen.getByText(/master dimmer and the strobe gate act at once/)).toBeInTheDocument()
+  })
+
   describe('what it shows', () => {
     it('is off when the preference has never been set', () => {
       renderWith()
@@ -218,6 +223,21 @@ describe('LagCompensationSettings', () => {
       expect(store.get(lightingPrefsAtom).videoLagCompensationMs).toBe(100)
       await waitFor(() => expect(slider(GAME).value).toBe('100'))
     })
+  })
+
+  it('writes the same delay again after a refusal', async () => {
+    savePrefs.mockResolvedValueOnce(refused('nope'))
+    renderWith({ videoLagCompensationMs: 100 })
+
+    fireEvent.change(slider(GAME), { target: { value: '210' } })
+    settle()
+    await waitFor(() => expect(slider(GAME).value).toBe('100'))
+
+    fireEvent.change(slider(GAME), { target: { value: '210' } })
+    settle()
+
+    await waitFor(() => expect(savePrefs).toHaveBeenCalledTimes(2))
+    expect(savePrefs).toHaveBeenLastCalledWith({ videoLagCompensationMs: 210 })
   })
 
   it('writes a held change when the card goes away', async () => {

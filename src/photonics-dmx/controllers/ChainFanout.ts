@@ -5,8 +5,15 @@ import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import type { SongEventCondition } from './sequencer/interfaces'
 import { RigChain } from './RigChain'
+import { StrobeStateManager } from './StrobeStateManager'
 import { ChainCueRuntime } from './ChainCueRuntime'
 import type { NetCueMode } from '../cues/types/nodeCueTypes'
+import type { MotionCueChangePayload } from '../../shared/ipc/common'
+
+/** What a domain reports while no motion cue runs on it. */
+function noMotionCue(): MotionCueChangePayload {
+  return { ref: null, source: 'cleared', manualFallback: false }
+}
 
 /**
  * Listener / processor surface that dispatches the same incoming event to every active rig
@@ -24,6 +31,8 @@ import type { NetCueMode } from '../cues/types/nodeCueTypes'
  */
 export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
   private chains: RigChain[] = []
+  /** The strobe slot every chain's cue handlers set and the publisher reads. */
+  public readonly strobeState = new StrobeStateManager()
 
   public setChains(chains: RigChain[]): void {
     this.chains = chains
@@ -31,6 +40,21 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
 
   public getChains(): RigChain[] {
     return this.chains
+  }
+
+  /** The chain whose handlers speak for a domain: the one marked primary, else the first. */
+  public getPrimaryChain(): RigChain | null {
+    return this.chains.find((c) => c.isPrimary) ?? this.chains[0] ?? null
+  }
+
+  /** The motion cue a net domain runs, as its handler on the primary chain reports it. */
+  public runningMotionCue(domain: NetCueMode): MotionCueChangePayload {
+    return this.getPrimaryChain()?.cueHandlers[domain]?.getRunningMotionCue() ?? noMotionCue()
+  }
+
+  /** The motion cue the audio input runs, as its handler on the primary chain reports it. */
+  public audioRunningMotionCue(): MotionCueChangePayload {
+    return this.getPrimaryChain()?.audioCueHandler?.getRunningMotionCue() ?? noMotionCue()
   }
 
   // ── Game domains (CueRuntime) ────────────────────────────────────────────────────────
@@ -144,8 +168,16 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
     strobeCueType: AudioCueType | null = null,
     gameModeActive = false,
   ): void {
+    // One token per call, so every chain applies the same motion decision.
+    const dispatchToken = {}
     for (const c of this.chains) {
-      c.audioCueHandler?.syncSlots(primaryCueType, secondaryCueType, strobeCueType, gameModeActive)
+      c.audioCueHandler?.syncSlots(
+        primaryCueType,
+        secondaryCueType,
+        strobeCueType,
+        gameModeActive,
+        dispatchToken,
+      )
     }
   }
 
@@ -158,6 +190,7 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
     enabledBandCount: number,
     gameModeActive: boolean,
   ): Promise<void> {
+    const dispatchToken = {}
     await Promise.allSettled(
       this.chains.map((c) =>
         c.audioCueHandler?.handleAudioData(
@@ -168,6 +201,7 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
           strobeCueType,
           enabledBandCount,
           gameModeActive,
+          dispatchToken,
         ),
       ),
     )
@@ -235,9 +269,8 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
   }
 
   /**
-   * Blackout every chain's sequencer sequentially so per-chain fades start in chain order
-   * and don't race each other. Errors on any chain don't block the others (mirrors the
-   * `Promise.allSettled` pattern used elsewhere in the fanout).
+   * Blackout every chain's sequencer at once, so every rig fades together. Resolves when every
+   * fade has settled, and an error on one chain does not block the others.
    */
   public async blackout(durationMs: number): Promise<void> {
     await Promise.allSettled(this.chains.map((c) => c.sequencer.blackout(durationMs)))

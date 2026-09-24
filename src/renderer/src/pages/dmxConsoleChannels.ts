@@ -120,6 +120,35 @@ export function getEffectiveChannelEntries(
   )
 }
 
+/**
+ * The light driving `channel` through a channel other than the one being moved, or null when
+ * nothing else is on it. `overrides` holds the console's session remaps by light id, so a channel
+ * already moved counts where it is now.
+ */
+export function lightOnChannel(
+  config: LightingConfiguration,
+  templates: DmxFixture[],
+  overrides: Record<string, Record<string, number>>,
+  channel: number,
+  moving: { lightId: string; channelName: string },
+): DmxLight | null {
+  const allLights = [...config.frontLights, ...config.backLights, ...config.strobeLights]
+  for (const light of allLights as DmxLight[]) {
+    const lightOverrides = light.id ? overrides[light.id] : undefined
+    const onChannel = getEffectiveChannelEntries(light, templates, lightOverrides).some(
+      ([name, number]) =>
+        number === channel && !(light.id === moving.lightId && name === moving.channelName),
+    )
+    if (
+      onChannel ||
+      getTemplateAlignedExtraChannels(light, templates).some((extra) => extra.channel === channel)
+    ) {
+      return light
+    }
+  }
+  return null
+}
+
 export function isLightModified(
   light: DmxLight,
   templates: DmxFixture[],

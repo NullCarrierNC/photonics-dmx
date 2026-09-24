@@ -2,6 +2,7 @@ import React from 'react'
 import type { ExpressionLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { compileExpression } from '../../../../../../../photonics-dmx/cues/node/runtime/expressionEvaluator'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface ExpressionLogicEditorProps extends LogicEditorCommonProps {
   node: ExpressionLogicNode
@@ -49,20 +50,14 @@ const ExpressionLogicEditor: React.FC<ExpressionLogicEditorProps> = ({
           Not declared in scope (reads as 0): {unknownVars.join(', ')}
         </p>
       )}
-      <label className="flex flex-col font-medium">
-        Assign To
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo}
-          onChange={(event) => updateNode({ assignTo: event.target.value })}>
-          <option value="">-- select variable --</option>
-          {availableVariables.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.type}, {v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Assign To"
+        value={node.assignTo}
+        onChange={(name) => updateNode({ assignTo: name })}
+        variables={availableVariables}
+        placeholder="-- select variable --"
+        showType
+      />
     </div>
   )
 }

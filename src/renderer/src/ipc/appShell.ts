@@ -1,13 +1,15 @@
 /**
  * App shell calls: lifecycle, windows, app info, system status and the OS shell.
  */
-import { CONFIG, LIFECYCLE, LIGHT, SHELL, WINDOW } from '../../../shared/ipcChannels'
+import { CONFIG, LIFECYCLE, LIGHT, RENDERER_SEND, SHELL, WINDOW } from '../../../shared/ipcChannels'
+import { orThrow } from './ipcResult'
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-export const getLifecyclePhase = () => window.api.invoke(LIFECYCLE.GET_PHASE, undefined)
+export const getLifecyclePhase = () =>
+  window.api.invoke(LIFECYCLE.GET_PHASE, undefined).then(orThrow)
 
 export const retryControllerInit = () => window.api.invoke(LIFECYCLE.RETRY_INIT, undefined)
 
@@ -18,6 +20,10 @@ export const retryControllerInit = () => window.api.invoke(LIFECYCLE.RETRY_INIT,
 export const openCueEditorWindow = () => window.api.invoke(WINDOW.OPEN_CUE_EDITOR, undefined)
 
 export const openAudioPreviewWindow = () => window.api.invoke(WINDOW.OPEN_AUDIO_PREVIEW, undefined)
+
+/** Tells main whether this page holds unsaved changes, so a Quit asks about it first. */
+export const reportUnsavedChanges = (unsaved: boolean) =>
+  window.api.sendToMain(RENDERER_SEND.UNSAVED_CHANGES, unsaved)
 
 // ---------------------------------------------------------------------------
 // App information

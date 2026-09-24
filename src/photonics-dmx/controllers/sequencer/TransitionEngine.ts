@@ -2,6 +2,7 @@ import { applyWaitUntil, delayWaitMs } from './waitUntil'
 import { performance } from 'perf_hooks'
 import { EffectTransition, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
+import { isPositionOnly } from './lightBlending'
 import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
 import { IEffectManager } from './interfaces'
 import { createLogger } from '../../../shared/logger'
@@ -138,11 +139,11 @@ export class TransitionEngine implements ITransitionEngine {
       }
       const hasNewEffect = this.layerManager.getActiveEffect(layer, lightId) !== undefined
       const hasQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId) !== undefined
-      if (!hasNewEffect && !hasQueuedEffect) {
+      // A finished move leaves its aim on the layer, so the head holds it and the next move eases
+      // from it. Stopping motion clears the aim through the pan/tilt clear.
+      const holdsAim = isPositionOnly(this.lightTransitionController.getLightState(lightId, layer))
+      if (!hasNewEffect && !hasQueuedEffect && !holdsAim) {
         this.lightTransitionController.removeLightLayer(lightId, layer)
-        // Clear only THIS light's stored state on the layer — other lights on the same layer may
-        // still be running and must keep their state.
-        this.layerManager.clearLightLayerState(layer, lightId)
       }
     }
     this._pendingLayerRemovals = stillDeferred
@@ -374,11 +375,6 @@ export class TransitionEngine implements ITransitionEngine {
       startState = activeEffect.lastEndState
     }
 
-    // If no state in the effect, check the layer manager for stored state
-    if (!startState) {
-      startState = this.layerManager.getLightState(transition.layer, light.id)
-    }
-
     // If still no state, check the current light state in the controller
     if (!startState) {
       startState = this.lightTransitionController.getLightState(light.id, transition.layer)
@@ -480,24 +476,5 @@ export class TransitionEngine implements ITransitionEngine {
       activeEffect.currentTransitionIndex += 1
       activeEffect.state = 'idle'
     }
-  }
-
-  /**
-   * Gets the stored final state for a light on a specific layer
-   * @param lightId The ID of the light
-   * @param layer The layer number
-   * @returns The final state of the light on that layer, or undefined if not found
-   */
-  public getFinalState(lightId: string, layer: number): RGBIO | undefined {
-    return this.layerManager.getLightState(layer, lightId)
-  }
-
-  /**
-   * Clears stored final states for a layer
-   * @param layer The layer to clear final states for
-   */
-  public clearFinalStates(layer: number): void {
-    // Delegate to layer manager
-    this.layerManager.clearLayerStates(layer)
   }
 }

@@ -12,6 +12,7 @@ import {
 import { MotionCueAccess } from './MotionCueAccess'
 import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import {
+  releaseGroupFrom,
   releaseSequencersFor,
   type MotionCueDetail,
   type MotionGroupInfo,
@@ -111,12 +112,30 @@ export class CueRegistry {
    * @param groupId The group identifier to remove
    */
   public unregisterGroup(groupId: string): boolean {
-    if (!this.catalog.unregister(groupId)) {
+    const group = this.catalog.getGroup(groupId)
+    if (!group || !this.catalog.unregister(groupId)) {
       return false
     }
+    releaseGroupFrom(group)
     this.motion.onUnregisterGroup(groupId)
     this.selection.clearGroupConsistencyTracking(groupId)
     return true
+  }
+
+  /**
+   * Swap a rebuilt group in for the registered group with the same id. The group keeps its place,
+   * its membership, its motion state and the selections pinned to it, so a held cue stays on this
+   * group and runs the rebuilt instance on its next resolution. An id not yet registered is
+   * registered.
+   */
+  public replaceGroup(group: ICueGroup): void {
+    const previous = this.catalog.getGroup(group.id)
+    if (!previous || !this.catalog.replace(group)) {
+      this.registerGroup(group)
+      return
+    }
+    releaseGroupFrom(previous)
+    this.motion.onRegisterGroup(group)
   }
 
   /**
@@ -182,7 +201,8 @@ export class CueRegistry {
   }
 
   /**
-   * Set the cue consistency window to prevent rapid randomization changes.
+   * Set how long a cue called again after another cue reuses the group it last got. A held cue
+   * keeps its group whatever the window.
    * @param windowMs The consistency window in milliseconds (default: 2000ms)
    */
   public setCueConsistencyWindow(windowMs: number): void {

@@ -10,6 +10,16 @@ export function delayWaitMs(transition: EffectTransition): number {
 }
 
 /**
+ * Whether a light's first transition waits before it starts. A zero-length delay starts in the
+ * frame it is submitted, so it does not count.
+ */
+export function firstTransitionWaits(transitions: EffectTransition[], lightId: string): boolean {
+  const first = transitions.find((t) => t.lights.some((l) => l.id === lightId))
+  if (!first || first.waitForCondition === 'none') return false
+  return !(first.waitForCondition === 'delay' && first.waitForTime <= 0)
+}
+
+/**
  * Applies a transition's `waitUntil` clause to an effect that has just reached its end colour.
  *
  * The scheduler and both transition-engine paths run this, so a zero count means the same thing

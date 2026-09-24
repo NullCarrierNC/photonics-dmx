@@ -1,6 +1,5 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { CueGroupEnableList } from './CueGroupEnableList'
 

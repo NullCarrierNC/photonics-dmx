@@ -122,7 +122,6 @@ The sequencing system contains several other components, though these are mainly
 - `lightBlending.ts`: Easing, interpolation, and the layer blend maths.
 - `transitionStep.ts`: Samples a single transition at a single instant.
 - `transitionHealth.ts`: Clamps light state into range and reaps orphaned transitions.
-- `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled).
 
 #### Centralized Timing
 
@@ -398,35 +397,3 @@ When creating effects the lights can be further divided by criteria like `even`,
 This allows the effects to be agnostic to the user's specific configuration. E.g. it doesn't matter if they
 have 6 front lights and 3 back lights while someone else has 4 front and no back lights. The effects never try
 to target any one specific light, so they run smoothly on all configurations.
-
-## Debug Tools
-
-Photonics includes debugging tools to visualize the effects active on each layer.
-
-### Using the Debug Monitor
-
-The `DebugMonitor` provides real-time debugging capabilities via the Sequencer:
-
-```typescript
-// Enable real-time debug monitoring with default 1000ms refresh rate
-sequencer.enableDebug(true)
-
-// Enable with custom refresh rate in milliseconds
-sequencer.enableDebug(true, 2000)
-
-// Print detailed layer state information
-sequencer.debugLightLayers()
-
-// Disable when finished
-sequencer.enableDebug(false)
-```
-
-### Debug Output
-
-When real-time monitoring is enabled, you'll see a formatted table in the console showing:
-
-- Each light as a column
-- Each active layer as a row
-- Current RGB and intensity values for each light/layer combination
-- Effect names associated with each layer
-- The final merged state of all layers

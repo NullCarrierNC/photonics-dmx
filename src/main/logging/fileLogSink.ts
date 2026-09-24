@@ -37,6 +37,13 @@ const DEFAULT_MAX_BYTES_PER_DAY = 64 * 1024 * 1024
  */
 const ERROR_RESERVE_BYTES = 4 * 1024 * 1024
 
+/**
+ * How long after a write stream error the sink waits before it opens a fresh stream for the day.
+ * Lines logged meanwhile are dropped, so a disk that stays full costs one console error per wait
+ * rather than one per line.
+ */
+const REOPEN_AFTER_ERROR_MS = 5000
+
 function localDateKeyFromMs(ms: number): string {
   const d = new Date(ms)
   const y = d.getFullYear()
@@ -145,14 +152,21 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   let bytesThisDay = 0
   let capReported = false
   let closed = false
+  /** Set after a stream error: no stream opens before this time. */
+  let reopenAtMs: number | null = null
   // Streams that have been rotated away (or are the final stream) and are flushing to disk.
   // close() awaits these so a file is never read back before its buffered writes have landed.
   const flushing: Promise<void>[] = []
 
-  // Ends a stream and resolves once it has finished flushing its buffer to disk.
+  // Ends a stream and resolves once it has finished flushing its buffer to disk, or once it has
+  // failed and been destroyed, which leaves nothing to flush.
   function endStream(s: fs.WriteStream): Promise<void> {
+    if (s.destroyed) {
+      return Promise.resolve()
+    }
     return new Promise((resolve) => {
       s.once('finish', () => resolve())
+      s.once('close', () => resolve())
       s.end()
     })
   }
@@ -164,6 +178,12 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     s.on('error', (err) => {
       // eslint-disable-next-line no-console
       console.error(`[fileLogSink] Write stream error for ${filePath}:`, err)
+      // A failed stream destroys itself, so the next line after the wait opens a fresh one.
+      if (currentStream === s) {
+        currentStream = null
+        currentDateKey = null
+        reopenAtMs = clock() + REOPEN_AFTER_ERROR_MS
+      }
     })
     currentStream = s
     currentDateKey = dateKey
@@ -180,6 +200,12 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     // Ahead of the rotation branch, so a closed sink opens nothing.
     if (closed) {
       return
+    }
+    if (reopenAtMs !== null) {
+      if (clock() < reopenAtMs) {
+        return
+      }
+      reopenAtMs = null
     }
     const key = localDateKeyFromMs(clock())
     if (key !== currentDateKey) {

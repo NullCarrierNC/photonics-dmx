@@ -6,6 +6,10 @@ import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistrie
 import { applyCueConsistencyWindow } from '../controllers/cueDomainBindings'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
+import {
+  CUE_CONSISTENCY_WINDOW_MS_MAX,
+  CUE_CONSISTENCY_WINDOW_MS_MIN,
+} from '../../shared/cueConsistencyWindow'
 import { validateCueGroupSelectionMode, validateNumberInRange } from './inputValidation'
 import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import {
@@ -144,7 +148,12 @@ export function setupCueSelectionPrefsHandlers(
   controllerManager: ControllerManager,
 ): void {
   handleInvoke(ipcMain, LIGHT.SET_CUE_CONSISTENCY_WINDOW, log, async (_, windowMs: unknown) => {
-    const validated = validateNumberInRange(windowMs, 0, 600000, 'cueConsistencyWindow')
+    const validated = validateNumberInRange(
+      windowMs,
+      CUE_CONSISTENCY_WINDOW_MS_MIN,
+      CUE_CONSISTENCY_WINDOW_MS_MAX,
+      'cueConsistencyWindow',
+    )
     if (!validated.ok) {
       return ipcError(new Error(validated.error))
     }

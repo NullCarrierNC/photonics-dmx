@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 2,
+  "cueVersion": 3,
   "mode": "audio",
   "group": {
     "id": "audio-motion-default",
@@ -2443,7 +2443,7 @@
           {
             "id": "cbh-event-beat",
             "type": "event",
-            "eventType": "cue-called",
+            "eventType": "beat",
             "triggerMode": "edge",
             "threshold": 0.5,
             "cooldownMs": 100

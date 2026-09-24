@@ -6,15 +6,18 @@
  * and leaves a process the user cannot see or quit. The file log sink is the first thing in there
  * and it creates its directory up front, which is the throw most likely to happen in the field.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { LogEntry } from '../../shared/logger'
 
 const applicationInit = jest.fn<() => Promise<void>>()
 const applicationShutdown = jest.fn<() => Promise<void>>()
+const closeWindowsForQuit = jest.fn<() => Promise<boolean>>()
 const handleSecondInstance = jest.fn()
+const handleActivate = jest.fn()
 const applicationCtor = jest.fn()
 let mockIsPackaged = false
 let mockHasInstanceLock = true
+let mockSwitches: string[] = []
 const createFileLogSink = jest.fn()
 const installCsp = jest.fn()
 const installPermissionHandlers = jest.fn()
@@ -42,10 +45,13 @@ jest.mock('electron', () => ({
     get isPackaged() {
       return mockIsPackaged
     },
-    commandLine: { appendSwitch: jest.fn() },
+    commandLine: {
+      appendSwitch: jest.fn(),
+      hasSwitch: (name: string) => mockSwitches.includes(name),
+    },
     name: '',
   },
-  BrowserWindow: { getAllWindows: jest.fn(() => []) },
+  BrowserWindow: { getAllWindows: jest.fn(() => [{}]) },
   dialog: { showErrorBox },
 }))
 
@@ -59,6 +65,8 @@ jest.mock('../rendererSessionSecurity', () => ({
   installDefaultSessionPermissionHandlers: installPermissionHandlers,
 }))
 
+jest.mock('../rendererScheme', () => ({ serveRendererFromScheme: jest.fn() }))
+
 jest.mock('../logging/fileLogSink', () => ({
   createFileLogSink: (...args: unknown[]) => createFileLogSink(...args),
 }))
@@ -70,10 +78,11 @@ jest.mock('../application', () => ({
     }
     init = applicationInit
     shutdown = applicationShutdown
+    closeWindowsForQuit = closeWindowsForQuit
     flushLogs: (() => Promise<void>) | null = null
     handleSecondInstance = handleSecondInstance
     handleAllWindowsClosed = jest.fn()
-    handleActivate = jest.fn()
+    handleActivate = handleActivate
     getControllerManager = jest.fn(() => null)
   },
 }))
@@ -97,15 +106,33 @@ async function startUp(): Promise<void> {
   await Promise.resolve()
 }
 
+/** The process events the entry point listens on at module scope, once per load. */
+const PROCESS_EVENTS: string[] = ['uncaughtException', 'unhandledRejection', 'SIGINT', 'SIGTERM']
+
+type ProcessListener = (...args: unknown[]) => void
+
+/** The process as a plain emitter, which takes any event name. */
+const processEvents: NodeJS.EventEmitter = process
+
+function processListeners(event: string): ProcessListener[] {
+  return processEvents.listeners(event) as ProcessListener[]
+}
+
 describe('main startup', () => {
+  let listenersBefore = new Set<ProcessListener>()
+
   beforeEach(() => {
+    listenersBefore = new Set(PROCESS_EVENTS.flatMap(processListeners))
     jest.resetModules()
     readyResolve = undefined
     applicationInit.mockReset()
     applicationInit.mockResolvedValue(undefined)
     applicationShutdown.mockReset()
     applicationShutdown.mockResolvedValue(undefined)
+    closeWindowsForQuit.mockReset()
+    closeWindowsForQuit.mockResolvedValue(true)
     handleSecondInstance.mockReset()
+    handleActivate.mockReset()
     mockIsPackaged = false
     applicationCtor.mockReset()
     createFileLogSink.mockReset()
@@ -116,6 +143,18 @@ describe('main startup', () => {
     appExit.mockReset()
     appOn.mockReset()
     mockHasInstanceLock = true
+    mockSwitches = []
+  })
+
+  // Each test loads a fresh copy of the entry point, which adds its own process listeners.
+  afterEach(() => {
+    for (const event of PROCESS_EVENTS) {
+      for (const listener of processListeners(event)) {
+        if (!listenersBefore.has(listener)) {
+          processEvents.removeListener(event, listener)
+        }
+      }
+    }
   })
 
   it('builds the application once Electron is ready', async () => {
@@ -125,6 +164,20 @@ describe('main startup', () => {
     expect(installPermissionHandlers).toHaveBeenCalled()
     expect(applicationCtor).toHaveBeenCalledTimes(1)
     expect(applicationInit).toHaveBeenCalledTimes(1)
+  })
+
+  it('watches window shortcuts before the application builds its first window', async () => {
+    const order: string[] = []
+    appOn.mockImplementation((event: unknown) => {
+      if (event === 'browser-window-created') order.push('watch')
+    })
+    applicationInit.mockImplementation(async () => {
+      order.push('init')
+    })
+
+    await startUp()
+
+    expect(order).toEqual(['watch', 'init'])
   })
 
   it('carries on to the window when the log directory cannot be created', async () => {
@@ -150,6 +203,22 @@ describe('main startup', () => {
     expect(appExit).toHaveBeenCalledWith(1)
   })
 
+  it('stops a packaged launch with --remote-debugging-port before building anything', async () => {
+    mockIsPackaged = true
+    mockSwitches = ['remote-debugging-port']
+    const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    try {
+      await startUp()
+
+      expect(exit).toHaveBeenCalledWith(1)
+      expect(exit.mock.invocationCallOrder[0]).toBeLessThan(
+        whenReady.mock.invocationCallOrder[0] ?? Infinity,
+      )
+    } finally {
+      exit.mockRestore()
+    }
+  })
+
   it('quits a second launch rather than running two copies', async () => {
     mockHasInstanceLock = false
 
@@ -166,6 +235,44 @@ describe('main startup', () => {
     ;(secondInstance as () => void)()
 
     expect(handleSecondInstance).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands every Dock activation to the application, with windows open or not', async () => {
+    await startUp()
+
+    const activate = appOn.mock.calls.find((c) => c[0] === 'activate')?.[1]
+    ;(activate as () => void)()
+
+    expect(handleActivate).toHaveBeenCalledTimes(1)
+  })
+
+  /** Sends the app the Quit a menu, Cmd+Q or the Dock sends, and lets it run to its end. */
+  async function quit(): Promise<void> {
+    const beforeQuit = appOn.mock.calls.find((c) => c[0] === 'before-quit')?.[1]
+    ;(beforeQuit as (event: { preventDefault: () => void }) => void)({ preventDefault: jest.fn() })
+    for (let i = 0; i < 5; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+  }
+
+  it('shuts down on a Quit once every window has closed', async () => {
+    await startUp()
+
+    await quit()
+
+    expect(closeWindowsForQuit).toHaveBeenCalledTimes(1)
+    expect(applicationShutdown).toHaveBeenCalledTimes(1)
+    expect(appExit).toHaveBeenCalledWith(0)
+  })
+
+  it('keeps the app and its controllers running when a window stays open on Quit', async () => {
+    closeWindowsForQuit.mockResolvedValue(false)
+    await startUp()
+
+    await quit()
+
+    expect(applicationShutdown).not.toHaveBeenCalled()
+    expect(appExit).not.toHaveBeenCalled()
   })
 
   it('keeps the configuration account recording when a packaged build raises the floor', async () => {
@@ -188,36 +295,56 @@ describe('main startup', () => {
     expect(entries.map((e) => e.scope)).toEqual(['ConfigFile', 'Main'])
   })
 
-  it('flushes the log before a forced exit on a signal', async () => {
-    const order: string[] = []
-    const closeFileLog = jest.fn(async () => {
-      order.push('flush')
-    })
-    createFileLogSink.mockReturnValue({ sink: jest.fn(), close: closeFileLog })
-    applicationShutdown.mockImplementation(() => new Promise<void>(() => {}))
+  it('keeps warnings when a packaged build raises the floor', async () => {
+    mockIsPackaged = true
 
-    const before = new Set(process.listeners('SIGINT'))
+    const entries: LogEntry[] = []
     await startUp()
-    const handler = process.listeners('SIGINT').find((l) => !before.has(l))
-
-    const exit = jest.spyOn(process, 'exit').mockImplementation(((): never => {
-      order.push('exit')
-      return undefined as never
-    }) as never)
     const logger = await loadedLogger()
-    logger.setLogSink(() => {})
-    jest.useFakeTimers()
+    logger.setLogSink((entry) => entries.push(entry))
     try {
-      void handler?.('SIGINT')
-      await jest.advanceTimersByTimeAsync(2000)
-
-      expect(order).toEqual(['flush', 'exit'])
-      expect(exit).toHaveBeenCalledWith(1)
+      logger.createLogger('LightTransitionController').warn('a sender fell behind')
+      logger.createLogger('LightTransitionController').info('frame chatter')
     } finally {
-      jest.clearAllTimers()
-      jest.useRealTimers()
-      exit.mockRestore()
       logger.resetLogConfiguration()
     }
+
+    expect(entries.map((e) => `${e.level} ${e.message}`)).toEqual(['warn a sender fell behind'])
   })
+
+  it.each(['SIGINT', 'SIGTERM'] as const)(
+    'flushes the log before a forced exit on %s',
+    async (signal) => {
+      const order: string[] = []
+      const closeFileLog = jest.fn(async () => {
+        order.push('flush')
+      })
+      createFileLogSink.mockReturnValue({ sink: jest.fn(), close: closeFileLog })
+      applicationShutdown.mockImplementation(() => new Promise<void>(() => {}))
+
+      const before = new Set(process.listeners(signal))
+      await startUp()
+      const handler = process.listeners(signal).find((l) => !before.has(l))
+
+      const exit = jest.spyOn(process, 'exit').mockImplementation(((): never => {
+        order.push('exit')
+        return undefined as never
+      }) as never)
+      const logger = await loadedLogger()
+      logger.setLogSink(() => {})
+      jest.useFakeTimers()
+      try {
+        void handler?.(signal)
+        await jest.advanceTimersByTimeAsync(2000)
+
+        expect(order).toEqual(['flush', 'exit'])
+        expect(exit).toHaveBeenCalledWith(1)
+      } finally {
+        jest.clearAllTimers()
+        jest.useRealTimers()
+        exit.mockRestore()
+        logger.resetLogConfiguration()
+      }
+    },
+  )
 })

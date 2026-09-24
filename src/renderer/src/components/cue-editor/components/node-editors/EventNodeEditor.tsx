@@ -1,6 +1,8 @@
 import React from 'react'
+import { AUDIO_EVENT_EXECUTION_POLICIES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   NetEventNode,
+  AudioEventExecutionPolicy,
   AudioEventNode,
   AudioEventType,
   AudioEventNodeUnion,
@@ -14,7 +16,12 @@ import {
   AUDIO_EVENT_OPTIONS,
 } from '../../lib/options'
 import AudioTriggerEditor, { AUDIO_TRIGGER_DEFAULTS } from './AudioTriggerEditor'
-import { AUDIO_EVENT_PROPERTY_DOCS, AUDIO_EVENT_TYPE_DOCS, DOC_BLOCK_CLASS } from './eventNodeDocs'
+import {
+  AUDIO_EVENT_EXECUTION_POLICY_DOCS,
+  AUDIO_EVENT_PROPERTY_DOCS,
+  AUDIO_EVENT_TYPE_DOCS,
+  DOC_BLOCK_CLASS,
+} from './eventNodeDocs'
 
 interface EventNodeEditorProps {
   node: NetEventNode | AudioEventNodeUnion
@@ -36,6 +43,13 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
       : (node as NetEventNode).eventType
   const isTrigger = activeMode === 'audio' && eventType === 'audio-trigger'
   const trigger = isTrigger ? (node as AudioTriggerNode) : null
+  // Cue-called runs the graph on every audio frame and an edge on every trigger, so both take a
+  // policy for a graph still running from the last one.
+  const audioEvent = node as AudioEventNode
+  const runsGraph =
+    eventType === 'cue-called' ||
+    (eventType !== 'cue-started' && audioEvent.triggerMode !== 'level')
+  const executionPolicy = audioEvent.executionPolicy ?? 'continuous'
 
   return (
     <div className="space-y-2 text-xs">
@@ -199,6 +213,29 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               </span>
             </div>
           </label>
+          {runsGraph && (
+            <label className="flex flex-col font-medium">
+              While running
+              <select
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={executionPolicy}
+                onChange={(event) =>
+                  updateAudioNode({
+                    executionPolicy: event.target.value as AudioEventExecutionPolicy,
+                  })
+                }>
+                {AUDIO_EVENT_EXECUTION_POLICIES.map((policy) => (
+                  <option key={policy} value={policy}>
+                    {AUDIO_EVENT_EXECUTION_POLICY_DOCS[policy].label}
+                  </option>
+                ))}
+              </select>
+              <div className={DOC_BLOCK_CLASS}>
+                What happens when this event fires again before the graph it started has finished.{' '}
+                {AUDIO_EVENT_EXECUTION_POLICY_DOCS[executionPolicy].description}
+              </div>
+            </label>
+          )}
         </>
       )}
     </div>

@@ -2,7 +2,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { validateEffectFile } from '../schema/validation'
 import { EffectCompiler } from '../compiler/EffectCompiler'
-import { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import { EffectFile, EffectMode } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import {
   BaseNodeFileLoader,
@@ -87,8 +87,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
 
     this.assertNoConflictingEffectGroupIdForPath(filePath, mode, content.group.id)
 
-    await fs.mkdir(path.dirname(filePath), { recursive: true })
-    await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8')
+    await this.writeSavedFile(filePath, JSON.stringify(content, null, 2))
     await this.loadFile(mode, filePath)
 
     this.emit('changed', this.getSummary())
@@ -109,33 +108,29 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   }
 
   /**
-   * Load an effect file by reference (used at runtime to load referenced effects)
+   * Every valid effect file of a mode by group id, read from disk in one pass. Invalid files are
+   * skipped, and the first file in name order keeps a group id two files share.
    */
-  public async loadEffectByReference(
-    ref: EffectReference,
-    mode: EffectMode,
-  ): Promise<EffectFile | null> {
+  public async readEffectFilesByGroupId(mode: EffectMode): Promise<Map<string, EffectFile>> {
     const dir = this.dirs[mode]
-    const files = await fs.readdir(dir).catch(() => [])
+    const files = (await fs.readdir(dir).catch(() => [] as string[])).sort()
+    const byGroupId = new Map<string, EffectFile>()
 
     for (const file of files) {
       if (!isJsonFile(file)) {
         continue
       }
-
-      const filePath = path.join(dir, file)
       try {
-        const effectFile = await this.readFile(filePath)
-        if (effectFile.group.id === ref.effectFileId) {
-          return effectFile
+        const effectFile = await this.readFile(path.join(dir, file))
+        if (!byGroupId.has(effectFile.group.id)) {
+          byGroupId.set(effectFile.group.id, effectFile)
         }
       } catch {
         // Skip invalid files
-        continue
       }
     }
 
-    return null
+    return byGroupId
   }
 
   protected async loadFile(mode: EffectMode, filePath: string): Promise<EffectFileSummary | null> {
@@ -241,4 +236,29 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       'Effect file path must be under the YARG or audio effect directories.',
     )
   }
+}
+
+/**
+ * The group ids of the effect files that differ between two summaries: added, removed, loaded
+ * again, or moved to another group id (both ids count).
+ */
+export function changedEffectFileIds(
+  previous: EffectListSummary,
+  next: EffectListSummary,
+): Set<string> {
+  const changed = new Set<string>()
+  for (const mode of Object.keys(next) as EffectMode[]) {
+    const before = new Map(previous[mode].map((summary) => [summary.path, summary]))
+    const after = new Map(next[mode].map((summary) => [summary.path, summary]))
+    for (const filePath of new Set([...before.keys(), ...after.keys()])) {
+      const was = before.get(filePath)
+      const now = after.get(filePath)
+      if (was === now) {
+        continue
+      }
+      if (was) changed.add(was.groupId)
+      if (now) changed.add(now.groupId)
+    }
+  }
+  return changed
 }

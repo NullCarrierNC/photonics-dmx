@@ -44,10 +44,12 @@ const mockControllerManager = withCollaboratorGetters({
   })),
   ensureChainsHaveHandlersForSimulation: jest.fn(),
   getIsInitialized: jest.fn().mockReturnValue(true),
+  getLifecyclePhase: jest.fn().mockReturnValue('running'),
   getDmxPublisher: jest.fn().mockReturnValue(null),
   getVenueFrameProcessor: jest.fn(() => ({ getVenuePostProcessing: () => 'Default' })),
-  getIsYargEnabled: jest.fn().mockReturnValue(true),
+  getIsYargEnabled: jest.fn().mockReturnValue(false),
   getIsRb3Enabled: jest.fn().mockReturnValue(false),
+  getIsAudioEnabled: jest.fn().mockReturnValue(false),
   init: jest.fn(),
   startTestEffect: jest.fn(),
   stopTestEffect: jest.fn(),
@@ -113,6 +115,8 @@ describe('IPC Light Handlers for Cue Registry', () => {
     jest.clearAllMocks()
     mockControllerManager.getLightingController = jest.fn().mockReturnValue({ onBeat: jest.fn() })
     mockControllerManager.getCueHandler = jest.fn().mockReturnValue({ handleCue: jest.fn() })
+    mockControllerManager.getLifecyclePhase = jest.fn().mockReturnValue('running')
+    mockControllerManager.init = jest.fn()
 
     // Capture the handlers when they're registered
     mockIpcMain.handle.mockImplementation((channel: string, handler: any) => {
@@ -206,6 +210,42 @@ describe('IPC Light Handlers for Cue Registry', () => {
 
       expect(groupInfo).toHaveLength(2)
       expect(groupInfo.map((g: { id: string }) => g.id)).not.toContain('motion-only')
+    })
+
+    it('answers once the cold init has filled the registry', async () => {
+      let finishInit = (): void => undefined
+      mockControllerManager.getLifecyclePhase = jest.fn().mockReturnValue('initializing')
+      mockControllerManager.init = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishInit = resolve
+          }),
+      )
+      registry.reset()
+
+      const answer = getCueGroupsHandler({})
+      registry.registerGroup(customGroup)
+      finishInit()
+
+      expect((await answer).map((g: { id: string }) => g.id)).toEqual(['custom'])
+    })
+
+    it('answers with what the registry holds when the cold init fails', async () => {
+      mockControllerManager.getLifecyclePhase = jest.fn().mockReturnValue('initializing')
+      mockControllerManager.init = jest.fn(() => Promise.reject(new Error('no appData')))
+
+      const groupInfo = await getCueGroupsHandler({})
+
+      expect(groupInfo).toHaveLength(2)
+    })
+
+    it('leaves a failed init for the user to retry', async () => {
+      mockControllerManager.getLifecyclePhase = jest.fn().mockReturnValue('failed')
+      mockControllerManager.init = jest.fn()
+
+      await getCueGroupsHandler({})
+
+      expect(mockControllerManager.init).not.toHaveBeenCalled()
     })
   })
 

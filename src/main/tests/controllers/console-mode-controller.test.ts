@@ -15,7 +15,6 @@ function baseDeps(
     pauseYarg: () => Promise.resolve(),
     pauseRb3: () => Promise.resolve(),
     pauseAudio: () => Promise.resolve(),
-    refreshActiveRigs: () => {},
     restartControllers: () => Promise.resolve(),
     ...overrides,
   }
@@ -179,5 +178,71 @@ describe('ConsoleModeController', () => {
     c.sendConsoleDmx({ 1: 255 })
 
     expect(setManualBuffer).toHaveBeenCalledWith({ 1: 255 })
+  })
+
+  it('saves nothing when the fixture template is missing', async () => {
+    const saveDmxRig = jest.fn()
+    const light = {
+      id: 'mh-1',
+      fixtureId: 'fixture-1',
+      fixture: 'rgb/mh',
+      config: {},
+    }
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: () =>
+          ({
+            getDmxRig: () => ({
+              id: 'rig-1',
+              config: { frontLights: [light], backLights: [], strobeLights: [] },
+            }),
+            getUserLights: () => [],
+            saveDmxRig,
+            updateUserLight: jest.fn(),
+          }) as never,
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig({
+      rigId: 'rig-1',
+      lightId: 'mh-1',
+      fixtureId: 'fixture-1',
+      config: { panHome: 50 },
+    })
+
+    expect(result).toEqual({ success: false, error: 'Fixture template not found in My Lights' })
+    expect(saveDmxRig).not.toHaveBeenCalled()
+  })
+
+  it('answers a saved fixture edit as saved when the restart after it fails', async () => {
+    const light = { id: 'mh-1', fixtureId: 'fixture-1', fixture: 'rgb/mh', config: {} }
+    const saveDmxRig = jest.fn(async () => {})
+    const updateUserLight = jest.fn(async () => {})
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: () =>
+          ({
+            getDmxRig: () => ({
+              id: 'rig-1',
+              config: { frontLights: [light], backLights: [], strobeLights: [] },
+            }),
+            getUserLights: () => [{ id: 'fixture-1', fixture: 'rgb/mh', config: {} }],
+            saveDmxRig,
+            updateUserLight,
+          }) as never,
+        restartControllers: () => Promise.reject(new Error('rig chain would not dispose')),
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig({
+      rigId: 'rig-1',
+      lightId: 'mh-1',
+      fixtureId: 'fixture-1',
+      config: { panHome: 50 },
+    })
+
+    expect(result).toEqual({ success: true, restartError: 'rig chain would not dispose' })
+    expect(saveDmxRig).toHaveBeenCalledTimes(1)
+    expect(updateUserLight).toHaveBeenCalledTimes(1)
   })
 })

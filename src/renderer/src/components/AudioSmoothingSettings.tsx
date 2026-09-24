@@ -1,5 +1,8 @@
 import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioSmoothingSettings: React.FC = () => {
   const audio = useAudioConfigFields({ smoothing: { enabled: true, alpha: 0.7 } })
@@ -18,6 +21,7 @@ const AudioSmoothingSettings: React.FC = () => {
   const handleAlphaSave = (): void => {
     void audio.commit()
   }
+  const alphaRelease = useCommitOnRelease(handleAlphaSave)
 
   return (
     <div className="space-y-6">
@@ -67,26 +71,27 @@ const AudioSmoothingSettings: React.FC = () => {
               max="0.95"
               step="0.05"
               value={alpha}
-              onChange={(e) => handleAlphaChange(parseFloat(e.target.value))}
-              onMouseUp={handleAlphaSave}
-              onTouchEnd={handleAlphaSave}
+              onChange={(e) => {
+                handleAlphaChange(parseFloat(e.target.value))
+                alphaRelease.changed()
+              }}
+              {...alphaRelease.props}
               className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
               style={{
                 background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((alpha - 0.1) / (0.95 - 0.1)) * 100}%, #e5e7eb ${((alpha - 0.1) / (0.95 - 0.1)) * 100}%, #e5e7eb 100%)`,
               }}
             />
 
-            <input
-              type="number"
-              min="0.1"
-              max="0.95"
-              step="0.05"
+            <DraftNumberField
+              min={0.1}
+              max={0.95}
+              step={0.05}
+              decimals={2}
               value={alpha}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value) || 0.1
-                handleAlphaChange(Math.max(0.1, Math.min(0.95, value)))
-              }}
-              onBlur={handleAlphaSave}
+              onCommit={(value) =>
+                void audio.save({ smoothing: { ...audio.values.smoothing, alpha: value } })
+              }
+              aria-label="Smoothing factor value"
               className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
             />
           </div>
@@ -94,6 +99,7 @@ const AudioSmoothingSettings: React.FC = () => {
       )}
 
       {isSaving && <p className="text-xs text-gray-500 dark:text-gray-400">Saving...</p>}
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

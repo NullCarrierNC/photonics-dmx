@@ -4,9 +4,12 @@ import * as path from 'path'
 import * as fsPromises from 'fs/promises'
 import {
   corruptBackupFilePath,
+  repairedCopyFilePath,
   type ConfigCorruptInfo,
   type ConfigCorruptReason,
 } from './configCorruptTypes'
+import { migrateStepwise, readEnvelope, type ConfigWithVersion } from './configFileEnvelope'
+import { renameSyncWithRetry, renameWithRetry } from './configFileRename'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
@@ -35,17 +38,25 @@ export type ConfigFileHooks<T> = {
    * reference) when nothing needs fixing, or a repaired copy otherwise; a changed reference is
    * persisted. Use to seed shape additions (e.g. new required keys) so a same-version file that
    * predates them passes validation instead of triggering corrupt-recovery.
+   *
+   * `reportRepair` tells the corrupt-recovery hook that stored values were put back to their
+   * defaults, with a message naming them.
    */
-  normalizeLoaded?: (data: T) => T
+  normalizeLoaded?: (data: T, reportRepair: (message: string) => void) => T
 }
 
-/**
- * Configuration data with version tracking
- */
-interface ConfigWithVersion<T> {
-  version: number
-  data: T
-}
+type RecoveryDetail = { parseOrMigrateError?: unknown; schemaText?: string }
+
+/** A stored file's text read into data, or why it could not be. */
+type DecodedFile<T> =
+  | { ok: true; data: T; version: number; needsPersist: boolean }
+  | {
+      ok: false
+      reason: ConfigCorruptReason
+      detail: RecoveryDetail
+      /** Set when a newer build stamped the file, which stays in place, read-only. */
+      newerVersion?: number
+    }
 
 /**
  * Handles individual configuration file operations
@@ -59,13 +70,21 @@ export class ConfigFile<T> {
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
   private readonly coerceUnversioned: ((raw: unknown) => T) | undefined
-  private readonly normalizeLoaded: ((data: T) => T) | undefined
+  private readonly normalizeLoaded:
+    | ((data: T, reportRepair: (message: string) => void) => T)
+    | undefined
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
-  // Serializes whole read-modify-write turns. `saveChain` only orders the writes, which is not
-  // enough on its own: `update` publishes `this.data` after its write resolves, so two callers
-  // that each read before awaiting both start from the pre-write value and the later write wins.
+  /** Set while a corrupt file could not be moved aside. No write replaces it until one can. */
+  private corruptFileInPlace = false
+  /** Set when a hand repair was adopted and no whole-file replacement has copied it yet. */
+  private repairNotCopied = false
+  /** The version of a file written by a newer build, which no write replaces. */
+  private newerVersionOnDisk: number | null = null
+  // Serializes every update and read-modify-write turn. `saveChain` only orders the writes, which
+  // is not enough on its own: a write publishes `this.data` after it resolves, so a caller that
+  // reads while one is in flight starts from the pre-write value and its later write wins.
   private mutateChain: Promise<unknown> = Promise.resolve()
 
   constructor(
@@ -108,16 +127,13 @@ export class ConfigFile<T> {
     }
   }
 
-  private recoverToDefault(
-    reason: ConfigCorruptReason,
-    detail: { parseOrMigrateError?: unknown; schemaText?: string },
-  ): T {
+  private recoverToDefault(reason: ConfigCorruptReason, detail: RecoveryDetail): T {
     let canWriteDefaults = !fs.existsSync(this.filePath)
 
     if (fs.existsSync(this.filePath)) {
       const dest = corruptBackupFilePath(this.filePath)
       try {
-        fs.renameSync(this.filePath, dest)
+        renameSyncWithRetry(this.filePath, dest)
         canWriteDefaults = true
       } catch (e) {
         log.error(
@@ -125,6 +141,7 @@ export class ConfigFile<T> {
           e,
         )
         canWriteDefaults = false
+        this.corruptFileInPlace = true
       }
     }
 
@@ -138,7 +155,7 @@ export class ConfigFile<T> {
             ? detail.parseOrMigrateError.message
             : String(detail.parseOrMigrateError ?? 'invalid configuration'))
     if (!canWriteDefaults) {
-      message = `${message}; corrupt file left in place: defaults are in memory only until the file can be moved aside.`
+      message = `${message}; corrupt file left in place and defaults in use. Repair it and relaunch to load it, or leave it and the next save moves it aside.`
     }
 
     this.onCorruptRecovery?.({
@@ -146,6 +163,7 @@ export class ConfigFile<T> {
       filePath: this.filePath,
       reason,
       message: message || undefined,
+      ...(canWriteDefaults ? {} : { leftInPlace: true }),
     })
     if (canWriteDefaults) {
       log.info(
@@ -198,58 +216,19 @@ export class ConfigFile<T> {
       return this.recoverToDefault('read', { parseOrMigrateError: error })
     }
 
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(fileContent)
-    } catch (error) {
-      log.error(`[Photonics Config] JSON parse failed for ${this.filePath}:`, error)
-      return this.recoverToDefault('parse', { parseOrMigrateError: error })
+    const decoded = this.decode(fileContent)
+    if (!decoded.ok) {
+      if (decoded.newerVersion !== undefined) {
+        this.holdNewerFile(decoded.newerVersion, false)
+        return this.freshDefaults()
+      }
+      return this.recoverToDefault(decoded.reason, decoded.detail)
     }
 
-    let data: T
-    let version: number
-    let migratedNeedsPersist = false
-    try {
-      if (this.isVersionedFormat(parsed)) {
-        data = parsed.data
-        version = parsed.version
-      } else {
-        const raw = this.coerceUnversioned ? this.coerceUnversioned(parsed) : (parsed as T)
-        data = raw
-        version = 0
-      }
-      if (version < this.currentVersion) {
-        data = this.migrateData(data, version, this.currentVersion)
-        migratedNeedsPersist = true
-      }
-      if (this.normalizeLoaded) {
-        // Repair shape additions that a same-version file may predate (e.g. new required keys),
-        // so validation below never fails on them. Persist only when it actually changed the data.
-        const normalized = this.normalizeLoaded(data)
-        if (normalized !== data) {
-          data = normalized
-          migratedNeedsPersist = true
-        }
-      }
-    } catch (error) {
-      log.error(
-        `[Photonics Config] Migration or shape handling failed for ${this.filePath}:`,
-        error,
-      )
-      return this.recoverToDefault('schema', { parseOrMigrateError: error })
-    }
-
-    if (this.validate) {
-      const v = this.validate(data)
-      if (!v.valid) {
-        const schemaText = v.errors.join('; ')
-        log.error(`[Photonics Config] Schema validation failed for ${this.filePath}:`, schemaText)
-        return this.recoverToDefault('schema', { schemaText })
-      }
-    }
-
-    if (migratedNeedsPersist) {
-      this.save(data).catch((err) =>
+    if (decoded.version > this.currentVersion) {
+      this.holdNewerFile(decoded.version, true)
+    } else if (decoded.needsPersist) {
+      this.save(decoded.data).catch((err) =>
         log.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
       )
     }
@@ -261,15 +240,101 @@ export class ConfigFile<T> {
       this.hasLoggedLoad = true
     }
 
-    return data
+    return decoded.data
   }
 
   /**
-   * Checks if the parsed data is in versioned format
+   * A file from a newer build is never saved over, so it keeps the version the newer build stamped.
+   * Its settings are in use when this build can read them, and defaults are otherwise.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON parse result before validation
-  private isVersionedFormat(parsed: any): parsed is ConfigWithVersion<T> {
-    return parsed && typeof parsed === 'object' && 'version' in parsed && 'data' in parsed
+  private holdNewerFile(version: number, settingsInUse: boolean): void {
+    this.newerVersionOnDisk = version
+    const fileName = path.basename(this.filePath)
+    const inUse = settingsInUse
+      ? 'Its settings are in use'
+      : 'This version cannot read its settings, so defaults are in use'
+    const message = `Written by a newer version of Photonics (format ${version}, this version reads up to ${this.currentVersion}). ${inUse}, and changes are not saved to it while this version runs.`
+    log.warn(`[Photonics Config] ${fileName}: ${message}`)
+    this.onCorruptRecovery?.({
+      fileName,
+      filePath: this.filePath,
+      reason: 'newerVersion',
+      message,
+      ...(settingsInUse ? {} : { leftInPlace: true }),
+    })
+  }
+
+  /**
+   * Reads a stored file's text into data: parse, migrate, repair, validate. The load and the check
+   * for a hand repair share it, so both accept exactly the same files.
+   */
+  private decode(fileContent: string): DecodedFile<T> {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(fileContent)
+    } catch (error) {
+      log.error(`[Photonics Config] JSON parse failed for ${this.filePath}:`, error)
+      return { ok: false, reason: 'parse', detail: { parseOrMigrateError: error } }
+    }
+
+    const envelope = readEnvelope<T>(parsed)
+    if (!envelope.ok) {
+      const { schemaText } = envelope
+      log.error(`[Photonics Config] Unusable version in ${this.filePath}: ${schemaText}`)
+      return { ok: false, reason: 'schema', detail: { schemaText } }
+    }
+
+    const version = envelope.version
+    // A newer build's file is held whatever this build makes of its shape.
+    const newer = version > this.currentVersion ? { newerVersion: version } : {}
+
+    let data: T
+    let migratedNeedsPersist = false
+    try {
+      if (envelope.versioned) {
+        data = envelope.data
+      } else {
+        const { raw } = envelope
+        data = this.coerceUnversioned ? this.coerceUnversioned(raw) : (raw as T)
+      }
+      if (version < this.currentVersion) {
+        data = this.migrateData(data, version, this.currentVersion)
+        migratedNeedsPersist = true
+      }
+      if (this.normalizeLoaded) {
+        // Repair shape additions that a same-version file may predate (e.g. new required keys),
+        // so validation below never fails on them. Persist only when it actually changed the data.
+        const normalized = this.normalizeLoaded(data, (message) =>
+          this.onCorruptRecovery?.({
+            fileName: path.basename(this.filePath),
+            filePath: this.filePath,
+            reason: 'repaired',
+            message,
+          }),
+        )
+        if (normalized !== data) {
+          data = normalized
+          migratedNeedsPersist = true
+        }
+      }
+    } catch (error) {
+      log.error(
+        `[Photonics Config] Migration or shape handling failed for ${this.filePath}:`,
+        error,
+      )
+      return { ok: false, reason: 'schema', detail: { parseOrMigrateError: error }, ...newer }
+    }
+
+    if (this.validate) {
+      const v = this.validate(data)
+      if (!v.valid) {
+        const schemaText = v.errors.join('; ')
+        log.error(`[Photonics Config] Schema validation failed for ${this.filePath}:`, schemaText)
+        return { ok: false, reason: 'schema', detail: { schemaText }, ...newer }
+      }
+    }
+
+    return { ok: true, data, version, needsPersist: migratedNeedsPersist }
   }
 
   /**
@@ -282,13 +347,9 @@ export class ConfigFile<T> {
 
     log.info(`[Photonics Config] Migrating configuration from v${fromVersion} to v${toVersion}`)
 
-    // Apply migrations in sequence
-    let migratedData = data
-    for (let version = fromVersion + 1; version <= toVersion; version++) {
-      migratedData = this.applyMigration(migratedData, version - 1, version)
-    }
-
-    return migratedData
+    return migrateStepwise(data, fromVersion, toVersion, (d, from, to) =>
+      this.applyMigration(d, from, to),
+    )
   }
 
   /**
@@ -316,6 +377,11 @@ export class ConfigFile<T> {
    * Performs the actual atomic write: write to a unique temp file, then rename over the target.
    */
   private async writeAtomic(data: T): Promise<void> {
+    if (this.newerVersionOnDisk !== null) {
+      throw new Error(
+        `Failed to save configuration: ${path.basename(this.filePath)} is from a newer version of Photonics (format ${this.newerVersionOnDisk}) and is kept as it is`,
+      )
+    }
     const versionedData: ConfigWithVersion<T> = {
       version: this.currentVersion,
       data: data,
@@ -327,8 +393,18 @@ export class ConfigFile<T> {
     const unique = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     const tempPath = path.join(dir, `.${basename}.tmp.${unique}`)
     try {
+      if (this.corruptFileInPlace) {
+        try {
+          await renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
+          log.info(`[Photonics Config] Moved the corrupt ${basename} aside before saving`)
+        } catch (error) {
+          // A file deleted or moved by hand since the load leaves nothing to preserve.
+          if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error
+        }
+        this.corruptFileInPlace = false
+      }
       await fsPromises.writeFile(tempPath, content, 'utf-8')
-      await this.renameWithRetry(tempPath, this.filePath)
+      await renameWithRetry(tempPath, this.filePath)
     } catch (error) {
       try {
         await fsPromises.unlink(tempPath).catch(() => {})
@@ -337,36 +413,6 @@ export class ConfigFile<T> {
       }
       log.error(`Error saving configuration to ${this.filePath}:`, error)
       throw new Error(`Failed to save configuration: ${error}`)
-    }
-  }
-
-  /**
-   * Renames with retry-and-backoff for transient Windows file-lock errors.
-   *
-   * On Windows, rename() fails with EPERM/EACCES/EBUSY when the source temp file or
-   * the destination is momentarily held open by another process — antivirus real-time
-   * scanning, Controlled Folder Access, cloud-sync of AppData, or the search indexer.
-   * These locks clear within tens of milliseconds, so a short backoff almost always
-   * succeeds. Non-transient errors (e.g. ENOSPC, ENOENT) are re-thrown immediately.
-   */
-  private async renameWithRetry(from: string, to: string): Promise<void> {
-    const transientCodes = new Set(['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'])
-    const delaysMs = [10, 20, 40, 80, 160]
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await fsPromises.rename(from, to)
-        return
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException)?.code
-        if (!code || !transientCodes.has(code) || attempt >= delaysMs.length) {
-          throw error
-        }
-        const delay = delaysMs[attempt]
-        log.warn(
-          `Rename of ${to} hit ${code}; retrying in ${delay}ms (attempt ${attempt + 1}/${delaysMs.length})`,
-        )
-        await new Promise((resolve) => setTimeout(resolve, delay))
-      }
     }
   }
 
@@ -388,10 +434,46 @@ export class ConfigFile<T> {
    * {@link recoverToDefault}, {@link load} and {@link applyLoadMigration}. Gating those would let a
    * validator fault block corruption recovery itself, leaving the file moved aside with nothing
    * written back. `update` is the only caller carrying user edits, so it is the only one that needs
-   * the gate. The throw happens before `this.data` is touched, so in-memory state is unchanged and
-   * the rollback below is not involved.
+   * the gate. `this.data` takes the new value only once the save succeeds, so a refused or failed
+   * save leaves the in-memory state as it was. The write waits its turn behind every update and
+   * {@link mutate} called before it.
+   *
+   * `newData` may have been built before a hand repair was adopted, so the first update after an
+   * adopt copies the file on disk aside before replacing it.
    */
   async update(newData: T): Promise<void> {
+    return this.enqueue(async () => {
+      await this.copyAdoptedRepair()
+      await this.write(newData)
+    })
+  }
+
+  /** Keeps the adopted hand repair, and whatever turns since added to it, as a sibling copy. */
+  private async copyAdoptedRepair(): Promise<void> {
+    if (!this.repairNotCopied) {
+      return
+    }
+    const dest = repairedCopyFilePath(this.filePath)
+    try {
+      await fsPromises.copyFile(this.filePath, dest)
+    } catch (error) {
+      // A file deleted or moved by hand since the adopt leaves nothing to keep.
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error
+      this.repairNotCopied = false
+      return
+    }
+    this.repairNotCopied = false
+    const fileName = path.basename(this.filePath)
+    log.info(`[Photonics Config] Kept the repaired ${fileName} as ${path.basename(dest)}`)
+    this.onCorruptRecovery?.({
+      fileName,
+      filePath: this.filePath,
+      reason: 'repairCopied',
+      message: `The repaired file was saved as ${path.basename(dest)} before a save replaced it.`,
+    })
+  }
+
+  private async write(newData: T): Promise<void> {
     if (this.validate) {
       const v = this.validate(newData)
       if (!v.valid) {
@@ -401,14 +483,8 @@ export class ConfigFile<T> {
       }
     }
 
-    const previous = this.data
-    try {
-      await this.save(newData)
-      this.data = newData
-    } catch (err) {
-      this.data = previous
-      throw err
-    }
+    await this.save(newData)
+    this.data = newData
   }
 
   /**
@@ -420,21 +496,58 @@ export class ConfigFile<T> {
    * its argument. Returning the input unchanged skips the write.
    */
   async mutate(change: (current: T) => T): Promise<void> {
-    const turn = async (): Promise<void> => {
+    return this.enqueue(async () => {
       const next = change(this.data)
       if (next === this.data) {
         return
       }
-      await this.update(next)
+      await this.write(next)
+    })
+  }
+
+  private enqueue(turn: () => Promise<void>): Promise<void> {
+    const adoptThenTurn = async (): Promise<void> => {
+      await this.adoptRepairedFile()
+      await turn()
     }
     // Both arms run the turn: a rejected predecessor must not skip this one.
-    const run = this.mutateChain.then(turn, turn)
+    const run = this.mutateChain.then(adoptThenTurn, adoptThenTurn)
     // A failed turn must not poison the ones behind it.
     this.mutateChain = run.then(
       () => undefined,
       () => undefined,
     )
     return run
+  }
+
+  /**
+   * A corrupt file left in place at load may have been repaired by hand since. One that now reads
+   * cleanly becomes the data the turn starts from, and the write saves over it.
+   */
+  private async adoptRepairedFile(): Promise<void> {
+    if (!this.corruptFileInPlace) {
+      return
+    }
+    let content: string
+    try {
+      content = await fsPromises.readFile(this.filePath, 'utf-8')
+    } catch {
+      // Gone or unreadable, which the write's move-aside handles.
+      return
+    }
+    const decoded = this.decode(content)
+    if (decoded.ok) {
+      this.data = decoded.data
+      this.corruptFileInPlace = false
+      this.repairNotCopied = true
+      log.info(`[Photonics Config] Adopted the repaired ${path.basename(this.filePath)}`)
+      if (decoded.version > this.currentVersion) {
+        this.holdNewerFile(decoded.version, true)
+      }
+    } else if (decoded.newerVersion !== undefined) {
+      this.corruptFileInPlace = false
+      this.holdNewerFile(decoded.newerVersion, false)
+    }
   }
 
   /**

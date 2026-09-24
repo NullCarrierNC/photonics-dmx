@@ -15,13 +15,48 @@ import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { ExecutionContext } from './ExecutionContext'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
-import { VariableValue } from './executionTypes'
+import { VariableValue, type NodeCueDebugSwitch } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
+import { AudioEventRuns } from './audioEventRuns'
 import { evaluateBandTrigger } from '../../audio/bandReactivity'
 import { createLogger } from '../../../../shared/logger'
 import { monotonicNowMs } from '../../../../shared/time'
+import { dropGroupStore } from '../../registries/cueRegistrySupport'
+import type { RGBIO, TrackedLight } from '../../../types'
 const log = createLogger('BaseAudioNodeCue')
+
+/** A level-mode effect on the sequencer, as {@link BaseAudioNodeCue} submitted it. */
+interface LevelEffect {
+  layer: number
+  lights: TrackedLight[]
+}
+
+/** What a level look on the base layer leaves its lights at once it ends. */
+const LEVEL_BASE_OFF: RGBIO = {
+  red: 0,
+  green: 0,
+  blue: 0,
+  intensity: 0,
+  opacity: 1,
+  blendMode: 'replace',
+}
+
+/**
+ * Take a level effect off the sequencer. The sequencer keeps a light's layer-0 state once the
+ * effect there ends, so a look on the base layer also sets its lights to black, unless a blackout
+ * running now is already taking them there.
+ */
+function endLevelEffect(
+  sequencer: ILightingController,
+  effectKey: string,
+  { layer, lights }: LevelEffect,
+): void {
+  sequencer.removeEffect(effectKey, layer)
+  if (layer === 0 && !sequencer.isBlackoutActive()) {
+    sequencer.setState(lights, LEVEL_BASE_OFF, 0)
+  }
+}
 
 /**
  * Per-rig (per-sequencer) runtime state for an audio node cue. Each rig running the same cue
@@ -34,13 +69,16 @@ interface AudioCueRunState {
   triggerPhase: Map<string, 'idle' | 'active'>
   triggerEnterTime: Map<string, number>
   lastTriggerTime: Map<string, number>
-  activeLevelEffects: Map<string, number>
+  /** Each running level-mode effect by key, with the layer and lights it was submitted on. */
+  activeLevelEffects: Map<string, LevelEffect>
   smoothedBandEnergy: Map<string, number>
   /** Wall-clock ms of the last band-energy smoothing update per trigger, for frame-rate-independent attack/release. */
   bandSmoothTime: Map<string, number>
   cueLevelVarStore: Map<string, VariableValue>
   groupLevelVarStore: Map<string, VariableValue>
   executionEngine: NodeExecutionEngine | null
+  /** The run each cue-called or edge event has in flight, under its execution policy. */
+  eventRuns: AudioEventRuns
   /** Per-context ExecutionStateMachine tracking for the engine-driven event paths. */
   esmLifecycle: ReturnType<typeof createExecutionStateMachineLifecycle>
   cueStartedFired: boolean
@@ -85,6 +123,7 @@ export abstract class BaseAudioNodeCue {
     effectRegistry: EffectRegistry | undefined,
     private readonly runtimeBroadcaster: RuntimeBroadcaster,
     cueType: AudioCueType,
+    private readonly debug?: NodeCueDebugSwitch,
   ) {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     this.id = `${groupId}:${definition.id}`
@@ -129,6 +168,7 @@ export abstract class BaseAudioNodeCue {
       // sync even when cue logic mutates group state during execute().
       groupLevelVarStore: this.getGroupVarStore(sequencer),
       executionEngine: null,
+      eventRuns: new AudioEventRuns(),
       esmLifecycle: createExecutionStateMachineLifecycle(),
       cueStartedFired: false,
       firstSubmissionUsesSetEffectRef: { use: false },
@@ -179,6 +219,7 @@ export abstract class BaseAudioNodeCue {
         {
           firstSubmissionUsesSetEffectRef: state.firstSubmissionUsesSetEffectRef,
           onContextLifecycle: state.esmLifecycle.onContextLifecycle,
+          debug: this.debug,
         },
       )
     }
@@ -207,15 +248,7 @@ export abstract class BaseAudioNodeCue {
         continue
       }
       if (event.eventType === 'cue-called') {
-        const eventContext: EventContext = { eventRawValue: 1 }
-        const cueData: AudioCueData & { eventContext: EventContext } = {
-          ...safeData,
-          eventContext,
-        }
-        state.executionEngine.startExecution(
-          event,
-          cueData as unknown as import('../../types/cueTypes').CueData,
-        )
+        this.startEventRun(state, event, safeData, 1)
         continue
       }
       if (event.eventType === 'audio-trigger') {
@@ -237,15 +270,7 @@ export abstract class BaseAudioNodeCue {
           state.lastTriggerTime.set(event.id, now)
         }
 
-        const eventContext: EventContext = { eventRawValue: evaluation.intensity }
-        const cueData: AudioCueData & { eventContext: EventContext } = {
-          ...safeData,
-          eventContext,
-        }
-        state.executionEngine.startExecution(
-          event,
-          cueData as unknown as import('../../types/cueTypes').CueData,
-        )
+        this.startEventRun(state, event, safeData, evaluation.intensity)
       } else {
         const eventContext: EventContext = { eventRawValue: evaluation.intensity }
         const cueData: AudioCueData & { eventContext: EventContext } = {
@@ -294,18 +319,21 @@ export abstract class BaseAudioNodeCue {
           if (effect) {
             const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
             if (state.firstSubmissionUsesSetEffectRef.use) {
+              // The first submission replaces the look like the engine's, leaving motion running.
               state.firstSubmissionUsesSetEffectRef.use = false
-              sequencer.removeAllEffects()
+              sequencer.setEffect(effectKey, effect)
             } else {
               sequencer.removeEffect(effectKey, layer)
+              sequencer.addEffect(effectKey, effect)
             }
-            sequencer.addEffect(effectKey, effect)
-            state.activeLevelEffects.set(effectKey, layer)
+            state.activeLevelEffects.set(effectKey, { layer, lights })
           }
-        } else if (state.activeLevelEffects.has(effectKey)) {
-          const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
-          sequencer.removeEffect(effectKey, layer)
-          state.activeLevelEffects.delete(effectKey)
+        } else {
+          const running = state.activeLevelEffects.get(effectKey)
+          if (running) {
+            endLevelEffect(sequencer, effectKey, running)
+            state.activeLevelEffects.delete(effectKey)
+          }
         }
       }
     }
@@ -313,6 +341,25 @@ export abstract class BaseAudioNodeCue {
     if (tasks.length) {
       await Promise.allSettled(tasks)
     }
+  }
+
+  /** Start a cue-called or edge event's graph under the event's execution policy. */
+  private startEventRun(
+    state: AudioCueRunState,
+    event: AudioEventNode,
+    data: AudioCueData,
+    eventRawValue: number,
+  ): void {
+    const cueData: AudioCueData & { eventContext: EventContext } = {
+      ...data,
+      eventContext: { eventRawValue },
+    }
+    state.eventRuns.start(
+      state.executionEngine!,
+      event,
+      event.executionPolicy,
+      cueData as unknown as import('../../types/cueTypes').CueData,
+    )
   }
 
   onStop(): void {
@@ -334,6 +381,7 @@ export abstract class BaseAudioNodeCue {
         state.executionEngine.cancelAll(skipEffectRemoval)
       }
       state.esmLifecycle.cancelAll()
+      state.eventRuns.clear()
       state.executionEngine = null
       state.cueStartedFired = false
       state.eventStates.clear()
@@ -344,8 +392,8 @@ export abstract class BaseAudioNodeCue {
       // so cancelAll never sees them. Take them off by the layer each was recorded against before
       // dropping the tracking, or they stay lit with nothing left holding a reference to them.
       if (!skipEffectRemoval) {
-        for (const [effectKey, layer] of state.activeLevelEffects) {
-          sequencer.removeEffect(effectKey, layer)
+        for (const [effectKey, running] of state.activeLevelEffects) {
+          endLevelEffect(sequencer, effectKey, running)
         }
       }
       state.activeLevelEffects.clear()
@@ -362,6 +410,10 @@ export abstract class BaseAudioNodeCue {
    * instance (a registry singleton) would accumulate one stale entry per
    * `restartControllers` cycle, plus stale group var stores in the static map.
    */
+  releaseGroup(): void {
+    dropGroupStore(BaseAudioNodeCue.groupLevelVarStores, this.groupId)
+  }
+
   releaseSequencer(sequencer: ILightingController): void {
     const state = this.states.get(sequencer)
     if (state) {

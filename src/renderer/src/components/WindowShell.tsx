@@ -1,6 +1,10 @@
 import * as React from 'react'
 import { useBlackoutShortcut } from '../hooks/useBlackoutShortcut'
 import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
+import { useAudioEnabledSync } from '../hooks/useAudioEnabledSync'
+import { useListenerEnabledSync } from '../hooks/useListenerEnabledSync'
+import { ToastStack } from './Toast'
+import { ConfirmModalHost } from './ConfirmModalHost'
 
 /**
  * The behaviour every Photonics window carries, whichever root it renders.
@@ -11,8 +15,16 @@ import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
  */
 const WindowShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useMasterOutputSync()
+  useAudioEnabledSync()
+  useListenerEnabledSync()
   useBlackoutShortcut()
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      <ToastStack />
+      <ConfirmModalHost />
+    </>
+  )
 }
 
 export default WindowShell

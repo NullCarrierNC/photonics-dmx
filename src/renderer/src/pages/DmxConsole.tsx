@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { getDefaultStore, useAtom } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import {
   DmxLight,
   DmxRig,
@@ -8,11 +8,13 @@ import {
 } from '../../../photonics-dmx/types'
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
 import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
+import { leaveConsole } from '../utils/leaveConsole'
 import {
+  consoleRigIdAtom,
+  consoleRigIdFor,
   lightingPrefsAtom,
   myDmxLightsAtom,
   previewRigIdAtom,
-  resolveLastUsedRigId,
 } from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
 import StrobeChannelPreviewNotice from '../components/StrobeChannelPreviewNotice'
@@ -23,22 +25,12 @@ import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { useRigDmxValues } from '../hooks/useRigDmxValues'
 import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
+import { DraftNumberField, type CommitOutcome } from '../components/controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
 const messageFor = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
-
-/** Hands DMX output back. The cleanup that calls this cannot wait, so failure is reported here. */
-const leaveConsole = (): void => {
-  disableConsole()
-    .then((result) => {
-      if (!result.success) {
-        log.error('Main refused to leave DMX console mode:', result.error)
-      }
-    })
-    .catch((error) => log.error('Failed to leave DMX console mode:', error))
-}
 
 import {
   buildConsoleFixedSeed,
@@ -49,13 +41,20 @@ import {
   isLightModified,
   isMovingHeadFixture,
   isPanTiltChannelName,
+  lightOnChannel,
 } from './dmxConsoleChannels'
 
 const DmxConsole: React.FC = () => {
   const [rigs, setRigs] = useState<DmxRig[]>([])
   const [prefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
-  const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
+  const [consoleChoice, setConsoleChoice] = useAtom(consoleRigIdAtom)
+  const previewRigId = useAtomValue(previewRigIdAtom)
+  const selectedRigId = consoleRigIdFor(
+    consoleChoice,
+    previewRigId,
+    rigs.map((r) => r.id),
+  )
   // Templates drive which channels are displayed (so e.g. a newly-added Strobe Channel surfaces
   // without needing to re-save the rig); per-light DMX channel numbers still come from the rig.
   const [myLights] = useAtom(myDmxLightsAtom)
@@ -72,6 +71,9 @@ const DmxConsole: React.FC = () => {
   // An enable that is still in flight owns console mode just as much as an open one does, so the
   // unmount cleanup waits for it rather than leaving the publisher in manual output.
   const enableInFlightRef = useRef<Promise<unknown> | null>(null)
+  const [enabling, setEnabling] = useState(false)
+  // Moves on when the page closes, so an enable answered after that seeds nothing.
+  const enableTokenRef = useRef(0)
   // Mirror the currently-selected rig id into a ref so the long-lived DMX_VALUES listener can
   // pick the right per-rig buffer from `kind: 'rigs'` payloads without re-registering on every
   // rig switch.
@@ -92,12 +94,6 @@ const DmxConsole: React.FC = () => {
         const list = await getDmxRigs()
         if (cancelled) return
         setRigs(list)
-        const orderedIds = list.map((r) => r.id)
-        const currentId = getDefaultStore().get(previewRigIdAtom)
-        const resolved = resolveLastUsedRigId(currentId, orderedIds)
-        if (resolved !== currentId) {
-          setSelectedRigId(resolved)
-        }
         setLoadError(null)
       } catch (e) {
         log.error('Failed to load DMX rigs', e)
@@ -109,7 +105,7 @@ const DmxConsole: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [setSelectedRigId])
+  }, [])
 
   useEffect(() => {
     if (!selectedRigId) {
@@ -146,6 +142,7 @@ const DmxConsole: React.FC = () => {
 
   useEffect(() => {
     return () => {
+      enableTokenRef.current += 1
       const pending = enableInFlightRef.current
       if (pending) {
         // Either way it settles: an enable that rejects can still have left console mode open.
@@ -191,18 +188,25 @@ const DmxConsole: React.FC = () => {
       setActionError('Rig is still loading — try again in a moment')
       return
     }
+    if (enableInFlightRef.current) return
+    enableTokenRef.current += 1
+    const token = enableTokenRef.current
     const pending = enableConsole(selectedRigId)
     enableInFlightRef.current = pending
-    let result: Awaited<typeof pending>
-    try {
-      result = await pending
-    } catch (error) {
-      log.error('Failed to enter DMX console mode', error)
-      setActionError(messageFor(error))
+    setEnabling(true)
+    const answer = await pending.then(
+      (result) => ({ result }),
+      (error: unknown) => ({ error }),
+    )
+    enableInFlightRef.current = null
+    if (token !== enableTokenRef.current) return
+    setEnabling(false)
+    if ('error' in answer) {
+      log.error('Failed to enter DMX console mode', answer.error)
+      setActionError(messageFor(answer.error))
       return
-    } finally {
-      enableInFlightRef.current = null
     }
+    const { result } = answer
     if (result.success) {
       // Seed pinned fixed/mode channels so fixtures that need them light up during the session.
       const seed = buildConsoleFixedSeed(selectedRig.config, myLights)
@@ -236,7 +240,7 @@ const DmxConsole: React.FC = () => {
       setConsoleBuffer({})
     }
     setChannelOverrides({})
-    setSelectedRigId(nextId)
+    setConsoleChoice(nextId)
   }
 
   const handleChannelValueChange = (channelNumber: number, value: number) => {
@@ -250,7 +254,7 @@ const DmxConsole: React.FC = () => {
     channelName: string,
     previousChannel: number,
     newChannel: number,
-  ) => {
+  ): CommitOutcome => {
     if (light.id === null) {
       return
     }
@@ -262,6 +266,14 @@ const DmxConsole: React.FC = () => {
     const baseChannels = getTemplateAlignedChannels(light, myLights)
     const baseline = baseChannels[channelName]
     const lightId = light.id
+    const config = selectedRig?.config
+    const moving = { lightId, channelName }
+    // Moving onto a channel in use overwrites that light's value, so it is refused.
+    const occupant = config && lightOnChannel(config, myLights, channelOverrides, clamped, moving)
+    if (occupant) {
+      setActionError(`Channel ${clamped} is already used by ${occupant.name}. Pick a free channel.`)
+      return false
+    }
 
     setChannelOverrides((prev) => {
       const nextForLight = { ...(prev[lightId] ?? {}) }
@@ -281,7 +293,10 @@ const DmxConsole: React.FC = () => {
 
     const next = { ...consoleBuffer }
     const moved = next[previousChannel] ?? 0
-    delete next[previousChannel]
+    // A light that shares the old channel keeps its value there.
+    if (!config || !lightOnChannel(config, myLights, channelOverrides, previousChannel, moving)) {
+      delete next[previousChannel]
+    }
     next[clamped] = moved
     pushConsoleBuffer(next)
   }
@@ -339,21 +354,14 @@ const DmxConsole: React.FC = () => {
                   <label className="text-xs text-gray-600 dark:text-gray-400 shrink-0">
                     DMX ch
                   </label>
-                  <input
-                    type="number"
+                  <DraftNumberField
+                    value={channelNumber}
                     min={1}
                     max={512}
-                    defaultValue={channelNumber}
-                    key={`${light.id}-${channelName}-${channelNumber}`}
                     disabled={!consoleEnabled || light.id === null}
-                    onBlur={(e) => {
-                      const parsed = parseInt(e.target.value, 10)
-                      if (!Number.isFinite(parsed)) {
-                        e.target.value = String(channelNumber)
-                        return
-                      }
-                      handleChannelNumberCommit(light, channelName, channelNumber, parsed)
-                    }}
+                    onCommit={(channel) =>
+                      handleChannelNumberCommit(light, channelName, channelNumber, channel)
+                    }
                     className={`w-20 p-1 border rounded text-sm ${
                       channelInputModified
                         ? 'border-amber-400 dark:border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100'
@@ -481,7 +489,7 @@ const DmxConsole: React.FC = () => {
           <button
             type="button"
             onClick={() => void handleToggleConsole()}
-            disabled={!consoleEnabled && (selectedRigForUi == null || hasNoLights)}
+            disabled={enabling || (!consoleEnabled && (selectedRigForUi == null || hasNoLights))}
             className={`px-4 py-2 rounded-md font-medium text-white ${
               consoleEnabled
                 ? 'bg-red-600 hover:bg-red-500'

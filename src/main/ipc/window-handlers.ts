@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { WindowManager } from '../WindowManager'
 import { ipcError } from './ipcResult'
-import { WINDOW } from '../../shared/ipcChannels'
+import { RENDERER_SEND, WINDOW } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
 const log = createLogger('window-handlers')
@@ -31,6 +31,13 @@ export function setupWindowHandlers(ipcMain: IpcMain, windowManager: WindowManag
       return {
         ...ipcError(error),
       }
+    }
+  })
+
+  // Pages report their unsaved changes, so a Quit can ask about each before any window closes.
+  ipcMain.on(RENDERER_SEND.UNSAVED_CHANGES, (event, unsaved: unknown) => {
+    if (typeof unsaved === 'boolean') {
+      windowManager.setUnsavedChanges(event.sender, unsaved)
     }
   })
 }

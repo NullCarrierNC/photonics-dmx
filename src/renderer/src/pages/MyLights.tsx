@@ -4,7 +4,6 @@ import equal from 'fast-deep-equal'
 
 import LightSettingsModal from '../components/LightSettingsModal'
 import LightChannelsPreview from '../components/LightChannelsPreview'
-import ToastContainer from '../components/Toast'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
@@ -15,7 +14,7 @@ import { createLogger } from '../../../shared/logger'
 const log = createLogger('MyLights')
 
 const MyLights = () => {
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
   const confirm = useConfirm()
   const [myLights, setMyLights] = useAtom(myDmxLightsAtom)
   const [myLightsSorted] = useAtom(sortedMyDmxLightsAtom)
@@ -28,6 +27,7 @@ const MyLights = () => {
    * an existing one (its saved state).
    */
   const [editorBaseline, setEditorBaseline] = useState<DmxFixture | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const openEditor = (light: DmxFixture) => {
     setCurrentLight(light)
@@ -69,11 +69,13 @@ const MyLights = () => {
   }
 
   const handleSave = async () => {
-    if (!currentLight) return
+    if (!currentLight || saving) return
     const lightToSave: DmxFixture = {
       ...currentLight,
       id: currentLight.id || crypto.randomUUID(),
     }
+    // Kept on the working copy, so a save retried after a refusal writes the same light.
+    setCurrentLight(lightToSave)
 
     const existingIndex = myLights.findIndex((light) => light.id === lightToSave.id)
     const nextLibrary =
@@ -89,7 +91,9 @@ const MyLights = () => {
     // doesn't keep showing an unsaved state that isn't on disk.
     const previousLibrary = myLights
     setMyLights(nextLibrary)
-    if (!(await persistLibrary(nextLibrary, previousLibrary))) return
+    setSaving(true)
+    const saved = await persistLibrary(nextLibrary, previousLibrary).finally(() => setSaving(false))
+    if (!saved) return
     closeEditor()
   }
 
@@ -128,7 +132,6 @@ const MyLights = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">My Lights</h1>
 
       {/* prettier-ignore */}
@@ -230,6 +233,7 @@ const MyLights = () => {
         light={currentLight}
         onChange={setCurrentLight}
         onSave={() => void handleSave()}
+        saving={saving}
         onCancel={() => void handleCancel()}
         onDelete={isExistingLight ? () => void handleDelete() : undefined}
       />

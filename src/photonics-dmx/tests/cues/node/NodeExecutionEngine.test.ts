@@ -10,7 +10,14 @@ import {
   ActionNode,
   LogicNode,
 } from '../../../cues/types/nodeCueTypes'
-import type { YargEffectDefinition } from '../../../cues/types/nodeCueTypes'
+import type {
+  Connection,
+  EffectRaiserNode,
+  NetLightingNodeCueDefinition,
+  ValueSource,
+  VariableDefinition,
+  YargEffectDefinition,
+} from '../../../cues/types/nodeCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { Beat, CueData, CueType } from '../../../cues/types/cueTypes'
@@ -19,11 +26,87 @@ import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry'
 import type { TrackedLight } from '../../../types'
 import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../types'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
-import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { noopRuntimeBroadcaster, type RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
+
+const beatEvent: NetEventNode = { id: 'event1', type: 'event', eventType: 'beat' }
+
+const buildAdjacency = (connections: Connection[]): Map<string, Connection[]> => {
+  const adjacency = new Map<string, Connection[]>()
+  for (const connection of connections) {
+    const list = adjacency.get(connection.from) ?? []
+    list.push(connection)
+    adjacency.set(connection.from, list)
+  }
+  return adjacency
+}
+
+const compile = (
+  definition: NetNodeCueDefinition,
+  mode: CompiledNetCue['mode'] = 'yarg',
+): CompiledNetCue => ({
+  definition,
+  mode,
+  eventMap: new Map(definition.nodes.events.map((node) => [node.id, node])),
+  actionMap: new Map(definition.nodes.actions.map((node) => [node.id, node])),
+  logicMap: new Map((definition.nodes.logic ?? []).map((node) => [node.id, node])),
+  eventRaiserMap: new Map((definition.nodes.eventRaisers ?? []).map((node) => [node.id, node])),
+  eventListenerMap: new Map((definition.nodes.eventListeners ?? []).map((node) => [node.id, node])),
+  effectRaiserMap: new Map((definition.nodes.effectRaisers ?? []).map((node) => [node.id, node])),
+  eventDefinitions: definition.events ?? [],
+  adjacency: buildAdjacency(definition.connections),
+})
+
+/** The 'test-cue' lighting cue, with any other definition field overridable. */
+const testCue = (
+  nodes: NetLightingNodeCueDefinition['nodes'],
+  connections: Connection[],
+  overrides: Partial<Omit<NetLightingNodeCueDefinition, 'nodes' | 'connections'>> = {},
+): NetNodeCueDefinition => ({
+  id: 'test-cue',
+  name: 'Test Cue',
+  kind: 'lighting',
+  cueType: CueType.Default,
+  style: 'primary',
+  nodes,
+  connections,
+  ...overrides,
+})
+
+/** A set-color action on one group that starts at once and holds for `duration` ms. */
+const setColorAction = (
+  id: string,
+  color: string,
+  {
+    group = 'front',
+    brightness = 'high',
+    duration = 100,
+    easing,
+  }: { group?: string; brightness?: string; duration?: number; easing?: string } = {},
+): ActionNode => ({
+  id,
+  type: 'action',
+  effectType: 'set-color',
+  target: {
+    groups: { source: 'literal', value: group },
+    filter: { source: 'literal', value: 'all' },
+  },
+  color: {
+    name: { source: 'literal', value: color },
+    brightness: { source: 'literal', value: brightness },
+  },
+  timing: {
+    waitForCondition: { source: 'literal', value: 'none' },
+    waitForTime: { source: 'literal', value: 0 },
+    duration: { source: 'literal', value: duration },
+    waitUntilCondition: { source: 'literal', value: 'none' },
+    waitUntilTime: { source: 'literal', value: 0 },
+    ...(easing === undefined ? {} : { easing: { source: 'literal' as const, value: easing } }),
+  },
+})
 
 describe('NodeExecutionEngine', () => {
   let mockSequencer: ILightingController
@@ -57,6 +140,34 @@ describe('NodeExecutionEngine', () => {
     bonusEffect: false,
     beat: beat ?? 'Unknown',
   })
+
+  const createEngine = (
+    definition: NetNodeCueDefinition,
+    {
+      cueId = 'test-group:test-cue',
+      effectRegistry = new EffectRegistry(),
+      broadcaster = noopRuntimeBroadcaster(),
+      variables = definition.variables,
+      mode = 'yarg',
+    }: {
+      cueId?: string
+      effectRegistry?: EffectRegistry
+      broadcaster?: RuntimeBroadcaster
+      variables?: VariableDefinition[]
+      mode?: CompiledNetCue['mode']
+    } = {},
+  ): NodeExecutionEngine =>
+    new NodeExecutionEngine(
+      compile(definition, mode),
+      cueId,
+      mockSequencer,
+      mockLightManager,
+      broadcaster,
+      cueLevelVarStore,
+      groupLevelVarStore,
+      effectRegistry,
+      variables,
+    )
 
   beforeEach(() => {
     // Create mock sequencer
@@ -96,74 +207,18 @@ describe('NodeExecutionEngine', () => {
   describe('Basic Execution', () => {
     it('should execute a simple action node', () => {
       // Create a simple cue: event -> action
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-          easing: { source: 'literal', value: 'linear' },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [],
-        },
-        connections: [{ from: 'event1', to: 'action1' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
+      const engine = createEngine(
+        testCue(
+          {
+            events: [beatEvent],
+            actions: [setColorAction('action1', 'red', { duration: 200, easing: 'linear' })],
+            logic: [],
+          },
+          [{ from: 'event1', to: 'action1' }],
+        ),
       )
 
-      const parameters = createCueData('Strong')
-      engine.startExecution(eventNode, parameters)
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Verify that addEffect was called
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
@@ -171,54 +226,6 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should handle action -> action chain', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const action1: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const action2: ActionNode = {
-        id: 'action2',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'back' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'blue' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
       mockLightManager.getLights = jest.fn((group: string | string[]) => {
         const groups = Array.isArray(group) ? group : [group]
         if (groups.includes('back')) {
@@ -239,54 +246,24 @@ describe('NodeExecutionEngine', () => {
         ]
       })
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [action1, action2],
-          logic: [],
-        },
-        connections: [
-          { from: 'event1', to: 'action1' },
-          { from: 'action1', to: 'action2' },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([
-          ['action1', action1],
-          ['action2', action2],
-        ]),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'action1' }]],
-          ['action1', [{ from: 'action1', to: 'action2' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
+      const engine = createEngine(
+        testCue(
+          {
+            events: [beatEvent],
+            actions: [
+              setColorAction('action1', 'red'),
+              setColorAction('action2', 'blue', { group: 'back' }),
+            ],
+            logic: [],
+          },
+          [
+            { from: 'event1', to: 'action1' },
+            { from: 'action1', to: 'action2' },
+          ],
+        ),
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // With different layers chain is not composed; each action is submitted (fire-and-forget)
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2)
@@ -295,12 +272,6 @@ describe('NodeExecutionEngine', () => {
 
   describe('Logic Node Execution', () => {
     it('should evaluate conditional node at runtime', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const conditionalNode: LogicNode = {
         id: 'logic1',
         type: 'logic',
@@ -310,103 +281,25 @@ describe('NodeExecutionEngine', () => {
         right: { source: 'literal', value: 3 },
       }
 
-      const actionTrue: ActionNode = {
-        id: 'action-true',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'green' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const actionFalse: ActionNode = {
-        id: 'action-false',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionTrue, actionFalse],
-          logic: [conditionalNode],
-        },
-        connections: [
-          { from: 'event1', to: 'logic1' },
-          { from: 'logic1', to: 'action-true', fromPort: 'true' },
-          { from: 'logic1', to: 'action-false', fromPort: 'false' },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([
-          ['action-true', actionTrue],
-          ['action-false', actionFalse],
-        ]),
-        logicMap: new Map([['logic1', conditionalNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'logic1' }]],
-          [
-            'logic1',
-            [
-              { from: 'logic1', to: 'action-true', fromPort: 'true' },
-              { from: 'logic1', to: 'action-false', fromPort: 'false' },
+      const engine = createEngine(
+        testCue(
+          {
+            events: [beatEvent],
+            actions: [
+              setColorAction('action-true', 'green'),
+              setColorAction('action-false', 'red'),
             ],
+            logic: [conditionalNode],
+          },
+          [
+            { from: 'event1', to: 'logic1' },
+            { from: 'logic1', to: 'action-true', fromPort: 'true' },
+            { from: 'logic1', to: 'action-false', fromPort: 'false' },
           ],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
+        ),
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Since 5 > 3 is true, action-true should be executed
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
@@ -416,12 +309,6 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should set and read variables at runtime', async () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const setVarNode: LogicNode = {
         id: 'logic1',
         type: 'logic',
@@ -441,86 +328,32 @@ describe('NodeExecutionEngine', () => {
         right: { source: 'literal', value: 42 },
       }
 
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'green' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [setVarNode, readVarNode],
-        },
-        connections: [
-          { from: 'event1', to: 'logic1' },
-          { from: 'logic1', to: 'logic2' },
-          { from: 'logic2', to: 'action1', fromPort: 'true' },
-        ],
-        variables: [
+      const engine = createEngine(
+        testCue(
           {
-            name: 'counter',
-            type: 'number',
-            scope: 'cue',
-            initialValue: 0,
+            events: [beatEvent],
+            actions: [setColorAction('action1', 'green')],
+            logic: [setVarNode, readVarNode],
           },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map<string, LogicNode>([
-          ['logic1', setVarNode],
-          ['logic2', readVarNode],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'logic1' }]],
-          ['logic1', [{ from: 'logic1', to: 'logic2' }]],
-          ['logic2', [{ from: 'logic2', to: 'action1', fromPort: 'true' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables ?? [],
+          [
+            { from: 'event1', to: 'logic1' },
+            { from: 'logic1', to: 'logic2' },
+            { from: 'logic2', to: 'action1', fromPort: 'true' },
+          ],
+          {
+            variables: [
+              {
+                name: 'counter',
+                type: 'number',
+                scope: 'cue',
+                initialValue: 0,
+              },
+            ],
+          },
+        ),
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Advance timers to allow the mock callback to fire
       jest.runAllTimers()
@@ -537,19 +370,11 @@ describe('NodeExecutionEngine', () => {
   })
 
   describe('Execution Context', () => {
-    it('should prevent cycles with visited tracking', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
+    const createContext = (): ExecutionContext =>
+      new ExecutionContext(beatEvent, createCueData('Strong'), cueLevelVarStore, groupLevelVarStore)
 
-      const context = new ExecutionContext(
-        eventNode,
-        createCueData('Strong'),
-        cueLevelVarStore,
-        groupLevelVarStore,
-      )
+    it('should prevent cycles with visited tracking', () => {
+      const context = createContext()
 
       // Mark node as visited
       context.markVisited('action1')
@@ -562,42 +387,10 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should track active actions', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const context = new ExecutionContext(
-        eventNode,
-        createCueData('Strong'),
-        cueLevelVarStore,
-        groupLevelVarStore,
-      )
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
+      const context = createContext()
 
       // Register active action
-      context.registerActiveAction('action1', actionNode)
+      context.registerActiveAction('action1', setColorAction('action1', 'red'))
       expect(context.hasActiveActions()).toBe(true)
 
       // Complete action
@@ -606,169 +399,42 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should detect completion correctly', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const context = new ExecutionContext(
-        eventNode,
-        createCueData('Strong'),
-        cueLevelVarStore,
-        groupLevelVarStore,
-      )
+      const context = createContext()
 
       // Context with no active nodes should be complete
       expect(context.isComplete()).toBe(true)
       expect(context.tryComplete()).toBe(true)
 
       // With an active action, context is not complete
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-      context.registerActiveAction('action1', actionNode)
+      context.registerActiveAction('action1', setColorAction('action1', 'red'))
       expect(context.isComplete()).toBe(false)
       expect(context.tryComplete()).toBe(false)
     })
   })
 
   describe('Error Handling', () => {
+    const redCue = (): NetNodeCueDefinition =>
+      testCue({ events: [beatEvent], actions: [setColorAction('action1', 'red')], logic: [] }, [
+        { from: 'event1', to: 'action1' },
+      ])
+
     it('should handle missing action nodes gracefully', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [],
-        },
-        connections: [{ from: 'event1', to: 'nonexistent-action' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'nonexistent-action' }]]]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
+      const engine = createEngine(
+        testCue({ events: [beatEvent], actions: [], logic: [] }, [
+          { from: 'event1', to: 'nonexistent-action' },
+        ]),
       )
 
       // Should not throw
       expect(() => {
-        engine.startExecution(eventNode, createCueData('Strong'))
+        engine.startExecution(beatEvent, createCueData('Strong'))
       }).not.toThrow()
     })
 
     it('should cleanup on cancelAll', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
+      const engine = createEngine(redCue())
 
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [],
-        },
-        connections: [{ from: 'event1', to: 'action1' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Cancel all executions
       engine.cancelAll()
@@ -779,72 +445,9 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
+      const engine = createEngine(redCue())
 
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 100 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [],
-        },
-        connections: [{ from: 'event1', to: 'action1' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       const removeEffectBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
       const removeCallbackBefore = (mockSequencer.removeEffectCallback as jest.Mock).mock.calls
@@ -863,50 +466,31 @@ describe('NodeExecutionEngine', () => {
   })
 
   describe('Effect Raiser Node', () => {
-    it('should execute effect when Effect Raiser is triggered', async () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
+    const raiserCue = (
+      raiser: EffectRaiserNode,
+      actions: ActionNode[] = [],
+      connections: Connection[] = [{ from: 'event1', to: 'raiser1' }],
+    ): NetNodeCueDefinition =>
+      testCue(
+        {
+          events: [beatEvent],
+          actions,
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [raiser],
+        },
+        connections,
+        { cueType: 'TestType' as CueType, description: 'Test' },
+      )
 
+    it('should execute effect when Effect Raiser is triggered', async () => {
       const effectRaiserNode = {
         id: 'raiser1',
         type: 'effect-raiser' as const,
         effectId: 'test-effect',
         label: 'Raise Effect',
         outputs: [],
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: 'TestType' as CueType,
-        style: 'primary',
-        description: 'Test',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [],
-          eventRaisers: [],
-          eventListeners: [],
-          effectRaisers: [effectRaiserNode],
-        },
-        connections: [{ from: 'event1', to: 'raiser1' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]]),
       }
 
       // Create a mock effect
@@ -922,18 +506,9 @@ describe('NodeExecutionEngine', () => {
       const effectRegistry = new EffectRegistry()
       effectRegistry.registerEffect('test-effect', mockEffect as CompiledEffect)
 
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        effectRegistry,
-      )
+      const engine = createEngine(raiserCue(effectRaiserNode), { effectRegistry })
 
-      await engine.startExecution(eventNode, createCueData('Strong'))
+      await engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Effect should be found and executed (non-blocking)
       // In real execution, EffectExecutionEngine would be triggered
@@ -941,12 +516,6 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should handle missing effect gracefully', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const effectRaiserNode = {
         id: 'raiser1',
         type: 'effect-raiser' as const,
@@ -955,63 +524,17 @@ describe('NodeExecutionEngine', () => {
         outputs: [],
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: 'TestType' as CueType,
-        style: 'primary',
-        description: 'Test',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [],
-          eventRaisers: [],
-          eventListeners: [],
-          effectRaisers: [effectRaiserNode],
-        },
-        connections: [{ from: 'event1', to: 'raiser1' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]]),
-      }
-
       const effectRegistry = new EffectRegistry() // Empty registry
 
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        effectRegistry,
-      )
+      const engine = createEngine(raiserCue(effectRaiserNode), { effectRegistry })
 
       // Should not throw, just log warning
       expect(() => {
-        engine.startExecution(eventNode, createCueData('Strong'))
+        engine.startExecution(beatEvent, createCueData('Strong'))
       }).not.toThrow()
     })
 
     it('should continue execution after Effect Raiser (non-blocking)', async () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const effectRaiserNode = {
         id: 'raiser1',
         type: 'effect-raiser' as const,
@@ -1043,43 +566,6 @@ describe('NodeExecutionEngine', () => {
           level: { source: 'literal', value: 1 },
         },
         layer: { source: 'literal', value: 0 },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: 'TestType' as CueType,
-        style: 'primary',
-        description: 'Test',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [],
-          eventRaisers: [],
-          eventListeners: [],
-          effectRaisers: [effectRaiserNode],
-        },
-        connections: [
-          { from: 'event1', to: 'raiser1' },
-          { from: 'raiser1', to: 'action1' },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'raiser1' }]],
-          ['raiser1', [{ from: 'raiser1', to: 'action1' }]],
-        ]),
       }
 
       const effectListenerNode = {
@@ -1116,18 +602,19 @@ describe('NodeExecutionEngine', () => {
       const effectRegistry = new EffectRegistry()
       effectRegistry.registerEffect('test-effect', mockEffect as unknown as CompiledEffect)
 
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        effectRegistry,
+      const engine = createEngine(
+        raiserCue(
+          effectRaiserNode,
+          [actionNode],
+          [
+            { from: 'event1', to: 'raiser1' },
+            { from: 'raiser1', to: 'action1' },
+          ],
+        ),
+        { effectRegistry },
       )
 
-      await engine.startExecution(eventNode, createCueData('Strong'))
+      await engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Both effect and subsequent action should execute
       // Effect executes async, action executes in chain
@@ -1221,12 +708,6 @@ describe('NodeExecutionEngine', () => {
       const effectRegistry = new EffectRegistry()
       effectRegistry.registerEffect('score-like-effect', compiledEffect)
 
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const effectRaiserNode = {
         id: 'raiser1',
         type: 'effect-raiser' as const,
@@ -1239,37 +720,6 @@ describe('NodeExecutionEngine', () => {
           waitUntilCondition: { source: 'literal' as const, value: 'delay' },
           waitUntilTime: { source: 'literal' as const, value: 500 },
         },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: 'TestType' as CueType,
-        style: 'primary',
-        description: 'Test',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [],
-          eventRaisers: [],
-          eventListeners: [],
-          effectRaisers: [effectRaiserNode],
-        },
-        connections: [{ from: 'event1', to: 'raiser1' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]]),
       }
 
       cueLevelVarStore.set('lights', {
@@ -1291,18 +741,9 @@ describe('NodeExecutionEngine', () => {
         captureEffect,
       )
 
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        effectRegistry,
-      )
+      const engine = createEngine(raiserCue(effectRaiserNode), { effectRegistry })
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       expect(submittedEffect).toBeDefined()
       expect(submittedEffect.transitions?.length).toBeGreaterThan(0)
@@ -1315,206 +756,97 @@ describe('NodeExecutionEngine', () => {
   })
 
   describe('Data Nodes', () => {
-    it('should extract YARG cue data and assign to variable', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const cueDataNode: LogicNode = {
-        id: 'cuedata1',
-        type: 'logic',
-        logicType: 'cue-data',
-        dataProperty: 'bpm',
-        assignTo: 'currentBpm',
-        outputs: [],
-      }
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
+    it.each<{
+      name: string
+      node: LogicNode
+      variable: string
+      cueData?: Partial<CueData>
+      lightsInGroup?: (groups: string | string[]) => Partial<TrackedLight>[]
+      expected: number
+    }>([
+      {
+        name: 'should extract YARG cue data and assign to variable',
+        node: {
+          id: 'cuedata1',
+          type: 'logic',
+          logicType: 'cue-data',
+          dataProperty: 'bpm',
+          assignTo: 'currentBpm',
+          outputs: [],
         },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
+        variable: 'currentBpm',
+        cueData: { beatsPerMinute: 140 },
+        expected: 140,
+      },
+      {
+        name: 'should extract config data and assign to variable',
+        node: {
+          id: 'configdata1',
+          type: 'logic',
+          logicType: 'config-data',
+          dataProperty: 'front-lights-count',
+          assignTo: 'numFrontLights',
+          outputs: [],
         },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
+        variable: 'numFrontLights',
+        lightsInGroup: () => Array.from({ length: 8 }, (_, i) => ({ id: `f${i + 1}` })),
+        expected: 8,
+      },
+      {
+        name: 'should extract config data for total lights',
+        node: {
+          id: 'configdata1',
+          type: 'logic',
+          logicType: 'config-data',
+          dataProperty: 'total-lights',
+          assignTo: 'totalCount',
+          outputs: [],
         },
+        variable: 'totalCount',
+        lightsInGroup: (groups) => {
+          if (Array.isArray(groups)) {
+            return [
+              { id: 'f1', position: 0 },
+              { id: 'f2', position: 1 },
+              { id: 'f3', position: 2 },
+              { id: 'f4', position: 3 },
+              { id: 'b1', position: 0 },
+              { id: 'b2', position: 1 },
+              { id: 's1', position: 0 },
+            ]
+          }
+          return []
+        },
+        expected: 7,
+      },
+    ])('$name', ({ node, variable, cueData, lightsInGroup, expected }) => {
+      if (lightsInGroup) {
+        mockLightManager.getLightsInGroup = jest.fn(
+          lightsInGroup,
+        ) as unknown as DmxLightManager['getLightsInGroup']
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [cueDataNode],
-        },
-        connections: [
-          { from: 'event1', to: 'cuedata1' },
-          { from: 'cuedata1', to: 'action1' },
-        ],
-        variables: [{ name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map([['cuedata1', cueDataNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
-          ['cuedata1', [{ from: 'cuedata1', to: 'action1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+      const engine = createEngine(
+        testCue(
+          {
+            events: [beatEvent],
+            actions: [setColorAction('action1', 'red', { duration: 200 })],
+            logic: [node],
+          },
+          [
+            { from: 'event1', to: node.id },
+            { from: node.id, to: 'action1' },
+          ],
+          { variables: [{ name: variable, type: 'number', scope: 'cue', initialValue: 0 }] },
+        ),
       )
 
-      const parameters = createCueData('Strong')
-      parameters.beatsPerMinute = 140
-      engine.startExecution(eventNode, parameters)
+      engine.startExecution(beatEvent, { ...createCueData('Strong'), ...cueData })
 
       // Verify variable was set
-      const storedVar = cueLevelVarStore.get('currentBpm')
+      const storedVar = cueLevelVarStore.get(variable)
       expect(storedVar).toBeDefined()
-      expect(storedVar?.value).toBe(140)
-      expect(storedVar?.type).toBe('number')
-
-      // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
-    })
-
-    it('should extract config data and assign to variable', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const configDataNode: LogicNode = {
-        id: 'configdata1',
-        type: 'logic',
-        logicType: 'config-data',
-        dataProperty: 'front-lights-count',
-        assignTo: 'numFrontLights',
-        outputs: [],
-      }
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [configDataNode],
-        },
-        connections: [
-          { from: 'event1', to: 'configdata1' },
-          { from: 'configdata1', to: 'action1' },
-        ],
-        variables: [{ name: 'numFrontLights', type: 'number', scope: 'cue', initialValue: 0 }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map([['configdata1', configDataNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'configdata1' }]],
-          ['configdata1', [{ from: 'configdata1', to: 'action1' }]],
-        ]),
-      }
-
-      // Mock getLightsInGroup to return 8 front lights
-      mockLightManager.getLightsInGroup = jest
-        .fn()
-        .mockReturnValue([
-          { id: 'f1' },
-          { id: 'f2' },
-          { id: 'f3' },
-          { id: 'f4' },
-          { id: 'f5' },
-          { id: 'f6' },
-          { id: 'f7' },
-          { id: 'f8' },
-        ])
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
-
-      // Verify variable was set
-      const storedVar = cueLevelVarStore.get('numFrontLights')
-      expect(storedVar).toBeDefined()
-      expect(storedVar?.value).toBe(8)
+      expect(storedVar?.value).toBe(expected)
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
@@ -1522,12 +854,6 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should handle cue data node without assignTo', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const cueDataNode: LogicNode = {
         id: 'cuedata1',
         type: 'logic',
@@ -1537,72 +863,21 @@ describe('NodeExecutionEngine', () => {
         outputs: [],
       }
 
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [cueDataNode],
-        },
-        connections: [
-          { from: 'event1', to: 'cuedata1' },
-          { from: 'cuedata1', to: 'action1' },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map([['cuedata1', cueDataNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
-          ['cuedata1', [{ from: 'cuedata1', to: 'action1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
+      const engine = createEngine(
+        testCue(
+          {
+            events: [beatEvent],
+            actions: [setColorAction('action1', 'red', { duration: 200 })],
+            logic: [cueDataNode],
+          },
+          [
+            { from: 'event1', to: 'cuedata1' },
+            { from: 'cuedata1', to: 'action1' },
+          ],
+        ),
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // No variable should be set
       expect(cueLevelVarStore.size).toBe(0)
@@ -1612,12 +887,6 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should use cue data in conditional branching', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const cueDataNode: LogicNode = {
         id: 'cuedata1',
         type: 'logic',
@@ -1637,113 +906,30 @@ describe('NodeExecutionEngine', () => {
         outputs: [],
       }
 
-      const actionHigh: ActionNode = {
-        id: 'action-high',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const actionLow: ActionNode = {
-        id: 'action-low',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'blue' },
-          brightness: { source: 'literal', value: 'low' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionHigh, actionLow],
-          logic: [cueDataNode, conditionalNode],
-        },
-        connections: [
-          { from: 'event1', to: 'cuedata1' },
-          { from: 'cuedata1', to: 'conditional1' },
-          { from: 'conditional1', to: 'action-high', fromPort: 'true' },
-          { from: 'conditional1', to: 'action-low', fromPort: 'false' },
-        ],
-        variables: [{ name: 'noteCount', type: 'number', scope: 'cue', initialValue: 0 }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([
-          ['action-high', actionHigh],
-          ['action-low', actionLow],
-        ]),
-        logicMap: new Map<string, LogicNode>([
-          ['cuedata1', cueDataNode],
-          ['conditional1', conditionalNode],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
-          ['cuedata1', [{ from: 'cuedata1', to: 'conditional1' }]],
-          [
-            'conditional1',
-            [
-              { from: 'conditional1', to: 'action-high', fromPort: 'true' },
-              { from: 'conditional1', to: 'action-low', fromPort: 'false' },
+      const engine = createEngine(
+        testCue(
+          {
+            events: [beatEvent],
+            actions: [
+              setColorAction('action-high', 'red', { duration: 200 }),
+              setColorAction('action-low', 'blue', { brightness: 'low', duration: 200 }),
             ],
+            logic: [cueDataNode, conditionalNode],
+          },
+          [
+            { from: 'event1', to: 'cuedata1' },
+            { from: 'cuedata1', to: 'conditional1' },
+            { from: 'conditional1', to: 'action-high', fromPort: 'true' },
+            { from: 'conditional1', to: 'action-low', fromPort: 'false' },
           ],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+          { variables: [{ name: 'noteCount', type: 'number', scope: 'cue', initialValue: 0 }] },
+        ),
       )
 
       // Test with 3 guitar notes (should trigger high action)
       const parameters = createCueData('Strong')
       parameters.guitarNotes = ['Green', 'Red', 'Yellow'] as CueData['guitarNotes']
-      engine.startExecution(eventNode, parameters)
+      engine.startExecution(beatEvent, parameters)
 
       // Verify variable was set correctly
       const storedVar = cueLevelVarStore.get('noteCount')
@@ -1754,117 +940,6 @@ describe('NodeExecutionEngine', () => {
         expect.stringContaining('action-high'),
         expect.anything(),
       )
-    })
-
-    it('should extract config data for total lights', () => {
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const configDataNode: LogicNode = {
-        id: 'configdata1',
-        type: 'logic',
-        logicType: 'config-data',
-        dataProperty: 'total-lights',
-        assignTo: 'totalCount',
-        outputs: [],
-      }
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'red' },
-          brightness: { source: 'literal', value: 'high' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [configDataNode],
-        },
-        connections: [
-          { from: 'event1', to: 'configdata1' },
-          { from: 'configdata1', to: 'action1' },
-        ],
-        variables: [{ name: 'totalCount', type: 'number', scope: 'cue', initialValue: 0 }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map([['configdata1', configDataNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'configdata1' }]],
-          ['configdata1', [{ from: 'configdata1', to: 'action1' }]],
-        ]),
-      }
-
-      // Mock total lights count
-      mockLightManager.getLightsInGroup = jest.fn((groups) => {
-        if (Array.isArray(groups)) {
-          return [
-            { id: 'f1', position: 0 },
-            { id: 'f2', position: 1 },
-            { id: 'f3', position: 2 },
-            { id: 'f4', position: 3 },
-            { id: 'b1', position: 0 },
-            { id: 'b2', position: 1 },
-            { id: 's1', position: 0 },
-          ]
-        }
-        return []
-      })
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
-
-      // Verify variable was set
-      const storedVar = cueLevelVarStore.get('totalCount')
-      expect(storedVar).toBeDefined()
-      expect(storedVar?.value).toBe(7)
-      expect(storedVar?.type).toBe('number')
-
-      // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
     })
   })
 
@@ -1884,120 +959,50 @@ describe('NodeExecutionEngine', () => {
       })
     })
 
-    it('should resolve variable for color name', () => {
-      // Setup: event -> variable (set color) -> action (use color variable)
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-        outputs: ['var1'],
-      }
-
-      const variableNode: LogicNode = {
-        id: 'var1',
-        type: 'logic',
-        logicType: 'variable',
-        mode: 'set',
+    it.each<{
+      name: string
+      varName: string
+      value: string
+      groups: ValueSource
+      color: ValueSource
+      brightness: string
+    }>([
+      {
+        name: 'should resolve variable for color name',
         varName: 'myColor',
-        valueType: 'string',
-        value: { source: 'literal', value: 'red' },
-        outputs: ['action1'],
-      }
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'variable', name: 'myColor' },
-          brightness: { source: 'literal', value: 'medium' },
-          blendMode: { source: 'literal', value: 'replace' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-          easing: { source: 'literal', value: 'sinInOut' },
-          level: { source: 'literal', value: 1 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [variableNode],
-        },
-        connections: [
-          { from: 'event1', to: 'var1', fromPort: 'event1', toPort: 'var1' },
-          { from: 'var1', to: 'action1', fromPort: 'var1', toPort: 'action1' },
-        ],
-        variables: [{ name: 'myColor', type: 'string', scope: 'cue', initialValue: '' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map([[actionNode.id, actionNode]]),
-        logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'var1' }]],
-          ['var1', [{ from: 'var1', to: 'action1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
-
-      jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
-      // The resolved color should be 'red' from the variable
-    })
-
-    it('should resolve variable for target groups', () => {
-      // Setup: variable (set groups) -> action (use groups variable)
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-        outputs: ['var1'],
-      }
+        value: 'red',
+        groups: { source: 'literal', value: 'front' },
+        color: { source: 'variable', name: 'myColor' },
+        brightness: 'medium',
+      },
+      {
+        name: 'should resolve variable for target groups',
+        varName: 'targetGroups',
+        value: 'front,back',
+        groups: { source: 'variable', name: 'targetGroups' },
+        color: { source: 'literal', value: 'blue' },
+        brightness: 'high',
+      },
+      {
+        name: 'should handle invalid color variable gracefully',
+        varName: 'badColor',
+        value: 'not-a-valid-color',
+        groups: { source: 'literal', value: 'front' },
+        color: { source: 'variable', name: 'badColor' },
+        brightness: 'medium',
+      },
+    ])('$name', ({ varName, value, groups, color, brightness }) => {
+      // Setup: event -> variable (set string) -> action reading that variable
+      const eventNode: NetEventNode = { ...beatEvent, outputs: ['var1'] }
 
       const variableNode: LogicNode = {
         id: 'var1',
         type: 'logic',
         logicType: 'variable',
         mode: 'set',
-        varName: 'targetGroups',
+        varName,
         valueType: 'string',
-        value: { source: 'literal', value: 'front,back' },
+        value: { source: 'literal', value },
         outputs: ['action1'],
       }
 
@@ -2006,12 +1011,12 @@ describe('NodeExecutionEngine', () => {
         type: 'action',
         effectType: 'set-color',
         target: {
-          groups: { source: 'variable', name: 'targetGroups' },
+          groups,
           filter: { source: 'literal', value: 'all' },
         },
         color: {
-          name: { source: 'literal', value: 'blue' },
-          brightness: { source: 'literal', value: 'high' },
+          name: color,
+          brightness: { source: 'literal', value: brightness },
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
@@ -2025,67 +1030,30 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [variableNode],
-        },
-        connections: [
-          { from: 'event1', to: 'var1' },
-          { from: 'var1', to: 'action1' },
-        ],
-        variables: [{ name: 'targetGroups', type: 'string', scope: 'cue', initialValue: '' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map([[actionNode.id, actionNode]]),
-        logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'var1' }]],
-          ['var1', [{ from: 'var1', to: 'action1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+      const engine = createEngine(
+        testCue(
+          { events: [eventNode], actions: [actionNode], logic: [variableNode] },
+          [
+            { from: 'event1', to: 'var1' },
+            { from: 'var1', to: 'action1' },
+          ],
+          {
+            cueType: CueType.Intro,
+            variables: [{ name: varName, type: 'string', scope: 'cue', initialValue: '' }],
+          },
+        ),
+        { cueId: 'test-cue' },
       )
 
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
       expect(mockSequencer.addEffect).toHaveBeenCalled()
-      // Groups should be resolved to ['front', 'back']
     })
 
     it('should report runtime error when variable not found', () => {
       // Action references non-existent variable; runtime reports error via IPC
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-        outputs: ['action1'],
-      }
+      const eventNode: NetEventNode = { ...beatEvent, outputs: ['action1'] }
 
       const actionNode: ActionNode = {
         id: 'action1',
@@ -2111,47 +1079,16 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [],
-        },
-        connections: [{ from: 'event1', to: 'action1' }],
-        variables: [],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map([[actionNode.id, actionNode]]),
-        logicMap: new Map<string, LogicNode>(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
-      }
-
       const emit = jest.fn()
       const testBroadcaster = { emit }
 
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        testBroadcaster,
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+      const engine = createEngine(
+        testCue(
+          { events: [eventNode], actions: [actionNode], logic: [] },
+          [{ from: 'event1', to: 'action1' }],
+          { cueType: CueType.Intro, variables: [] },
+        ),
+        { cueId: 'test-cue', broadcaster: testBroadcaster },
       )
 
       engine.startExecution(eventNode, createCueData('Strong'))
@@ -2165,12 +1102,7 @@ describe('NodeExecutionEngine', () => {
 
     it('should resolve variable for duration', () => {
       // Cue data -> math -> action with dynamic duration
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-        outputs: ['cuedata1'],
-      }
+      const eventNode: NetEventNode = { ...beatEvent, outputs: ['cuedata1'] }
 
       const cueDataNode: LogicNode = {
         id: 'cuedata1',
@@ -2216,58 +1148,23 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [cueDataNode, mathNode],
-        },
-        connections: [
-          { from: 'event1', to: 'cuedata1' },
-          { from: 'cuedata1', to: 'math1' },
-          { from: 'math1', to: 'action1' },
-        ],
-        variables: [
-          { name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 },
-          { name: 'calculatedDuration', type: 'number', scope: 'cue', initialValue: 0 },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map([[actionNode.id, actionNode]]),
-        logicMap: new Map<string, LogicNode>([
-          [cueDataNode.id, cueDataNode],
-          [mathNode.id, mathNode],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
-          ['cuedata1', [{ from: 'cuedata1', to: 'math1' }]],
-          ['math1', [{ from: 'math1', to: 'action1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+      const engine = createEngine(
+        testCue(
+          { events: [eventNode], actions: [actionNode], logic: [cueDataNode, mathNode] },
+          [
+            { from: 'event1', to: 'cuedata1' },
+            { from: 'cuedata1', to: 'math1' },
+            { from: 'math1', to: 'action1' },
+          ],
+          {
+            cueType: CueType.Intro,
+            variables: [
+              { name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 },
+              { name: 'calculatedDuration', type: 'number', scope: 'cue', initialValue: 0 },
+            ],
+          },
+        ),
+        { cueId: 'test-cue' },
       )
 
       engine.startExecution(eventNode, createCueData('Strong'))
@@ -2276,103 +1173,6 @@ describe('NodeExecutionEngine', () => {
       expect(mockSequencer.addEffect).toHaveBeenCalled()
       // Duration should be 120 (BPM) * 5 = 600
       expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600)
-    })
-
-    it('should handle invalid color variable gracefully', () => {
-      // Variable contains invalid color, should use default
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-        outputs: ['var1'],
-      }
-
-      const variableNode: LogicNode = {
-        id: 'var1',
-        type: 'logic',
-        logicType: 'variable',
-        mode: 'set',
-        varName: 'badColor',
-        valueType: 'string',
-        value: { source: 'literal', value: 'not-a-valid-color' },
-        outputs: ['action1'],
-      }
-
-      const actionNode: ActionNode = {
-        id: 'action1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'variable', name: 'badColor' },
-          brightness: { source: 'literal', value: 'medium' },
-          blendMode: { source: 'literal', value: 'replace' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 200 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-          easing: { source: 'literal', value: 'sinInOut' },
-          level: { source: 'literal', value: 1 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [variableNode],
-        },
-        connections: [
-          { from: 'event1', to: 'var1' },
-          { from: 'var1', to: 'action1' },
-        ],
-        variables: [{ name: 'badColor', type: 'string', scope: 'cue', initialValue: '' }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map([[actionNode.id, actionNode]]),
-        logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'var1' }]],
-          ['var1', [{ from: 'var1', to: 'action1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
-
-      jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
-      // Should resolve to default color 'blue' (from resolveColor method)
     })
   })
 
@@ -2386,12 +1186,6 @@ describe('NodeExecutionEngine', () => {
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const configDataNode: LogicNode = {
         id: 'config1',
         type: 'logic',
@@ -2400,47 +1194,21 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'frontLights',
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [configDataNode],
-        },
-        connections: [{ from: 'event1', to: 'config1' }],
-        variables: [{ name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] }],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map<string, LogicNode>([[configDataNode.id, configDataNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([['event1', [{ from: 'event1', to: 'config1' }]]]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+      const engine = createEngine(
+        testCue(
+          { events: [beatEvent], actions: [], logic: [configDataNode] },
+          [{ from: 'event1', to: 'config1' }],
+          {
+            cueType: CueType.Intro,
+            variables: [
+              { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+            ],
+          },
+        ),
+        { cueId: 'test-cue' },
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       // Check that the light array was stored in the variable store
       const storedValue = cueLevelVarStore.get('frontLights')
@@ -2465,12 +1233,6 @@ describe('NodeExecutionEngine', () => {
         return []
       }) as unknown as DmxLightManager['getLightsInGroup']
 
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const config1: LogicNode = {
         id: 'config1',
         type: 'logic',
@@ -2487,64 +1249,25 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'backLights',
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [config1, config2],
-        },
-        connections: [
-          { from: 'event1', to: 'config1' },
-          { from: 'event1', to: 'config2' },
-        ],
-        variables: [
-          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map<string, LogicNode>([
-          [config1.id, config1],
-          [config2.id, config2],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
+      const engine = createEngine(
+        testCue(
+          { events: [beatEvent], actions: [], logic: [config1, config2] },
           [
-            'event1',
-            [
-              { from: 'event1', to: 'config1' },
-              { from: 'event1', to: 'config2' },
-            ],
+            { from: 'event1', to: 'config1' },
+            { from: 'event1', to: 'config2' },
           ],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+          {
+            cueType: CueType.Intro,
+            variables: [
+              { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+              { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
+            ],
+          },
+        ),
+        { cueId: 'test-cue' },
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       expect(cueLevelVarStore.get('frontLights')?.value).toEqual(mockFrontLights)
       expect(cueLevelVarStore.get('backLights')?.value).toEqual(mockBackLights)
@@ -2565,12 +1288,6 @@ describe('NodeExecutionEngine', () => {
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const configNode: LogicNode = {
         id: 'config1',
         type: 'logic',
@@ -2588,59 +1305,25 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'selectedLight',
       }
 
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [configNode, indexNode],
-        },
-        connections: [
-          { from: 'event1', to: 'config1' },
-          { from: 'config1', to: 'lights-index1' },
-        ],
-        variables: [
-          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map<string, LogicNode>([
-          [configNode.id, configNode],
-          [indexNode.id, indexNode],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'config1' }]],
-          ['config1', [{ from: 'config1', to: 'lights-index1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
+      const engine = createEngine(
+        testCue(
+          { events: [beatEvent], actions: [], logic: [configNode, indexNode] },
+          [
+            { from: 'event1', to: 'config1' },
+            { from: 'config1', to: 'lights-index1' },
+          ],
+          {
+            cueType: CueType.Intro,
+            variables: [
+              { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
+              { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] },
+            ],
+          },
+        ),
+        { cueId: 'test-cue' },
       )
 
-      engine.startExecution(eventNode, createCueData('Strong'))
+      engine.startExecution(beatEvent, createCueData('Strong'))
 
       const selectedLight = cueLevelVarStore.get('selectedLight')
       expect(selectedLight).toBeDefined()
@@ -2889,78 +1572,30 @@ describe('NodeExecutionEngine', () => {
       assignEdge: 'ledEdge',
     } as unknown as LogicNode
 
-    const actionNode: ActionNode = {
-      id: 'action1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 200 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-        easing: { source: 'literal', value: 'linear' },
-      },
-    }
+    const actionNode = setColorAction('action1', 'red', { duration: 200, easing: 'linear' })
 
-    const eventNode: NetEventNode = { id: 'event1', type: 'event', eventType: 'beat' }
+    const ledVariables: VariableDefinition[] = [
+      { name: 'ledIndex', type: 'number', scope: 'cue', initialValue: 0 },
+      { name: 'ledColor', type: 'string', scope: 'cue', initialValue: 'transparent' },
+      { name: 'ledEdge', type: 'string', scope: 'cue', initialValue: '' },
+    ]
 
-    const buildEngine = (): NodeExecutionEngine => {
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.RB3,
-        style: 'primary',
-        nodes: { events: [eventNode], actions: [actionNode], logic: [ledChangedNode] },
-        connections: [
-          { from: 'event1', to: 'lc1' },
-          { from: 'lc1', to: 'action1', fromPort: 'each' },
-        ],
-      }
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([['action1', actionNode]]),
-        logicMap: new Map([['lc1', ledChangedNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'lc1' }]],
-          ['lc1', [{ from: 'lc1', to: 'action1', fromPort: 'each' }]],
-        ]),
-      }
-      return new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        [
-          { name: 'ledIndex', type: 'number', scope: 'cue', initialValue: 0 },
-          { name: 'ledColor', type: 'string', scope: 'cue', initialValue: 'transparent' },
-          { name: 'ledEdge', type: 'string', scope: 'cue', initialValue: '' },
-        ],
+    const buildEngine = (): NodeExecutionEngine =>
+      createEngine(
+        testCue(
+          { events: [beatEvent], actions: [actionNode], logic: [ledChangedNode] },
+          [
+            { from: 'event1', to: 'lc1' },
+            { from: 'lc1', to: 'action1', fromPort: 'each' },
+          ],
+          { cueType: CueType.RB3 },
+        ),
+        { variables: ledVariables },
       )
-    }
 
     const runFrame = (cueData: CueData): string[] => {
       ;(mockSequencer.addEffect as jest.Mock).mockClear()
-      buildEngine().startExecution(eventNode, cueData)
+      buildEngine().startExecution(beatEvent, cueData)
       return (mockSequencer.addEffect as jest.Mock).mock.calls.map((c) => c[0] as string)
     }
 
@@ -3002,60 +1637,21 @@ describe('NodeExecutionEngine', () => {
 
     it('runs the done branch after the fan-out and reuses the memoized body across frames', () => {
       const action2: ActionNode = { ...actionNode, id: 'action2' }
-      const compiledCue: CompiledNetCue = {
-        mode: 'rb3',
-        definition: {
-          id: 'test-cue',
-          name: 'Test Cue',
-          kind: 'lighting',
-          cueType: CueType.RB3,
-          style: 'primary',
-          nodes: { events: [eventNode], actions: [actionNode, action2], logic: [ledChangedNode] },
-          connections: [
+      const engine = createEngine(
+        testCue(
+          { events: [beatEvent], actions: [actionNode, action2], logic: [ledChangedNode] },
+          [
             { from: 'event1', to: 'lc1' },
             { from: 'lc1', to: 'action1', fromPort: 'each' },
             { from: 'lc1', to: 'action2', fromPort: 'done' },
           ],
-        },
-        eventMap: new Map([['event1', eventNode]]),
-        actionMap: new Map([
-          ['action1', actionNode],
-          ['action2', action2],
-        ]),
-        logicMap: new Map([['lc1', ledChangedNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'lc1' }]],
-          [
-            'lc1',
-            [
-              { from: 'lc1', to: 'action1', fromPort: 'each' },
-              { from: 'lc1', to: 'action2', fromPort: 'done' },
-            ],
-          ],
-        ]),
-      }
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-group:test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        [
-          { name: 'ledIndex', type: 'number', scope: 'cue', initialValue: 0 },
-          { name: 'ledColor', type: 'string', scope: 'cue', initialValue: 'transparent' },
-          { name: 'ledEdge', type: 'string', scope: 'cue', initialValue: '' },
-        ],
+          { cueType: CueType.RB3 },
+        ),
+        { mode: 'rb3', variables: ledVariables },
       )
       const run = (): string[] => {
         ;(mockSequencer.addEffect as jest.Mock).mockClear()
-        engine.startExecution(eventNode, frame(banks(bank([0, 2]), 0, 0, 0), banks(0, 0, 0, 0)))
+        engine.startExecution(beatEvent, frame(banks(bank([0, 2]), 0, 0, 0), banks(0, 0, 0, 0)))
         return (mockSequencer.addEffect as jest.Mock).mock.calls.map((c) => c[0] as string)
       }
 

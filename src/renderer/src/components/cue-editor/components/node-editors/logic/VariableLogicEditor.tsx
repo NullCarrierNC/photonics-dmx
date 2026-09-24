@@ -8,6 +8,7 @@ import { VARIABLE_TYPES } from '../../../../../../../photonics-dmx/cues/types/no
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import MultiItemSummary from './MultiItemSummary'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface VariableLogicEditorProps extends LogicEditorCommonProps {
   node: VariableLogicNode
@@ -40,20 +41,14 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
           <option value="init">Init</option>
         </select>
       </label>
-      <label className="flex flex-col font-medium">
-        Variable Name
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.varName}
-          onChange={(event) => updateNode({ varName: event.target.value })}>
-          <option value="">-- Select Variable --</option>
-          {availableVariables.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.type}, {v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Variable Name"
+        value={node.varName}
+        onChange={(name) => updateNode({ varName: name })}
+        variables={availableVariables}
+        placeholder="-- Select Variable --"
+        showType
+      />
       <label className="flex flex-col font-medium">
         Type
         <select

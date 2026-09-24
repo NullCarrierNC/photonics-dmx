@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { getYargFallbackCueTimeMs, setYargFallbackCueTimeMs } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { persistSetting } from '../ipc/persistPrefs'
 import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const log = createLogger('YargFallbackSettings')
 
@@ -17,6 +19,7 @@ const YargFallbackSettings: React.FC = () => {
   const [seconds, setSeconds] = useState(20)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -38,22 +41,23 @@ const YargFallbackSettings: React.FC = () => {
     async (value: number) => {
       if (isSaving) return
       const clampedSeconds = Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, Math.round(value)))
+      const previous = seconds
       setSeconds(clampedSeconds)
-      try {
-        setIsSaving(true)
-        const result = await setYargFallbackCueTimeMs(clampedSeconds * 1000)
-        if (result.success && typeof result.fallbackMs === 'number') {
-          setSeconds(Math.round(result.fallbackMs / 1000))
-        } else if (!result.success) {
-          log.error('Failed to save YARG fallback time:', result.error)
-        }
-      } catch (error) {
-        log.error('Failed to save YARG fallback time:', error)
-      } finally {
-        setIsSaving(false)
+      setSaveError(null)
+      setIsSaving(true)
+      const saved = await persistSetting(
+        () => setYargFallbackCueTimeMs(clampedSeconds * 1000),
+        'the fallback time',
+        setSaveError,
+      )
+      if (saved === null) {
+        setSeconds(previous)
+      } else if (typeof saved.fallbackMs === 'number') {
+        setSeconds(Math.round(saved.fallbackMs / 1000))
       }
+      setIsSaving(false)
     },
-    [isSaving],
+    [isSaving, seconds],
   )
 
   return (
@@ -95,6 +99,7 @@ const YargFallbackSettings: React.FC = () => {
           <span className="text-sm text-gray-600 dark:text-gray-400">seconds (0 = disabled)</span>
         </div>
       </div>
+      <SaveErrorAlert message={saveError} />
     </div>
   )
 }

@@ -7,7 +7,9 @@
  * what stops a change made just before leaving a page from disappearing.
  *
  * The write itself belongs to the caller: it says whether the value landed, and anything it wants
- * to do with a refusal, a revert or a value the main process answered with, it does in there.
+ * to do with a refusal, a revert or a value the main process answered with, it does in there. A
+ * write that resolves `false` or rejects did not land, so the same value is written again when it
+ * next comes round.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { createLogger } from '../../../shared/logger'
@@ -44,6 +46,9 @@ export function useDebouncedSave<T>(
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const held = useRef<{ value: T } | null>(null)
   const written = useRef<{ value: T } | null>(null)
+  // The write still waiting on its answer. Only it may record what landed, and a seed or a later
+  // write takes that from it.
+  const attempt = useRef<{ value: T } | null>(null)
 
   // Held in a ref so the unmount write uses the current writer, not the one from the first render.
   const writeRef = useRef(write)
@@ -75,8 +80,13 @@ export function useDebouncedSave<T>(
     if (last !== null && same !== undefined && same(last.value, pending.value)) {
       return
     }
-    written.current = pending
-    writeRef.current(pending.value).catch((error) => log.error('A debounced save failed', error))
+    attempt.current = pending
+    writeRef.current(pending.value).then(
+      (landed) => {
+        if (landed !== false && attempt.current === pending) written.current = pending
+      },
+      (error) => log.error('A debounced save failed', error),
+    )
   }, [clearTimer])
 
   const cancel = useCallback((): void => {
@@ -97,6 +107,7 @@ export function useDebouncedSave<T>(
   )
 
   const seed = useCallback((value: T): void => {
+    attempt.current = null
     written.current = { value }
   }, [])
 

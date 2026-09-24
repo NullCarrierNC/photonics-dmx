@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
+import { useAtomValue } from 'jotai'
 import { CueData } from 'src/photonics-dmx/cues/types/cueTypes'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import { registerIpcListener } from '@renderer/utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { setListenCueData, getYargEnabled, getRb3Enabled } from '../ipcApi'
+import { setListenCueData } from '../ipcApi'
+import { rb3eListenerEnabledAtom, yargListenerEnabledAtom } from '../atoms'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('NetworkDebug')
 
@@ -24,9 +26,9 @@ const NetworkDebug = () => {
   // Counter for the events.
   const [handledCount, setHandledCount] = useState(0)
 
-  // Track enabled listeners for re-registration
-  const [yargEnabled, setYargEnabled] = useState(false)
-  const [rb3Enabled, setRb3Enabled] = useState(false)
+  // Which listeners run, kept current for the window by useListenerEnabledSync
+  const yargEnabled = useAtomValue(yargListenerEnabledAtom)
+  const rb3Enabled = useAtomValue(rb3eListenerEnabledAtom)
 
   useEffect(() => {
     // Reset counter on mount.
@@ -73,36 +75,12 @@ const NetworkDebug = () => {
     }
   }, [])
 
-  // Monitor enabled listeners and re-register when they change
+  // A listener that starts while the page is open asks main for the cue data again
   useEffect(() => {
-    const checkEnabledState = async () => {
-      try {
-        const yargState = await getYargEnabled()
-        const rb3State = await getRb3Enabled()
-
-        const yargWasEnabled = yargEnabled
-        const rb3WasEnabled = rb3Enabled
-
-        setYargEnabled(yargState)
-        setRb3Enabled(rb3State)
-
-        // If listeners were enabled while we were already mounted, re-register
-        if ((yargState && !yargWasEnabled) || (rb3State && !rb3WasEnabled)) {
-          log.info('Listener state changed, re-registering cue data listeners')
-          setListenCueData(true)
-        }
-      } catch (error) {
-        log.error('Error checking listener state:', error)
-      }
+    if (yargEnabled || rb3Enabled) {
+      log.info('Listener state changed, re-registering cue data listeners')
+      setListenCueData(true)
     }
-
-    // Check initial state
-    void checkEnabledState()
-
-    // Set up interval to check for changes
-    const interval = setInterval(() => void checkEnabledState(), 1000)
-
-    return () => clearInterval(interval)
   }, [yargEnabled, rb3Enabled])
 
   const renderCueData = (data: CueData) => {

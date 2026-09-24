@@ -19,7 +19,11 @@ import {
   normalizeEnttecProDmxSpeedHz,
   normalizeOpenDmxSpeedHz,
 } from '../../shared/dmxOutputRefresh'
-import { validateStoredArtNetConfig, validateStoredSacnConfig } from '../ipc/inputValidation'
+import {
+  validateSerialDevicePath,
+  validateStoredArtNetConfig,
+  validateStoredSacnConfig,
+} from '../ipc/inputValidation'
 
 const log = createLogger('SenderLifecycle')
 
@@ -32,6 +36,34 @@ interface NetworkErrorLike {
 
 function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
   return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
+}
+
+const NETWORK_SEND_ERROR_CODES = new Set(['EHOSTUNREACH', 'EHOSTDOWN', 'ENETUNREACH', 'ETIMEDOUT'])
+
+/** A UDP send that the network refused, which a wire sender's socket raises uncaught. */
+export function isNetworkSendError(err: unknown): err is NetworkErrorLike {
+  return (
+    isNetworkErrorLike(err) &&
+    err.code !== undefined &&
+    NETWORK_SEND_ERROR_CODES.has(err.code) &&
+    err.syscall === 'send'
+  )
+}
+
+/**
+ * The serial port a USB sender's stored config names, held to the rule `SENDER_ENABLE` applies,
+ * because the file is editable by hand. Null when none is stored or it is not a serial device.
+ */
+function storedSerialPort(port: string | undefined, label: string): string | null {
+  if (!port) {
+    return null
+  }
+  const checked = validateSerialDevicePath(port)
+  if (!checked.ok) {
+    log.error(`Leaving the ${label} sender off, its stored port is invalid: ${checked.error}`)
+    return null
+  }
+  return checked.value
 }
 
 export type OutputSenderStateSnapshot = {
@@ -128,25 +160,12 @@ export class SenderLifecycleController {
   }
 
   /**
-   * Re-enable DMX output senders based on persisted preferences.
-   * Called after controller restart so that sACN / Art-Net / USB senders
-   * resume automatically without the user needing to toggle them off and on.
-   * When `activeSenders.ipc` is true (pre-restart snapshot), restores the IPC preview sender.
+   * Re-enable the senders that were running before a controller restart, each with the
+   * configuration saved for it, so output carries on without the user toggling them again. The
+   * saved `dmxOutputConfig` flags say which outputs the Status page offers, not which run.
    */
-  public async restoreSenderOutputsFromPrefs(
-    activeSenders?: OutputSenderStateSnapshot,
-  ): Promise<void> {
+  public async restoreRunningSenders(sendersToRestore: OutputSenderStateSnapshot): Promise<void> {
     const prefs = this.getConfig().getAllPreferences()
-    const outputConfig = prefs.dmxOutputConfig
-    if (!outputConfig) return
-
-    const sendersToRestore: OutputSenderStateSnapshot = activeSenders ?? {
-      sacn: outputConfig.sacnEnabled,
-      artnet: outputConfig.artNetEnabled,
-      enttecpro: outputConfig.enttecProEnabled,
-      opendmx: outputConfig.openDmxEnabled,
-      ipc: false,
-    }
 
     this.ensureSenderManager()
     const sm = this.senderManager!
@@ -223,11 +242,12 @@ export class SenderLifecycleController {
 
     if (sendersToRestore.enttecpro) {
       const ec = prefs.enttecProConfig
-      if (ec?.port) {
+      const port = storedSerialPort(ec?.port, 'Enttec Pro')
+      if (ec && port) {
         try {
           await sm.enableSender('enttecpro', 'enttecpro', {
             sender: 'enttecpro',
-            devicePath: ec.port,
+            devicePath: port,
             dmxSpeed: normalizeEnttecProDmxSpeedHz(ec.dmxSpeed),
           })
           log.info('Restored Enttec Pro sender from preferences')
@@ -239,11 +259,12 @@ export class SenderLifecycleController {
 
     if (sendersToRestore.opendmx) {
       const oc = prefs.openDmxConfig
-      if (oc?.port) {
+      const port = storedSerialPort(oc?.port, 'OpenDMX')
+      if (oc && port) {
         try {
           await sm.enableSender('opendmx', 'opendmx', {
             sender: 'opendmx',
-            devicePath: oc.port,
+            devicePath: port,
             dmxSpeed: normalizeOpenDmxSpeedHz(oc.dmxSpeed),
           })
           log.info('Restored OpenDMX sender from preferences')
@@ -261,30 +282,20 @@ export class SenderLifecycleController {
    * @returns true if the error was handled as a network sender error, false otherwise
    */
   public handleUncaughtException(error: unknown, getIsInitialized: () => boolean): boolean {
-    const isNetworkError =
-      isNetworkErrorLike(error) &&
-      (error.code === 'EHOSTUNREACH' ||
-        error.code === 'EHOSTDOWN' ||
-        error.code === 'ENETUNREACH' ||
-        error.code === 'ETIMEDOUT') &&
-      error.syscall === 'send'
-
-    if (!isNetworkError || !this.senderManager || !getIsInitialized()) {
+    if (!isNetworkSendError(error) || !this.senderManager || !getIsInitialized()) {
       return false
     }
 
     let senderId: string | null = null
-    if (isNetworkErrorLike(error)) {
-      const senderManager = this.senderManager
-      if (error.port != null) {
-        senderId = senderManager.getSenderIdByPort(error.port)
-      }
-      if (!senderId && error.port == null && error.address) {
-        if (senderManager.isSenderEnabled('artnet')) {
-          senderId = 'artnet'
-        } else if (senderManager.isSenderEnabled('sacn')) {
-          senderId = 'sacn'
-        }
+    const senderManager = this.senderManager
+    if (error.port != null) {
+      senderId = senderManager.getSenderIdByPort(error.port)
+    }
+    if (!senderId && error.port == null && error.address) {
+      if (senderManager.isSenderEnabled('artnet')) {
+        senderId = 'artnet'
+      } else if (senderManager.isSenderEnabled('sacn')) {
+        senderId = 'sacn'
       }
     }
 

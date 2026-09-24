@@ -1,10 +1,21 @@
 import * as path from 'path'
 
 /**
- * Report from ConfigFile when a read, JSON parse, migration, or schema check fails on disk;
- * the original file is preserved under a `.corrupt-*` name.
+ * Report from ConfigFile when a stored file could not be used as it was. For 'read', 'parse' and
+ * 'schema' the original file is preserved under a `.corrupt-*` name and defaults are used. For
+ * 'repaired' only the named fields went back to their defaults, and the rest of the file was kept.
+ * For 'newerVersion' the file came from a newer build and nothing is saved over it: it is used as
+ * it is, or with `leftInPlace` set, this build cannot read it and defaults are used. For
+ * 'repairCopied' a hand repair of a corrupt file was replaced by a whole-file save, and the repair
+ * is kept under a `.repaired-*` name.
  */
-export type ConfigCorruptReason = 'read' | 'parse' | 'schema'
+export type ConfigCorruptReason =
+  | 'read'
+  | 'parse'
+  | 'schema'
+  | 'repaired'
+  | 'newerVersion'
+  | 'repairCopied'
 
 export interface ConfigCorruptInfo {
   fileName: string
@@ -12,15 +23,28 @@ export interface ConfigCorruptInfo {
   reason: ConfigCorruptReason
   /** human-readable, for logs and optional UI */
   message?: string
+  /** Set when a file that would not load is still there, with defaults in use. */
+  leftInPlace?: boolean
+}
+
+function timestampedSiblingPath(absoluteFilePath: string, kind: string, timestamp: Date): string {
+  const dir = path.dirname(absoluteFilePath)
+  const ext = path.extname(absoluteFilePath)
+  const base = path.basename(absoluteFilePath, ext)
+  const iso = timestamp.toISOString().replace(/:/g, '-')
+  return path.join(dir, `${base}.${kind}-${iso}${ext}`)
 }
 
 export function corruptBackupFilePath(
   absoluteFilePath: string,
   timestamp: Date = new Date(),
 ): string {
-  const dir = path.dirname(absoluteFilePath)
-  const ext = path.extname(absoluteFilePath)
-  const base = path.basename(absoluteFilePath, ext)
-  const iso = timestamp.toISOString().replace(/:/g, '-')
-  return path.join(dir, `${base}.corrupt-${iso}${ext}`)
+  return timestampedSiblingPath(absoluteFilePath, 'corrupt', timestamp)
+}
+
+export function repairedCopyFilePath(
+  absoluteFilePath: string,
+  timestamp: Date = new Date(),
+): string {
+  return timestampedSiblingPath(absoluteFilePath, 'repaired', timestamp)
 }

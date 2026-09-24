@@ -154,6 +154,7 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
       schedulePanTiltClear: jest.fn(),
       cancelPanTiltClear: jest.fn(),
       handleSongEvent: jest.fn(),
+      onMotionPatternsCleared: () => () => {},
     } as never
     const handler = new CueHandler({} as never, sequencer, {
       registry,
@@ -190,8 +191,7 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
     proc.tick() // arm
     proc.emit('red', []) // led-1 edge -> re-pick fans to the handler
 
-    const active = (handler as unknown as { currentMotionCue: INetCue | null }).currentMotionCue
-    expect(active).toBe(motionCue)
+    expect(handler.getMotionCoordinator().getCurrent()).toBe(motionCue)
     expect(registry.getRandomMotionCue).toHaveBeenCalled()
   })
 })

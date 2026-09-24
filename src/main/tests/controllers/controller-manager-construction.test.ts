@@ -80,6 +80,20 @@ describe('ControllerManager construction', () => {
     expect(manager.getLifecyclePhase()).toBe('stopped')
   })
 
+  it('ends a running test effect in both domains when it shuts down', async () => {
+    const testEffectRunner = { cancel: jest.fn(), stopTestEffect: jest.fn(async () => {}) }
+    const rb3TestEffectRunner = { cancel: jest.fn(), stopTestEffect: jest.fn(async () => {}) }
+    const manager = new ControllerManager({
+      config: stubConfig(),
+      collaborators: { testEffectRunner, rb3TestEffectRunner } as never,
+    })
+
+    await manager.shutdown()
+
+    expect(testEffectRunner.cancel).toHaveBeenCalled()
+    expect(rb3TestEffectRunner.cancel).toHaveBeenCalled()
+  })
+
   it('shutdown is idempotent across repeated calls', async () => {
     const manager = new ControllerManager({ config: stubConfig() })
 

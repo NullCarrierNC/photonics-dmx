@@ -17,13 +17,30 @@ const MAX_CATCHUP_TICKS = 5
 const DEFAULT_INTERVAL_MS = 10
 
 /**
+ * What a sequencer or rig chain needs from its clock, so the headless simulator's virtual time and
+ * a test's hand-driven clock can stand in for the real one.
+ */
+export interface ClockSource {
+  getIntervalMs(): number
+  onTick(callback: (deltaTime: number) => void): void
+  offTick(callback: (deltaTime: number) => void): void
+  start(): void
+  stop(): void
+  isActive(): boolean
+  getCurrentTimeMs(): number
+  getAbsoluteTimeMs(): number
+  getTickCount(): number
+  destroy(): void
+}
+
+/**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
  *
  * Uses a self-correcting setTimeout loop instead of setInterval to reduce
  * cumulative drift and jitter.
  */
-export class Clock {
+export class Clock implements ClockSource {
   private timeoutId: NodeJS.Timeout | null = null
   private startTime: number
   private lastUpdateTime: number
@@ -215,8 +232,9 @@ export class Clock {
 
     // Notify all registered callbacks. A subscriber that throws is isolated so the rest of the
     // pipeline still runs, and reported once per fault rather than on every tick: at the default
-    // rate an unlatched log writes a hundred lines a second for as long as the fault lasts.
-    this.updateCallbacks.forEach((callback) => {
+    // rate an unlatched log writes a hundred lines a second for as long as the fault lasts. The
+    // list is copied first, so a subscriber that unregisters during the pass cannot shift it.
+    Array.from(this.updateCallbacks).forEach((callback) => {
       try {
         callback(deltaTime)
         this.faultedCallbacks.delete(callback)

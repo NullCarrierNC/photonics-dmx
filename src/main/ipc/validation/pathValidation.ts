@@ -7,9 +7,10 @@ import * as os from 'os'
 import * as path from 'path'
 import type { ValidationResult } from './primitives'
 import { isNonEmptyString } from './primitives'
+import { realPathOf } from '../../../photonics-dmx/helpers/realPath'
 
 /**
- * Resolves `targetPath` and confirms it sits under one of `allowedRoots` after normalization,
+ * Resolves `targetPath`, following links, and confirms it sits under one of `allowedRoots`,
  * rejecting empty input, null bytes, and paths that escape the roots. The default roots include the
  * user's home directory by design: users import/export cue and effect libraries to arbitrary
  * locations they choose, so shell open/show operations are scoped to the home tree rather than a
@@ -50,8 +51,15 @@ export function validatePathUnderAllowedRoots(
     return { ok: false, error: 'Path must not contain null bytes' }
   }
 
-  const resolvedTarget = path.resolve(path.normalize(targetPath))
-  const resolvedRoots = allowedRoots.map((root) => path.resolve(root))
+  // Links are followed on both sides, so a link under a root cannot lead out of it, and a root
+  // that is itself a link (macOS tmpdir is one) still contains what it contains.
+  const resolvedTarget = realPathOf(path.resolve(path.normalize(targetPath)))
+  if (resolvedTarget === null) {
+    return { ok: false, error: 'Path could not be resolved' }
+  }
+  const resolvedRoots = allowedRoots
+    .map((root) => realPathOf(path.resolve(root)))
+    .filter((root): root is string => root !== null)
 
   const isWithinAllowedRoot = resolvedRoots.some((root) => {
     const relative = path.relative(root, resolvedTarget)

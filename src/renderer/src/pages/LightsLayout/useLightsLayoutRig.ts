@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { LightingConfiguration } from '../../../../photonics-dmx/types'
 import type { DmxRig } from '../../../../photonics-dmx/types'
 import { getDmxRig, getDmxRigs, saveDmxRig } from '../../ipcApi'
+import { orThrow } from '../../ipc/ipcResult'
 import { createDefaultDmxRig } from './lightsLayoutHelpers'
 import type { Dispatch, SetStateAction } from 'react'
 import { createLogger } from '../../../../shared/logger'
@@ -22,16 +23,24 @@ export function useLightsLayoutRig(
   const [rigName, setRigName] = useState('')
 
   useEffect(() => {
+    // A cleared effect stops before it writes, so a remount (StrictMode runs this twice) cannot
+    // save a second default rig.
+    let cancelled = false
     const loadRigs = async () => {
       try {
         const loadedRigs = await getDmxRigs()
+        if (cancelled) return
         setRigs(loadedRigs || [])
 
-        if (!activeRigId && loadedRigs.length > 0) {
+        // A selection that is not on disk (deleted from Preferences while this page was closed)
+        // is replaced like a missing one, so the page never edits a rig that no longer exists.
+        const selectionOnDisk = loadedRigs.some((rig) => rig.id === activeRigId)
+        if (!selectionOnDisk && loadedRigs.length > 0) {
           setActiveRigId(loadedRigs[0].id)
         } else if (loadedRigs.length === 0) {
           const defaultRig = createDefaultDmxRig()
-          await saveDmxRig(defaultRig)
+          orThrow(await saveDmxRig(defaultRig))
+          if (cancelled) return
           setRigs([defaultRig])
           setActiveRigId(defaultRig.id)
         }
@@ -41,16 +50,20 @@ export function useLightsLayoutRig(
     }
 
     void loadRigs()
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: load rigs once
   }, [setActiveRigId, setRigs])
 
   useEffect(() => {
+    let cancelled = false
     const loadRigConfig = async () => {
       if (!activeRigId) return
 
       try {
         const rig = await getDmxRig(activeRigId)
-        if (rig) {
+        if (rig && !cancelled) {
           setRigName(rig.name)
           setActiveLightsConfig(rig.config)
         }
@@ -61,6 +74,9 @@ export function useLightsLayoutRig(
 
     if (activeRigId) {
       void loadRigConfig()
+    }
+    return () => {
+      cancelled = true
     }
   }, [activeRigId, setActiveLightsConfig])
 

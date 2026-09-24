@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { DmxFixture, DmxRig, LightingConfiguration } from '../../../../photonics-dmx/types'
 import {
   reconcileImportedTemplates,
@@ -16,6 +16,7 @@ import {
   deleteDmxRig,
 } from '../../ipcApi'
 import type { ImportRigSummary } from './components/ImportRigModal'
+import { wasCancelled } from '../../ipc/ipcResult'
 import type { ToastType } from '../../hooks/useToast'
 import type { ConfirmOptions } from '../../hooks/useConfirm'
 import { createLogger } from '../../../../shared/logger'
@@ -68,9 +69,6 @@ interface UseRigImportExportParams {
   confirm: (options: ConfirmOptions) => Promise<boolean>
 }
 
-const CANCEL_EXPORT = 'User cancelled export.'
-const CANCEL_IMPORT = 'User cancelled import.'
-
 export function useRigImportExport({
   rigs,
   setRigs,
@@ -118,7 +116,7 @@ export function useRigImportExport({
     try {
       const result = await exportRig(activeRigId)
       if (!result.success) {
-        if (result.error !== CANCEL_EXPORT) {
+        if (!wasCancelled(result)) {
           showToast(result.error, 'error', 5000)
         }
         return
@@ -139,7 +137,7 @@ export function useRigImportExport({
     try {
       const result = await pickRigImportFile()
       if (!result.success) {
-        if (result.error !== CANCEL_IMPORT) {
+        if (!wasCancelled(result)) {
           showToast(result.error, 'error', 5000)
         }
         return
@@ -173,7 +171,7 @@ export function useRigImportExport({
 
   const clearPendingImport = useCallback(() => setPendingImport(null), [])
 
-  const commitPendingImport = useCallback(
+  const commitImport = useCallback(
     async (rigName: string) => {
       if (!pendingImport) return
       const pending = pendingImport
@@ -211,7 +209,22 @@ export function useRigImportExport({
     [pendingImport, myFixtureLibrary, rigs, setMyFixtureLibrary, selectSavedRig, showToast],
   )
 
-  const handleDuplicate = useCallback(async () => {
+  // An imported or duplicated rig is saved active, and that save restarts the controllers, so a
+  // second request lands inside the first. It is turned away until the first has finished.
+  const creatingRef = useRef(false)
+  const oneCreateAtATime = useCallback(async (create: () => Promise<void>) => {
+    if (creatingRef.current) return
+    creatingRef.current = true
+    await create()
+    creatingRef.current = false
+  }, [])
+
+  const commitPendingImport = useCallback(
+    (rigName: string) => oneCreateAtATime(() => commitImport(rigName)),
+    [oneCreateAtATime, commitImport],
+  )
+
+  const duplicateActiveRig = useCallback(async () => {
     if (!(await onBeforeDiscardingUnsaved())) return
     const source = rigs.find((r) => r.id === activeRigId)
     if (!source) {
@@ -235,6 +248,11 @@ export function useRigImportExport({
       showToast('Failed to duplicate layout.', 'error', 5000)
     }
   }, [onBeforeDiscardingUnsaved, rigs, activeRigId, selectSavedRig, showToast])
+
+  const handleDuplicate = useCallback(
+    () => oneCreateAtATime(duplicateActiveRig),
+    [oneCreateAtATime, duplicateActiveRig],
+  )
 
   const handleDelete = useCallback(async () => {
     if (!activeRigId) return

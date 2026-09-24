@@ -1,11 +1,13 @@
 import * as path from 'path'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, dialog } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import {
   installDefaultSessionContentSecurityPolicy,
   installDefaultSessionPermissionHandlers,
 } from './rendererSessionSecurity'
 import { Application } from './application'
+import { refuseDebuggingSwitches } from './debuggingSwitches'
+import { serveRendererFromScheme } from './rendererScheme'
 import { createFileLogSink } from './logging/fileLogSink'
 import {
   consoleLogSink,
@@ -17,12 +19,15 @@ import {
 
 const log = createLogger('Main')
 
+refuseDebuggingSwitches()
+serveRendererFromScheme()
+
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('disable-http-cache')
 }
 
 /**
- * Scopes kept at `info` when a packaged build raises the floor to `error`.
+ * Scopes kept at `info` when a packaged build raises the floor to `warn`.
  *
  * These record what became of the user's own files: which one was loaded, what a migration
  * rewrote, and what a recovery replaced. The failure itself logs at `error`, and these are the
@@ -54,7 +59,9 @@ function reportStartupFailure(err: unknown): void {
   app.exit(1)
 }
 
-// Global error handling: delegate network sender errors to ControllerManager for unified handling
+// A network sender error stays with the senders. Anything else holds the lighting controllers
+// failed and dark until a restart (ControllerManager.handleUncaughtException), and the process
+// carries on so the blackout reaches the rig.
 process.on('uncaughtException', (error: unknown) => {
   const handled =
     applicationInstance?.getControllerManager()?.handleUncaughtException(error) ?? false
@@ -63,16 +70,16 @@ process.on('uncaughtException', (error: unknown) => {
   }
 })
 
-// Global unhandled promise rejection handling
+// Logged only, and the show carries on. A rejection nobody awaited is async work failing after
+// its caller moved on.
 process.on('unhandledRejection', (reason, _promise) => {
   log.error('Unhandled promise rejection:', reason)
 })
 
-// Handle clean shutdown on process signals
-async function shutdownOnSigint(): Promise<void> {
-  log.info('Received SIGINT signal, shutting down gracefully...')
+/** Shuts down cleanly on a process signal, forcing the exit if that takes more than 2 seconds. */
+async function shutdownOnSignal(signal: NodeJS.Signals): Promise<void> {
+  log.info(`Received ${signal} signal, shutting down gracefully...`)
 
-  // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     log.error('Forced exit due to shutdown timeout!')
     // The line explaining the forced exit is the one worth having, and it is still buffered in the
@@ -88,45 +95,18 @@ async function shutdownOnSigint(): Promise<void> {
   } catch (error) {
     // Log BEFORE closing the file log, or the one message explaining the failed shutdown never
     // reaches the log file.
-    log.error('Error during SIGINT shutdown:', error)
+    log.error(`Error during ${signal} shutdown:`, error)
     await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
 }
 
-process.on('SIGINT', () => {
-  void shutdownOnSigint()
-})
-
-async function shutdownOnSigterm(): Promise<void> {
-  log.info('Received SIGTERM signal, shutting down gracefully...')
-
-  // Set a hard timeout to force exit after 2 seconds
-  const forceExitTimeout = setTimeout(() => {
-    log.error('Forced exit due to shutdown timeout!')
-    // The line explaining the forced exit is the one worth having, and it is still buffered in the
-    // stream at this point, so give the flush its chance before going.
-    void closeFileLogWithTimeout().finally(() => process.exit(1))
-  }, 2000)
-
-  try {
-    await applicationInstance?.shutdown()
-    await closeFileLogWithTimeout()
-    clearTimeout(forceExitTimeout)
-    app.quit()
-  } catch (error) {
-    // Log BEFORE closing the file log so the shutdown-failure message is actually written.
-    log.error('Error during SIGTERM shutdown:', error)
-    await closeFileLogWithTimeout()
-    clearTimeout(forceExitTimeout)
-    process.exit(1)
-  }
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    void shutdownOnSignal(signal)
+  })
 }
-
-process.on('SIGTERM', () => {
-  void shutdownOnSigterm()
-})
 
 /**
  * Start writing to the daily log file, or carry on without it.
@@ -156,7 +136,7 @@ function onReady(): void {
   // Named while the floor is still info, so the log file records where it is.
   log.info(`Writing logs to ${logsDir}`)
   if (!process.env.PHOTONICS_LOG_LEVEL && app.isPackaged) {
-    setMinLogLevel('error')
+    setMinLogLevel('warn')
     for (const scope of STARTUP_ACCOUNT_SCOPES) {
       setScopeMinLogLevel(scope, 'info')
     }
@@ -183,15 +163,15 @@ function onReady(): void {
     return
   }
 
+  // Default session handlers, ahead of init so the main window it builds gets them too.
+  app.on('browser-window-created', (_, window) => {
+    optimizer.watchWindowShortcuts(window)
+  })
+
   // Initialize application. A controller failure resolves and leaves the window reporting the
   // failed phase, so a rejection here means the window or IPC could not be set up and there is
   // nothing left to report through. Say so and stop rather than idling with no interface.
   applicationInstance.init().catch(reportStartupFailure)
-
-  // Default session handlers
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
 }
 
 /**
@@ -219,9 +199,7 @@ app.on('window-all-closed', () => {
 
 // Handle activate event (macOS)
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    applicationInstance?.handleActivate()
-  }
+  applicationInstance?.handleActivate()
 })
 
 // Handle before-quit event
@@ -242,8 +220,27 @@ async function shutdownBeforeQuit(): Promise<void> {
   }
 }
 
+let quitInProgress = false
+
+/**
+ * A Quit from the menu, Cmd+Q or the Dock closes the windows first, so a page with unsaved changes
+ * can ask, and the controllers shut down only once every window has gone.
+ */
+async function quitWhenWindowsClose(): Promise<void> {
+  if (quitInProgress) {
+    return
+  }
+  quitInProgress = true
+  if (applicationInstance && !(await applicationInstance.closeWindowsForQuit())) {
+    log.info('Quit cancelled, a window kept its unsaved changes')
+    quitInProgress = false
+    return
+  }
+  await shutdownBeforeQuit()
+}
+
 app.on('before-quit', (event) => {
   // Prevent the default quit behavior
   event.preventDefault()
-  void shutdownBeforeQuit()
+  void quitWhenWindowsClose()
 })

@@ -1,6 +1,10 @@
 import React from 'react'
 
+export type SenderName = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
+
 interface DmxOutputEnabledModesProps {
+  /** Senders whose flag is still saving. Their boxes are disabled until it lands. */
+  saving: ReadonlySet<SenderName>
   sacnEnabled: boolean
   onSacnToggle: () => void
   artNetEnabled: boolean
@@ -12,6 +16,7 @@ interface DmxOutputEnabledModesProps {
 }
 
 const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
+  saving,
   sacnEnabled,
   onSacnToggle,
   artNetEnabled,
@@ -26,8 +31,8 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
       Enabled DMX Output Modes
     </h3>
     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-      Select the DMX modes you want to use. This will make them available for use in Game Settings
-      on the Status page.
+      Select the DMX modes you want to use. Ticking one starts that output straight away and adds
+      its switch to Input/Output Settings on the Status page, and unticking one stops it.
     </p>
     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
       Each sender can be configured individually below.
@@ -38,6 +43,7 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
           type="checkbox"
           checked={sacnEnabled}
           onChange={onSacnToggle}
+          disabled={saving.has('sacn')}
           className="form-checkbox h-4 w-4 text-blue-600 rounded"
         />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">sACN</span>
@@ -47,6 +53,7 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
           type="checkbox"
           checked={artNetEnabled}
           onChange={onArtNetToggle}
+          disabled={saving.has('artnet')}
           className="form-checkbox h-4 w-4 text-blue-600 rounded"
         />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ArtNet</span>
@@ -56,6 +63,7 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
           type="checkbox"
           checked={enttecProEnabled}
           onChange={onEnttecProToggle}
+          disabled={saving.has('enttecpro')}
           className="form-checkbox h-4 w-4 text-blue-600 rounded"
         />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enttec Pro USB</span>
@@ -65,6 +73,7 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
           type="checkbox"
           checked={openDmxEnabled}
           onChange={onOpenDmxToggle}
+          disabled={saving.has('opendmx')}
           className="form-checkbox h-4 w-4 text-blue-600 rounded"
         />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenDMX USB</span>

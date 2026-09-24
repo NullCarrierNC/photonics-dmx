@@ -58,13 +58,25 @@ describe('ClockRateSettings', () => {
     expect(field).toHaveValue(10)
   })
 
-  it('saves the rate again when the same one is asked for', async () => {
+  it('saves the rate again when the same one is typed', async () => {
     const field = await renderPanel()
 
+    fireEvent.change(field, { target: { value: '' } })
     fireEvent.change(field, { target: { value: '10' } })
     fireEvent.blur(field)
 
     await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(10))
+  })
+
+  it('saves nothing when the field is clicked into and left with nothing typed', async () => {
+    const field = await renderPanel()
+
+    field.focus()
+    fireEvent.blur(field)
+    fireEvent.focus(field)
+    fireEvent.blur(field)
+
+    expect(setClockRateMock).not.toHaveBeenCalled()
   })
 
   it('saves a rate inside the window as typed', async () => {
@@ -74,5 +86,44 @@ describe('ClockRateSettings', () => {
     fireEvent.blur(field)
 
     await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(25))
+  })
+
+  it('shows the saved rate again when the save is refused', async () => {
+    setClockRateMock.mockResolvedValue({ success: false, error: 'read only' } as never)
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '25' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(25))
+    await waitFor(() => expect(field).toHaveValue(10))
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the clock rate.')
+  })
+
+  it('says so when the save lands and the lights do not restart', async () => {
+    setClockRateMock.mockResolvedValue({ success: true, restartError: 'sACN port busy' } as never)
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '25' } })
+    fireEvent.blur(field)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Saved, but the lights did not restart. sACN port busy',
+    )
+    expect(field).toHaveValue(25)
+  })
+
+  it('clears the message once a later save lands', async () => {
+    setClockRateMock.mockResolvedValueOnce({ success: false, error: 'read only' } as never)
+    const field = await renderPanel()
+    fireEvent.change(field, { target: { value: '25' } })
+    fireEvent.blur(field)
+    await screen.findByRole('alert')
+
+    fireEvent.change(field, { target: { value: '30' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(field).toHaveValue(30)
   })
 })

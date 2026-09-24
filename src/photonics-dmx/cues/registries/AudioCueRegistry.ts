@@ -4,6 +4,7 @@ import { IAudioCue } from '../interfaces/IAudioCue'
 import { CueGroupCatalog } from './CueGroupCatalog'
 import { MotionCueAccess } from './MotionCueAccess'
 import {
+  releaseGroupFrom,
   releaseSequencersFor,
   type MotionCueDetail,
   type MotionGroupInfo,
@@ -77,13 +78,30 @@ export class AudioCueRegistry {
    * @param groupId The group identifier
    */
   public unregisterGroup(groupId: string): boolean {
-    if (!this.catalog.unregister(groupId)) {
+    const group = this.catalog.getGroup(groupId)
+    if (!group || !this.catalog.unregister(groupId)) {
       return false
     }
+    releaseGroupFrom(group)
 
     this.cueDetailsCache.delete(groupId)
     this.motion.onUnregisterGroup(groupId)
     return true
+  }
+
+  /**
+   * Swap a rebuilt group in for the registered group with the same id, keeping its place, its
+   * enabled state and its motion state. An id not yet registered is registered.
+   */
+  public replaceGroup(group: AudioCueGroup): void {
+    const previous = this.catalog.getGroup(group.id)
+    if (!previous || !this.catalog.replace(group)) {
+      this.registerGroup(group)
+      return
+    }
+    releaseGroupFrom(previous)
+    this.cueDetailsCache.delete(group.id)
+    this.motion.onRegisterGroup(group)
   }
 
   /**
@@ -121,6 +139,15 @@ export class AudioCueRegistry {
 
     const fallbackId = this.catalog.getDefaultGroupId()
     return fallbackId ? this.catalog.cueFrom(fallbackId, cueType) : null
+  }
+
+  /**
+   * The enabled groups that carry `cueType`, in the order {@link getCueImplementation} tries them.
+   */
+  public getEnabledGroupsProviding(cueType: AudioCueType): string[] {
+    return this.catalog
+      .getEnabledGroups()
+      .filter((groupId) => this.catalog.cueFrom(groupId, cueType) !== null)
   }
 
   /**

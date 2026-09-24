@@ -9,6 +9,7 @@ import { EffectRegistry } from './EffectRegistry'
 import { BaseAudioNodeCue } from './BaseAudioNodeCue'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import type { NodeCueDebugSwitch } from './executionTypes'
 
 /**
  * Audio lighting node cue: primary / secondary / strobe slot semantics via `style`.
@@ -19,6 +20,7 @@ export class AudioNodeCue extends BaseAudioNodeCue implements IAudioCue {
     compiledCue: CompiledAudioCue,
     effectRegistry?: EffectRegistry,
     runtimeBroadcaster?: RuntimeBroadcaster,
+    debug?: NodeCueDebugSwitch,
   ) {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     if (definition.kind !== 'lighting') {
@@ -31,6 +33,7 @@ export class AudioNodeCue extends BaseAudioNodeCue implements IAudioCue {
       effectRegistry,
       runtimeBroadcaster ?? noopRuntimeBroadcaster(),
       lit.cueTypeId,
+      debug,
     )
   }
 

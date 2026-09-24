@@ -15,6 +15,7 @@ import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { validateAudioLightingData } from '../ipc/audioLightingValidation'
 import type { RigChain } from './RigChain'
+import { clearAndBlackOutChains } from './chainBlackout'
 import type { ChainFanout } from './ChainFanout'
 const log = createLogger('AudioController')
 
@@ -35,14 +36,32 @@ export class AudioController {
   private isAudioEnabled = false
   private audioDataHandler: AudioDataHandler | null = null
   private broadcastAudioMirror: ((data: AudioLightingData) => void) | null = null
+  /** Opens the main window, where capture runs, when there is none. Set by the window layer. */
+  private openCaptureWindow: (() => void) | null = null
   /** Throttle logs for invalid renderer audio frames (can arrive at high rate). */
   private invalidAudioFrameCount = 0
   private invalidAudioFrameLastLogMs = 0
 
+  /** Enable and disable run one at a time, so a disable that arrives mid-enable tears it down. */
+  private opChain: Promise<unknown> = Promise.resolve()
+
   constructor(private readonly deps: AudioControllerDeps) {}
+
+  private serialize<T>(op: () => Promise<T>): Promise<T> {
+    const run = this.opChain.then(op, op)
+    this.opChain = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
 
   public setBroadcastAudioMirror(fn: ((data: AudioLightingData) => void) | null): void {
     this.broadcastAudioMirror = fn
+  }
+
+  public setOpenCaptureWindow(fn: (() => void) | null): void {
+    this.openCaptureWindow = fn
   }
 
   public async enableAudio(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
@@ -53,7 +72,11 @@ export class AudioController {
     await this.enableAudioInternal()
   }
 
-  public async enableAudioInternal(): Promise<void> {
+  public enableAudioInternal(): Promise<void> {
+    return this.serialize(() => this.startAudio())
+  }
+
+  private async startAudio(): Promise<void> {
     const chains = this.deps.getRigChains()
     if (this.isAudioEnabled || chains.length === 0) {
       log.info('Cannot enable Audio: already enabled or no rig chains')
@@ -69,7 +92,7 @@ export class AudioController {
         audioConfig,
         preferredCueType,
         null,
-        () => this.deps.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        () => this.deps.config.getPreference('cueDomains').audioMotion.minimumHoldMs ?? 5000,
         () => this.deps.config.getPreference('cueDomains').audioMotion.probabilityPercent ?? 100,
       )
       this.audioProcessor.setOnStrobeStateChange((active) => {
@@ -96,10 +119,10 @@ export class AudioController {
       if (gameMode.enabled) {
         this.audioProcessor.enableGameMode(gameMode)
       } else {
-        await this.deps.config.setPreference(
-          'activeAudioCueType',
-          this.audioProcessor.getManualPrimaryCueType(),
-        )
+        // Remembered for the next start only, so failing to store it leaves audio running.
+        await this.deps.config
+          .setPreference('activeAudioCueType', this.audioProcessor.getManualPrimaryCueType())
+          .catch((error: unknown) => log.error('Could not store the active audio cue type:', error))
       }
       if (this.audioDataHandler) {
         ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
@@ -126,23 +149,28 @@ export class AudioController {
         this.broadcastAudioMirror?.(lightingData)
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
+      // The Audio Preview window can switch audio on with the main window closed. A main window
+      // opened here misses the announcement below and picks the running audio up once it loads.
+      this.openCaptureWindow?.()
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
       log.info('Sent audio:enable to renderer')
       this.isAudioEnabled = true
+      this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled: true })
       log.info('Audio enabled successfully')
     } catch (error) {
       log.error('Failed to enable audio:', error)
+      this.releaseProcessor()
+      this.isAudioEnabled = false
       throw error
     }
   }
 
-  public async disableAudio(): Promise<void> {
-    if (!this.isAudioEnabled) {
-      return
-    }
-    log.info('Disabling audio...')
-    // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
-    // blackout is the last word on the lights.
+  public disableAudio(): Promise<void> {
+    return this.serialize(() => this.stopAudio())
+  }
+
+  /** Detach the frame listener and shut the processor down. */
+  private releaseProcessor(): void {
     if (this.audioDataHandler) {
       ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.audioDataHandler = null
@@ -154,27 +182,28 @@ export class AudioController {
       this.audioProcessor.shutdown()
       this.audioProcessor = null
     }
-    // Blackout via every chain's sequencer so multi-rig setups don't leave secondary rigs
-    // lit when the audio listener is turned off.
-    for (const chain of this.deps.getRigChains()) {
-      try {
-        chain.sequencer.removeAllEffects()
-        await chain.sequencer.blackout(0)
-      } catch (error) {
-        log.error(`Error clearing effects on rig ${chain.rigId} when disabling Audio:`, error)
-      }
+  }
+
+  private async stopAudio(): Promise<void> {
+    if (!this.isAudioEnabled) {
+      return
     }
-    log.info('AudioController: Cleared running effects and blacked out every rig (disable Audio)')
+    log.info('Disabling audio...')
+    // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
+    // blackout is the last word on the lights.
+    this.releaseProcessor()
+    await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling Audio')
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
     log.info('Sent audio:disable to renderer')
     this.isAudioEnabled = false
+    this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled: false })
     log.info('Audio disabled successfully')
   }
 
   /**
    * Applies an already-persisted config to the running processor. Persistence belongs to the
    * caller: a write here races the caller's write and puts the runtime-only `enabled` flag on
-   * disk, which setAudioConfig does not strip.
+   * disk.
    */
   public updateAudioConfig(config: AudioConfig): void {
     if (!this.isAudioEnabled || !this.audioProcessor) {

@@ -1,14 +1,19 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useAtom } from 'jotai'
-import YargToggle from './YargToggle'
-import Rb3Toggle from './Rb3Toggle'
+import ListenerToggle from './ListenerToggle'
 import AudioToggle from './AudioToggle'
 import EnttecProToggle from './EnttecProToggle'
 import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa'
-import { lightingPrefsAtom, myValidDmxLightsAtom } from '../atoms'
+import {
+  audioListenerEnabledAtom,
+  dmxRigsAtom,
+  dmxRigsLoadedAtom,
+  lightingPrefsAtom,
+  myValidDmxLightsAtom,
+} from '../atoms'
 import { useLifecyclePhase, isLifecycleBusy } from '../hooks/useLifecyclePhase'
 
 interface DmxSettingsProps {
@@ -19,7 +24,13 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [validDmxLights] = useAtom(myValidDmxLightsAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
+  const [rigs] = useAtom(dmxRigsAtom)
+  const [rigsLoaded] = useAtom(dmxRigsLoadedAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
+  const [audioEnabled] = useAtom(audioListenerEnabledAtom)
+  // Audio lives in Advanced Mode, but running audio holds the game listeners, so its switch stays
+  // while it runs.
+  const showAudioToggle = advancedModeEnabled || audioEnabled
   const lifecyclePhase = useLifecyclePhase()
   // Lock listener and sender toggles while the controller graph is mid-transition (restart, shutdown, failed, etc.).
   const lifecycleLocked = isLifecycleBusy(lifecyclePhase)
@@ -30,6 +41,8 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
 
   const hasInvalidConfig = useMemo(() => validDmxLights.length === 0, [validDmxLights.length])
   const togglesDisabled = hasInvalidConfig || lifecycleLocked
+  // With no active rig the controllers run an empty chain, so the switches work and nothing lights.
+  const noActiveRig = rigsLoaded && !hasInvalidConfig && !rigs.some((rig) => rig.active)
 
   return (
     <div className=" rounded-lg shadow-sm mb-4">
@@ -46,9 +59,9 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
           <div className="mb-6">
             <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">Input</h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
-              <YargToggle disabled={togglesDisabled} />
-              <Rb3Toggle disabled={togglesDisabled} />
-              {advancedModeEnabled && <AudioToggle disabled={togglesDisabled} />}
+              <ListenerToggle listener="yarg" disabled={togglesDisabled} />
+              <ListenerToggle listener="rb3" disabled={togglesDisabled} />
+              {showAudioToggle && <AudioToggle disabled={togglesDisabled} />}
             </div>
           </div>
 
@@ -69,6 +82,16 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
               <p className="text-sm font-medium text-red-800 dark:text-red-200">
                 The lighting controllers failed to reinitialize after their last restart. Make a
                 configuration change and restart, or restart the application.
+              </p>
+            </div>
+          )}
+          {noActiveRig && (
+            <div
+              role="status"
+              className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                No rig is active, so nothing reaches your lights. Create and activate a rig in
+                Lights Layout.
               </p>
             </div>
           )}

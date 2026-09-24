@@ -8,6 +8,8 @@ Shared services used across main and (where applicable) renderer. Currently focu
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ConfigurationManager`  | Manages `AppPreferences` (including per-domain cue preferences), user lights, lighting layout, DMX rigs, audio config. Runs the startup migrations on construction               |
 | `ConfigFile`            | Async atomic JSON file I/O (write-temp-then-rename). Versioned persistence with migration, plus `validate`, `coerceUnversioned`, `normalizeLoaded` and `onCorruptRecovery` hooks |
+| `configFileEnvelope`    | The `{ version, data }` wrapper a file is saved in, how a stored one is read, and the stepwise migration walk                                                                    |
+| `configFileRename`      | The renames `ConfigFile` saves and moves files aside with, retried through transient file locks                                                                                  |
 | `PreferencesConfigFile` | Typed preferences persistence layered on `ConfigFile`. Carries the prefs version and its migration chain, and seeds cue domains missing from an older file                       |
 | `configurationDefaults` | The `AppPreferences` shape, `DEFAULT_PREFERENCES`, and the value normalizers preferences are read through                                                                        |
 | `startupMigrations`     | One-time migrations that span several config files: legacy lights format, fixture schema, stray sender keys, and the move to DMX rigs                                            |
@@ -28,7 +30,9 @@ Stored in `{appData}/Photonics.rocks/`:
 | `dmxRigs.json`      | DMX rig definitions (per-rig light layout, sender-output routing, mirror flags) |
 
 A file that fails to read, parse or validate is preserved alongside the original as
-`<name>.corrupt-<timestamp>.json` and the event is surfaced to the renderer. The same folder also
+`<name>.corrupt-<timestamp>.json` and the event is surfaced to the renderer. A corrupt file that
+could not be moved aside and was then repaired by hand is adopted by the next save, and the first
+whole-file save after that keeps the repair as `<name>.repaired-<timestamp>.json`. The same folder also
 holds the `logs/` directory and the `node-data/` cue and effect trees seeded from the bundled
 defaults.
 

@@ -129,6 +129,35 @@ describe('ActionEffectFactory', () => {
     expect(effect!.transitions[0].waitUntilTime).toBe(0)
   })
 
+  it('reads literal wait conditions off an action it was given unresolved', () => {
+    const action = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'literal', value: 'red' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 100 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    } as unknown as ActionNode
+
+    const transition = ActionEffectFactory.buildEffect({ action, lights })!.transitions[0]
+
+    expect(transition.waitForCondition).toBe('none')
+    expect(transition.waitUntilCondition).toBe('none')
+  })
+
   it('buildEffect returns null when lights array is empty', () => {
     const action: ActionNode = {
       id: 'a1',

@@ -15,6 +15,7 @@ export {
   openAudioPreviewWindow,
   openCueEditorWindow,
   openPath,
+  reportUnsavedChanges,
   retryControllerInit,
   showItemInFolder,
 } from './ipc/appShell'
@@ -102,8 +103,6 @@ export {
 } from './ipc/cueAuthoring'
 
 export {
-  disableCueGroup,
-  enableCueGroup,
   getAudioCueGroups,
   getAudioMotionCueGroups,
   getAudioMotionCueProbabilityPercent,
@@ -155,13 +154,13 @@ export {
   enableConsole,
   getClockRate,
   getMasterOutput,
+  getRunningMotionCue,
   getStageKitPriority,
   sendConsoleDmx,
   setClockRate,
   setConsoleFixtureConfig,
   setMasterOutput,
   setStageKitPriority,
-  updateConsoleChannel,
 } from './ipc/lighting'
 
 export {
@@ -169,10 +168,8 @@ export {
   disableYarg,
   enableRb3,
   enableYarg,
-  getRb3Enabled,
   getRb3Mode,
   getRb3Stats,
-  getYargEnabled,
   setCueStyle,
   setListenCueData,
 } from './ipc/listeners'

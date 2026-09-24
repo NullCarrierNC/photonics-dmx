@@ -1,40 +1,23 @@
-import { useState, useEffect } from 'react'
-import { useAtom } from 'jotai'
-import { yargListenerEnabledAtom, rb3eListenerEnabledAtom } from '../atoms'
-import { getAudioEnabled } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('useCuePreviewInputPlatform')
+import { useAtomValue } from 'jotai'
+import {
+  yargListenerEnabledAtom,
+  rb3eListenerEnabledAtom,
+  audioListenerEnabledAtom,
+} from '../atoms'
 
 /**
  * Determines which input platform is active for cue preview.
  * Priority: RB3E > YARG > AUDIO > null
  *
+ * Audio comes from audioListenerEnabledAtom, which WindowShell keeps on what main is running.
+ *
  * @returns The active platform or null if none are enabled
  */
 export function useCuePreviewInputPlatform(): 'RB3E' | 'YARG' | 'AUDIO' | null {
-  const [yargListenerEnabled] = useAtom(yargListenerEnabledAtom)
-  const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom)
-  const [audioEnabled, setAudioEnabled] = useState(false)
+  const yargListenerEnabled = useAtomValue(yargListenerEnabledAtom)
+  const rb3eListenerEnabled = useAtomValue(rb3eListenerEnabledAtom)
+  const audioEnabled = useAtomValue(audioListenerEnabledAtom)
 
-  // Check audio enabled state
-  useEffect(() => {
-    const checkAudioState = async () => {
-      try {
-        const enabled = await getAudioEnabled()
-        setAudioEnabled(enabled)
-      } catch (error) {
-        log.error('Failed to check audio enabled state:', error)
-      }
-    }
-
-    void checkAudioState()
-
-    // Poll for audio state changes every 500ms
-    const interval = setInterval(() => void checkAudioState(), 500)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Derive platform from listener state. Priority: RB3E > YARG > AUDIO
   if (rb3eListenerEnabled) {
     return 'RB3E'
   } else if (yargListenerEnabled) {

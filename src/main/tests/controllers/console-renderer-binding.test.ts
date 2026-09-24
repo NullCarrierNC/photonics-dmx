@@ -67,6 +67,17 @@ describe('console mode follows the page that opened it', () => {
     expect(disable).toHaveBeenCalledTimes(1)
   })
 
+  it('stops listening to the page once it has left console mode', () => {
+    const { emitter, webContents } = fakeWebContents()
+    bindConsoleModeToRenderer(webContents, async () => ({ success: true }))
+
+    emitter.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false })
+
+    for (const event of ['did-start-navigation', 'destroyed', 'render-process-gone']) {
+      expect({ event, listeners: emitter.listenerCount(event) }).toEqual({ event, listeners: 0 })
+    }
+  })
+
   it('takes DMX output back off the manual buffer when the page reloads', async () => {
     const setManualBuffer = jest.fn()
     const clearManualBuffer = jest.fn()
@@ -79,7 +90,6 @@ describe('console mode follows the page that opened it', () => {
       pauseYarg: async () => {},
       pauseRb3: async () => {},
       pauseAudio: async () => {},
-      refreshActiveRigs: () => {},
       restartControllers: async () => {},
     })
     await consoleMode.enableConsoleMode('rig-1')

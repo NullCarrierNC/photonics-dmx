@@ -1,74 +1,49 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import {
+  createFakeBrowserWindow as mockCreateFakeBrowserWindow,
+  type FakeBrowserWindow,
+} from './fakeBrowserWindow'
 
 jest.mock('electron', () => ({
-  BrowserWindow: Object.assign(jest.fn(), { getAllWindows: jest.fn(() => []) }),
+  BrowserWindow: jest.fn((options: Record<string, unknown>) =>
+    mockCreateFakeBrowserWindow(options),
+  ),
   shell: { openExternal: jest.fn() },
-  screen: { getAllDisplays: jest.fn(() => []), getPrimaryDisplay: jest.fn() },
+  screen: {
+    getAllDisplays: jest.fn(() => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }]),
+    getPrimaryDisplay: jest.fn(() => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })),
+  },
 }))
 jest.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
+jest.mock('../rendererSessionSecurity', () => ({ denyWebContentsWillNavigate: jest.fn() }))
 
+import { BrowserWindow } from 'electron'
 import { WindowManager } from '../WindowManager'
 
-/**
- * Every window the manager owns, with the private field it is held in, the debounce timers it
- * arms, and the preference key its geometry is saved under.
- *
- * The close path enumerates each window three separate times, to save, clear timers and close, so
- * a window can be present in one pass and missing from another.
- */
-const WINDOWS = [
-  { field: 'mainWindow', prefKey: 'windowState', timers: ['resizeTimeout', 'moveTimeout'] },
-  {
-    field: 'cueEditorWindow',
-    prefKey: 'cueEditorWindowState',
-    timers: ['cueEditorResizeTimeout', 'cueEditorMoveTimeout'],
-  },
-  {
-    field: 'audioPreviewWindow',
-    prefKey: 'audioPreviewWindowState',
-    timers: ['audioPreviewResizeTimeout', 'audioPreviewMoveTimeout'],
-  },
-] as const
-
-type Internals = Record<string, unknown>
-
-function fakeWindow(destroyed = false) {
-  return {
-    isDestroyed: jest.fn(() => destroyed),
-    close: jest.fn(),
-    getBounds: jest.fn(() => ({ width: 1280, height: 800, x: 10, y: 20 })),
-    isMaximized: jest.fn(() => false),
-    webContents: { send: jest.fn() },
-  }
+/** Every window the manager has built, in the order it built them. */
+function builtWindows(): FakeBrowserWindow[] {
+  return (BrowserWindow as unknown as jest.Mock).mock.results.map(
+    (result) => result.value as FakeBrowserWindow,
+  )
 }
 
-/** A manager with every window open, every timer armed, and preference writes captured. */
+/** A manager with every window open, with preference writes captured. */
 function managerWithAllWindowsOpen() {
   const wm = new WindowManager()
-  const internals = wm as unknown as Internals
-  const saved: Array<{ key: string }> = []
-
-  const windows = new Map<string, ReturnType<typeof fakeWindow>>()
-  for (const spec of WINDOWS) {
-    const win = fakeWindow()
-    windows.set(spec.field, win)
-    internals[spec.field] = win
-    for (const timer of spec.timers) {
-      internals[timer] = setTimeout(() => {}, 60_000)
-    }
-  }
-
+  const saved: string[] = []
   wm.setControllerManager({
     getConfig: () => ({
+      getPreference: () => undefined,
       updatePreferences: async (updates: Record<string, unknown>) => {
-        for (const key of Object.keys(updates)) {
-          saved.push({ key })
-        }
+        saved.push(...Object.keys(updates))
       },
     }),
   } as never)
 
-  return { wm, internals, windows, saved }
+  wm.createMainWindow()
+  wm.openCueEditorWindow()
+  wm.openAudioPreviewWindow()
+  return { wm, saved, windows: builtWindows() }
 }
 
 describe('WindowManager.closeAllWindows', () => {
@@ -76,35 +51,18 @@ describe('WindowManager.closeAllWindows', () => {
     jest.clearAllMocks()
   })
 
-  it('closes every window it owns', async () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('closes every window it opened', async () => {
     const { wm, windows } = managerWithAllWindowsOpen()
 
     await wm.closeAllWindows()
 
-    for (const spec of WINDOWS) {
-      expect(windows.get(spec.field)!.close).toHaveBeenCalledTimes(1)
-    }
-  })
-
-  it('drops its reference to every window', async () => {
-    const { wm, internals } = managerWithAllWindowsOpen()
-
-    await wm.closeAllWindows()
-
-    for (const spec of WINDOWS) {
-      expect(internals[spec.field]).toBeNull()
-    }
-  })
-
-  it('clears every debounce timer, so nothing fires after teardown', async () => {
-    const { wm, internals } = managerWithAllWindowsOpen()
-
-    await wm.closeAllWindows()
-
-    for (const spec of WINDOWS) {
-      for (const timer of spec.timers) {
-        expect(internals[timer]).toBeNull()
-      }
+    expect(windows).toHaveLength(3)
+    for (const window of windows) {
+      expect(window.close).toHaveBeenCalledTimes(1)
     }
   })
 
@@ -113,38 +71,82 @@ describe('WindowManager.closeAllWindows', () => {
 
     await wm.closeAllWindows()
 
-    expect(saved.map((s) => s.key).sort()).toEqual(WINDOWS.map((w) => w.prefKey).sort())
+    expect(saved.sort()).toEqual(['audioPreviewWindowState', 'cueEditorWindowState', 'windowState'])
   })
 
-  it('leaves a destroyed window alone rather than closing it twice', async () => {
-    const { wm, internals } = managerWithAllWindowsOpen()
-    const destroyed = fakeWindow(true)
-    internals.cueEditorWindow = destroyed
+  it('drops pending geometry saves, so nothing is written after teardown', async () => {
+    jest.useFakeTimers()
+    const { wm, saved, windows } = managerWithAllWindowsOpen()
+    for (const window of windows) {
+      window.emit('moved')
+    }
+
+    await wm.closeAllWindows()
+    saved.length = 0
+    jest.advanceTimersByTime(1000)
+
+    expect(saved).toEqual([])
+  })
+
+  it('forgets every window, so the next open builds a new one', async () => {
+    const { wm } = managerWithAllWindowsOpen()
+
+    await wm.closeAllWindows()
+    wm.openCueEditorWindow()
+
+    expect(wm.getMainWindow()).toBeNull()
+    expect(builtWindows()).toHaveLength(4)
+  })
+
+  it('leaves a destroyed window alone', async () => {
+    const { wm, windows } = managerWithAllWindowsOpen()
+    windows[1].destroyed = true
 
     await wm.closeAllWindows()
 
-    expect(destroyed.close).not.toHaveBeenCalled()
-    expect(internals.cueEditorWindow).toBeNull()
+    expect(windows[1].close).not.toHaveBeenCalled()
   })
 
   it('is safe to call when no window was ever opened', async () => {
     const wm = new WindowManager()
 
     await expect(wm.closeAllWindows()).resolves.toBeUndefined()
-    expect(wm.hasWindows()).toBe(false)
+    expect(builtWindows()).toEqual([])
+  })
+})
+
+describe('WindowManager geometry saves', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.useFakeTimers()
   })
 
-  it('covers every window field the manager declares', () => {
-    const wm = new WindowManager()
-    const declared = Object.keys(wm as unknown as Internals).filter((k) => k.endsWith('Window'))
-
-    expect(declared.sort()).toEqual(WINDOWS.map((w) => w.field).sort())
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
-  it('covers every debounce timer the manager declares', () => {
-    const wm = new WindowManager()
-    const declared = Object.keys(wm as unknown as Internals).filter((k) => k.endsWith('Timeout'))
+  it('saves once after moves and resizes settle', () => {
+    const { saved, windows } = managerWithAllWindowsOpen()
+    const editor = windows[1]
 
-    expect(declared.sort()).toEqual(WINDOWS.flatMap((w) => [...w.timers]).sort())
+    editor.emit('moved')
+    jest.advanceTimersByTime(300)
+    editor.emit('resized')
+    jest.advanceTimersByTime(499)
+    expect(saved).toEqual([])
+
+    jest.advanceTimersByTime(1)
+    expect(saved).toEqual(['cueEditorWindowState'])
+  })
+
+  it('saves each window under its own preference', () => {
+    const { saved, windows } = managerWithAllWindowsOpen()
+
+    for (const window of windows) {
+      window.emit('resized')
+    }
+    jest.advanceTimersByTime(500)
+
+    expect(saved.sort()).toEqual(['audioPreviewWindowState', 'cueEditorWindowState', 'windowState'])
   })
 })

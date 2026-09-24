@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -25,6 +25,7 @@ import {
   validateStringUnion,
 } from '../../ipc/inputValidation'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
+import { CUE_CONSISTENCY_WINDOW_MS_MAX } from '../../../shared/cueConsistencyWindow'
 import {
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
@@ -33,121 +34,80 @@ import {
 
 describe('inputValidation', () => {
   describe('isPlainObject', () => {
-    it('returns true for plain object', () => {
-      expect(isPlainObject({ a: 1 })).toBe(true)
+    it.each([
+      ['a plain object', { a: 1 }],
+      ['a nested plain object', { a: { b: 2 } }],
+    ])('returns true for %s', (_label, value) => {
+      expect(isPlainObject(value)).toBe(true)
     })
 
-    it('returns true for nested plain object', () => {
-      expect(isPlainObject({ a: { b: 2 } })).toBe(true)
-    })
-
-    it('returns false for null and arrays', () => {
-      expect(isPlainObject(null)).toBe(false)
-      expect(isPlainObject([1, 2, 3])).toBe(false)
-    })
-
-    it('returns false for undefined', () => {
-      expect(isPlainObject(undefined)).toBe(false)
+    it.each([null, [1, 2, 3], undefined])('returns false for %p', (value) => {
+      expect(isPlainObject(value)).toBe(false)
     })
   })
 
   describe('validateSenderId', () => {
-    it('accepts known sender ids', () => {
-      expect(validateSenderId('sacn').ok).toBe(true)
-      expect(validateSenderId('artnet').ok).toBe(true)
-      expect(validateSenderId('ipc').ok).toBe(true)
-      expect(validateSenderId('enttecpro').ok).toBe(true)
-      expect(validateSenderId('opendmx').ok).toBe(true)
-    })
+    it.each(['sacn', 'artnet', 'ipc', 'enttecpro', 'opendmx'])(
+      'accepts the known sender id %s',
+      (id) => {
+        expect(validateSenderId(id).ok).toBe(true)
+      },
+    )
 
-    it('rejects unknown sender ids', () => {
-      const result = validateSenderId('bogus')
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects empty string', () => {
-      expect(validateSenderId('').ok).toBe(false)
+    it.each([
+      ['an unknown sender id', 'bogus'],
+      ['an empty string', ''],
+    ])('rejects %s', (_label, id) => {
+      expect(validateSenderId(id).ok).toBe(false)
     })
   })
 
   describe('validateRigOutputs', () => {
-    it('accepts undefined (legacy / publish-to-all default)', () => {
-      const result = validateRigOutputs(undefined)
+    it.each([
+      ['undefined as the publish-to-all default', undefined, undefined],
+      ['null as undefined, as a JSON round-trip produces', null, undefined],
+      ['an empty array as publish nowhere on the wire', [], []],
+      ['a valid wire-sender array', ['sacn', 'opendmx'], ['sacn', 'opendmx']],
+      [
+        'repeated entries and deduplicates them',
+        ['sacn', 'sacn', 'opendmx', 'sacn'],
+        ['sacn', 'opendmx'],
+      ],
+    ])('accepts %s', (_label, outputs, expected) => {
+      const result = validateRigOutputs(outputs)
       expect(result.ok).toBe(true)
       if (result.ok) {
-        expect(result.value).toBeUndefined()
+        expect(result.value).toEqual(expected)
       }
     })
 
-    it('accepts null as undefined (defensive — JSON round-trip)', () => {
-      const result = validateRigOutputs(null)
-      expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.value).toBeUndefined()
-      }
-    })
-
-    it('accepts an empty array (explicit "publish nowhere on wire")', () => {
-      const result = validateRigOutputs([])
-      expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.value).toEqual([])
-      }
-    })
-
-    it('accepts a valid wire-sender array', () => {
-      const result = validateRigOutputs(['sacn', 'opendmx'])
-      expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.value).toEqual(['sacn', 'opendmx'])
-      }
-    })
-
-    it('deduplicates repeated entries', () => {
-      const result = validateRigOutputs(['sacn', 'sacn', 'opendmx', 'sacn'])
-      expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.value).toEqual(['sacn', 'opendmx'])
-      }
-    })
-
-    it('rejects "ipc" (IPC is not a routable wire sender)', () => {
-      const result = validateRigOutputs(['ipc'])
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects unknown sender ids', () => {
-      const result = validateRigOutputs(['sacn', 'bogus'])
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects non-array values', () => {
-      expect(validateRigOutputs('sacn').ok).toBe(false)
-      expect(validateRigOutputs({}).ok).toBe(false)
-      expect(validateRigOutputs(42).ok).toBe(false)
-    })
-
-    it('rejects arrays containing non-string entries', () => {
-      const result = validateRigOutputs(['sacn', 123])
-      expect(result.ok).toBe(false)
+    it.each([
+      ['"ipc", which is not a routable wire sender', ['ipc']],
+      ['an unknown sender id', ['sacn', 'bogus']],
+      ['a string', 'sacn'],
+      ['an object', {}],
+      ['a number', 42],
+      ['an array containing a non-string entry', ['sacn', 123]],
+    ])('rejects %s', (_label, outputs) => {
+      expect(validateRigOutputs(outputs).ok).toBe(false)
     })
   })
 
-  describe('validateDmxRigPayload outputs handling', () => {
-    const baseRig = {
-      id: 'r1',
-      name: 'Rig 1',
-      active: true,
-      config: {
-        numLights: 1,
-        lightLayout: { id: 'two-rows', label: 'Two Rows' },
-        strobeType: 'None',
-        frontLights: [],
-        backLights: [],
-        strobeLights: [],
-      },
-    }
+  const baseRig = {
+    id: 'r1',
+    name: 'Rig 1',
+    active: true,
+    config: {
+      numLights: 1,
+      lightLayout: { id: 'two-rows', label: 'Two Rows' },
+      strobeType: 'None',
+      frontLights: [],
+      backLights: [],
+      strobeLights: [],
+    },
+  }
 
+  describe('validateDmxRigPayload outputs handling', () => {
     it('omits outputs when not supplied (legacy default preserved)', () => {
       const result = validateDmxRigPayload(baseRig)
       expect(result.ok).toBe(true)
@@ -164,24 +124,17 @@ describe('inputValidation', () => {
       }
     })
 
-    it('rejects a rig whose outputs contain an invalid sender id', () => {
-      const result = validateDmxRigPayload({ ...baseRig, outputs: ['sacn', 'bogus'] })
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects a rig whose outputs is not an array', () => {
-      const result = validateDmxRigPayload({ ...baseRig, outputs: 'sacn' })
-      expect(result.ok).toBe(false)
+    it.each([
+      ['contain an invalid sender id', ['sacn', 'bogus']],
+      ['is not an array', 'sacn'],
+    ])('rejects a rig whose outputs %s', (_label, outputs) => {
+      expect(validateDmxRigPayload({ ...baseRig, outputs }).ok).toBe(false)
     })
   })
 
   describe('validateRigMirrorFlag', () => {
-    it('accepts undefined and null as undefined', () => {
-      expect(validateRigMirrorFlag(undefined, 'mirrorHoriz')).toEqual({
-        ok: true,
-        value: undefined,
-      })
-      expect(validateRigMirrorFlag(null, 'mirrorHoriz')).toEqual({ ok: true, value: undefined })
+    it.each([undefined, null])('accepts %p as undefined', (flag) => {
+      expect(validateRigMirrorFlag(flag, 'mirrorHoriz')).toEqual({ ok: true, value: undefined })
     })
 
     it('accepts true and passes it through', () => {
@@ -192,28 +145,18 @@ describe('inputValidation', () => {
       expect(validateRigMirrorFlag(false, 'mirrorHoriz')).toEqual({ ok: true, value: undefined })
     })
 
-    it('rejects non-boolean values with a field-tagged error', () => {
-      expect(validateRigMirrorFlag('yes', 'mirrorHoriz').ok).toBe(false)
-      expect(validateRigMirrorFlag(1, 'mirrorVert').ok).toBe(false)
-      expect(validateRigMirrorFlag({}, 'mirrorHoriz').ok).toBe(false)
+    it.each([
+      ['yes', 'mirrorHoriz'],
+      [1, 'mirrorVert'],
+      [{}, 'mirrorHoriz'],
+    ] as const)('rejects the non-boolean %p with an error tagged %s', (value, field) => {
+      const result = validateRigMirrorFlag(value, field)
+      expect(result.ok).toBe(false)
+      expect(result.ok ? '' : result.error).toContain(field)
     })
   })
 
   describe('validateDmxRigPayload mirror handling', () => {
-    const baseRig = {
-      id: 'r1',
-      name: 'Rig 1',
-      active: true,
-      config: {
-        numLights: 1,
-        lightLayout: { id: 'two-rows', label: 'Two Rows' },
-        strobeType: 'None',
-        frontLights: [],
-        backLights: [],
-        strobeLights: [],
-      },
-    }
-
     it('omits mirror fields when not supplied', () => {
       const result = validateDmxRigPayload(baseRig)
       expect(result.ok).toBe(true)
@@ -250,9 +193,11 @@ describe('inputValidation', () => {
       }
     })
 
-    it('rejects non-boolean mirror values', () => {
-      expect(validateDmxRigPayload({ ...baseRig, mirrorHoriz: 'yes' }).ok).toBe(false)
-      expect(validateDmxRigPayload({ ...baseRig, mirrorVert: 1 }).ok).toBe(false)
+    it.each([
+      ['mirrorHoriz', 'yes'],
+      ['mirrorVert', 1],
+    ])('rejects a non-boolean %s of %p', (field, value) => {
+      expect(validateDmxRigPayload({ ...baseRig, [field]: value }).ok).toBe(false)
     })
   })
 
@@ -262,44 +207,35 @@ describe('inputValidation', () => {
       expect(result).toEqual({ ok: true, value: 10 })
     })
 
-    it('accepts boundary min and max', () => {
-      expect(validateNumberInRange(1, 1, 100, 'x')).toEqual({ ok: true, value: 1 })
-      expect(validateNumberInRange(100, 1, 100, 'x')).toEqual({ ok: true, value: 100 })
+    it.each([
+      ['the minimum', 1, 1],
+      ['the maximum', 100, 100],
+      ['a numeric string and coerces it', '50', 50],
+    ])('accepts %s', (_label, input, value) => {
+      expect(validateNumberInRange(input, 1, 100, 'x')).toEqual({ ok: true, value })
     })
 
-    it('rejects below min and above max', () => {
-      expect(validateNumberInRange(0, 1, 100, 'x').ok).toBe(false)
-      expect(validateNumberInRange(101, 1, 100, 'x').ok).toBe(false)
-    })
-
-    it('rejects NaN and Infinity', () => {
-      expect(validateNumberInRange(NaN, 1, 100, 'x').ok).toBe(false)
-      expect(validateNumberInRange(Infinity, 1, 100, 'x').ok).toBe(false)
-    })
-
-    it('coerces string numbers', () => {
-      expect(validateNumberInRange('50', 1, 100, 'x')).toEqual({ ok: true, value: 50 })
+    it.each([0, 101, NaN, Infinity])('rejects %p for a 1-100 range', (input) => {
+      expect(validateNumberInRange(input, 1, 100, 'x').ok).toBe(false)
     })
   })
 
   describe('validateHost', () => {
-    it('accepts ipv4 and hostname', () => {
-      expect(validateHost('127.0.0.1').ok).toBe(true)
-      expect(validateHost('example.local').ok).toBe(true)
+    it.each([
+      ['an IPv4 address', '127.0.0.1'],
+      ['a hostname', 'example.local'],
+      ['the IPv6 loopback', '::1'],
+      ['an IPv6 address', '2001:db8::1'],
+    ])('accepts %s', (_label, host) => {
+      expect(validateHost(host).ok).toBe(true)
     })
 
-    it('accepts IPv6', () => {
-      expect(validateHost('::1').ok).toBe(true)
-      expect(validateHost('2001:db8::1').ok).toBe(true)
-    })
-
-    it('rejects invalid host values', () => {
-      expect(validateHost('').ok).toBe(false)
-      expect(validateHost('bad host').ok).toBe(false)
-    })
-
-    it('rejects path injection attempts', () => {
-      expect(validateHost('../../../etc/passwd').ok).toBe(false)
+    it.each([
+      ['an empty host', ''],
+      ['a host containing a space', 'bad host'],
+      ['a path injection attempt', '../../../etc/passwd'],
+    ])('rejects %s', (_label, host) => {
+      expect(validateHost(host).ok).toBe(false)
     })
   })
 
@@ -310,8 +246,8 @@ describe('inputValidation', () => {
       if (result.ok) {
         expect(result.value.sender).toBe('artnet')
         if (result.value.sender === 'artnet') {
-          expect(result.value.maxOutputRate).toBe(40)
-          expect(result.value.base_refresh_interval).toBe(25)
+          expect(result.value.maxOutputRate).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
+          expect(result.value.base_refresh_interval).toBe(23)
         }
       }
     })
@@ -345,17 +281,21 @@ describe('inputValidation', () => {
       const result = validateSenderEnablePayload({ sender: 'sacn', universe: 1 })
       expect(result.ok).toBe(true)
       if (result.ok && result.value.sender === 'sacn') {
-        expect(result.value.maxOutputRate).toBe(40)
-        expect(result.value.minRefreshRate).toBe(40)
+        expect(result.value.maxOutputRate).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
+        expect(result.value.minRefreshRate).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
       }
     })
 
-    it('holds a sacn enable payload to the universes the protocol defines', () => {
-      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 0 }).ok).toBe(false)
-      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 1 }).ok).toBe(true)
-      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 63999 }).ok).toBe(true)
-      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 64000 }).ok).toBe(false)
+    it.each([1, 63999])('accepts a sacn enable payload on universe %p', (universe) => {
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe }).ok).toBe(true)
     })
+
+    it.each([0, 64000])(
+      'refuses a sacn enable payload on universe %p, which the protocol does not define',
+      (universe) => {
+        expect(validateSenderEnablePayload({ sender: 'sacn', universe }).ok).toBe(false)
+      },
+    )
 
     it('accepts sacn legacy maxOutputRate and clamps Hz into 10–44', () => {
       const result = validateSenderEnablePayload({
@@ -370,131 +310,140 @@ describe('inputValidation', () => {
       }
     })
 
-    it('accepts valid ipc payload', () => {
-      const result = validateSenderEnablePayload({ sender: 'ipc' })
+    it.each([
+      { sender: 'ipc' },
+      { sender: 'enttecpro', devicePath: '/dev/ttyUSB0' },
+      { sender: 'opendmx', devicePath: 'COM3', dmxSpeed: 40 },
+    ])('accepts the valid payload %p', (payload) => {
+      const result = validateSenderEnablePayload(payload)
       expect(result.ok).toBe(true)
-      if (result.ok) expect(result.value.sender).toBe('ipc')
+      if (result.ok) expect(result.value.sender).toBe(payload.sender)
     })
 
-    it('accepts valid enttecpro payload with devicePath', () => {
-      const result = validateSenderEnablePayload({
+    describe('sACN unicast destination', () => {
+      const sacn = (unicastDestination: unknown) =>
+        validateSenderEnablePayload({ sender: 'sacn', useUnicast: true, unicastDestination })
+
+      it.each([
+        ['an IP address', '10.0.0.5'],
+        ['a hostname', 'lights.local'],
+      ])('accepts %s', (_label, host) => {
+        const result = sacn(host)
+        expect(result.ok && result.value.sender === 'sacn' && result.value.unicastDestination).toBe(
+          host,
+        )
+      })
+
+      it('reads an empty destination as none', () => {
+        const result = sacn('')
+        expect(result.ok && result.value.sender === 'sacn' && result.value.unicastDestination).toBe(
+          undefined,
+        )
+      })
+
+      it.each([
+        ['a string that is not a host', 'not a host!'],
+        ['a number', 42],
+      ])('refuses %s as the destination', (_label, destination) => {
+        expect(sacn(destination).ok).toBe(false)
+      })
+    })
+
+    describe('serial device paths', () => {
+      it.each([
+        'COM3',
+        'com12',
+        '\\\\.\\COM14',
+        '/dev/ttyUSB0',
+        '/dev/tty.usbserial-A10KDJ7N',
+        '/dev/cu.usbserial-A10KDJ7N',
+        '/dev/ttyACM0',
+        '/dev/serial/by-id/usb-FTDI_FT232R-if00-port0',
+      ])('accepts %s', (devicePath) => {
+        expect(validateSenderEnablePayload({ sender: 'enttecpro', devicePath }).ok).toBe(true)
+        expect(validateSenderEnablePayload({ sender: 'opendmx', devicePath }).ok).toBe(true)
+      })
+
+      it.each([
+        '/etc/passwd',
+        '/dev/../etc/passwd',
+        'ttyUSB0',
+        'COM3; rm -rf /',
+        '/tmp/port',
+        'COM',
+        '/dev/console',
+        '/dev/disk0',
+        '/dev/tty',
+      ])('refuses %s', (devicePath) => {
+        expect(validateSenderEnablePayload({ sender: 'enttecpro', devicePath }).ok).toBe(false)
+        expect(validateSenderEnablePayload({ sender: 'opendmx', devicePath }).ok).toBe(false)
+      })
+
+      it('holds a stored port to the same rule, with an empty port meaning none chosen', () => {
+        expect(validatePreferencesPayload({ enttecProConfig: { port: '/etc/passwd' } }).ok).toBe(
+          false,
+        )
+        expect(validatePreferencesPayload({ openDmxConfig: { port: '' } }).ok).toBe(true)
+        expect(validatePreferencesPayload({ openDmxConfig: { port: '/dev/ttyUSB0' } }).ok).toBe(
+          true,
+        )
+      })
+    })
+
+    it.each([
+      ['a non-object payload', 'bad'],
+      ['a payload with no sender', { host: '127.0.0.1' }],
+      ['enttecpro without a devicePath', { sender: 'enttecpro' }],
+    ])('rejects %s', (_label, payload) => {
+      expect(validateSenderEnablePayload(payload).ok).toBe(false)
+    })
+
+    describe.each([
+      {
         sender: 'enttecpro',
         devicePath: '/dev/ttyUSB0',
-      })
-      expect(result.ok).toBe(true)
-      if (result.ok) expect(result.value.sender).toBe('enttecpro')
-    })
-
-    it('accepts valid opendmx payload', () => {
-      const result = validateSenderEnablePayload({
+        range: '10-44',
+        clamps: [
+          [2.4, 10],
+          [44.6, 44],
+          [20.5, 21],
+        ],
+      },
+      {
         sender: 'opendmx',
         devicePath: 'COM3',
-        dmxSpeed: 40,
-      })
-      expect(result.ok).toBe(true)
-      if (result.ok) expect(result.value.sender).toBe('opendmx')
-    })
-
-    it('rejects non-object payload', () => {
-      const result = validateSenderEnablePayload('bad')
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects payload with missing sender', () => {
-      const result = validateSenderEnablePayload({ host: '127.0.0.1' })
-      expect(result.ok).toBe(false)
-    })
-
-    it('rejects enttecpro without devicePath', () => {
-      const result = validateSenderEnablePayload({ sender: 'enttecpro' })
-      expect(result.ok).toBe(false)
-    })
-
-    it('leaves enttecpro dmxSpeed undefined when the payload does not carry one', () => {
-      const result = validateSenderEnablePayload({
-        sender: 'enttecpro',
-        devicePath: '/dev/ttyUSB0',
-      })
-      expect(result.ok).toBe(true)
-      if (result.ok && result.value.sender === 'enttecpro') {
-        expect(result.value.dmxSpeed).toBeUndefined()
-      }
-    })
-
-    it('rounds and clamps a supplied enttecpro dmxSpeed to 10-44', () => {
-      const low = validateSenderEnablePayload({
-        sender: 'enttecpro',
-        devicePath: '/dev/ttyUSB0',
-        dmxSpeed: 2.4,
-      })
-      expect(low.ok).toBe(true)
-      if (low.ok && low.value.sender === 'enttecpro') expect(low.value.dmxSpeed).toBe(10)
-
-      const high = validateSenderEnablePayload({
-        sender: 'enttecpro',
-        devicePath: '/dev/ttyUSB0',
-        dmxSpeed: 44.6,
-      })
-      expect(high.ok).toBe(true)
-      if (high.ok && high.value.sender === 'enttecpro') expect(high.value.dmxSpeed).toBe(44)
-
-      const mid = validateSenderEnablePayload({
-        sender: 'enttecpro',
-        devicePath: '/dev/ttyUSB0',
-        dmxSpeed: 20.5,
-      })
-      expect(mid.ok).toBe(true)
-      if (mid.ok && mid.value.sender === 'enttecpro') expect(mid.value.dmxSpeed).toBe(21)
-    })
-
-    it.each([NaN, Infinity, -Infinity, '40', null])(
-      'rejects a supplied enttecpro dmxSpeed of %p rather than defaulting it',
-      (dmxSpeed) => {
-        const result = validateSenderEnablePayload({
-          sender: 'enttecpro',
-          devicePath: '/dev/ttyUSB0',
-          dmxSpeed,
-        })
-        expect(result.ok).toBe(false)
+        range: '1-44',
+        clamps: [
+          [5, 5],
+          [0, 1],
+          [-3, 1],
+          [20.5, 21],
+          [1000, 44],
+        ],
       },
-    )
+    ])('$sender dmxSpeed', ({ sender, devicePath, range, clamps }) => {
+      const enable = (fields: Record<string, unknown> = {}) =>
+        validateSenderEnablePayload({ sender, devicePath, ...fields })
+      const dmxSpeedOf = (result: ReturnType<typeof enable>): unknown =>
+        result.ok ? (result.value as { dmxSpeed?: number }).dmxSpeed : 'rejected'
 
-    it('rounds and clamps a supplied opendmx dmxSpeed to its own 1-44 range', () => {
-      const speedFor = (dmxSpeed: number): number | undefined => {
-        const result = validateSenderEnablePayload({
-          sender: 'opendmx',
-          devicePath: 'COM3',
-          dmxSpeed,
-        })
-        return result.ok && result.value.sender === 'opendmx' ? result.value.dmxSpeed : undefined
-      }
+      it('stays undefined when the payload does not carry one', () => {
+        const result = enable()
+        expect(result.ok && result.value.sender).toBe(sender)
+        expect(dmxSpeedOf(result)).toBeUndefined()
+      })
 
-      expect(speedFor(5)).toBe(5)
-      expect(speedFor(0)).toBe(1)
-      expect(speedFor(-3)).toBe(1)
-      expect(speedFor(20.5)).toBe(21)
-      expect(speedFor(1000)).toBe(44)
+      it.each(clamps)(`rounds and clamps a supplied %p into ${range} as %p`, (dmxSpeed, stored) => {
+        expect(dmxSpeedOf(enable({ dmxSpeed }))).toBe(stored)
+      })
+
+      it.each([NaN, Infinity, -Infinity, '40', null])(
+        'rejects a supplied %p with no fallback to a default',
+        (dmxSpeed) => {
+          expect(enable({ dmxSpeed }).ok).toBe(false)
+        },
+      )
     })
-
-    it('leaves opendmx dmxSpeed undefined when the payload does not carry one', () => {
-      const result = validateSenderEnablePayload({ sender: 'opendmx', devicePath: 'COM3' })
-      expect(result.ok).toBe(true)
-      if (result.ok && result.value.sender === 'opendmx') {
-        expect(result.value.dmxSpeed).toBeUndefined()
-      }
-    })
-
-    it.each([NaN, Infinity, -Infinity, '40', null])(
-      'rejects a supplied opendmx dmxSpeed of %p rather than defaulting it',
-      (dmxSpeed) => {
-        const result = validateSenderEnablePayload({
-          sender: 'opendmx',
-          devicePath: 'COM3',
-          dmxSpeed,
-        })
-        expect(result.ok).toBe(false)
-      },
-    )
   })
 
   describe('validateLightingConfiguration', () => {
@@ -517,36 +466,21 @@ describe('inputValidation', () => {
       }
     })
 
-    it('rejects non-object input', () => {
-      expect(validateLightingConfiguration('bad').ok).toBe(false)
-      expect(validateLightingConfiguration(null).ok).toBe(false)
-      expect(validateLightingConfiguration([]).ok).toBe(false)
+    it.each(['bad', null, []])('rejects the non-object input %p', (input) => {
+      expect(validateLightingConfiguration(input).ok).toBe(false)
     })
 
-    it('rejects invalid numLights', () => {
-      expect(validateLightingConfiguration({ ...validPayload, numLights: -1 }).ok).toBe(false)
-      expect(validateLightingConfiguration({ ...validPayload, numLights: NaN }).ok).toBe(false)
-    })
-
-    it('rejects invalid lightLayout', () => {
-      expect(validateLightingConfiguration({ ...validPayload, lightLayout: { id: 'x' } }).ok).toBe(
-        false,
-      )
-      expect(validateLightingConfiguration({ ...validPayload, lightLayout: 'not-object' }).ok).toBe(
-        false,
-      )
-    })
-
-    it('rejects invalid strobeType', () => {
-      expect(validateLightingConfiguration({ ...validPayload, strobeType: 'Invalid' }).ok).toBe(
-        false,
-      )
-    })
-
-    it('rejects non-array frontLights, backLights, or strobeLights', () => {
-      expect(validateLightingConfiguration({ ...validPayload, frontLights: {} }).ok).toBe(false)
-      expect(validateLightingConfiguration({ ...validPayload, backLights: null }).ok).toBe(false)
-      expect(validateLightingConfiguration({ ...validPayload, strobeLights: 'x' }).ok).toBe(false)
+    it.each([
+      ['numLights', -1],
+      ['numLights', NaN],
+      ['lightLayout', { id: 'x' }],
+      ['lightLayout', 'not-object'],
+      ['strobeType', 'Invalid'],
+      ['frontLights', {}],
+      ['backLights', null],
+      ['strobeLights', 'x'],
+    ])('rejects an invalid %s of %p', (field, value) => {
+      expect(validateLightingConfiguration({ ...validPayload, [field]: value }).ok).toBe(false)
     })
   })
 
@@ -558,54 +492,48 @@ describe('inputValidation', () => {
       expect(r).toEqual({ ok: true, value: 'b' })
     })
 
-    it('rejects values not in the union', () => {
-      expect(validateStringUnion('z', allowed, 'field').ok).toBe(false)
-    })
-
-    it('rejects non-string inputs', () => {
-      expect(validateStringUnion(1, allowed, 'field').ok).toBe(false)
-      expect(validateStringUnion(undefined, allowed, 'field').ok).toBe(false)
+    it.each([
+      ['a value not in the union', 'z'],
+      ['a number', 1],
+      ['undefined', undefined],
+    ])('rejects %s', (_label, value) => {
+      expect(validateStringUnion(value, allowed, 'field').ok).toBe(false)
     })
   })
 
   describe('validateMotionSelectionMode', () => {
-    it('accepts every supported mode', () => {
-      for (const mode of ['oncePerSong', 'perCueChange', 'none'] as const) {
-        expect(validateMotionSelectionMode(mode).ok).toBe(true)
-      }
+    it.each(['oncePerSong', 'perCueChange', 'none'])('accepts the supported mode %s', (mode) => {
+      expect(validateMotionSelectionMode(mode).ok).toBe(true)
     })
 
-    it('rejects "withinSong" (cue-group mode, not motion mode)', () => {
-      expect(validateMotionSelectionMode('withinSong').ok).toBe(false)
-    })
-
-    it('rejects non-string inputs', () => {
-      expect(validateMotionSelectionMode(null).ok).toBe(false)
+    it.each([
+      ['"withinSong", which is a cue-group mode and not a motion mode', 'withinSong'],
+      ['a non-string input', null],
+    ])('rejects %s', (_label, mode) => {
+      expect(validateMotionSelectionMode(mode).ok).toBe(false)
     })
   })
 
   describe('validateCueGroupSelectionMode', () => {
-    it('accepts oncePerSong and withinSong only', () => {
-      expect(validateCueGroupSelectionMode('oncePerSong').ok).toBe(true)
-      expect(validateCueGroupSelectionMode('withinSong').ok).toBe(true)
+    it.each(['oncePerSong', 'withinSong'])('accepts %s', (mode) => {
+      expect(validateCueGroupSelectionMode(mode).ok).toBe(true)
     })
 
-    it('rejects motion-only modes', () => {
-      expect(validateCueGroupSelectionMode('perCueChange').ok).toBe(false)
-      expect(validateCueGroupSelectionMode('none').ok).toBe(false)
+    it.each(['perCueChange', 'none'])('rejects the motion-only mode %s', (mode) => {
+      expect(validateCueGroupSelectionMode(mode).ok).toBe(false)
     })
   })
 
   describe('validateStageKitPriority', () => {
-    it('accepts every supported priority', () => {
-      for (const priority of ['prefer-for-tracked', 'random', 'never'] as const) {
+    it.each(['prefer-for-tracked', 'random', 'never'])(
+      'accepts the supported priority %s',
+      (priority) => {
         expect(validateStageKitPriority(priority).ok).toBe(true)
-      }
-    })
+      },
+    )
 
-    it('rejects unknown priority', () => {
-      expect(validateStageKitPriority('always').ok).toBe(false)
-      expect(validateStageKitPriority(0).ok).toBe(false)
+    it.each(['always', 0])('rejects the unknown priority %p', (priority) => {
+      expect(validateStageKitPriority(priority).ok).toBe(false)
     })
   })
 
@@ -617,21 +545,19 @@ describe('inputValidation', () => {
       if (r.ok) expect(r.value).toBe(known)
     })
 
-    it('rejects an unknown string', () => {
-      expect(validateCueType('not-a-real-cue').ok).toBe(false)
-    })
-
-    it('rejects empty / non-string inputs', () => {
-      expect(validateCueType('').ok).toBe(false)
-      expect(validateCueType(null).ok).toBe(false)
-      expect(validateCueType(7).ok).toBe(false)
+    it.each([
+      ['an unknown string', 'not-a-real-cue'],
+      ['an empty string', ''],
+      ['null', null],
+      ['a number', 7],
+    ])('rejects %s', (_label, value) => {
+      expect(validateCueType(value).ok).toBe(false)
     })
   })
 
   describe('validateCueRefPayload', () => {
-    it('accepts null and undefined as the explicit "no active cue" value', () => {
-      expect(validateCueRefPayload(null)).toEqual({ ok: true, value: null })
-      expect(validateCueRefPayload(undefined)).toEqual({ ok: true, value: null })
+    it.each([null, undefined])('accepts %p as the explicit "no active cue" value', (payload) => {
+      expect(validateCueRefPayload(payload)).toEqual({ ok: true, value: null })
     })
 
     it('accepts a well-formed { groupId, cueId } object and trims whitespace', () => {
@@ -639,15 +565,14 @@ describe('inputValidation', () => {
       expect(r).toEqual({ ok: true, value: { groupId: 'g1', cueId: 'c1' } })
     })
 
-    it('rejects non-object payloads', () => {
-      expect(validateCueRefPayload('bad').ok).toBe(false)
-      expect(validateCueRefPayload(42).ok).toBe(false)
-    })
-
-    it('rejects payloads missing groupId or cueId', () => {
-      expect(validateCueRefPayload({ groupId: '' }).ok).toBe(false)
-      expect(validateCueRefPayload({ cueId: 'c1' }).ok).toBe(false)
-      expect(validateCueRefPayload({ groupId: 'g1', cueId: '   ' }).ok).toBe(false)
+    it.each([
+      ['a string payload', 'bad'],
+      ['a number payload', 42],
+      ['an empty groupId', { groupId: '' }],
+      ['a missing groupId', { cueId: 'c1' }],
+      ['a blank cueId', { groupId: 'g1', cueId: '   ' }],
+    ])('rejects %s', (_label, payload) => {
+      expect(validateCueRefPayload(payload).ok).toBe(false)
     })
   })
 
@@ -659,68 +584,108 @@ describe('inputValidation', () => {
       expect(result.ok).toBe(true)
     })
 
-    it('rejects paths outside allowed roots', () => {
-      const result = validatePathUnderAllowedRoots('/etc/passwd', allowedRoots)
-      expect(result.ok).toBe(false)
+    it.each([
+      ['a path outside the allowed roots', '/etc/passwd', allowedRoots],
+      ['a path with a null byte', '/tmp/project/file\x00.txt', allowedRoots],
+      ['a non-string path', 123, allowedRoots],
+      ['an empty string path', '', allowedRoots],
+      ['a path when the allowed roots are empty', '/tmp/foo', []],
+    ])('rejects %s', (_label, candidate, roots) => {
+      expect(validatePathUnderAllowedRoots(candidate, roots).ok).toBe(false)
     })
 
-    it('rejects path with null bytes', () => {
-      const result = validatePathUnderAllowedRoots('/tmp/project/file\x00.txt', allowedRoots)
-      expect(result.ok).toBe(false)
-    })
+    describe('links', () => {
+      let root: string
 
-    it('rejects non-string path', () => {
-      expect(validatePathUnderAllowedRoots(123, allowedRoots).ok).toBe(false)
-    })
+      beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-links-'))
+      })
 
-    it('rejects empty string path', () => {
-      expect(validatePathUnderAllowedRoots('', allowedRoots).ok).toBe(false)
-    })
+      afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true })
+      })
 
-    it('rejects path when allowed roots is empty', () => {
-      const result = validatePathUnderAllowedRoots('/tmp/foo', [])
-      expect(result.ok).toBe(false)
+      it('refuses a link under a root that points outside it', () => {
+        const link = path.join(root, 'escape')
+        fs.symlinkSync('/etc', link)
+
+        expect(validatePathUnderAllowedRoots(link, [root]).ok).toBe(false)
+        expect(validatePathUnderAllowedRoots(path.join(link, 'hosts'), [root]).ok).toBe(false)
+      })
+
+      it('accepts a file inside a root that is reached through a link', () => {
+        const real = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-real-'))
+        const linkedRoot = path.join(root, 'libraries')
+        fs.symlinkSync(real, linkedRoot)
+        try {
+          expect(validatePathUnderAllowedRoots(path.join(real, 'cues.json'), [linkedRoot]).ok).toBe(
+            true,
+          )
+        } finally {
+          fs.rmSync(real, { recursive: true, force: true })
+        }
+      })
+
+      it('accepts a file that does not exist yet under a root', () => {
+        expect(validatePathUnderAllowedRoots(path.join(root, 'new', 'cues.json'), [root]).ok).toBe(
+          true,
+        )
+      })
     })
   })
 
   describe('validateOpenablePath', () => {
     const allowedRoots = [os.tmpdir()]
     const under = (name: string) => path.join(os.tmpdir(), name)
-
-    it('accepts the file types the app opens', () => {
-      for (const name of ['library.json', 'notes.txt', 'photonics.log', 'readme.md', 'rows.csv']) {
-        expect(validateOpenablePath(under(name), allowedRoots).ok).toBe(true)
-      }
-    })
-
-    it('refuses to hand an executable to the system handler', () => {
-      for (const name of ['installer.exe', 'run.sh', 'payload.command', 'link.lnk', 'go.bat']) {
-        expect(validateOpenablePath(under(name), allowedRoots).ok).toBe(false)
-      }
-    })
-
-    it('accepts a plain directory, which opens a file manager', () => {
+    const inTempDir = (check: (dir: string) => void): void => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-openable-'))
       try {
-        expect(validateOpenablePath(dir, allowedRoots).ok).toBe(true)
+        check(dir)
       } finally {
         fs.rmSync(dir, { recursive: true, force: true })
       }
+    }
+
+    it.each(['library.json', 'notes.txt', 'photonics.log', 'readme.md', 'rows.csv'])(
+      'accepts %s, a file type the app opens',
+      (name) => {
+        expect(validateOpenablePath(under(name), allowedRoots).ok).toBe(true)
+      },
+    )
+
+    it.each(['installer.exe', 'run.sh', 'payload.command', 'link.lnk', 'go.bat'])(
+      'refuses to hand the executable %s to the system handler',
+      (name) => {
+        expect(validateOpenablePath(under(name), allowedRoots).ok).toBe(false)
+      },
+    )
+
+    it('accepts a plain directory, which opens a file manager', () => {
+      inTempDir((dir) => {
+        expect(validateOpenablePath(dir, allowedRoots).ok).toBe(true)
+      })
     })
 
     it('refuses a directory carrying an extension, which is what a macOS bundle is', () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-openable-'))
-      const bundle = path.join(dir, 'Something.app')
-      fs.mkdirSync(bundle)
-      try {
+      inTempDir((dir) => {
+        const bundle = path.join(dir, 'Something.app')
+        fs.mkdirSync(bundle)
         expect(validateOpenablePath(bundle, allowedRoots).ok).toBe(false)
-      } finally {
-        fs.rmSync(dir, { recursive: true, force: true })
-      }
+      })
     })
 
     it('still refuses a path outside the allowed roots', () => {
       expect(validateOpenablePath('/etc/hosts.json', allowedRoots).ok).toBe(false)
+    })
+
+    it('refuses a link with no extension that leads to an application bundle', () => {
+      inTempDir((dir) => {
+        const bundle = path.join(dir, 'Something.app')
+        fs.mkdirSync(bundle)
+        const link = path.join(dir, 'harmless')
+        fs.symlinkSync(bundle, link)
+        expect(validateOpenablePath(link, allowedRoots).ok).toBe(false)
+      })
     })
 
     describe('channel bounds', () => {
@@ -811,13 +776,11 @@ describe('inputValidation', () => {
         expect(validateDmxFixturesArray([el]).ok).toBe(true)
       })
 
-      it('normalises null and [] extraChannels to a missing key', () => {
-        for (const empty of [null, []]) {
-          const el = fixtureWith(empty)
-          const result = validateDmxFixturesArray([el])
-          expect(result.ok).toBe(true)
-          expect('extraChannels' in el).toBe(false)
-        }
+      it.each([null, []])('normalises %p extraChannels to a missing key', (empty) => {
+        const el = fixtureWith(empty)
+        const result = validateDmxFixturesArray([el])
+        expect(result.ok).toBe(true)
+        expect('extraChannels' in el).toBe(false)
       })
 
       it.each([
@@ -922,12 +885,13 @@ describe('inputValidation', () => {
         })
       })
 
-      it('drops an all-default scaling object and a null one entirely', () => {
-        for (const scaling of [{ red: 100, green: 100 }, null]) {
-          const el = fixtureWith({ brightnessScaling: scaling })
-          expect(validateDmxFixturesArray([el]).ok).toBe(true)
-          expect('brightnessScaling' in el).toBe(false)
-        }
+      it.each([
+        ['an all-default scaling object', { red: 100, green: 100 }],
+        ['a null scaling', null],
+      ])('drops %s entirely', (_label, scaling) => {
+        const el = fixtureWith({ brightnessScaling: scaling })
+        expect(validateDmxFixturesArray([el]).ok).toBe(true)
+        expect('brightnessScaling' in el).toBe(false)
       })
 
       it('validates and normalises scaling on rig-snapshot lights via the layout path', () => {
@@ -978,6 +942,16 @@ describe('inputValidation', () => {
   })
 
   describe('validatePreferencesPayload', () => {
+    it('holds cueConsistencyWindow to the range the settings box offers', () => {
+      const atCeiling = validatePreferencesPayload({
+        cueConsistencyWindow: CUE_CONSISTENCY_WINDOW_MS_MAX,
+      })
+      expect(atCeiling.ok).toBe(true)
+      expect(
+        validatePreferencesPayload({ cueConsistencyWindow: CUE_CONSISTENCY_WINDOW_MS_MAX + 1 }).ok,
+      ).toBe(false)
+    })
+
     it('clamps sacnConfig.refreshRateHz into allowed range', () => {
       const r = validatePreferencesPayload({
         sacnConfig: { universe: 1, useUnicast: false, refreshRateHz: 300 },
@@ -1014,43 +988,42 @@ describe('inputValidation', () => {
       if (r.ok) expect(r.value.sacnConfig?.refreshRateHz).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
     })
 
-    it('refuses an Art-Net host that is not an address', () => {
-      // The stored host reaches the driver verbatim on the next launch, so a bad one keeps sending
-      // the rig's output somewhere else.
-      for (const host of ['10.0.0.5 ; rm -rf /', 'http://10.0.0.5', '10.0.0.5/24', '-leading']) {
+    // The stored host reaches the driver verbatim on the next launch, so a bad one keeps sending
+    // the rig's output somewhere else.
+    it.each(['10.0.0.5 ; rm -rf /', 'http://10.0.0.5', '10.0.0.5/24', '-leading'])(
+      'refuses the Art-Net host %p, which is not an address',
+      (host) => {
         const r = validatePreferencesPayload({ artNetConfig: { host } })
         expect(r.ok).toBe(false)
-      }
+      },
+    )
+
+    it.each([
+      ['10.0.0.5', '10.0.0.5'],
+      ['  10.0.0.5  ', '10.0.0.5'],
+      ['fe80::1', 'fe80::1'],
+      ['lighting-desk.local', 'lighting-desk.local'],
+      ['', ''],
+    ])('accepts the Art-Net host %p and stores it trimmed as %p', (host, stored) => {
+      const r = validatePreferencesPayload({ artNetConfig: { host } })
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.value.artNetConfig?.host).toBe(stored)
     })
 
-    it('accepts an Art-Net host as an address or a hostname, trimmed', () => {
-      for (const [host, stored] of [
-        ['10.0.0.5', '10.0.0.5'],
-        ['  10.0.0.5  ', '10.0.0.5'],
-        ['fe80::1', 'fe80::1'],
-        ['lighting-desk.local', 'lighting-desk.local'],
-        ['', ''],
-      ]) {
-        const r = validatePreferencesPayload({ artNetConfig: { host } })
-        expect(r.ok).toBe(true)
-        if (r.ok) expect(r.value.artNetConfig?.host).toBe(stored)
-      }
-    })
-
-    it('holds the Art-Net addressing fields in range', () => {
+    it('accepts every Art-Net addressing field at the top of its range', () => {
       const inRange = { universe: 32767, net: 127, subnet: 15, subuni: 15, port: 65535 }
       expect(validatePreferencesPayload({ artNetConfig: inRange }).ok).toBe(true)
+    })
 
-      for (const [field, value] of Object.entries({
-        universe: 32768,
-        net: 128,
-        subnet: 16,
-        subuni: 16,
-        port: 0,
-      })) {
-        const r = validatePreferencesPayload({ artNetConfig: { [field]: value } })
-        expect(r.ok).toBe(false)
-      }
+    it.each([
+      ['universe', 32768],
+      ['net', 128],
+      ['subnet', 16],
+      ['subuni', 16],
+      ['port', 0],
+    ])('rejects an out-of-range Art-Net %s of %p', (field, value) => {
+      const r = validatePreferencesPayload({ artNetConfig: { [field]: value } })
+      expect(r.ok).toBe(false)
     })
 
     it('refuses a sACN unicast destination that is not an address', () => {
@@ -1060,12 +1033,12 @@ describe('inputValidation', () => {
       expect(r.ok).toBe(false)
     })
 
-    it('holds the sACN universe in range', () => {
-      expect(validatePreferencesPayload({ sacnConfig: { universe: 1 } }).ok).toBe(true)
-      expect(validatePreferencesPayload({ sacnConfig: { universe: 63999 } }).ok).toBe(true)
-      expect(validatePreferencesPayload({ sacnConfig: { universe: 64000 } }).ok).toBe(false)
-      expect(validatePreferencesPayload({ sacnConfig: { universe: 0 } }).ok).toBe(false)
-      expect(validatePreferencesPayload({ sacnConfig: { universe: -1 } }).ok).toBe(false)
+    it.each([1, 63999])('accepts a sACN universe of %p', (universe) => {
+      expect(validatePreferencesPayload({ sacnConfig: { universe } }).ok).toBe(true)
+    })
+
+    it.each([64000, 0, -1])('rejects an out-of-range sACN universe of %p', (universe) => {
+      expect(validatePreferencesPayload({ sacnConfig: { universe } }).ok).toBe(false)
     })
 
     it('rejects a non-boolean sACN useUnicast', () => {
@@ -1080,7 +1053,7 @@ describe('inputValidation', () => {
       expect(r.ok).toBe(false)
     })
 
-    describe('shape validation for pass-through prefs (M-7)', () => {
+    describe('shape validation for pass-through prefs', () => {
       it('accepts a well-formed brightness object', () => {
         const r = validatePreferencesPayload({
           brightness: { low: 10, medium: 80, high: 180, max: 255 },
@@ -1097,45 +1070,41 @@ describe('inputValidation', () => {
         expect(validatePreferencesPayload({ brightness }).ok).toBe(false)
       })
 
-      it('validates stageKitPrefs.yargPriority against the allowed set', () => {
-        expect(validatePreferencesPayload({ stageKitPrefs: { yargPriority: 'random' } }).ok).toBe(
-          true,
-        )
-        expect(validatePreferencesPayload({ stageKitPrefs: { yargPriority: 'bogus' } }).ok).toBe(
-          false,
-        )
+      const payloadAt = (field: string, value: unknown): Record<string, unknown> => {
+        const [key, nested] = field.split('.')
+        return { [key]: nested ? { [nested]: value } : value }
+      }
+
+      it.each([
+        ['stageKitPrefs.yargPriority', 'random'],
+        ['rb3Prefs.processingMode', 'direct'],
+        ['rb3Prefs.processingMode', 'cue'],
+        ['whiteChannelMixMode', 'w-only'],
+        ['whiteChannelMixMode', 'strobe-rgbw'],
+        ['whiteChannelMixMode', 'always-rgbw'],
+        ['blackoutShortcutKey', 'escape'],
+        ['blackoutShortcutKey', 'backquote'],
+        ['blackoutShortcutScope', 'disabled'],
+        ['blackoutShortcutScope', 'focused'],
+        ['blackoutShortcutScope', 'system-wide'],
+      ])('accepts a %s of %p from the allowed set', (field, value) => {
+        expect(validatePreferencesPayload(payloadAt(field, value)).ok).toBe(true)
       })
 
-      it('validates rb3Prefs.processingMode against the allowed set', () => {
-        expect(validatePreferencesPayload({ rb3Prefs: { processingMode: 'direct' } }).ok).toBe(true)
-        expect(validatePreferencesPayload({ rb3Prefs: { processingMode: 'cue' } }).ok).toBe(true)
-        expect(validatePreferencesPayload({ rb3Prefs: { processingMode: 'Cue' } }).ok).toBe(false)
-        expect(validatePreferencesPayload({ rb3Prefs: {} }).ok).toBe(false)
-        expect(validatePreferencesPayload({ rb3Prefs: 'cue' }).ok).toBe(false)
-      })
-
-      it('validates whiteChannelMixMode against the allowed set', () => {
-        expect(validatePreferencesPayload({ whiteChannelMixMode: 'w-only' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ whiteChannelMixMode: 'strobe-rgbw' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ whiteChannelMixMode: 'always-rgbw' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ whiteChannelMixMode: 'rgbw' }).ok).toBe(false)
-        expect(validatePreferencesPayload({ whiteChannelMixMode: 3 }).ok).toBe(false)
-      })
-
-      it('validates blackoutShortcutKey against the allowed set', () => {
-        expect(validatePreferencesPayload({ blackoutShortcutKey: 'escape' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ blackoutShortcutKey: 'backquote' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ blackoutShortcutKey: 'backtick' }).ok).toBe(false)
-        expect(validatePreferencesPayload({ blackoutShortcutKey: '`' }).ok).toBe(false)
-        expect(validatePreferencesPayload({ blackoutShortcutKey: true }).ok).toBe(false)
-      })
-
-      it('validates blackoutShortcutScope against the allowed set', () => {
-        expect(validatePreferencesPayload({ blackoutShortcutScope: 'disabled' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ blackoutShortcutScope: 'focused' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ blackoutShortcutScope: 'system-wide' }).ok).toBe(true)
-        expect(validatePreferencesPayload({ blackoutShortcutScope: 'systemwide' }).ok).toBe(false)
-        expect(validatePreferencesPayload({ blackoutShortcutScope: true }).ok).toBe(false)
+      it.each([
+        ['stageKitPrefs.yargPriority', 'bogus'],
+        ['rb3Prefs.processingMode', 'Cue'],
+        ['rb3Prefs', {}],
+        ['rb3Prefs', 'cue'],
+        ['whiteChannelMixMode', 'rgbw'],
+        ['whiteChannelMixMode', 3],
+        ['blackoutShortcutKey', 'backtick'],
+        ['blackoutShortcutKey', '`'],
+        ['blackoutShortcutKey', true],
+        ['blackoutShortcutScope', 'systemwide'],
+        ['blackoutShortcutScope', true],
+      ])('rejects a %s of %p against the allowed set', (field, value) => {
+        expect(validatePreferencesPayload(payloadAt(field, value)).ok).toBe(false)
       })
 
       it('keeps both blackout shortcut keys through the allowlist', () => {
@@ -1149,17 +1118,16 @@ describe('inputValidation', () => {
         expect(result.ok && result.value.blackoutShortcutScope).toBe('system-wide')
       })
 
-      it('holds each lag compensation inside its range', () => {
-        const at = (value: unknown): unknown => {
-          const result = validatePreferencesPayload({ videoLagCompensationMs: value })
-          return result.ok ? result.value.videoLagCompensationMs : 'rejected'
-        }
-        expect(at(0)).toBe(0)
-        expect(at(250)).toBe(250)
-        expect(at(500)).toBe(500)
-        expect(at(501)).toBe(500)
-        expect(at(-5)).toBe(0)
-        expect(at(120.6)).toBe(121)
+      it.each([
+        [0, 0],
+        [250, 250],
+        [500, 500],
+        [501, 500],
+        [-5, 0],
+        [120.6, 121],
+      ])('holds a videoLagCompensationMs of %p inside its range as %p', (value, stored) => {
+        const result = validatePreferencesPayload({ videoLagCompensationMs: value })
+        expect(result.ok ? result.value.videoLagCompensationMs : 'rejected').toBe(stored)
       })
 
       it('holds the audio lag compensation the same way', () => {
@@ -1167,10 +1135,12 @@ describe('inputValidation', () => {
         expect(result.ok && result.value.audioLagCompensationMs).toBe(500)
       })
 
-      it('rejects a lag compensation that is not a usable number', () => {
-        expect(validatePreferencesPayload({ videoLagCompensationMs: 'slow' }).ok).toBe(false)
-        expect(validatePreferencesPayload({ videoLagCompensationMs: Number.NaN }).ok).toBe(false)
-        expect(validatePreferencesPayload({ audioLagCompensationMs: null }).ok).toBe(false)
+      it.each([
+        ['videoLagCompensationMs', 'slow'],
+        ['videoLagCompensationMs', Number.NaN],
+        ['audioLagCompensationMs', null],
+      ])('rejects a %s of %p, which is not a usable number', (key, value) => {
+        expect(validatePreferencesPayload({ [key]: value }).ok).toBe(false)
       })
 
       it('keeps both lag compensation keys through the allowlist', () => {
@@ -1193,7 +1163,7 @@ describe('inputValidation', () => {
         )
       })
 
-      it('validates the simulationSettings shape', () => {
+      describe('simulationSettings shape', () => {
         const good = {
           registryType: 'YARG',
           groupId: 'default',
@@ -1202,16 +1172,20 @@ describe('inputValidation', () => {
           bpm: 120,
           instrument: 'drums',
         }
-        expect(validatePreferencesPayload({ simulationSettings: good }).ok).toBe(true)
-        expect(
-          validatePreferencesPayload({ simulationSettings: { ...good, registryType: 'X' } }).ok,
-        ).toBe(false)
-        expect(
-          validatePreferencesPayload({ simulationSettings: { ...good, bpm: 'fast' } }).ok,
-        ).toBe(false)
-        expect(
-          validatePreferencesPayload({ simulationSettings: { ...good, instrument: 'kazoo' } }).ok,
-        ).toBe(false)
+
+        it('accepts a well-formed simulationSettings', () => {
+          expect(validatePreferencesPayload({ simulationSettings: good }).ok).toBe(true)
+        })
+
+        it.each([
+          ['registryType', 'X'],
+          ['bpm', 'fast'],
+          ['instrument', 'kazoo'],
+        ])('rejects a %s of %p', (field, value) => {
+          expect(
+            validatePreferencesPayload({ simulationSettings: { ...good, [field]: value } }).ok,
+          ).toBe(false)
+        })
       })
     })
 
@@ -1243,13 +1217,13 @@ describe('inputValidation', () => {
         expect(validatePreferencesPayload({ yargFallbackCueTimeMs: 'later' }).ok).toBe(false)
       })
 
-      it('clamps clockRate into the window the Clock accepts', () => {
-        const under = validatePreferencesPayload({ clockRate: 0 })
-        expect(under.ok && under.value.clockRate).toBe(1)
-        const over = validatePreferencesPayload({ clockRate: 9999 })
-        expect(over.ok && over.value.clockRate).toBe(50)
-        const justOver = validatePreferencesPayload({ clockRate: 51 })
-        expect(justOver.ok && justOver.value.clockRate).toBe(50)
+      it.each([
+        [0, 1],
+        [9999, 50],
+        [51, 50],
+      ])('clamps a clockRate of %p to %p, inside the window the Clock accepts', (rate, stored) => {
+        const r = validatePreferencesPayload({ clockRate: rate })
+        expect(r.ok && r.value.clockRate).toBe(stored)
       })
     })
 
@@ -1282,27 +1256,30 @@ describe('inputValidation', () => {
         },
       )
 
-      it('validates the adapter config shapes', () => {
-        expect(validatePreferencesPayload({ enttecProConfig: { port: 'COM3' } }).ok).toBe(true)
-        expect(validatePreferencesPayload({ enttecProConfig: { port: 3 } }).ok).toBe(false)
-        expect(
-          validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed: 40 } }).ok,
-        ).toBe(true)
-        expect(
-          validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed: 'fast' } }).ok,
-        ).toBe(false)
-        expect(validatePreferencesPayload({ dmxOutputConfig: { sacnEnabled: true } }).ok).toBe(true)
-        expect(validatePreferencesPayload({ dmxOutputConfig: { sacnEnabled: 1 } }).ok).toBe(false)
+      it.each([
+        ['enttecProConfig', { port: 'COM3' }],
+        ['openDmxConfig', { port: 'COM3', dmxSpeed: 40 }],
+        ['dmxOutputConfig', { sacnEnabled: true }],
+      ])('accepts the adapter config %s %p', (key, config) => {
+        expect(validatePreferencesPayload({ [key]: config }).ok).toBe(true)
       })
 
-      it('rejects a non-finite enttecProConfig.dmxSpeed rather than storing it', () => {
-        expect(
-          validatePreferencesPayload({ enttecProConfig: { port: 'COM3', dmxSpeed: NaN } }).ok,
-        ).toBe(false)
-        expect(
-          validatePreferencesPayload({ enttecProConfig: { port: 'COM3', dmxSpeed: 'fast' } }).ok,
-        ).toBe(false)
+      it.each([
+        ['enttecProConfig', { port: 3 }],
+        ['openDmxConfig', { port: 'COM3', dmxSpeed: 'fast' }],
+        ['dmxOutputConfig', { sacnEnabled: 1 }],
+      ])('rejects the malformed adapter config %s %p', (key, config) => {
+        expect(validatePreferencesPayload({ [key]: config }).ok).toBe(false)
       })
+
+      it.each([NaN, 'fast'])(
+        'rejects an unusable enttecProConfig.dmxSpeed of %p without storing it',
+        (dmxSpeed) => {
+          expect(
+            validatePreferencesPayload({ enttecProConfig: { port: 'COM3', dmxSpeed } }).ok,
+          ).toBe(false)
+        },
+      )
 
       it('clamps a valid enttecProConfig.dmxSpeed to 10-44 without mutating the caller payload', () => {
         const payload = { enttecProConfig: { port: 'COM3', dmxSpeed: 2 } }
@@ -1317,21 +1294,27 @@ describe('inputValidation', () => {
         expect(payload.enttecProConfig.dmxSpeed).toBe(2)
       })
 
-      it('keeps a low openDmxConfig.dmxSpeed and clamps one past the ceiling', () => {
-        const stored = (dmxSpeed: number): number | undefined => {
-          const result = validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed } })
-          if (!result.ok) return undefined
-          return (result.value as { openDmxConfig?: { dmxSpeed?: number } }).openDmxConfig?.dmxSpeed
+      it.each([
+        [5, 5],
+        [0, 1],
+        [200, 44],
+      ])('stores an openDmxConfig.dmxSpeed of %p as %p', (dmxSpeed, stored) => {
+        const result = validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed } })
+        expect(result.ok).toBe(true)
+        if (result.ok) {
+          const cleaned = result.value as { openDmxConfig?: { dmxSpeed?: number } }
+          expect(cleaned.openDmxConfig?.dmxSpeed).toBe(stored)
         }
-
-        expect(stored(5)).toBe(5)
-        expect(stored(0)).toBe(1)
-        expect(stored(200)).toBe(44)
       })
 
-      it('rejects a malformed audioGameMode instead of storing it', () => {
-        expect(validatePreferencesPayload({ audioGameMode: { enabled: 'yes' } }).ok).toBe(false)
-        expect(validatePreferencesPayload({ audioGameMode: { cueDurationMin: -1 } }).ok).toBe(false)
+      it.each([{ enabled: 'yes' }, { cueDurationMin: -1 }])(
+        'rejects the malformed audioGameMode %p without storing it',
+        (audioGameMode) => {
+          expect(validatePreferencesPayload({ audioGameMode }).ok).toBe(false)
+        },
+      )
+
+      it('accepts a well-formed audioGameMode', () => {
         expect(validatePreferencesPayload({ audioGameMode: { enabled: true } }).ok).toBe(true)
       })
 
@@ -1376,26 +1359,37 @@ describe('inputValidation', () => {
       if (result.ok) expect(result.value.sensitivity).toBe(2.5)
     })
 
-    it('rejects non-object payloads', () => {
-      expect(validateAudioConfigPayload(null).ok).toBe(false)
-      expect(validateAudioConfigPayload([]).ok).toBe(false)
+    it.each([null, []])('rejects the non-object payload %p', (payload) => {
+      expect(validateAudioConfigPayload(payload).ok).toBe(false)
     })
 
-    it('rejects out-of-range sensitivity and noiseFloor', () => {
-      expect(validateAudioConfigPayload({ sensitivity: 0.05 }).ok).toBe(false)
-      expect(validateAudioConfigPayload({ noiseFloor: 256 }).ok).toBe(false)
+    // The strobe threshold is a 0-1 fraction and the strobe probability a 0-100 percentage.
+    it.each([
+      ['strobeTriggerThreshold', 0.5],
+      ['strobeProbability', 60],
+    ])('accepts an in-range %s of %p', (key, value) => {
+      expect(validateAudioConfigPayload({ [key]: value }).ok).toBe(true)
     })
 
-    it('rejects fftSize values that are not a power of two', () => {
-      expect(validateAudioConfigPayload({ fftSize: 4096 }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ fftSize: 999 }).ok).toBe(false)
+    it.each([
+      ['sensitivity', 0.05],
+      ['noiseFloor', 256],
+      ['strobeTriggerThreshold', 1.5],
+      ['strobeProbability', 101],
+    ])('rejects an out-of-range %s of %p', (key, value) => {
+      expect(validateAudioConfigPayload({ [key]: value }).ok).toBe(false)
     })
 
-    it('requires fftSize to be an integer without rounding', () => {
-      expect(validateAudioConfigPayload({ fftSize: 4095.6 }).ok).toBe(false)
-      expect(validateAudioConfigPayload({ fftSize: '4096' }).ok).toBe(false)
-      expect(validateAudioConfigPayload({ fftSize: 32 }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ fftSize: 32768 }).ok).toBe(true)
+    it.each([4096, 32, 32768])('accepts the power-of-two fftSize %p', (fftSize) => {
+      expect(validateAudioConfigPayload({ fftSize }).ok).toBe(true)
+    })
+
+    it.each([
+      ['not a power of two', 999],
+      ['fractional, without rounding it', 4095.6],
+      ['a numeric string', '4096'],
+    ])('rejects an fftSize that is %s', (_label, fftSize) => {
+      expect(validateAudioConfigPayload({ fftSize }).ok).toBe(false)
     })
 
     it('accepts an explicit deviceId clear for the system default', () => {
@@ -1404,25 +1398,23 @@ describe('inputValidation', () => {
       if (result.ok) expect(result.value.deviceId).toBeUndefined()
     })
 
-    it('rejects a non-string or empty deviceId when provided', () => {
-      expect(validateAudioConfigPayload({ deviceId: 42 }).ok).toBe(false)
+    it.each([
+      ['a non-string deviceId', 42],
       // The UI represents the default device as undefined, so '' is never a real selection.
-      expect(validateAudioConfigPayload({ deviceId: '' }).ok).toBe(false)
+      ['an empty deviceId', ''],
+    ])('rejects %s when provided', (_label, deviceId) => {
+      expect(validateAudioConfigPayload({ deviceId }).ok).toBe(false)
     })
 
-    it('accepts the boolean flags and rejects non-booleans', () => {
-      expect(validateAudioConfigPayload({ enabled: true }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ linearResponse: false }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ strobeEnabled: true }).ok).toBe(true)
+    it.each([{ enabled: true }, { linearResponse: false }, { strobeEnabled: true }])(
+      'accepts the boolean flag %p',
+      (payload) => {
+        expect(validateAudioConfigPayload(payload).ok).toBe(true)
+      },
+    )
+
+    it('rejects a non-boolean flag', () => {
       expect(validateAudioConfigPayload({ strobeEnabled: 'yes' }).ok).toBe(false)
-    })
-
-    it('range-checks the strobe scalars', () => {
-      // threshold is a 0-1 fraction, probability is a 0-100 percentage.
-      expect(validateAudioConfigPayload({ strobeTriggerThreshold: 0.5 }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ strobeTriggerThreshold: 1.5 }).ok).toBe(false)
-      expect(validateAudioConfigPayload({ strobeProbability: 60 }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ strobeProbability: 101 }).ok).toBe(false)
     })
 
     describe('bands', () => {
@@ -1443,39 +1435,39 @@ describe('inputValidation', () => {
         if (result.ok) expect(result.value.bands).toHaveLength(8)
       })
 
-      it('rejects a non-array or a set that is not exactly eight bands', () => {
-        expect(validateAudioConfigPayload({ bands: 'nope' }).ok).toBe(false)
-        expect(validateAudioConfigPayload({ bands: eightBands().slice(0, 7) }).ok).toBe(false)
+      it.each([
+        ['a non-array', 'nope'],
+        ['a set of seven bands', eightBands().slice(0, 7)],
+      ])('rejects %s in place of exactly eight bands', (_label, bands) => {
+        expect(validateAudioConfigPayload({ bands }).ok).toBe(false)
       })
 
-      it('rejects a malformed band member', () => {
-        expect(validateAudioConfigPayload({ bands: eightBands({ id: '' }) }).ok).toBe(false)
-        expect(validateAudioConfigPayload({ bands: eightBands({ name: '' }) }).ok).toBe(false)
-      })
-
-      it('rejects out-of-range or inverted frequency bounds', () => {
-        expect(validateAudioConfigPayload({ bands: eightBands({ minHz: 10 }) }).ok).toBe(false)
-        expect(validateAudioConfigPayload({ bands: eightBands({ maxHz: 20001 }) }).ok).toBe(false)
-        expect(
-          validateAudioConfigPayload({ bands: eightBands({ minHz: 500, maxHz: 400 }) }).ok,
-        ).toBe(false)
+      it.each([
+        ['an empty id', { id: '' }],
+        ['an empty name', { name: '' }],
+        ['a minHz below range', { minHz: 10 }],
+        ['a maxHz above range', { maxHz: 20001 }],
+        ['inverted frequency bounds', { minHz: 500, maxHz: 400 }],
+      ])('rejects a band member with %s', (_label, overrides) => {
+        expect(validateAudioConfigPayload({ bands: eightBands(overrides) }).ok).toBe(false)
       })
     })
 
-    it('requires a complete beatDetection object', () => {
-      expect(validateAudioConfigPayload({ beatDetection: validBeatDetection }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ beatDetection: {} }).ok).toBe(false)
-      expect(validateAudioConfigPayload({ beatDetection: { threshold: 2 } }).ok).toBe(false)
+    it.each([
+      ['beatDetection', validBeatDetection],
+      ['smoothing', validSmoothing],
+      ['idleDetection', validIdleDetection],
+    ])('accepts a complete %s object', (key, value) => {
+      expect(validateAudioConfigPayload({ [key]: value }).ok).toBe(true)
     })
 
-    it('requires a complete smoothing object', () => {
-      expect(validateAudioConfigPayload({ smoothing: validSmoothing }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ smoothing: { enabled: true } }).ok).toBe(false)
-    })
-
-    it('requires a complete idleDetection object', () => {
-      expect(validateAudioConfigPayload({ idleDetection: validIdleDetection }).ok).toBe(true)
-      expect(validateAudioConfigPayload({ idleDetection: { enabled: true } }).ok).toBe(false)
+    it.each([
+      ['beatDetection', {}],
+      ['beatDetection', { threshold: 2 }],
+      ['smoothing', { enabled: true }],
+      ['idleDetection', { enabled: true }],
+    ])('rejects an incomplete %s object %p', (key, value) => {
+      expect(validateAudioConfigPayload({ [key]: value }).ok).toBe(false)
     })
 
     it('rejects payloads with no recognised keys', () => {

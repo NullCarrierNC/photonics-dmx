@@ -19,23 +19,21 @@ import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
-import {
-  SenderLifecycleController,
-  type OutputSenderStateSnapshot,
-} from './SenderLifecycleController'
-import { ConsoleModeController } from './ConsoleModeController'
+import { SenderLifecycleController } from './SenderLifecycleController'
+import { ConsoleModeController, CONSOLE_UNAVAILABLE_MESSAGE } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { ControllerGraph } from './ControllerGraph'
 import { runControllerRestart } from './controllerRestart'
 import { runControllerShutdown } from './controllerShutdown'
+import { holdFailedAfterFault } from './uncaughtFault'
 import {
   buildControllerCollaborators,
   type ControllerCollaborators,
   type ControllerHost,
 } from './controllerWiring'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import type { LifecyclePhase } from '../../shared/ipcTypes'
+import type { IpcErrorResult, IpcSuccessResult, LifecyclePhase } from '../../shared/ipcTypes'
 import { CUE_DOMAIN_BINDINGS, applyAllEnabledGroupsFromConfig } from './cueDomainBindings'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
@@ -56,9 +54,8 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
  * - `failed`: reinitialization after teardown did not complete; call `restartControllers()` or `init()` to recover.
  *
  * Concurrency:
- * - YARG/RB3 toggles and `restartControllers()` serialize on one lifecycle queue (`runLifecycleOp`),
- *   so no two of them ever interleave. Queued ops additionally await any in-flight shutdown.
- * - Audio toggles run off the queue and await any in-flight restart/shutdown (one-directional).
+ * - Listener toggles, audio included, console entry and restarts share one lifecycle queue
+ *   (`runQueuedOp`), so no two of them ever interleave. Queued ops await any in-flight shutdown.
  * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await the in-flight
  *   shutdown via `awaitShutdownWork`, so a shutdown that waited on the queue would deadlock
  *   against them.
@@ -121,9 +118,11 @@ export class ControllerManager {
   private isInitialized = false
   /** Phase state, the op queue, and the in-flight restart and shutdown memos. */
   private readonly lifecycle: ControllerLifecycle
-  /** Invoked during restart teardown so process-scoped consumers (e.g. laser sim) drop state tied to the
-   *  engine/registry being rebuilt. A list, not a single slot, so multiple consumers can register without
-   *  overwriting each other. */
+  /**
+   * Invoked during restart and shutdown teardown so process-scoped consumers (a test effect, the
+   * laser sim) drop state tied to the engine being torn down. A list, so consumers never overwrite
+   * each other.
+   */
   private readonly onControllerRestartListeners: Array<() => void> = []
 
   constructor(deps: ControllerManagerDeps = {}) {
@@ -141,6 +140,10 @@ export class ControllerManager {
     this.listenerLifecycle = collaborators.listenerLifecycle
     this.registryInit = collaborators.registryInit
     this.consoleMode = collaborators.consoleMode
+    this.addOnControllerRestart(() => {
+      this.testEffectRunner.cancel()
+      this.rb3TestEffectRunner.cancel()
+    })
     this.graph =
       deps.graph ??
       new ControllerGraph({
@@ -181,10 +184,9 @@ export class ControllerManager {
         this.refreshAudioCueSelection()
       },
       getIsAudioEnabled: () => this.getIsAudioEnabled(),
-      pauseYarg: () => this.disableYarg(),
-      pauseRb3: () => this.disableRb3(),
-      pauseAudio: () => this.disableAudio(),
-      refreshActiveRigs: () => this.refreshActiveRigs(),
+      pauseYarg: () => this.listenerLifecycle.yargRb3.disableYarg(),
+      pauseRb3: () => this.listenerLifecycle.yargRb3.disableRb3(),
+      pauseAudio: () => this.listenerLifecycle.audio.disableAudio(),
       restartControllers: () => this.restartControllers(),
     }
   }
@@ -247,7 +249,7 @@ export class ControllerManager {
     }
 
     this.isInitialized = true
-    this.lifecycle.setPhase('running')
+    this.lifecycle.setPhaseUnlessShuttingDown('running')
   }
 
   /**
@@ -259,49 +261,44 @@ export class ControllerManager {
     await this.rb3TestEffectRunner.stopTestEffect()
   }
 
+  /** Stop the simulations. Every input enable runs this first, as the input owns the rig chains. */
+  private async preemptSimulation(): Promise<void> {
+    await this.stopTestEffect()
+    this.onSimulationPreempt?.()
+  }
+
   /**
    * Enable YARG listener. Runs on the shared lifecycle queue with the other toggles and controller
    * restarts, so enable/disable cannot interleave with each other or with teardown/reinit, and
    * additionally yields to any in-flight shutdown.
    */
   public async enableYarg(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedEnable(async () => {
+      await this.preemptSimulation()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
   }
 
-  /**
-   * Disable YARG listener
-   */
+  /** Disable YARG listener. */
   public async disableYarg(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableYarg()
     })
   }
 
-  /**
-   * Enable Rb3 listener. Running simulations are stopped first — the listener owns the rig
-   * chains from here and simulation IPC is refused while RB3E is enabled.
-   */
+  /** Enable Rb3 listener. */
   public async enableRb3(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
-      await this.stopTestEffect()
-      this.onSimulationPreempt?.()
+    await this.lifecycle.runQueuedEnable(async () => {
+      await this.preemptSimulation()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
     })
   }
 
-  /**
-   * Disable Rb3 listener
-   */
+  /** Disable Rb3 listener. */
   public async disableRb3(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableRb3()
     })
   }
@@ -324,6 +321,7 @@ export class ControllerManager {
         setInitialized: (value) => {
           this.isInitialized = value
         },
+        teardownListeners: () => [...this.onControllerRestartListeners],
       }),
     )
   }
@@ -343,6 +341,11 @@ export class ControllerManager {
 
   public getSenderManager(): SenderManager {
     return this.senderLifecycle.getSenderManager()
+  }
+
+  /** Runs a sender op on the lifecycle queue, against the sender manager a restart ahead leaves. */
+  public runSenderOp<T>(op: (senders: SenderManager) => Promise<T>): Promise<T> {
+    return this.lifecycle.runQueuedOp(() => op(this.getSenderManager()))
   }
 
   /** The sender lifecycle surface (status, error tracking, restore). */
@@ -365,12 +368,11 @@ export class ControllerManager {
     return domain === 'rb3' ? this.rb3TestEffectRunner : this.testEffectRunner
   }
 
-  /**
-   * Handles uncaught exceptions that are network sender errors.
-   * @returns true if the error was handled as a network sender error, false otherwise
-   */
+  /** True when the senders handled it. Any error but a network send holds the graph failed. */
   public handleUncaughtException(error: unknown): boolean {
-    return this.senderLifecycle.handleUncaughtException(error, () => this.getIsInitialized())
+    const handled = this.senderLifecycle.handleUncaughtException(error, () => this.isInitialized)
+    if (!handled) void holdFailedAfterFault(error, this.lifecycle, this)
+    return handled
   }
 
   /** Register a callback run during restart teardown. Returns an unregister function. */
@@ -384,7 +386,7 @@ export class ControllerManager {
     }
   }
 
-  /** Called when a listener takes over the rig chains (RB3E enable) so running simulations stop. */
+  /** Called when an input takes over the rig chains, so running simulations stop. */
   public setOnSimulationPreempt(callback: (() => void) | null): void {
     this.onSimulationPreempt = callback
   }
@@ -469,17 +471,6 @@ export class ControllerManager {
   }
 
   /**
-   * Refresh which rigs are active for DMX output without restarting controllers.
-   * Use this when only the active-rig set changes so senders stay running.
-   */
-  public refreshActiveRigs(): void {
-    if (!this.isInitialized) {
-      return
-    }
-    this.graph.refreshActiveRigs()
-  }
-
-  /**
    * Restart controllers to pick up configuration changes
    * This shuts down existing controllers and reinitializes them
    */
@@ -507,38 +498,22 @@ export class ControllerManager {
     })
   }
 
-  /**
-   * Re-enable DMX output senders based on persisted preferences.
-   * Called after controller restart so that sACN / Art-Net / USB senders
-   * resume automatically without the user needing to toggle them off and on.
-   */
-  public async restoreSenderOutputsFromPrefs(
-    activeSenders?: OutputSenderStateSnapshot,
-  ): Promise<void> {
-    return this.senderLifecycle.restoreSenderOutputsFromPrefs(activeSenders)
-  }
-
-  /**
-   * Enable audio listener and processor
-   */
+  /** Enable audio listener and processor. */
   public async enableAudio(): Promise<void> {
-    await this.lifecycle.awaitInFlightWork()
-    await this.listenerLifecycle.yargRb3.disableYarg()
-    await this.listenerLifecycle.yargRb3.disableRb3()
-    await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
+    await this.lifecycle.runQueuedEnable(async () => {
+      await this.preemptSimulation()
+      await this.listenerLifecycle.yargRb3.disableYarg()
+      await this.listenerLifecycle.yargRb3.disableRb3()
+      await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
+    })
   }
 
-  /**
-   * Disable audio processing
-   */
+  /** Disable audio processing. */
   public async disableAudio(): Promise<void> {
-    await this.lifecycle.awaitInFlightWork()
-    await this.listenerLifecycle.audio.disableAudio()
+    await this.lifecycle.runQueuedOp(() => this.listenerLifecycle.audio.disableAudio())
   }
 
-  /**
-   * Refresh active audio cue selection when enabled groups change
-   */
+  /** Refresh active audio cue selection when enabled groups change. */
   public refreshAudioCueSelection(): void {
     this.listenerLifecycle.audio.refreshAudioCueSelection()
   }
@@ -586,18 +561,18 @@ export class ControllerManager {
     this.graph.setManualMotionRefOnChains('rb3', ref)
   }
 
-  public async enableConsoleMode(
-    rigId: string,
-  ): Promise<{ success: true } | { success: false; error: string }> {
-    await this.init()
-    if (this.lifecycle.phase !== 'consoleMode') {
-      this.lifecycle.assertPhase(['running'], 'enableConsoleMode')
-    }
-    const r = await this.consoleMode.enableConsoleMode(rigId)
-    if (r.success) {
-      this.lifecycle.setPhase('consoleMode')
-    }
-    return r
+  public async enableConsoleMode(rigId: string): Promise<IpcSuccessResult | IpcErrorResult> {
+    return this.lifecycle.runQueuedOp(async () => {
+      await this.init()
+      if (this.lifecycle.phase !== 'running' && this.lifecycle.phase !== 'consoleMode') {
+        return { success: false as const, error: CONSOLE_UNAVAILABLE_MESSAGE }
+      }
+      const r = await this.consoleMode.enableConsoleMode(rigId)
+      if (r.success) {
+        this.lifecycle.setPhaseUnlessShuttingDown('consoleMode')
+      }
+      return r
+    })
   }
 
   public async disableConsoleMode(): Promise<

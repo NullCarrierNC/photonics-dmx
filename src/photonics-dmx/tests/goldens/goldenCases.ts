@@ -44,7 +44,7 @@ export const GOLDEN_CASES: GoldenCase[] = [
     library: 'yarg-stagekit',
     cue: 'Stomp',
     durationMs: 1500,
-    // Stomp holds black until the first keyframe, then alternates lit and black on each one.
+    // Stomp lights at once, then alternates black and lit on each keyframe.
     scenario: [
       { at: 300, event: 'keyframe-next' },
       { at: 700, event: 'keyframe-next' },

@@ -8,7 +8,7 @@
  * Game state, menu animation timing, and renderer-bound `cueHandled` event emission stay
  * on this coordinator. The per-rig render machinery lives in `Rb3StageKitRigProcessor`.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- RB3E game-state events and blended colours arrive untyped */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
@@ -22,8 +22,11 @@ import {
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
-import { Rb3StrobeWatchdog } from './rb3StrobeWatchdog'
+import { isActiveGameplayPacket } from './rb3GameplayEvidence'
+import { StrobeWatchdog } from './strobeWatchdog'
+import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 import {
   buildInGameClearCueData,
   buildMenusCueData,
@@ -52,10 +55,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private _inSong: boolean = false
 
   // Cuts a strobe the console stopped talking about.
-  private readonly strobeWatchdog: Rb3StrobeWatchdog
+  private readonly strobeWatchdog: StrobeWatchdog
 
   // The strobe type the rigs are running, so a repeated packet is not a second start.
-  private _currentStrobeType: 'slow' | 'medium' | 'fast' | 'fastest' | null = null
+  private _currentStrobeType: StrobeSpeedSlot | null = null
+  // When the running strobe began, which every rig takes its flash phase from.
+  private _strobeStartedAt = 0
 
   // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
   // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
@@ -75,16 +80,17 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   /**
    * Builds one `Rb3StageKitRigProcessor` per active rig in the supplied `ChainFanout`.
    * Chains with fewer than 4 lights are skipped with a warning (StageKit's light mapper
-   * only supports 4- or 8-light modes).
+   * only supports 4- or 8-light modes). `getOutputRateHz` is the DMX output rate strobes slow to.
    */
   constructor(
     private chainFanout: ChainFanout,
     stageKitConfig: Partial<StageKitConfig> = {},
     private cueHandler?: Rb3MenuCueDispatch | null,
+    private readonly getOutputRateHz: () => number = () => 0,
   ) {
     super()
     this.config = { ...DEFAULT_STAGEKIT_CONFIG, ...stageKitConfig }
-    this.strobeWatchdog = new Rb3StrobeWatchdog(this.config.strobeWatchdogMs ?? 0, () => {
+    this.strobeWatchdog = new StrobeWatchdog(this.config.strobeWatchdogMs ?? 0, () => {
       log.warn('StageKitDirectProcessor: strobe outlived its packets, cutting it.')
       this.clearStrobeEffectsAtPositions([])
     })
@@ -95,9 +101,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Synchronise `this.rigs` with the current chain list. Constructs a new rig processor
    * for chains that joined; disposes processors for chains that left. Chains whose light
    * count is below StageKit's 4-light minimum are skipped with a warning so a misconfigured
-   * rig can't break RB3 on its siblings.
-   *
-   * Public via `refreshRigs()` so future `refreshActiveRigs` integration can call it.
+   * rig can't break RB3 on its siblings. Public via `refreshRigs()`.
    */
   private rebuildRigProcessorsFromChains(): void {
     const chains = this.chainFanout.getChains()
@@ -120,8 +124,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
           chain.dmxLightManager,
           chain.sequencer,
           this.config,
+          this.getOutputRateHz,
         )
         this.rigs.set(rig.rigId, rig)
+        // A rig that joins during a strobe strobes with the others straight away.
+        if (this._currentStrobeType) {
+          rig.applyStrobeEffect(this._currentStrobeType, this._strobeStartedAt)
+        }
       } catch (err) {
         // Most likely the chain has <4 lights — skip it but keep the others working.
         log.warn(`Skipping StageKit rig ${chain.rigId}: ${(err as Error).message}`)
@@ -129,9 +138,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     }
   }
 
-  /** Public entry point for re-syncing the rig processors with the chain list — used by
-   *  the listener controller after `refreshActiveRigs` so rig add/remove takes effect
-   *  without restarting controllers. Idempotent. */
+  /** Public entry point for re-syncing the rig processors with the chain list. Idempotent. */
   public refreshRigs(): void {
     this.rebuildRigProcessorsFromChains()
   }
@@ -222,7 +229,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   /**
    * RB3E screen names that map to the main menu: drive the same Default menu cue as Menus game state.
-   * song_select_screen is skipped when that cue is already active to avoid restarting the menu loop.
+   * Either screen is skipped while that cue is already active, so the menu loop is not restarted.
    */
   private handleScreenNameEvent(event: { screenName: string; timestamp: number }): void {
     const { screenName } = event
@@ -230,10 +237,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       return
     }
 
-    if (screenName === RB3_SONG_SELECT_SCREEN && this.isDefaultMenuCueRunning()) {
-      log.info(
-        'StageKitDirectProcessor: song_select_screen skipped — Default menu cue already running',
-      )
+    if (this.isDefaultMenuCueRunning()) {
+      log.info(`StageKitDirectProcessor: ${screenName} skipped, Default menu cue already running`)
       return
     }
 
@@ -266,6 +271,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       return
     }
 
+    // A lost or late InGame state must not leave the song under the menu look.
+    if (this._currentGameState === 'Menus' && isActiveGameplayPacket(event)) {
+      log.info('StageKitDirectProcessor: Gameplay packet in Menus, leaving the menu look')
+      this.exitMenuLook()
+      this._currentGameState = 'InGame'
+    }
+
     if (!this._inSong) {
       log.info(
         'StageKitDirectProcessor: Received StageKit event while not in song, marking as in song',
@@ -275,13 +287,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
     if (strobeEffect === 'off') {
       this.strobeWatchdog.setStrobeRunning(false)
-      this._currentStrobeType = null
       this.clearStrobeEffectsAtPositions(positions)
     } else if (strobeEffect) {
       this.strobeWatchdog.setStrobeRunning(true)
       // RB3E repeats the packet for as long as the strobe holds, so only the edge is work.
       if (strobeEffect !== this._currentStrobeType) {
-        this._currentStrobeType = strobeEffect
+        this.setStrobeType(strobeEffect)
         this.applyStrobeEffect(strobeEffect)
       }
     } else if (color !== 'off') {
@@ -347,21 +358,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         )
 
         this._inSong = true
-        this.clearMenuAnimationTimer()
-
         this.turnOffAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error clearing lights during InGame transition:',
             error,
           )
         })
-
-        this.blackoutAllRigs().catch((error) => {
-          log.error(
-            'StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:',
-            error,
-          )
-        })
+        this.exitMenuLook()
       } else if (gameState === 'Menus') {
         log.info(
           'StageKitDirectProcessor: Transitioning to Menus - triggering cue handler and clearing LED positions',
@@ -406,15 +409,25 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest'): void {
     for (const rig of this.rigs.values()) {
       try {
-        rig.applyStrobeEffect(strobeType)
+        rig.applyStrobeEffect(strobeType, this._strobeStartedAt)
       } catch (error) {
         log.error(`Rig ${rig.rigId}: applyStrobeEffect failed:`, error)
       }
     }
   }
 
+  /**
+   * Record the strobe the rigs run and put it on the shared strobe slot, which drives the hardware
+   * strobe channels the way a cue-mode strobe does.
+   */
+  private setStrobeType(strobeType: StrobeSpeedSlot | null): void {
+    this._currentStrobeType = strobeType
+    if (strobeType) this._strobeStartedAt = monotonicNowMs()
+    this.chainFanout.strobeState.setActive(strobeType, 'net')
+  }
+
   private clearStrobeEffectsAtPositions(positions: number[]): void {
-    this._currentStrobeType = null
+    this.setStrobeType(null)
     for (const rig of this.rigs.values()) {
       try {
         rig.clearStrobeEffectsAtPositions(positions)
@@ -425,20 +438,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private async turnOffAllRigs(): Promise<void> {
-    this._currentStrobeType = null
+    this.setStrobeType(null)
     await Promise.allSettled(Array.from(this.rigs.values()).map((r) => r.turnOffAllLights()))
   }
 
   private async blackoutAllRigs(): Promise<void> {
     await Promise.allSettled(Array.from(this.rigs.values()).map((r) => r.blackoutSequencer()))
-  }
-
-  /**
-   * Update configuration
-   */
-  public updateConfig(newConfig: Partial<StageKitConfig>): void {
-    this.config = { ...this.config, ...newConfig }
-    log.info('StageKitDirectProcessor: config updated:', this.config)
   }
 
   /**
@@ -517,7 +522,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   private handleDisableAll(event: StageKitData): void {
     this.strobeWatchdog.setStrobeRunning(false)
-    this._currentStrobeType = null
+    this.clearStrobeEffectsAtPositions([])
     this.ledBanks.reset()
     this.emit('stagekit:processed', {
       positions: event.positions,
@@ -549,6 +554,18 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private startMenuAnimationTimer(): void {
     log.info('StageKitDirectProcessor: Starting the menu animation pump')
     this.menuFramePump.start()
+  }
+
+  /**
+   * Leave the menu look for gameplay: stop the pump, retire the menu's base and per-light layers,
+   * then black out every rig. Safe to repeat.
+   */
+  private exitMenuLook(): void {
+    this.clearMenuAnimationTimer()
+    this.cueHandler?.clear()
+    this.blackoutAllRigs().catch((error) => {
+      log.error('StageKitDirectProcessor: Error blacking out on leaving the menu look:', error)
+    })
   }
 
   /**

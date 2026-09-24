@@ -78,4 +78,22 @@ describe('setupConsoleHandlers', () => {
     expect(page.listenerCount('destroyed')).toBe(1)
     expect(disableConsoleMode).not.toHaveBeenCalled()
   })
+
+  it('follows the page again when it reopens the console after a reload', async () => {
+    const { manager, disableConsoleMode } = stubManager({ success: true })
+    setupConsoleHandlers(mockIpcMain as never, manager)
+    const page = new EventEmitter()
+    const enable = getHandler(LIGHT.CONSOLE_ENABLE)
+    const reload = () =>
+      page.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false })
+
+    await enable({ sender: page }, { rigId: 'rig-1' })
+    reload()
+    await enable({ sender: page }, { rigId: 'rig-1' })
+    expect(page.listenerCount('destroyed')).toBe(1)
+    expect(page.listenerCount('render-process-gone')).toBe(1)
+    reload()
+
+    expect(disableConsoleMode).toHaveBeenCalledTimes(2)
+  })
 })

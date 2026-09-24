@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- colour sets from the StageKit colour helpers are untyped */
 /**
  * Owns one rig's worth of RB3 StageKit render state and operations: the cached
  * `StageKitLightMapper` sized to that rig's light count, per-DMX-light colour-bank
- * blending state (`lightColorState`, `currentPassColors`, `colorToLights`,
- * `pendingUpdates`), the rig's active strobe effects + intervals, and every method that
- * issues `setState` / `blackout` against the rig's own `Sequencer`.
+ * blending state (`lightColorState`, `colorToLights`, `pendingUpdates`), the rig's active strobe
+ * effects + intervals, and every method that issues `setState` / `blackout` against the rig's own
+ * `Sequencer`.
  *
  * The coordinator (`Rb3StageKitDirectProcessor`) holds a `Map<rigId, Rb3StageKitRigProcessor>`
  * and fans every gameplay event out to each rig instance, so secondary rigs render the
@@ -17,6 +17,7 @@ import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { getColor } from '../helpers/dmxHelpers'
 import { Color, RGBIO, TrackedLight } from '../types'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('Rb3StageKitRigProcessor')
 
 type StrobeType = 'slow' | 'medium' | 'fast' | 'fastest'
@@ -24,8 +25,8 @@ type StrobeType = 'slow' | 'medium' | 'fast' | 'fastest'
 interface ActiveStrobeEffect {
   type: StrobeType
   positions: number[]
-  timestamp: number
-  interval?: NodeJS.Timeout
+  /** Cancels the run's timers. */
+  stop?: () => void
   targetLights: TrackedLight[]
 }
 
@@ -47,19 +48,23 @@ export class Rb3StageKitRigProcessor {
 
   // Per-light colour blending state. Keys are DMX light indices.
   private lightColorState = new Map<number, Set<string>>()
-  private currentPassColors = new Map<number, Set<string>>()
   private colorToLights = new Map<string, Set<number>>()
   private pendingUpdates = new Map<number, PendingUpdate>()
 
-  // Active strobe effects keyed by effect name (`stagekit-strobe-{rigId}-{type}-{ts}`).
+  // Active strobe effects keyed by effect name (`stagekit-strobe-{rigId}-{type}`).
   private activeStrobeEffects = new Map<string, ActiveStrobeEffect>()
   private strobedLights = new Set<number>()
 
+  /**
+   * @param getOutputRateHz The DMX output rate, read at each strobe start. 0 or less when nothing
+   *   governs the wire.
+   */
   constructor(
     rigId: string,
     lightManager: DmxLightManager,
     sequencer: ILightingController,
     config: StageKitConfig,
+    private readonly getOutputRateHz: () => number = () => 0,
   ) {
     this.rigId = rigId
     this.lightManager = lightManager
@@ -97,7 +102,11 @@ export class Rb3StageKitRigProcessor {
     this.updateColorBank(color, dmxLightIndices)
   }
 
-  public applyStrobeEffect(strobeType: StrobeType): void {
+  /**
+   * Strobe the rig's strobe lights. `startedAt` (monotonic ms) is when the strobe began, which sets
+   * the flash phase, so a rig that joins a running strobe flashes with the rigs already on it.
+   */
+  public applyStrobeEffect(strobeType: StrobeType, startedAt = monotonicNowMs()): void {
     const strobeLights = this.lightManager.getLights(['strobe'], 'all')
     const allLights = this.lightManager.getLights(['front', 'back'], 'all')
 
@@ -145,13 +154,19 @@ export class Rb3StageKitRigProcessor {
         nominalInterval = 100
     }
 
-    // Each half of a flash needs a frame to start in and a frame to be shown in. Asked to go
-    // faster than that, the frames all sample the same half and the lights hold it, so the run
-    // slows to what the frame can show.
-    const strobeInterval = Math.max(nominalInterval, this.sequencer.getFrameIntervalMs() * 2)
+    // Each half of a flash needs a frame to start in and a frame to be shown in, and two wire
+    // sends to reach the fixture. Asked to go faster than that, the frames or the sends sample the
+    // same half and the lights hold it, so the run slows to what the frame and the wire can show.
+    const outputRateHz = this.getOutputRateHz()
+    const sendIntervalMs = outputRateHz > 0 ? 1000 / outputRateHz : 0
+    const strobeInterval = Math.max(
+      nominalInterval,
+      this.sequencer.getFrameIntervalMs() * 2,
+      sendIntervalMs * 2,
+    )
     if (strobeInterval !== nominalInterval) {
       log.info(
-        `Rig ${this.rigId}: ${strobeType} strobe runs at ${strobeInterval}ms, the fastest this clock rate renders`,
+        `Rig ${this.rigId}: ${strobeType} strobe runs at ${strobeInterval}ms, the fastest this clock and output rate show`,
       )
     }
 
@@ -169,10 +184,16 @@ export class Rb3StageKitRigProcessor {
     this.activeStrobeEffects.set(effectName, {
       type: strobeType,
       positions: dmxLightIndices,
-      timestamp: Date.now(),
       targetLights,
     })
-    this.startStrobeEffect(effectName, targetLights, white, strobeInterval, dmxLightIndices)
+    this.startStrobeEffect(
+      effectName,
+      targetLights,
+      white,
+      strobeInterval,
+      dmxLightIndices,
+      startedAt,
+    )
   }
 
   /** The one name a given strobe type runs under on this rig. */
@@ -184,10 +205,10 @@ export class Rb3StageKitRigProcessor {
   private stopStrobeEffect(effectName: string): void {
     const effectData = this.activeStrobeEffects.get(effectName)
     this.activeStrobeEffects.delete(effectName)
-    if (!effectData?.interval) {
+    if (!effectData?.stop) {
       return
     }
-    clearInterval(effectData.interval)
+    effectData.stop()
     if (effectData.targetLights) {
       // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
       // pass the stored DMX indices (effectData.positions).
@@ -226,9 +247,6 @@ export class Rb3StageKitRigProcessor {
       if (this.lightColorState.has(lightIndex)) {
         this.lightColorState.get(lightIndex)!.delete(color)
       }
-      if (this.currentPassColors.has(lightIndex)) {
-        this.currentPassColors.get(lightIndex)!.delete(color)
-      }
       this.triggerReblend(lightIndex)
     }
     this.colorToLights.set(color, new Set())
@@ -239,7 +257,6 @@ export class Rb3StageKitRigProcessor {
   public async turnOffAllLights(): Promise<void> {
     try {
       this.lightColorState.clear()
-      this.currentPassColors.clear()
       for (const colorSet of this.colorToLights.values()) {
         colorSet.clear()
       }
@@ -273,12 +290,11 @@ export class Rb3StageKitRigProcessor {
     }
     this.pendingUpdates.clear()
     for (const effectData of this.activeStrobeEffects.values()) {
-      if (effectData.interval) clearInterval(effectData.interval)
+      effectData.stop?.()
     }
     this.activeStrobeEffects.clear()
     this.strobedLights.clear()
     this.lightColorState.clear()
-    this.currentPassColors.clear()
     this.colorToLights.clear()
   }
 
@@ -332,12 +348,18 @@ export class Rb3StageKitRigProcessor {
     color: RGBIO,
     interval: number,
     dmxLightIndices: number[],
+    startedAt: number,
   ): void {
-    let isOn = false
+    // Each half of a flash starts on a multiple of the interval since the strobe began.
+    const elapsed = Math.max(0, monotonicNowMs() - startedAt)
+    let isOn = Math.floor(elapsed / interval) % 2 === 1
     for (const lightIndex of dmxLightIndices) {
       this.strobedLights.add(lightIndex)
     }
-    const strobeInterval = setInterval(() => {
+    if (isOn) {
+      this.sequencer.setState(targetLights, color, 0)
+    }
+    const toggle = (): void => {
       if (isOn) {
         try {
           this.restoreColorsAfterStrobe(targetLights, dmxLightIndices)
@@ -349,8 +371,19 @@ export class Rb3StageKitRigProcessor {
         this.sequencer.setState(targetLights, color, 0)
         isOn = true
       }
-    }, interval)
-    this.activeStrobeEffects.get(effectName)!.interval = strobeInterval
+    }
+    let repeat: NodeJS.Timeout | null = null
+    const first = setTimeout(
+      () => {
+        toggle()
+        repeat = setInterval(toggle, interval)
+      },
+      interval - (elapsed % interval),
+    )
+    this.activeStrobeEffects.get(effectName)!.stop = () => {
+      clearTimeout(first)
+      if (repeat) clearInterval(repeat)
+    }
   }
 
   private restoreColorsAfterStrobe(_targetLights: TrackedLight[], lightIndices: number[]): void {
@@ -367,11 +400,6 @@ export class Rb3StageKitRigProcessor {
     }
     this.colorToLights.set(color, new Set())
     for (const lightIndex of newLightIndices) {
-      if (!this.currentPassColors.has(lightIndex)) {
-        this.currentPassColors.set(lightIndex, new Set())
-      }
-    }
-    for (const lightIndex of newLightIndices) {
       this.addColorToLight(lightIndex, color)
       this.colorToLights.get(color)!.add(lightIndex)
     }
@@ -381,11 +409,7 @@ export class Rb3StageKitRigProcessor {
     if (!this.lightColorState.has(lightIndex)) {
       this.lightColorState.set(lightIndex, new Set())
     }
-    if (!this.currentPassColors.has(lightIndex)) {
-      this.currentPassColors.set(lightIndex, new Set())
-    }
     this.lightColorState.get(lightIndex)!.add(color)
-    this.currentPassColors.get(lightIndex)!.add(color)
 
     const existingPending = this.pendingUpdates.get(lightIndex)
     if (existingPending) {
@@ -409,9 +433,6 @@ export class Rb3StageKitRigProcessor {
   private removeColorFromLight(lightIndex: number, color: string): void {
     if (!this.lightColorState.has(lightIndex)) return
     this.lightColorState.get(lightIndex)!.delete(color)
-    if (this.currentPassColors.has(lightIndex)) {
-      this.currentPassColors.get(lightIndex)!.delete(color)
-    }
     const existingPending = this.pendingUpdates.get(lightIndex)
     if (existingPending) {
       if (existingPending.timeout) clearTimeout(existingPending.timeout)
@@ -450,20 +471,12 @@ export class Rb3StageKitRigProcessor {
   private applyAccumulatedColors(lightIndex: number): void {
     const pendingUpdate = this.pendingUpdates.get(lightIndex)
     if (!pendingUpdate) return
-    const persistentColors = this.lightColorState.get(lightIndex) || new Set<string>()
-    const currentPassColors = this.currentPassColors.get(lightIndex) || new Set<string>()
-    if (currentPassColors.size > 0) {
-      const colorsToBlend = Array.from(currentPassColors)
-      const blendedColor = this.blendColors(colorsToBlend)
-      this.applyColorToLight(lightIndex, blendedColor)
-    } else if (persistentColors.size > 0) {
-      const colorsToBlend = Array.from(persistentColors)
-      const blendedColor = this.blendColors(colorsToBlend)
-      this.applyColorToLight(lightIndex, blendedColor)
+    const colors = this.lightColorState.get(lightIndex) || new Set<string>()
+    if (colors.size > 0) {
+      this.applyColorToLight(lightIndex, this.blendColors(Array.from(colors)))
     } else {
       this.turnOffLight(lightIndex)
       this.lightColorState.delete(lightIndex)
-      this.currentPassColors.delete(lightIndex)
     }
   }
 
@@ -473,11 +486,8 @@ export class Rb3StageKitRigProcessor {
       if (existingPending.timeout) clearTimeout(existingPending.timeout)
       this.pendingUpdates.delete(lightIndex)
     }
-    const persistentColors = this.lightColorState.get(lightIndex) || new Set<string>()
-    const currentPassColors = this.currentPassColors.get(lightIndex) || new Set<string>()
-    const colorsToBlend = Array.from(persistentColors).concat(Array.from(currentPassColors))
-    const blendedColor = this.blendColors(colorsToBlend)
-    this.applyColorToLight(lightIndex, blendedColor)
+    const colors = this.lightColorState.get(lightIndex) || new Set<string>()
+    this.applyColorToLight(lightIndex, this.blendColors(Array.from(colors)))
   }
 
   private blendColors(colors: string[]): RGBIO {

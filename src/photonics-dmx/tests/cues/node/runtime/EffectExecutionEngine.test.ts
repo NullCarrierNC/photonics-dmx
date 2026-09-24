@@ -317,6 +317,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, effectArg, _callback) => {
           submittedEffect = effectArg
+          return true
         },
       )
 
@@ -412,6 +413,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, effectArg, _callback) => {
           submitted.push(effectArg)
+          return true
         },
       )
 
@@ -533,6 +535,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, effectArg, _callback) => {
           submitted.push(effectArg)
+          return true
         },
       )
       mockSequencer.addEffect.mockImplementation((_name, effectArg) => {
@@ -705,6 +708,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, effectArg, _callback) => {
           submittedEffect = effectArg
+          return true
         },
       )
 
@@ -812,7 +816,10 @@ describe('EffectExecutionEngine', () => {
       const submissions: any[] = []
       const captureEffect = (_name: string, effectArg: any) => submissions.push(effectArg)
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
-        (name, effectArg, _callback) => captureEffect(name, effectArg),
+        (name, effectArg, _callback) => {
+          captureEffect(name, effectArg)
+          return true
+        },
       )
       mockSequencer.addEffect.mockImplementation((name, effectArg) => {
         captureEffect(name, effectArg)
@@ -1285,6 +1292,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
+          return true
         },
       )
 
@@ -1321,6 +1329,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
+          return true
         },
       )
 
@@ -1363,6 +1372,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
+          return true
         },
       )
 

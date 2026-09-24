@@ -95,6 +95,12 @@ export const confirmRequestAtom = atom<ConfirmRequest | null>(null)
 export const dmxRigsAtom = atom<DmxRig[]>([])
 
 /**
+ * Whether the rigs have been read from main, so an empty {@link dmxRigsAtom} means there are
+ * none.
+ */
+export const dmxRigsLoadedAtom = atom(false)
+
+/**
  * Atom for tracking the currently selected rig ID for editing
  */
 export const activeRigIdAtom = atom<string | null>(null)
@@ -120,14 +126,40 @@ export function resolveLastUsedRigId(
 }
 
 /**
- * Selected rig ID for DMX Preview, Cue Simulation, and DMX Console.
- * Persisted in localStorage; validate against loaded rig lists (active vs all) in those UIs.
+ * Selected rig ID for DMX Preview and Cue Simulation, persisted in localStorage.
+ * useActivePreviewRigs holds it to an active rig.
  */
 export const previewRigIdAtom = atomWithStorage<string | null>(
   LAST_USED_RIG_STORAGE_KEY,
   null,
   rigIdLocalStorage,
 )
+
+/**
+ * The rig the DMX Console's own picker chose, persisted in localStorage. The console lists
+ * inactive rigs too, so its choice is kept apart from the preview rig the other pages hold to an
+ * active one.
+ */
+export const consoleRigIdAtom = atomWithStorage<string | null>(
+  'photonics.dmx.consoleRigId',
+  null,
+  rigIdLocalStorage,
+)
+
+/**
+ * The rig the DMX Console shows: its own choice while that rig exists, otherwise the preview rig
+ * the other pages settled on, otherwise the first rig.
+ */
+export function consoleRigIdFor(
+  consoleChoice: string | null,
+  previewRigId: string | null,
+  rigIds: readonly string[],
+): string | null {
+  if (consoleChoice != null && rigIds.includes(consoleChoice)) {
+    return consoleChoice
+  }
+  return resolveLastUsedRigId(previewRigId, rigIds)
+}
 
 const PREVIEW_DIMENSION_STORAGE_KEY = 'photonics.dmx.previewDimension'
 
@@ -169,8 +201,7 @@ export const audioListenerEnabledAtom = atom<boolean>(false)
 export const audioDataAtom = atom<AudioLightingData | null>(null)
 
 export const isSenderErrorAtom = atom<boolean>(false)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- error message or serialized error
-export const senderErrorAtom = atom<any>('')
+export const senderErrorAtom = atom<string>('')
 
 export const senderEnttecProEnabledAtom = atom<boolean>(false)
 export const enttecProComPortAtom = atom<string>('')

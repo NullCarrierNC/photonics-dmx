@@ -10,13 +10,22 @@ import type { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
 import type { VariableValue } from './executionTypes'
-import type { NodeRuntimeCallbacks } from './executionTypes'
+import type { NodeCueDebugSwitch, NodeRuntimeCallbacks } from './executionTypes'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { EffectRegistry } from './EffectRegistry'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { ExecutionParameters } from './GraphExecutionPolicy'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { monotonicNowMs } from '../../../../shared/time'
+
+/**
+ * How long a cue-started or cue-called run may hold the lifecycle slot while frames wait behind it.
+ * Past this a run is taken to be waiting on something that will not come (a beat in a menu, a delay
+ * of days) and is cancelled so the newest frame can run. Musical waits of a few measures fit well
+ * inside it.
+ */
+export const LIFECYCLE_RUN_EXPIRY_MS = 30_000
 
 /** Session interface: variable stores and initial-clear policy. */
 export interface IGraphExecutionSession {
@@ -51,6 +60,7 @@ export class GraphExecutionEngine {
   private readonly runtimeBroadcaster: RuntimeBroadcaster
   private effectRegistry?: EffectRegistry
   private compiledCue?: CompiledNetCue
+  private debug?: NodeCueDebugSwitch
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
   /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
@@ -64,6 +74,8 @@ export class GraphExecutionEngine {
    * the newest frame and the frames in between are dropped.
    */
   private pendingParameters: ExecutionParameters | null = null
+  /** When the lifecycle run holding the slot started, on the monotonic clock. */
+  private lifecycleRunStartedAt = 0
 
   private get compiled(): CompiledNetCue {
     if (!this.compiledCue) {
@@ -87,6 +99,7 @@ export class GraphExecutionEngine {
     effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[],
     callbacks?: NodeRuntimeCallbacks,
+    debug?: NodeCueDebugSwitch,
   ): GraphExecutionEngine {
     const engine = new GraphExecutionEngine(
       policy,
@@ -100,6 +113,7 @@ export class GraphExecutionEngine {
     )
     engine.compiledCue = compiledCue
     engine.effectRegistry = effectRegistry
+    engine.debug = debug
     return engine
   }
 
@@ -143,6 +157,7 @@ export class GraphExecutionEngine {
         consumeInitialClearPolicy: () => this.session.consumeInitialClearPolicy(),
         onContextLifecycle: this.esmLifecycle.onContextLifecycle,
         revisitPolicy: this.policy.revisitPolicy,
+        debug: this.debug,
       },
     )
     return this.nodeEngine
@@ -164,6 +179,7 @@ export class GraphExecutionEngine {
     const { cueStartedNodes, cueCalledNodes, nonLifecycleNodes } =
       this.splitLifecycleEntryNodes(entryNodes)
     const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
+    if (hasCueEvent) this.expireStuckLifecycleRun()
     const lifecycleWouldQueue = this.policy.queuing && hasCueEvent && this.isExecutingCueStarted
     if (!lifecycleWouldQueue) {
       this.applyActivationSetup(cueStartedNodes, cueCalledNodes)
@@ -244,6 +260,7 @@ export class GraphExecutionEngine {
 
     if (hasCueEvent) {
       this.isExecutingCueStarted = true
+      this.lifecycleRunStartedAt = monotonicNowMs()
     }
 
     const params = parameters as CueData
@@ -311,6 +328,23 @@ export class GraphExecutionEngine {
         }
       })
     }
+  }
+
+  /**
+   * Cancel a lifecycle run that has held the slot past {@link LIFECYCLE_RUN_EXPIRY_MS}. Its effects
+   * stay up, and the frame waiting behind it gives way to the one arriving now.
+   */
+  private expireStuckLifecycleRun(): void {
+    if (!this.isExecutingCueStarted || !this.nodeEngine) return
+    if (monotonicNowMs() - this.lifecycleRunStartedAt < LIFECYCLE_RUN_EXPIRY_MS) return
+    const { cueStartedNodes, cueCalledNodes } = this.splitLifecycleEntryNodes([
+      ...this.compiled.eventMap.values(),
+    ])
+    for (const event of [...cueStartedNodes, ...cueCalledNodes]) {
+      this.nodeEngine.cancelContexts(event.id)
+    }
+    this.isExecutingCueStarted = false
+    this.pendingParameters = null
   }
 
   private onCueEventComplete(): void {

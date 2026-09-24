@@ -71,14 +71,14 @@ describe('SenderToggle', () => {
   it('is not offered when the sender is off in preferences', () => {
     renderToggle({ sacnEnabled: false })
 
-    expect(screen.queryByRole('button', { name: 'sACN Out' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'sACN Out' })).toBeNull()
   })
 
   it('sends what the sender needs to start', async () => {
     const enable = jest.fn(async () => ({ success: true }))
     const store = renderToggle({ enable })
 
-    fireEvent.click(screen.getByRole('button', { name: 'sACN Out' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'sACN Out' }))
 
     await waitFor(() => expect(enable).toHaveBeenCalledTimes(1))
     expect(store.get(runningAtom)).toBe(true)
@@ -87,7 +87,7 @@ describe('SenderToggle', () => {
   it('stops the sender when it is already running', async () => {
     renderToggle({ running: true })
 
-    fireEvent.click(screen.getByRole('button', { name: 'sACN Out' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'sACN Out' }))
 
     await waitFor(() => expect(disableSender).toHaveBeenCalledWith({ sender: 'sacn' }))
   })
@@ -97,23 +97,42 @@ describe('SenderToggle', () => {
       enable: async () => ({ success: false, error: 'port in use' }),
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'sACN Out' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'sACN Out' }))
 
     await waitFor(() => expect(store.get(runningAtom)).toBe(false))
+  })
+
+  it('holds the switch while its request is in flight', async () => {
+    let finish!: (result: unknown) => void
+    renderToggle({
+      enable: () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    })
+    const button = screen.getByRole('switch', { name: 'sACN Out' }) as HTMLButtonElement
+
+    fireEvent.click(button)
+    await waitFor(() => expect(button.disabled).toBe(true))
+    fireEvent.click(button)
+    finish({ success: true })
+
+    await waitFor(() => expect(button.disabled).toBe(false))
+    expect(disableSender).not.toHaveBeenCalled()
   })
 
   it('blocks the switch while the sender is not ready to start', () => {
     renderToggle({ notReady: true })
 
-    expect((screen.getByRole('button', { name: 'sACN Out' }) as HTMLButtonElement).disabled).toBe(
+    expect((screen.getByRole('switch', { name: 'sACN Out' }) as HTMLButtonElement).disabled).toBe(
       true,
     )
   })
 
-  it('reports its state to assistive technology', () => {
+  it('announces itself as a switch and whether it is on', () => {
     renderToggle({ running: true })
 
-    expect(screen.getByRole('button', { name: 'sACN Out' }).getAttribute('aria-pressed')).toBe(
+    expect(screen.getByRole('switch', { name: 'sACN Out' }).getAttribute('aria-checked')).toBe(
       'true',
     )
   })

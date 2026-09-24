@@ -2,7 +2,7 @@ import { DmxLightManager } from './DmxLightManager'
 import { LightStateManager } from './sequencer/LightStateManager'
 import { LightTransitionController } from './sequencer/LightTransitionController'
 import { Sequencer } from './sequencer/Sequencer'
-import { Clock } from './sequencer/Clock'
+import type { ClockSource } from './sequencer/Clock'
 import { LightingConfiguration } from '../types'
 import { CueHandler } from '../cueHandlers/CueHandler'
 import type { NetCueMode } from '../cues/types/nodeCueTypes'
@@ -19,7 +19,7 @@ const log = createLogger('RigChain')
 export interface RigChainOptions {
   rigId: string
   config: LightingConfiguration
-  clock: Clock
+  clock: ClockSource
   /**
    * When multiple chains run the same cue in parallel, only the primary chain's handlers
    * should emit renderer broadcasts (motion-cue change, cue-handled, etc.) so the UI sees

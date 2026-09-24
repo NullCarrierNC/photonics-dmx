@@ -2,6 +2,7 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { WindowManager } from '../WindowManager'
 import { setupConfigHandlers } from './config-handlers'
+import type { BlackoutShortcutBinding } from '../../shared/blackoutShortcut'
 import { setupLightHandlers } from './light-handlers'
 import { setupCueHandlers } from './cue-handlers'
 import { setupNodeCueHandlers } from './node-cue-handlers'
@@ -25,8 +26,9 @@ export function setupIpcHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
   windowManager: WindowManager,
+  onBlackoutShortcutChanged: (binding: BlackoutShortcutBinding) => void,
 ): void {
-  setupConfigHandlers(ipcMain, controllerManager)
+  setupConfigHandlers(ipcMain, controllerManager, onBlackoutShortcutChanged)
   setupLightHandlers(ipcMain, controllerManager)
   setupConsoleHandlers(ipcMain, controllerManager)
   setupMasterOutputHandlers(ipcMain, controllerManager)
@@ -37,7 +39,9 @@ export function setupIpcHandlers(
   setupWindowHandlers(ipcMain, windowManager)
   setupLifecycleHandlers(ipcMain, controllerManager)
 
-  controllerManager.getListenerLifecycle().audio.setBroadcastAudioMirror((data) => {
+  const audio = controllerManager.getListenerLifecycle().audio
+  audio.setBroadcastAudioMirror((data) => {
     windowManager.broadcastAudioMirror(data)
   })
+  audio.setOpenCaptureWindow(() => windowManager.ensureMainWindow())
 }

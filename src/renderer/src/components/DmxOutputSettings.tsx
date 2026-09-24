@@ -1,5 +1,5 @@
-import React, { useCallback, useState, useEffect } from 'react'
-import { useAtom } from 'jotai'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
+import { useAtom, useStore } from 'jotai'
 import {
   senderArtNetEnabledAtom,
   senderSacnEnabledAtom,
@@ -11,7 +11,7 @@ import {
   openDmxComPortAtom,
   lightingPrefsAtom,
 } from '../atoms'
-import DmxOutputEnabledModes from './DmxOutputSettings/DmxOutputEnabledModes'
+import DmxOutputEnabledModes, { type SenderName } from './DmxOutputSettings/DmxOutputEnabledModes'
 import SacnConfigCard from './DmxOutputSettings/SacnConfigCard'
 import ArtNetConfigCard from './DmxOutputSettings/ArtNetConfigCard'
 import EnttecProConfigCard from './DmxOutputSettings/EnttecProConfigCard'
@@ -34,7 +34,6 @@ import {
 import {
   clampRefreshRateValue,
   nextOutputConfig,
-  outputConfigFromRunningSenders,
   parseGlobalPublishingRate,
   parseOpenDmxSpeed,
   type DmxOutputFlag,
@@ -44,12 +43,14 @@ import { applySenderRunState } from '../ipc/senderSwitch'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { wasRefused } from '../ipc/ipcResult'
 import { useToast } from '../hooks/useToast'
-import ToastContainer from './Toast'
 import type { AppPreferences } from '../../../shared/ipcTypes'
 import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
+
+const ENTTEC_PRO_DEFAULT_CONFIG = { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ }
+const OPEN_DMX_DEFAULT_CONFIG = { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }
 
 const DmxOutputSettings: React.FC = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom)
@@ -61,6 +62,9 @@ const DmxOutputSettings: React.FC = () => {
   const [comPort, setComPort] = useAtom(enttecProComPortAtom)
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
+  const store = useStore()
+  // Flag saves run one at a time, each built from the config the one before it saved.
+  const flagSaves = useRef<Promise<unknown>>(Promise.resolve())
   const enttecProSpeed = prefs.enttecProConfig?.dmxSpeed ?? ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
   const globalDmxPublishingRate = prefs.globalDmxPublishingRateHz ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
@@ -70,10 +74,11 @@ const DmxOutputSettings: React.FC = () => {
   const [sacnExpanded, setSacnExpanded] = useState(false)
   const [enttecProExpanded, setEnttecProExpanded] = useState(false)
   const [openDmxExpanded, setOpenDmxExpanded] = useState(false)
+  const [savingSenders, setSavingSenders] = useState<ReadonlySet<SenderName>>(() => new Set())
   const [networkInterfaces, setNetworkInterfaces] = useState<
     Array<{ name: string; value: string; family: string }>
   >([])
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
 
   /** Writes preferences, reporting a refusal on screen. */
   const persist = useCallback(
@@ -103,16 +108,19 @@ const DmxOutputSettings: React.FC = () => {
   )
 
   /**
-   * Persists Enttec port/rate atomically and pushes the merged config to main. The push goes out
+   * Persists Enttec port/rate atomically and pushes the merged config to main. The port atom the
+   * Status toggle starts the sender from takes the port once it is stored. The push goes out
    * whether or not this render thinks the sender runs, because a sender enabled a moment ago may
    * not show as running here yet. Main applies it to a running or starting sender and ignores it
    * otherwise.
    */
   const commitEnttecConfig = useSerializedConfigCommit({
-    stored: prefs.enttecProConfig,
-    defaultConfig: { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ },
+    stored: prefs.enttecProConfig ?? ENTTEC_PRO_DEFAULT_CONFIG,
     persist: (config, what) => persist({ enttecProConfig: config }, what),
-    setStored: (config) => setPrefs((prev) => ({ ...prev, enttecProConfig: config })),
+    setStored: (config) => {
+      setPrefs((prev) => ({ ...prev, enttecProConfig: config }))
+      setComPort(config.port)
+    },
     applyToRunningSender: (config, what) =>
       applyToRunningSender(
         () => updateEnttecConfig({ devicePath: config.port, dmxSpeed: config.dmxSpeed }),
@@ -120,12 +128,37 @@ const DmxOutputSettings: React.FC = () => {
       ),
   })
 
-  /** Persists OpenDMX port/rate atomically. OpenDMX has no live-update channel to push to. */
+  /**
+   * Persists OpenDMX port/rate atomically, and hands the port atom the port once it is stored.
+   * OpenDMX has no live-update channel to push to.
+   */
   const commitOpenDmxConfig = useSerializedConfigCommit({
-    stored: prefs.openDmxConfig,
-    defaultConfig: { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
+    stored: prefs.openDmxConfig ?? OPEN_DMX_DEFAULT_CONFIG,
     persist: (config, what) => persist({ openDmxConfig: config }, what),
-    setStored: (config) => setPrefs((prev) => ({ ...prev, openDmxConfig: config })),
+    setStored: (config) => {
+      setPrefs((prev) => ({ ...prev, openDmxConfig: config }))
+      setOpenDmxComPort(config.port)
+    },
+  })
+
+  /** Persists the whole resolved ArtNet config and hands it to the sender if it runs. */
+  const commitArtNetConfig = useSerializedConfigCommit({
+    stored: artNetConfig,
+    persist: (config, what) => persist({ artNetConfig: config }, what),
+    setStored: (config) => setPrefs((prev) => ({ ...prev, artNetConfig: config })),
+    applyToRunningSender: async (config, what) => {
+      if (isArtNetEnabled) await applyToRunningSender(() => updateArtNetConfig(config), what)
+    },
+  })
+
+  /** Persists the whole resolved sACN config and hands it to the sender if it runs. */
+  const commitSacnConfig = useSerializedConfigCommit({
+    stored: sacnConfig,
+    persist: (config, what) => persist({ sacnConfig: config }, what),
+    setStored: (config) => setPrefs((prev) => ({ ...prev, sacnConfig: config })),
+    applyToRunningSender: async (config, what) => {
+      if (isSacnEnabled) await applyToRunningSender(() => updateSacnConfig(config), what)
+    },
   })
 
   // The port fields hold their own text while they are being edited and report on blur, so the
@@ -173,46 +206,6 @@ const DmxOutputSettings: React.FC = () => {
     void loadNetworkInterfaces()
   }, [])
 
-  // Seed the saved output config on first run from whatever the backend already has running.
-  useEffect(() => {
-    if (prefs.dmxOutputConfig) {
-      return
-    }
-    const initialConfig = outputConfigFromRunningSenders({
-      sacn: isSacnEnabled,
-      artnet: isArtNetEnabled,
-      enttecpro: isEnttecProEnabled,
-      opendmx: isOpenDmxEnabled,
-    })
-    log.info('No DMX output config in preferences, initializing from sender states:', initialConfig)
-
-    let cancelled = false
-    void (async () => {
-      const saved = await persist(
-        { dmxOutputConfig: initialConfig },
-        'the DMX output configuration',
-      )
-      if (!saved || cancelled) {
-        return
-      }
-      setPrefs((prev) => ({
-        ...prev,
-        dmxOutputConfig: initialConfig,
-      }))
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [
-    prefs.dmxOutputConfig,
-    isSacnEnabled,
-    isArtNetEnabled,
-    isEnttecProEnabled,
-    isOpenDmxEnabled,
-    setPrefs,
-    persist,
-  ])
-
   /** What one sender needs to be turned on or off: its saved flag and its backend state. */
   type SenderToggle = {
     flag: DmxOutputFlag
@@ -221,8 +214,6 @@ const DmxOutputSettings: React.FC = () => {
     start: () => Promise<unknown>
     stop: () => Promise<unknown>
   }
-
-  type SenderName = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
 
   const senderToggles: Record<SenderName, SenderToggle> = {
     sacn: {
@@ -266,10 +257,11 @@ const DmxOutputSettings: React.FC = () => {
    * follows the saved config while starting and stopping follows what the backend reports, so a
    * sender already in the state being asked for is left running, or stopped, as it is.
    */
-  const handleSenderToggle = async (name: SenderName) => {
+  const saveSenderFlag = async (name: SenderName) => {
     const toggle = senderToggles[name]
-    const enabled = !(prefs.dmxOutputConfig?.[toggle.flag] ?? false)
-    const newConfig = nextOutputConfig(prefs.dmxOutputConfig, toggle.flag, enabled)
+    const current = store.get(lightingPrefsAtom).dmxOutputConfig
+    const enabled = !(current?.[toggle.flag] ?? false)
+    const newConfig = nextOutputConfig(current, toggle.flag, enabled)
     log.info('Sender toggled:', name, enabled, newConfig)
 
     if (!(await persist({ dmxOutputConfig: newConfig }, 'the DMX output configuration'))) {
@@ -288,84 +280,62 @@ const DmxOutputSettings: React.FC = () => {
     }
   }
 
-  const handleArtNetConfigChange = async (
+  /** Holds the sender's box while its flag saves, so a second click cannot ask again. */
+  const handleSenderToggle = async (name: SenderName) => {
+    if (savingSenders.has(name)) return
+    const markSaving = (saving: boolean) =>
+      setSavingSenders((current) => {
+        const next = new Set(current)
+        if (saving) next.add(name)
+        else next.delete(name)
+        return next
+      })
+    markSaving(true)
+    const saving = flagSaves.current.then(() => saveSenderFlag(name))
+    flagSaves.current = saving.catch(() => undefined)
+    await saving.finally(() => markSaving(false))
+  }
+
+  const handleArtNetConfigChange = (
     field: keyof typeof artNetConfig,
     value: string | number,
-  ) => {
+  ): Promise<boolean> => {
     const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
-    const newConfig = {
-      ...artNetConfig,
-      [field]: parsed,
-    }
-
-    if (!(await persist({ artNetConfig: newConfig }, 'the ArtNet configuration'))) {
-      return
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      artNetConfig: newConfig,
-    }))
-
-    if (isArtNetEnabled) {
-      await applyToRunningSender(() => updateArtNetConfig(newConfig), 'the ArtNet configuration')
-    }
+    return commitArtNetConfig({ [field]: parsed }, 'the ArtNet configuration')
   }
 
-  const handleComPortChange = async (newPort: string) => {
-    setComPort(newPort)
-    await commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
-  }
+  const handleComPortChange = (newPort: string): Promise<boolean> =>
+    commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
 
-  const handleEnttecProSpeedChange = async (hz: number) => {
-    await commitEnttecConfig(
+  const handleEnttecProSpeedChange = (hz: number): Promise<boolean> =>
+    commitEnttecConfig(
       { dmxSpeed: normalizeEnttecProDmxSpeedHz(hz) },
       'the Enttec Pro refresh rate',
     )
-  }
 
-  const handleOpenDmxComPortChange = async (newPort: string) => {
-    setOpenDmxComPort(newPort)
-    await commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
-  }
+  const handleOpenDmxComPortChange = (newPort: string): Promise<boolean> =>
+    commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
 
-  const handleOpenDmxSpeedChange = async (hz: number) => {
-    await commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
-  }
+  const handleOpenDmxSpeedChange = (hz: number): Promise<boolean> =>
+    commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
 
-  const handleGlobalDmxRateChange = async (hz: number) => {
+  const handleGlobalDmxRateChange = async (hz: number): Promise<boolean> => {
     const sanitized = parseGlobalPublishingRate(String(hz))
 
     if (!(await persist({ globalDmxPublishingRateHz: sanitized }, 'the DMX publishing rate'))) {
-      return
+      return false
     }
 
     setPrefs((prev) => ({ ...prev, globalDmxPublishingRateHz: sanitized }))
+    return true
   }
 
-  const handleSacnConfigChange = async (
+  const handleSacnConfigChange = (
     field: keyof typeof sacnConfig,
     value: string | number | boolean,
-  ) => {
+  ): Promise<boolean> => {
     const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
-    const newConfig = {
-      ...sacnConfig,
-      [field]: parsed,
-    }
-
-    if (!(await persist({ sacnConfig: newConfig }, 'the sACN configuration'))) {
-      return
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      sacnConfig: newConfig,
-    }))
-
-    // Update the running sender if sACN is enabled
-    if (isSacnEnabled) {
-      await applyToRunningSender(() => updateSacnConfig(newConfig), 'the sACN configuration')
-    }
+    return commitSacnConfig({ [field]: parsed }, 'the sACN configuration')
   }
 
   const panelSetters = {
@@ -411,7 +381,7 @@ const DmxOutputSettings: React.FC = () => {
             <DraftNumberField
               aria-label="Global DMX Publishing Rate"
               value={globalDmxPublishingRate}
-              onCommit={(hz) => void handleGlobalDmxRateChange(hz)}
+              onCommit={handleGlobalDmxRateChange}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               min={DMX_OUTPUT_REFRESH_RATE_HZ_MIN}
               max={DMX_OUTPUT_REFRESH_RATE_HZ_MAX}
@@ -445,6 +415,7 @@ const DmxOutputSettings: React.FC = () => {
       )}
 
       <DmxOutputEnabledModes
+        saving={savingSenders}
         sacnEnabled={prefs.dmxOutputConfig?.sacnEnabled || false}
         onSacnToggle={() => void handleSenderToggle('sacn')}
         artNetEnabled={prefs.dmxOutputConfig?.artNetEnabled || false}
@@ -462,7 +433,7 @@ const DmxOutputSettings: React.FC = () => {
             networkInterfaces={networkInterfaces}
             expanded={sacnExpanded}
             onToggle={() => void toggleExpanded('sacnExpanded')}
-            onConfigChange={(field, value) => void handleSacnConfigChange(field, value)}
+            onConfigChange={handleSacnConfigChange}
           />
         </div>
       )}
@@ -473,7 +444,7 @@ const DmxOutputSettings: React.FC = () => {
             config={artNetConfig}
             expanded={artNetExpanded}
             onToggle={() => void toggleExpanded('artNetExpanded')}
-            onConfigChange={(field, value) => void handleArtNetConfigChange(field, value)}
+            onConfigChange={handleArtNetConfigChange}
           />
         </div>
       )}
@@ -483,8 +454,8 @@ const DmxOutputSettings: React.FC = () => {
           <EnttecProConfigCard
             comPort={comPort}
             refreshRate={enttecProSpeed}
-            onComPortChange={(port) => void handleComPortChange(port)}
-            onRefreshRateChange={(hz) => void handleEnttecProSpeedChange(hz)}
+            onComPortChange={handleComPortChange}
+            onRefreshRateChange={handleEnttecProSpeedChange}
             expanded={enttecProExpanded}
             onToggle={() => void toggleExpanded('enttecProExpanded')}
           />
@@ -496,15 +467,13 @@ const DmxOutputSettings: React.FC = () => {
           <OpenDmxConfigCard
             comPort={openDmxComPort}
             refreshRate={openDmxSpeed}
-            onComPortChange={(port) => void handleOpenDmxComPortChange(port)}
-            onRefreshRateChange={(hz) => void handleOpenDmxSpeedChange(hz)}
+            onComPortChange={handleOpenDmxComPortChange}
+            onRefreshRateChange={handleOpenDmxSpeedChange}
             expanded={openDmxExpanded}
             onToggle={() => void toggleExpanded('openDmxExpanded')}
           />
         </div>
       )}
-
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>
   )
 }

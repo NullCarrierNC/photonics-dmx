@@ -172,6 +172,22 @@ describe('ControllerLifecycle', () => {
     })
   })
 
+  describe('setPhaseUnlessShuttingDown', () => {
+    it('moves the phase on while no shutdown has begun', () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhaseUnlessShuttingDown('running')
+      expect(lifecycle.phase).toBe('running')
+    })
+
+    it('leaves a shutdown in charge of the phase', () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      lifecycle.setPhase('shuttingDown')
+      lifecycle.setPhaseUnlessShuttingDown('running')
+      expect(lifecycle.phase).toBe('shuttingDown')
+    })
+  })
+
   describe('runSharedRestart', () => {
     it('memoizes overlapping calls onto one attempt and clears on resolve', async () => {
       const lifecycle = new ControllerLifecycle(() => {})
@@ -191,6 +207,68 @@ describe('ControllerLifecycle', () => {
 
       expect(work).toHaveBeenCalledTimes(1)
       expect(lifecycle.isRestartInFlight()).toBe(false)
+    })
+
+    it('gives a caller that arrives after the rebuild started one follow-up restart', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      let releaseFirst!: () => void
+      const firstBarrier = new Promise<void>((r) => {
+        releaseFirst = r
+      })
+      let rebuildStarted!: () => void
+      const started = new Promise<void>((r) => {
+        rebuildStarted = r
+      })
+      const runs: string[] = []
+      const first = lifecycle.runSharedRestart(async () => {
+        runs.push('first')
+        lifecycle.markRestartRebuildStarted()
+        rebuildStarted()
+        await firstBarrier
+      })
+      await started
+
+      const work = async (): Promise<void> => {
+        runs.push('follow-up')
+      }
+      const second = lifecycle.runSharedRestart(work)
+      const third = lifecycle.runSharedRestart(work)
+      expect(second).not.toBe(first)
+      expect(third).toBe(second)
+
+      releaseFirst()
+      await Promise.all([first, second, third])
+      expect(runs).toEqual(['first', 'follow-up'])
+      expect(lifecycle.isRestartInFlight()).toBe(false)
+    })
+
+    it('opens a further follow-up for a caller arriving during the follow-up rebuild', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      const releases: Array<() => void> = []
+      const runs: number[] = []
+      const work = async (): Promise<void> => {
+        runs.push(runs.length + 1)
+        lifecycle.markRestartRebuildStarted()
+        await new Promise<void>((r) => releases.push(r))
+      }
+      const flush = async (): Promise<void> => {
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+      }
+
+      const first = lifecycle.runSharedRestart(work)
+      await flush()
+      const second = lifecycle.runSharedRestart(work)
+      releases[0]()
+      await flush()
+      expect(runs).toEqual([1, 2])
+
+      const third = lifecycle.runSharedRestart(work)
+      expect(third).not.toBe(second)
+      releases[1]()
+      await flush()
+      releases[2]()
+      await Promise.all([first, second, third])
+      expect(runs).toEqual([1, 2, 3])
     })
 
     it('clears the memo on rejection so a later restart runs fresh', async () => {
@@ -231,25 +309,67 @@ describe('ControllerLifecycle', () => {
   })
 
   describe('await helpers', () => {
-    it('awaitInFlightWork waits on a restart and swallows its failure', async () => {
+    it('runQueuedOp runs its op once a shutdown in flight has settled', async () => {
       const lifecycle = new ControllerLifecycle(() => {})
-      let rejectWork!: (err: Error) => void
-      const barrier = new Promise<void>((_, reject) => {
-        rejectWork = reject
+      lifecycle.setPhase('running')
+      let releaseShutdown!: () => void
+      const shutdownBarrier = new Promise<void>((r) => {
+        releaseShutdown = r
       })
-      const restart = lifecycle.runSharedRestart(() => barrier)
-      restart.catch(() => {})
+      const shutdown = lifecycle.runExclusiveShutdown(() => shutdownBarrier)
+
+      let ran = false
+      const queued = lifecycle.runQueuedOp(async () => {
+        ran = true
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(ran).toBe(false)
+
+      releaseShutdown()
+      await Promise.all([shutdown, queued])
+      expect(ran).toBe(true)
+    })
+
+    it('awaitActiveOp waits for the queued op that is running', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      let releaseOp!: () => void
+      const op = lifecycle.runQueuedOp(
+        () =>
+          new Promise<void>((r) => {
+            releaseOp = r
+          }),
+      )
+      await new Promise((r) => setImmediate(r))
 
       let waited = false
-      const waiter = lifecycle.awaitInFlightWork().then(() => {
+      const waiter = lifecycle.awaitActiveOp().then(() => {
         waited = true
       })
       await Promise.resolve()
       expect(waited).toBe(false)
 
-      rejectWork(new Error('boom'))
-      await waiter
+      releaseOp()
+      await Promise.all([op, waiter])
       expect(waited).toBe(true)
+    })
+
+    it('awaitActiveOp passes over a queued op still waiting on the shutdown', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      let releaseShutdown!: () => void
+      const shutdownBarrier = new Promise<void>((r) => {
+        releaseShutdown = r
+      })
+      const shutdown = lifecycle.runExclusiveShutdown(() => shutdownBarrier)
+      const queued = lifecycle.runQueuedOp(async () => {})
+      await new Promise((r) => setImmediate(r))
+
+      await expect(lifecycle.awaitActiveOp()).resolves.toBeUndefined()
+
+      releaseShutdown()
+      await Promise.all([shutdown, queued])
     })
 
     it('awaitShutdownWork waits only on a shutdown, not a restart', async () => {

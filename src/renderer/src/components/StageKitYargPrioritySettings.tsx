@@ -1,30 +1,37 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { setStageKitPriority } from '../ipcApi'
+import { wasRefused } from '../ipc/ipcResult'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('StageKitYargPrioritySettings')
 
 const StageKitYargPrioritySettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
+  // The picker shows what main stored, so a refused priority leaves it on the one still in use.
   const handlePriorityChange = async (priority: 'prefer-for-tracked' | 'random') => {
-    const newStageKitPrefs = {
-      yargPriority: priority,
+    setSaveError(null)
+    try {
+      const result = await setStageKitPriority(priority)
+      if (wasRefused(result)) {
+        log.error('Refused to save Stage Kit priority:', result.error)
+        setSaveError('Could not save the Stage Kit priority.')
+        return
+      }
+    } catch (error) {
+      log.error('Failed to save Stage Kit priority:', error)
+      setSaveError('Could not save the Stage Kit priority.')
+      return
     }
 
     setPrefs((prev) => ({
       ...prev,
-      stageKitPrefs: newStageKitPrefs,
+      stageKitPrefs: { yargPriority: priority },
     }))
-
-    try {
-      await setStageKitPriority(priority)
-      log.info(`Stage Kit priority changed to: ${priority}`)
-    } catch (error) {
-      log.error('Failed to save Stage Kit priority:', error)
-    }
+    log.info(`Stage Kit priority changed to: ${priority}`)
   }
 
   const priorityOptions = [
@@ -91,6 +98,11 @@ const StageKitYargPrioritySettings: React.FC = () => {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               {getPriorityDescription(prefs.stageKitPrefs?.yargPriority || 'random')}
             </p>
+            {saveError && (
+              <p className="text-sm text-red-600 dark:text-red-400 mt-2" role="alert">
+                {saveError}
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -1,19 +1,64 @@
 import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
+import type { ControllerManager } from '../controllers/ControllerManager'
 import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
-import { isNonEmptyString, validateCueType } from './inputValidation'
+import { validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 const log = createLogger('cue-group-handlers')
+
+/**
+ * The window opens before the cold init has loaded the cue files, so a group list asked for then
+ * waits for that init to settle. A failed init is left for the user to retry.
+ */
+async function coldInitSettled(controllerManager: ControllerManager): Promise<void> {
+  if (controllerManager.getLifecyclePhase() !== 'initializing') return
+  try {
+    await controllerManager.init()
+  } catch {
+    // The init reports its own failure. The list answers with whatever the registry holds.
+  }
+}
+
+/**
+ * The cues of one group in a domain's registry. A missing or blank group id resolves to the
+ * registry's default group, then its first enabled group.
+ */
+function availableCues(domain: NetCueMode, groupId: unknown) {
+  try {
+    const registry = getCueRegistry(domain)
+    const requested = typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
+    const targetGroupId =
+      requested ?? registry.getDefaultGroupId() ?? registry.getEnabledGroups()[0]
+    const group = targetGroupId ? registry.getGroup(targetGroupId) : undefined
+    if (!group) {
+      return []
+    }
+    return Array.from(group.cues.entries()).map(([cueType, implementation]) => ({
+      id: cueType,
+      yargDescription: implementation.description,
+      rb3Description: implementation.description,
+      groupName: group.name,
+    }))
+  } catch (error) {
+    log.error(`Error getting available ${domain} cues:`, error)
+    return []
+  }
+}
 
 /**
  * Set up YARG cue group registry IPC handlers (enabled groups, source group, consistency status).
  * Cue selection preferences (consistency window, motion min-hold, group selection mode) live in
  * cue-selection-prefs-handlers.ts.
  */
-export function setupCueGroupHandlers(ipcMain: IpcMain): void {
+export function setupCueGroupHandlers(
+  ipcMain: IpcMain,
+  controllerManager: ControllerManager,
+): void {
   handleInvoke(ipcMain, LIGHT.GET_CUE_GROUPS, log, async () => {
+    await coldInitSettled(controllerManager)
     const registry = CueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
     return groupIds
@@ -33,6 +78,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   })
 
   handleInvoke(ipcMain, LIGHT.GET_RB3_CUE_GROUPS, log, async () => {
+    await coldInitSettled(controllerManager)
     const registry = getCueRegistry('rb3')
     return registry
       .getAllGroups()
@@ -51,73 +97,13 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       .filter((row): row is NonNullable<typeof row> => row !== null)
   })
 
-  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_RB3_CUES, log, async (_, groupId?: unknown) => {
-    try {
-      const registry = getCueRegistry('rb3')
-      const resolvedGroupId =
-        typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
-      const targetGroupId =
-        resolvedGroupId ?? registry.getDefaultGroupId() ?? registry.getEnabledGroups()[0]
-      if (!targetGroupId) {
-        return []
-      }
-      const group = registry.getGroup(targetGroupId)
-      if (!group) {
-        return []
-      }
-      return Array.from(group.cues.keys()).map((cueType) => {
-        const implementation = group.cues.get(cueType)!
-        return {
-          id: cueType,
-          yargDescription: implementation.description,
-          rb3Description: implementation.description,
-          groupName: group.name,
-        }
-      })
-    } catch (error) {
-      log.error('Error getting available RB3 cues:', error)
-      return []
-    }
-  })
+  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_CUES, log, async (_, groupId?: unknown) =>
+    availableCues('yarg', groupId),
+  )
 
-  handleInvoke(ipcMain, LIGHT.ENABLE_CUE_GROUP, log, async (_, groupId: unknown) => {
-    if (!isNonEmptyString(groupId)) {
-      return { success: false, error: 'groupId is required' }
-    }
-    const registry = CueRegistry.getInstance()
-    const group = registry.getGroup(groupId)
-    if (!group) {
-      return { success: false, error: `Group '${groupId}' not found` }
-    }
-    const result = registry.enableGroup(groupId)
-    if (result) {
-      log.info(`Enabled cue group: ${group.name}`)
-      return { success: true }
-    }
-    log.error(`Failed to enable group '${group.name}'.`)
-    return { success: false, error: `Failed to enable group '${group.name}'.` }
-  })
-
-  handleInvoke(ipcMain, LIGHT.DISABLE_CUE_GROUP, log, async (_, groupId: unknown) => {
-    if (!isNonEmptyString(groupId)) {
-      return { success: false, error: 'groupId is required' }
-    }
-    const registry = CueRegistry.getInstance()
-    const group = registry.getGroup(groupId)
-    if (!group) {
-      return { success: false, error: `Group '${groupId}' not found` }
-    }
-    const result = registry.disableGroup(groupId)
-    if (result) {
-      log.info(`Disabled cue group: ${group.name}`)
-      return { success: true }
-    }
-    log.error(`Failed to disable group '${group.name}'. It may be the default group.`)
-    return {
-      success: false,
-      error: `Failed to disable group '${group.name}'. It may be the default group.`,
-    }
-  })
+  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_RB3_CUES, log, async (_, groupId?: unknown) =>
+    availableCues('rb3', groupId),
+  )
 
   handleInvoke(ipcMain, LIGHT.GET_CUE_SOURCE_GROUP, log, async (_, cueType: unknown) => {
     const validated = validateCueType(cueType)

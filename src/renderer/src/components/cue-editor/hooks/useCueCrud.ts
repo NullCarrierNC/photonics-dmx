@@ -24,6 +24,12 @@ import {
   createDefaultEffect,
 } from '../lib/cueDefaults'
 import { firstByName } from '../lib/cueUtils'
+import {
+  modeKeyFor,
+  setLastActiveMode,
+  setLastFilePathForMode,
+  type EditorModeKey,
+} from './useLastCueFilePath'
 import { validateNodeCue, validateEffect, saveNodeCueFile, saveEffectFile } from '../../../ipcApi'
 import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('useCueCrud')
@@ -50,6 +56,7 @@ export type UseCueCrudParams = {
       | AudioEffectDefinition
       | null,
   ) => void
+  rememberLastFilePath: (path: string | null) => void
   refreshFiles: () => Promise<void>
   refreshEffectFiles: () => Promise<void>
   onError?: (message: string) => void
@@ -69,10 +76,21 @@ export function useCueCrud({
   setIsDirty,
   setCueKind,
   loadCueIntoFlow,
+  rememberLastFilePath,
   refreshFiles,
   refreshEffectFiles,
   onError,
 }: UseCueCrudParams) {
+  // A new file is the one open, so reopening the editor returns to it.
+  const rememberCreatedFile = useCallback(
+    (path: string, modeKey: EditorModeKey) => {
+      rememberLastFilePath(path)
+      setLastFilePathForMode(modeKey, path)
+      setLastActiveMode(modeKey)
+    },
+    [rememberLastFilePath],
+  )
+
   const handleCreateNewFile = useCallback(
     async (metadata: {
       groupId: string
@@ -127,6 +145,7 @@ export function useCueCrud({
           loadCueIntoFlow(file.effects[0] ?? null)
           setValidationErrors([])
           setIsDirty(false)
+          rememberCreatedFile(response.path, modeKeyFor(file.mode, 'lighting', true))
           await refreshEffectFiles()
         } catch (error) {
           log.error('Failed to create effect file', error)
@@ -161,6 +180,7 @@ export function useCueCrud({
           loadCueIntoFlow(file.cues[0] ?? null)
           setValidationErrors([])
           setIsDirty(false)
+          rememberCreatedFile(response.path, modeKeyFor(file.mode, cueKind, false))
           await refreshFiles()
         } catch (error) {
           log.error('Failed to create cue file', error)
@@ -178,6 +198,7 @@ export function useCueCrud({
       loadCueIntoFlow,
       refreshFiles,
       refreshEffectFiles,
+      rememberCreatedFile,
       setEditorDoc,
       setSelectedCueId,
       setFilename,

@@ -3,16 +3,30 @@ import { describe, expect, it } from '@jest/globals'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const {
   commandsFromPackageJson,
+  commandsFromLintStaged,
   commandsFromHook,
   commandsFromWorkflow,
   pathsInCommand,
+  pathsFromJestConfig,
+  pathsFromTsconfig,
   untrackedPaths,
+  unmatchedPatterns,
+  unmatchedIncludes,
 } = require('../../../../tools/referencedPathsCore.cjs') as {
   commandsFromPackageJson: (text: string) => string[]
+  commandsFromLintStaged: (text: string) => string[]
   commandsFromHook: (text: string) => string[]
   commandsFromWorkflow: (text: string) => string[]
   pathsInCommand: (command: string) => string[]
+  pathsFromJestConfig: (config: Record<string, unknown>) => string[]
+  pathsFromTsconfig: (text: string) => { required: string[]; included: string[] }
   untrackedPaths: (commands: string[], tracked: Set<string>) => string[]
+  unmatchedPatterns: (patterns: string[], tracked: Set<string>) => string[]
+  unmatchedIncludes: (
+    patterns: string[],
+    tracked: Set<string>,
+    exists: (path: string) => boolean,
+  ) => string[]
 }
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -56,6 +70,133 @@ describe('commandsFromPackageJson', () => {
 
   it('has nothing to offer a package with no scripts', () => {
     expect(commandsFromPackageJson('{"name":"x"}')).toEqual([])
+  })
+})
+
+describe('commandsFromLintStaged', () => {
+  it('takes every command lint-staged runs, from a string or a list', () => {
+    const text = JSON.stringify({
+      'lint-staged': {
+        '*.ts': 'eslint --fix',
+        '*.json': ['prettier --write', 'node tools/check-json.mjs'],
+      },
+    })
+
+    expect(commandsFromLintStaged(text)).toEqual([
+      'eslint --fix',
+      'prettier --write',
+      'node tools/check-json.mjs',
+    ])
+  })
+
+  it('has nothing to offer a package with no lint-staged config', () => {
+    expect(commandsFromLintStaged('{"name":"x"}')).toEqual([])
+  })
+})
+
+describe('pathsFromJestConfig', () => {
+  it('reads the setup files of the config and of each project', () => {
+    const config = {
+      setupFiles: ['<rootDir>/src/env.ts'],
+      globalSetup: './tools/global-setup.js',
+      projects: [
+        { setupFilesAfterEnv: ['<rootDir>/src/tests/jest.setup.ts'] },
+        {
+          setupFilesAfterEnv: [
+            '<rootDir>/src/tests/jest.setup.ts',
+            '<rootDir>/src/renderer/tests/setup.ts',
+          ],
+        },
+      ],
+    }
+
+    expect(pathsFromJestConfig(config)).toEqual([
+      'src/env.ts',
+      'tools/global-setup.js',
+      'src/tests/jest.setup.ts',
+      'src/renderer/tests/setup.ts',
+    ])
+  })
+
+  it('leaves out a setup file named as a package', () => {
+    expect(pathsFromJestConfig({ setupFilesAfterEnv: ['@testing-library/jest-dom'] })).toEqual([])
+  })
+})
+
+describe('pathsFromTsconfig', () => {
+  it('reads files, include, a relative extends and references, comments and all', () => {
+    const text = `{
+      // The base this builds on.
+      "extends": "./tsconfig.web.json",
+      "files": ["src/env.d.ts"],
+      "include": ["src/main/**/*", "./tools/*.ts",],
+      "references": [{ "path": "./tsconfig.node.json" }],
+    }`
+
+    expect(pathsFromTsconfig(text)).toEqual({
+      required: ['tsconfig.web.json', 'src/env.d.ts', 'tsconfig.node.json'],
+      included: ['src/main/**/*', 'tools/*.ts'],
+    })
+  })
+
+  it('leaves out a base config extended from a package', () => {
+    expect(
+      pathsFromTsconfig('{ "extends": "@electron-toolkit/tsconfig/tsconfig.node.json" }'),
+    ).toEqual({ required: [], included: [] })
+  })
+})
+
+describe('unmatchedPatterns', () => {
+  const tracked = new Set([
+    'electron.vite.config.ts',
+    'src/main/index.ts',
+    'src/renderer/src/App.tsx',
+    'src/tests/jest.setup.ts',
+  ])
+
+  it('passes a tracked file, a directory holding one, and a glob matching one', () => {
+    expect(
+      unmatchedPatterns(
+        [
+          'src/tests/jest.setup.ts',
+          'src/renderer',
+          'src/main/**/*',
+          'electron.vite.config.*',
+          'src/renderer/src/**/*.tsx',
+        ],
+        tracked,
+      ),
+    ).toEqual([])
+  })
+
+  it('reports a file, a directory or a glob with nothing committed behind it', () => {
+    expect(
+      unmatchedPatterns(['src/tests/missing.ts', 'scripts', 'scripts/**/*.ts'], tracked),
+    ).toEqual(['src/tests/missing.ts', 'scripts', 'scripts/**/*.ts'])
+  })
+
+  it('lists a pattern once however often it is named', () => {
+    expect(unmatchedPatterns(['scripts/a.ts', 'scripts/a.ts'], tracked)).toEqual(['scripts/a.ts'])
+  })
+})
+
+describe('unmatchedIncludes', () => {
+  const tracked = new Set(['src/main/index.ts'])
+  const onDisk = new Set(['', 'src', 'src/main', 'scripts', 'src/env.d.ts'])
+  const exists = (path: string) => onDisk.has(path)
+
+  it('reports an include with files on this machine and nothing committed behind it', () => {
+    expect(
+      unmatchedIncludes(['scripts/**/*.ts', 'src/env.d.ts', 'build.config.*'], tracked, exists),
+    ).toEqual(['scripts/**/*.ts', 'src/env.d.ts', 'build.config.*'])
+  })
+
+  it('passes an include matching nothing here either, which no typecheck reads', () => {
+    expect(unmatchedIncludes(['src/mocks/**/*', 'src/gone.d.ts'], tracked, exists)).toEqual([])
+  })
+
+  it('passes an include with committed files behind it', () => {
+    expect(unmatchedIncludes(['src/main/**/*'], tracked, exists)).toEqual([])
   })
 })
 

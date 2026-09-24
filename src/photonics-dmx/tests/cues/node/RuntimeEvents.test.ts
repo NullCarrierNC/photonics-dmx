@@ -18,6 +18,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../../cues/types/cueTypes'
 import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { createSequencerHarness } from '../../helpers/sequencerHarness'
 
 describe('Runtime Event System', () => {
   let mockSequencer: ILightingController
@@ -88,8 +89,6 @@ describe('Runtime Event System', () => {
       onKeysNote: jest.fn(),
       blackout: jest.fn(),
       cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
       shutdown: jest.fn(),
     } as any
 
@@ -869,7 +868,60 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
     })
 
-    it('LightingNodeCue (Secondary): execute submits effect via addEffect', () => {
+    it('the next primary fades in from the look a stopped primary left, on a real sequencer', () => {
+      const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+      const primary = (id: string, color: string, duration: number): LightingNodeCue => {
+        const start: NetEventNode = { id: `${id}-start`, type: 'event', eventType: 'cue-started' }
+        const action: ActionNode = {
+          id: `${id}-set`,
+          type: 'action',
+          effectType: 'set-color',
+          target: {
+            groups: { source: 'literal', value: 'front' },
+            filter: { source: 'literal', value: 'all' },
+          },
+          color: {
+            name: { source: 'literal', value: color },
+            brightness: { source: 'literal', value: 'high' },
+          },
+          timing: {
+            waitForCondition: { source: 'literal', value: 'none' },
+            waitForTime: { source: 'literal', value: 0 },
+            duration: { source: 'literal', value: duration },
+            waitUntilCondition: { source: 'literal', value: 'none' },
+            waitUntilTime: { source: 'literal', value: 0 },
+          },
+        }
+        const definition: NetNodeCueDefinition = {
+          id,
+          name: id,
+          kind: 'lighting',
+          cueType: 'Intro' as never,
+          style: 'primary',
+          nodes: { events: [start], actions: [action], logic: [] },
+          connections: [{ from: start.id, to: action.id }],
+          layout: { nodePositions: {} },
+        }
+        return new LightingNodeCue('group1', NodeCueCompiler.compileCue(definition, 'yarg'))
+      }
+      try {
+        const red = primary('red-cue', 'red', 0)
+        red.execute(createCueData(), h.sequencer, h.lightManager)
+        h.advanceBy(50)
+        const redLevel = h.getLightState(h.frontLightIds[0])?.red ?? 0
+        red.onStop()
+
+        primary('green-cue', 'green', 300).execute(createCueData(), h.sequencer, h.lightManager)
+        h.advanceBy(10)
+
+        expect(redLevel).toBeGreaterThan(0)
+        expect(h.getLightState(h.frontLightIds[0])?.red ?? 0).toBeGreaterThan(redLevel * 0.8)
+      } finally {
+        h.cleanup()
+      }
+    })
+
+    it('LightingNodeCue (Secondary): execute adds its effect without clearing the sequencer', () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -914,9 +966,9 @@ describe('Runtime Event System', () => {
       const cueData = createCueData()
 
       cue.execute(cueData, mockSequencer, mockLightManager)
-      const setCalls = (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length
-      const addCalls = (mockSequencer.addEffect as jest.Mock).mock.calls.length
-      expect(setCalls + addCalls).toBeGreaterThanOrEqual(1)
+      expect(mockSequencer.setEffectUnblockedName).not.toHaveBeenCalled()
+      expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
 
     it('LightingNodeCue (Primary, no cue-started node): first execute uses setEffect', () => {

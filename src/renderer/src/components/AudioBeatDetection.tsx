@@ -1,5 +1,8 @@
 import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioBeatDetection: React.FC = () => {
   const audio = useAudioConfigFields({
@@ -13,6 +16,11 @@ const AudioBeatDetection: React.FC = () => {
     audio.set({ beatDetection: { ...audio.values.beatDetection, ...patch } })
   }
 
+  /** Update one field and store it, for a number box the user has finished with. */
+  const saveField = (patch: Partial<typeof audio.values.beatDetection>): void => {
+    void audio.save({ beatDetection: { ...audio.values.beatDetection, ...patch } })
+  }
+
   const setThreshold = (value: number): void => setField({ threshold: value })
   const setDecayRate = (value: number): void => setField({ decayRate: value })
   const setMinInterval = (value: number): void => setField({ minInterval: value })
@@ -20,6 +28,9 @@ const AudioBeatDetection: React.FC = () => {
   const handleSave = (): void => {
     void audio.commit()
   }
+  const thresholdRelease = useCommitOnRelease(handleSave)
+  const decayRelease = useCommitOnRelease(handleSave)
+  const intervalRelease = useCommitOnRelease(handleSave)
 
   return (
     <div className="space-y-1">
@@ -46,26 +57,25 @@ const AudioBeatDetection: React.FC = () => {
             max="1.0"
             step="0.05"
             value={threshold}
-            onChange={(e) => setThreshold(parseFloat(e.target.value))}
-            onMouseUp={() => handleSave()}
-            onTouchEnd={() => handleSave()}
+            onChange={(e) => {
+              setThreshold(parseFloat(e.target.value))
+              thresholdRelease.changed()
+            }}
+            {...thresholdRelease.props}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((threshold - 0.1) / (1.0 - 0.1)) * 100}%, #e5e7eb ${((threshold - 0.1) / (1.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
             }}
           />
 
-          <input
-            type="number"
-            min="0.1"
-            max="1.0"
-            step="0.05"
+          <DraftNumberField
+            min={0.1}
+            max={1.0}
+            step={0.05}
+            decimals={2}
             value={threshold}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0.1
-              setThreshold(Math.max(0.1, Math.min(1.0, value)))
-            }}
-            onBlur={() => handleSave()}
+            onCommit={(value) => saveField({ threshold: value })}
+            aria-label="Detection threshold value"
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
@@ -87,26 +97,25 @@ const AudioBeatDetection: React.FC = () => {
             max="0.99"
             step="0.01"
             value={decayRate}
-            onChange={(e) => setDecayRate(parseFloat(e.target.value))}
-            onMouseUp={() => handleSave()}
-            onTouchEnd={() => handleSave()}
+            onChange={(e) => {
+              setDecayRate(parseFloat(e.target.value))
+              decayRelease.changed()
+            }}
+            {...decayRelease.props}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((decayRate - 0.8) / (0.99 - 0.8)) * 100}%, #e5e7eb ${((decayRate - 0.8) / (0.99 - 0.8)) * 100}%, #e5e7eb 100%)`,
             }}
           />
 
-          <input
-            type="number"
-            min="0.80"
-            max="0.99"
-            step="0.01"
+          <DraftNumberField
+            min={0.8}
+            max={0.99}
+            step={0.01}
+            decimals={2}
             value={decayRate}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0.8
-              setDecayRate(Math.max(0.8, Math.min(0.99, value)))
-            }}
-            onBlur={() => handleSave()}
+            onCommit={(value) => saveField({ decayRate: value })}
+            aria-label="Decay rate value"
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
@@ -130,32 +139,31 @@ const AudioBeatDetection: React.FC = () => {
             max="500"
             step="10"
             value={minInterval}
-            onChange={(e) => setMinInterval(parseInt(e.target.value))}
-            onMouseUp={() => handleSave()}
-            onTouchEnd={() => handleSave()}
+            onChange={(e) => {
+              setMinInterval(parseInt(e.target.value))
+              intervalRelease.changed()
+            }}
+            {...intervalRelease.props}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((minInterval - 50) / (500 - 50)) * 100}%, #e5e7eb ${((minInterval - 50) / (500 - 50)) * 100}%, #e5e7eb 100%)`,
             }}
           />
 
-          <input
-            type="number"
-            min="50"
-            max="500"
-            step="10"
+          <DraftNumberField
+            min={50}
+            max={500}
+            step={10}
             value={minInterval}
-            onChange={(e) => {
-              const value = parseInt(e.target.value) || 50
-              setMinInterval(Math.max(50, Math.min(500, value)))
-            }}
-            onBlur={() => handleSave()}
+            onCommit={(value) => saveField({ minInterval: value })}
+            aria-label="Minimum beat interval value"
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
       </div>
 
       {isSaving && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Saving...</p>}
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

@@ -21,7 +21,7 @@ import type {
   AudioLightingData,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { Rb3GameModeSchedulePayload } from '../../photonics-dmx/processors/Rb3GameModeManager'
-import type { DmxValuesPayload, LifecyclePhase } from './common'
+import type { DmxValuesPayload, LifecyclePhase, MotionCueChangePayload } from './common'
 
 export interface IpcSendMap {
   [CUE.YARG_LISTENER_ENABLED]: void
@@ -81,33 +81,25 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.RB3_ERROR]: { type: string; message: string; autoDisabled?: boolean }
   [RENDERER_RECEIVE.CONTROLLERS_RESTARTED]: undefined
+  [RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED]: undefined
   [RENDERER_RECEIVE.MASTER_OUTPUT_CHANGED]: MasterOutputSnapshot
   [RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED]: BlackoutShortcutBinding
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
+  [RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED]: { listener: 'yarg' | 'rb3'; enabled: boolean }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
+  [RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED]: undefined
+  [RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.MOTION_ENABLED_CHANGED]: boolean
-  [RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE]: {
-    ref: { groupId: string; cueId: string } | null
-    source: 'manual' | 'auto' | 'cleared'
-    manualFallback: boolean
-  }
-  [RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE]: {
-    ref: { groupId: string; cueId: string } | null
-    source: 'manual' | 'auto' | 'cleared'
-    manualFallback: boolean
-  }
-  [RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE]: {
-    ref: { groupId: string; cueId: string } | null
-    source: 'manual' | 'auto' | 'cleared'
-    manualFallback: boolean
-  }
+  [RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE]: MotionCueChangePayload
+  [RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE]: MotionCueChangePayload
+  [RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE]: MotionCueChangePayload
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE]: AudioGameModeSchedulePayload
   [RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE]: { groupId: string | null }
@@ -140,6 +132,7 @@ export type IpcEventChannel = keyof IpcEventMap
 
 export interface IpcRendererSendMap {
   [RENDERER_SEND.AUDIO_DATA]: AudioLightingData
+  [RENDERER_SEND.UNSAVED_CHANGES]: boolean
 }
 
 export type IpcRendererSendChannel = keyof IpcRendererSendMap

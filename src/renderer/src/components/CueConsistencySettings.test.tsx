@@ -411,7 +411,7 @@ describe('CueConsistencySettings selection modes', () => {
     expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('none')
   })
 
-  it('leaves a mode chosen while a write is in flight showing the stored one', async () => {
+  it('saves a mode chosen while a write is in flight once that write lands', async () => {
     let release: (
       value: Awaited<ReturnType<typeof ipcApi.setYargMotionGroupSelectionMode>>,
     ) => void = () => {}
@@ -426,19 +426,49 @@ describe('CueConsistencySettings selection modes', () => {
     await act(async () => {
       fireEvent.change(control('yarg-motion-group-selection-mode'), { target: { value: 'none' } })
     })
-    // A second change while that write is open is dropped, so the select must not show it.
     await act(async () => {
       fireEvent.change(control('yarg-motion-group-selection-mode'), {
         target: { value: 'oncePerSong' },
       })
     })
 
-    expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('none')
+    expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('oncePerSong')
     expect(mocks.setYargMotionGroupSelectionMode).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       release({ success: true, mode: 'none' })
     })
+
+    expect(mocks.setYargMotionGroupSelectionMode).toHaveBeenCalledTimes(2)
+    expect(mocks.setYargMotionGroupSelectionMode).toHaveBeenLastCalledWith('oncePerSong')
+    expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('oncePerSong')
+  })
+
+  it('saves a switch timer bound left while another field is saving', async () => {
+    let release: (
+      value: Awaited<ReturnType<typeof ipcApi.setCueGroupSelectionMode>>,
+    ) => void = () => {}
+    mocks.setCueGroupSelectionMode.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    await renderPanel({ motionGloballyEnabled: true })
+
+    await act(async () => {
+      fireEvent.change(control('cue-group-selection-mode'), { target: { value: 'oncePerSong' } })
+    })
+    const lower = control<HTMLInputElement>('rb3-motion-duration')
+    await act(async () => {
+      fireEvent.change(lower, { target: { value: '9' } })
+      fireEvent.blur(lower)
+    })
+    await act(async () => {
+      release({ success: true, mode: 'oncePerSong' })
+    })
+
+    expect(mocks.setRb3MotionCueDuration).toHaveBeenCalledWith({ min: 9, max: 20 })
+    expect(lower.value).toBe('9')
   })
 
   it('disables the YARG and audio motion modes when motion is globally off', async () => {

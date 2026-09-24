@@ -28,6 +28,16 @@ import {
   normalizeBearingDegrees,
   parseBearingFromResolvedValue,
 } from '../../../helpers/stageDirections'
+import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
+import { createLogger } from '../../../../shared/logger'
+
+const log = createLogger('actionResolver')
+
+/**
+ * Axisless linear sweeps already reported. Each compiled cue node holds its own setting, so each
+ * such node is reported once however often it runs.
+ */
+const reportedMissingSweepAxis = new WeakSet<NodeMotionPatternSetting>()
 
 export function resolveActionTiming(
   timing: ActionTimingConfig,
@@ -80,11 +90,14 @@ export function resolveActionColor(
   }
 }
 
+/** The action's layer, kept on the layers that exist whatever a variable holds. */
 export function resolveActionLayer(
   layer: ValueSource | undefined,
   context: ExecutionContext,
 ): number {
-  return layer ? Number(resolveValue('number', layer, context)) : 0
+  if (!layer) return 0
+  const n = Number(resolveValue('number', layer, context))
+  return Number.isFinite(n) ? Math.min(MAX_NODE_LAYER, Math.max(0, n)) : 0
 }
 
 function resolveBearingValue(source: ValueSource, context: ExecutionContext): number {
@@ -221,6 +234,10 @@ export function resolveMotionPattern(
     tiltAmplitudeDeg = sizeDeg
     tiltFreqMultiplier = 2
   } else if (pattern === 'linear-sweep') {
+    if (!setting.linearSweepAxis && !reportedMissingSweepAxis.has(setting)) {
+      reportedMissingSweepAxis.add(setting)
+      log.warn('linear-sweep motion pattern has no linearSweepAxis, sweeping horizontally (pan)')
+    }
     linearSweepAxis = setting.linearSweepAxis
       ? parseLinearSweepAxis(String(resolveValue('string', setting.linearSweepAxis, context)))
       : 'horizontal'

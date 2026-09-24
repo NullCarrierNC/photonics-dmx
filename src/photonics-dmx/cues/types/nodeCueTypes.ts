@@ -53,7 +53,9 @@ export type {
   YargEffectFile,
 } from './node/effectDefinitions'
 
+export { AUDIO_EVENT_EXECUTION_POLICIES } from './node/eventNodes'
 export type {
+  AudioEventExecutionPolicy,
   AudioEventNode,
   AudioEventNodeUnion,
   AudioEventType,

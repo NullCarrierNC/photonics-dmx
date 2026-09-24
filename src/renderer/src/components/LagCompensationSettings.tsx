@@ -4,6 +4,7 @@ import { lightingPrefsAtom } from '../atoms'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { DraftNumberField } from './controls/DraftField'
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import {
   LAG_COMPENSATION_MS_MAX,
   LAG_COMPENSATION_MS_MIN,
@@ -20,7 +21,8 @@ interface DelayFieldProps {
   label: string
   help: React.ReactNode
   stored: number
-  onWrite: (ms: number) => Promise<void>
+  /** Resolves whether the delay was stored. */
+  onWrite: (ms: number) => Promise<boolean>
 }
 
 /**
@@ -37,11 +39,12 @@ const DelayField: React.FC<DelayFieldProps> = ({ id, label, help, stored, onWrit
   const shown = pending ?? stored
 
   const write = useCallback(
-    async (ms: number): Promise<void> => {
-      await onWrite(ms)
+    async (ms: number): Promise<boolean> => {
+      const landed = await onWrite(ms)
       // Either way the control goes back to following what is stored, so a refusal cannot leave it
       // showing a delay the main process never took. A position moved on since is left alone.
       setPending((current) => (current === ms ? null : current))
+      return landed
     },
     [onWrite],
   )
@@ -64,6 +67,7 @@ const DelayField: React.FC<DelayFieldProps> = ({ id, label, help, stored, onWrit
   const commit = useCallback((): void => {
     saver.flush()
   }, [saver])
+  const release = useCommitOnRelease(commit)
 
   return (
     <div className="mb-4">
@@ -80,11 +84,11 @@ const DelayField: React.FC<DelayFieldProps> = ({ id, label, help, stored, onWrit
           max={LAG_COMPENSATION_MS_MAX}
           step={1}
           value={shown}
-          onChange={(event) => report(Number(event.target.value))}
-          onMouseUp={commit}
-          onPointerUp={commit}
-          onKeyUp={commit}
-          onBlur={commit}
+          onChange={(event) => {
+            report(Number(event.target.value))
+            release.changed()
+          }}
+          {...release.props}
           aria-label={label}
           aria-describedby={`${id}-description`}
           className="flex-1 accent-blue-500"
@@ -118,12 +122,13 @@ const LagCompensationSettings: React.FC = () => {
 
   /** Each field writes only its own key, so a refused save of one cannot revert the other. */
   const writeKey = useCallback(
-    async (key: LagPrefKey, what: string, ms: number): Promise<void> => {
+    async (key: LagPrefKey, what: string, ms: number): Promise<boolean> => {
       setSaveError(null)
       const saved = await persistPrefs({ [key]: ms }, what, setSaveError)
       if (saved) {
         setPrefs((prev) => ({ ...prev, [key]: ms }))
       }
+      return saved
     },
     [setPrefs],
   )
@@ -144,7 +149,8 @@ const LagCompensationSettings: React.FC = () => {
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         If your physical lights seem slightly out of sync with the lights on screen, set this to
-        match the calibration delay in game.
+        match the calibration delay in game. Blackout, the master dimmer and the strobe gate act at
+        once, so after using one the lights hold still for the delay while the show catches up.
       </p>
 
       <DelayField

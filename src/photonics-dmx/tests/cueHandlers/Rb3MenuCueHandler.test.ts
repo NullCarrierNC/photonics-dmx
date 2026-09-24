@@ -3,6 +3,8 @@ import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { createMockTrackedLight } from '../helpers/testFixtures'
 import { fakeLightingController } from '../helpers/fakeLightingController'
+import { createSequencerHarness } from '../helpers/sequencerHarness'
+import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 
 describe('Rb3MenuCueHandler', () => {
   let addEffect: jest.Mock
@@ -36,6 +38,22 @@ describe('Rb3MenuCueHandler', () => {
     expect(setEffect).toHaveBeenCalledWith('rb3-menu-base', expect.any(Object), true)
     expect(addEffect).toHaveBeenCalledTimes(2)
     expect(getLights).toHaveBeenCalledWith(['front', 'back'], 'all')
+  })
+
+  it('draws the base look once per frame and leaves it standing', () => {
+    const setTransition = jest.spyOn(LightTransitionController.prototype, 'setTransition')
+    const h = createSequencerHarness({ frontCount: 2, backCount: 2 })
+    try {
+      new Rb3MenuCueHandler(h.lightManager, h.sequencer).playMenuFrame()
+      for (let elapsed = 0; elapsed < 500; elapsed += 10) h.advanceBy(10)
+
+      const baseStarts = setTransition.mock.calls.filter(([, layer]) => layer === 0)
+      expect(baseStarts).toHaveLength(h.allLightIds.length)
+      expect(h.getLightState(h.frontLightIds[0])?.intensity).toBeGreaterThan(0)
+    } finally {
+      h.cleanup()
+      setTransition.mockRestore()
+    }
   })
 
   it('playMenuFrame with no lights is a no-op and does not throw', () => {

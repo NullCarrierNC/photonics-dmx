@@ -27,19 +27,24 @@ export function bindConsoleModeToRenderer(
     }
   }
 
+  const onDestroyed = (): void => release('closed')
+  const onGone = (): void => release('stopped')
+
   const release = (reason: string): void => {
     if (released) {
       return
     }
     released = true
     webContents.off('did-start-navigation', onNavigate)
+    webContents.off('destroyed', onDestroyed)
+    webContents.off('render-process-gone', onGone)
     log.info(`Leaving console mode: the page ${reason}`)
     disableConsoleMode().catch((err) => {
       log.error('Error leaving console mode:', err)
     })
   }
 
-  webContents.once('destroyed', () => release('closed'))
-  webContents.once('render-process-gone', () => release('stopped'))
+  webContents.once('destroyed', onDestroyed)
+  webContents.once('render-process-gone', onGone)
   webContents.on('did-start-navigation', onNavigate)
 }

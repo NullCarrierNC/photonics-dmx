@@ -16,7 +16,7 @@ import {
 import { pickAliasedPanMotorDeg } from '../../helpers/panMotorAlias'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
-import type { FixtureConfig } from '../../types'
+import type { FixtureConfig, TrackedLight } from '../../types'
 import type { CueData } from '../../cues/types/cueTypes'
 import type { NodeMotionPatternSetting, NetEventNode } from '../../cues/types/nodeCueTypes'
 import { panTiltDmxToSphericalXY } from '../../../renderer/src/components/lightsDmxPreviewMath'
@@ -29,6 +29,30 @@ const NEAR_POLE_EPS_DEG = 1e-9
 function makeExecutionContext(): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
   return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
+}
+
+function resolveNodPattern(): ResolvedMotionPatternSetting {
+  return resolveMotionPattern(
+    {
+      pattern: { source: 'literal', value: 'linear-sweep' },
+      linearSweepAxis: { source: 'literal', value: 'vertical' },
+      speed: { source: 'literal', value: 2 },
+      size: { source: 'literal', value: 20 },
+    } as NodeMotionPatternSetting,
+    makeExecutionContext(),
+  )
+}
+
+function resolveCirclePattern(speed: number, size: number): ResolvedMotionPatternSetting {
+  return resolveMotionPattern(
+    {
+      pattern: { source: 'literal', value: 'circle' },
+      bearing: { source: 'literal', value: 180 },
+      speed: { source: 'literal', value: speed },
+      size: { source: 'literal', value: size },
+    } as NodeMotionPatternSetting,
+    makeExecutionContext(),
+  )
 }
 
 const defaultMh: FixtureConfig = {
@@ -709,18 +733,31 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     expect(maxTiltStep).toBeLessThan(45)
   })
 
-  it('pan motor stays within physical [0, panRangeDeg] with panHome 0% (540° fixture)', () => {
-    const edge: FixtureConfig = { ...defaultMh, panHome: 0, panStageDeg: 0 }
-    const panRange = edge.panRangeDeg
-    for (let i = 0; i <= 64; i++) {
-      const t = (i / 64) * TWO_PI
+  it.each([
+    {
+      name: 'pan motor stays within physical [0, panRangeDeg] with panHome 0% (540° fixture)',
+      fixture: { ...defaultMh, panHome: 0, panStageDeg: 0 },
+      steps: 64,
+      bearingDeg: undefined,
+    },
+    {
+      name: 'narrow pan range (<360°): near-pole path stays in pan window',
+      fixture: { ...defaultMh, panHome: 10, panRangeDeg: 300, panStageDeg: 150 },
+      steps: 48,
+      bearingDeg: 180,
+    },
+  ])('$name', ({ fixture, steps, bearingDeg }) => {
+    const panRange = fixture.panRangeDeg
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * TWO_PI
       const p = gimbalCompensatedPanTiltOffsetsDeg({
         sizeDeg: 30,
         phase: t,
         ramp: 1,
-        fixtureConfig: edge,
+        fixtureConfig: fixture,
+        bearingDeg,
       })
-      const panMotorDeg = p.panOffsetDeg + (edge.panHome / 100) * panRange
+      const panMotorDeg = p.panOffsetDeg + (fixture.panHome / 100) * panRange
       expect(panMotorDeg).toBeGreaterThanOrEqual(-1e-6)
       expect(panMotorDeg).toBeLessThanOrEqual(panRange + 1e-6)
     }
@@ -745,24 +782,6 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     })
     expect(a.panOffsetDeg).toBeCloseTo(b.panOffsetDeg, 10)
     expect(a.tiltOffsetDeg).toBeCloseTo(b.tiltOffsetDeg, 10)
-  })
-
-  it('narrow pan range (<360°): near-pole path stays in pan window', () => {
-    const narrow: FixtureConfig = { ...defaultMh, panHome: 10, panRangeDeg: 300, panStageDeg: 150 }
-    const panRange = narrow.panRangeDeg
-    for (let i = 0; i <= 48; i++) {
-      const t = (i / 48) * TWO_PI
-      const p = gimbalCompensatedPanTiltOffsetsDeg({
-        sizeDeg: 30,
-        phase: t,
-        ramp: 1,
-        fixtureConfig: narrow,
-        bearingDeg: 180,
-      })
-      const panMotorDeg = p.panOffsetDeg + (narrow.panHome / 100) * panRange
-      expect(panMotorDeg).toBeGreaterThanOrEqual(-1e-6)
-      expect(panMotorDeg).toBeLessThanOrEqual(panRange + 1e-6)
-    }
   })
 
   it('gimbal offsets are identical regardless of invertPan (compensation is downstream)', () => {
@@ -866,24 +885,32 @@ const basePattern: ResolvedMotionPatternSetting = {
   reverse: false,
 }
 
-it('invertPan flips logical panDir so sine offset aliases on 540° window (DMX mirror still downstream)', () => {
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
+function startPattern(
+  name: string,
+  config: ResolvedMotionPatternSetting,
+  light: TrackedLight,
+  layer: number,
+): { ltc: LightTransitionController; engine: MotionPatternEngine } {
+  const ltc = new LightTransitionController(new LightStateManager())
   const engine = new MotionPatternEngine(ltc)
+  engine.addPattern({ name, config, lights: [light], layer, startTime: 0, rampUpDurationMs: 0 })
+  return { ltc, engine }
+}
+
+const gimbalCircle = (sizeDeg: number): ResolvedMotionPatternSetting => ({
+  ...basePattern,
+  pattern: 'circle',
+  sizeDeg,
+  gimbalCompensation: true,
+})
+
+it('invertPan flips logical panDir so sine offset aliases on 540° window (DMX mirror still downstream)', () => {
   const light = {
     id: 'rear-1',
     position: 1,
     config: { ...defaultMh, panHome: 10, invertPan: true },
   }
-
-  engine.addPattern({
-    name: 'pan-test',
-    config: basePattern,
-    lights: [light],
-    layer: 2,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
+  const { ltc, engine } = startPattern('pan-test', basePattern, light, 2)
 
   engine.advanceFrame({ frameStartTime: 250, deltaTime: 16, frameIndex: 1 })
 
@@ -902,27 +929,17 @@ it('invertPan flips logical panDir so sine offset aliases on 540° window (DMX m
 
 it('includes the light id in axis clamp warnings', () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
-  const engine = new MotionPatternEngine(ltc)
   const light = {
     id: 'rear-clamp',
     position: 2,
     config: { ...defaultMh, panHome: 0, panDirectionCW: false },
   }
-
-  engine.addPattern({
-    name: 'clamp-test',
-    config: {
-      ...basePattern,
-      panAmplitudeDeg: 0,
-      tiltAmplitudeDeg: 500,
-    },
-    lights: [light],
-    layer: 3,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
+  const { engine } = startPattern(
+    'clamp-test',
+    { ...basePattern, panAmplitudeDeg: 0, tiltAmplitudeDeg: 500 },
+    light,
+    3,
+  )
 
   engine.advanceFrame({ frameStartTime: 250, deltaTime: 16, frameIndex: 1 })
 
@@ -932,89 +949,58 @@ it('includes the light id in axis clamp warnings', () => {
   warn.mockRestore()
 })
 
-it('reported front-light calibration does not hit pan clamp in normal circle motion', () => {
-  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
-  const engine = new MotionPatternEngine(ltc)
-  const light = {
+it.each([
+  {
+    calibration: 'a front-light calibration',
+    axis: 'pan',
     id: '5290b4eb-5bd2-42e4-8438-8c27f992e9ce',
     position: 2,
-    config: {
-      ...defaultMh,
-      panHome: 67,
-      tiltHome: 81,
-      panStageDeg: 0,
-      tiltStageDeg: 90,
-      panDirectionCW: false,
-      invertPan: false,
-      invertTilt: false,
-    },
-  }
-
-  engine.addPattern({
+    panHome: 67,
+    tiltHome: 81,
     name: 'front-circle',
-    config: { ...basePattern, pattern: 'circle', sizeDeg: 25, gimbalCompensation: true },
-    lights: [light],
     layer: 4,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
-
-  for (let i = 0; i < 32; i++) {
-    engine.advanceFrame({ frameStartTime: i * 40, deltaTime: 40, frameIndex: i })
-  }
-
-  expect(warn).not.toHaveBeenCalledWith(
-    expect.stringContaining('5290b4eb-5bd2-42e4-8438-8c27f992e9ce pan clamped'),
-  )
-  warn.mockRestore()
-})
-
-it('reported near-pole light does not hit tilt clamp in normal circle motion', () => {
-  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
-  const engine = new MotionPatternEngine(ltc)
-  const light = {
+  },
+  {
+    calibration: 'a near-pole light',
+    axis: 'tilt',
     id: '379c87a2-0f49-45f4-940e-3ee2e87ba8de',
     position: 4,
-    config: {
-      ...defaultMh,
-      panHome: 66,
-      tiltHome: 88,
-      panStageDeg: 0,
-      tiltStageDeg: 90,
-      panDirectionCW: false,
-      invertPan: false,
-      invertTilt: false,
-    },
-  }
-
-  engine.addPattern({
+    panHome: 66,
+    tiltHome: 88,
     name: 'near-pole-circle',
-    config: { ...basePattern, pattern: 'circle', sizeDeg: 25, gimbalCompensation: true },
-    lights: [light],
     layer: 5,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
+  },
+])(
+  '$calibration does not hit the $axis clamp in normal circle motion',
+  ({ axis, id, position, panHome, tiltHome, name, layer }) => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const light = {
+      id,
+      position,
+      config: {
+        ...defaultMh,
+        panHome,
+        tiltHome,
+        panStageDeg: 0,
+        tiltStageDeg: 90,
+        panDirectionCW: false,
+        invertPan: false,
+        invertTilt: false,
+      },
+    }
+    const { engine } = startPattern(name, gimbalCircle(25), light, layer)
 
-  for (let i = 0; i < 32; i++) {
-    engine.advanceFrame({ frameStartTime: i * 40, deltaTime: 40, frameIndex: i })
-  }
+    for (let i = 0; i < 32; i++) {
+      engine.advanceFrame({ frameStartTime: i * 40, deltaTime: 40, frameIndex: i })
+    }
 
-  expect(warn).not.toHaveBeenCalledWith(
-    expect.stringContaining('379c87a2-0f49-45f4-940e-3ee2e87ba8de tilt clamped'),
-  )
-  warn.mockRestore()
-})
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining(`${id} ${axis} clamped`))
+    warn.mockRestore()
+  },
+)
 
 it('up-firing panHome 0 / panStageDeg 0: edge home produces limited pan sweep (clamp motion path)', () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
-  const engine = new MotionPatternEngine(ltc)
   const light = {
     id: 'up-fire-edge-home',
     position: 2,
@@ -1029,15 +1015,7 @@ it('up-firing panHome 0 / panStageDeg 0: edge home produces limited pan sweep (c
       invertTilt: false,
     },
   }
-
-  engine.addPattern({
-    name: 'up-fire-circle',
-    config: { ...basePattern, pattern: 'circle', sizeDeg: 25, gimbalCompensation: true },
-    lights: [light],
-    layer: 7,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
+  const { ltc, engine } = startPattern('up-fire-circle', gimbalCircle(25), light, 7)
 
   let minPan = 100
   let maxPan = 0
@@ -1057,9 +1035,6 @@ it('up-firing panHome 0 / panStageDeg 0: edge home produces limited pan sweep (c
 })
 
 it('up-firing front fixtures (phi0 < 0): no startup 180° snap and no periodic flip-flop', () => {
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
-  const engine = new MotionPatternEngine(ltc)
   const light = {
     id: 'front-up-firing',
     position: 3,
@@ -1075,14 +1050,7 @@ it('up-firing front fixtures (phi0 < 0): no startup 180° snap and no periodic f
     },
   }
 
-  engine.addPattern({
-    name: 'front-circle',
-    config: { ...basePattern, pattern: 'circle', sizeDeg: 30, gimbalCompensation: true },
-    lights: [light],
-    layer: 8,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
+  const { ltc, engine } = startPattern('front-circle', gimbalCircle(30), light, 8)
 
   const panHomePct = 33
   let maxPanDelta = 0
@@ -1110,9 +1078,6 @@ it('up-firing front fixtures (phi0 < 0): no startup 180° snap and no periodic f
 })
 
 it('light 6 down-firing config: pan/tilt stays within range and draws orbit across the pole', () => {
-  const lsm = new LightStateManager()
-  const ltc = new LightTransitionController(lsm)
-  const engine = new MotionPatternEngine(ltc)
   const light = {
     id: 'rear-6',
     position: 6,
@@ -1134,14 +1099,7 @@ it('light 6 down-firing config: pan/tilt stays within range and draws orbit acro
     },
   }
 
-  engine.addPattern({
-    name: 'rear-6-circle',
-    config: { ...basePattern, pattern: 'circle', sizeDeg: 60, gimbalCompensation: true },
-    lights: [light],
-    layer: 6,
-    startTime: 0,
-    rampUpDurationMs: 0,
-  })
+  const { ltc, engine } = startPattern('rear-6-circle', gimbalCircle(60), light, 6)
 
   let minTilt = 100
   let maxTilt = 0
@@ -1169,17 +1127,12 @@ it('light 6 down-firing config: pan/tilt stays within range and draws orbit acro
 it('reverse flips pan oscillation direction for non-gimbal pattern', () => {
   const light = { id: 'rev-test', position: 0, config: defaultMh }
   const sampleDelta = (reverse: boolean): number => {
-    const lsm = new LightStateManager()
-    const ltc = new LightTransitionController(lsm)
-    const engine = new MotionPatternEngine(ltc)
-    engine.addPattern({
-      name: 'rev-sample',
-      config: { ...basePattern, reverse, speedHz: 1 },
-      lights: [light],
-      layer: 9,
-      startTime: 0,
-      rampUpDurationMs: 0,
-    })
+    const { ltc, engine } = startPattern(
+      'rev-sample',
+      { ...basePattern, reverse, speedHz: 1 },
+      light,
+      9,
+    )
     engine.advanceFrame({ frameStartTime: 100, deltaTime: 16, frameIndex: 0 })
     const pan1 = ltc.getLightState(light.id, 9).pan ?? 50
     engine.advanceFrame({ frameStartTime: 180, deltaTime: 16, frameIndex: 1 })
@@ -1346,15 +1299,7 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       invertPan: true,
       invertTilt: true,
     }
-    const nodPattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'linear-sweep' },
-        linearSweepAxis: { source: 'literal', value: 'vertical' },
-        speed: { source: 'literal', value: 2 },
-        size: { source: 'literal', value: 20 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
+    const nodPattern = resolveNodPattern()
     for (let i = 0; i < 8; i++) {
       const t = (i / 8) * 500 // half-period at 2 Hz
       const floorXY = runPipelineTick(nodFloor, nodPattern, t)
@@ -1371,15 +1316,7 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
     // Use symmetric panMax to avoid 127/128 midpoint quantization skew around x=50%.
     const circleFloor: FixtureConfig = { ...floorConfig, panMax: 200 }
     const circleTruss: FixtureConfig = { ...trussConfig, panMax: 200 }
-    const circlePattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'circle' },
-        bearing: { source: 'literal', value: 180 },
-        speed: { source: 'literal', value: 0.5 },
-        size: { source: 'literal', value: 25 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
+    const circlePattern = resolveCirclePattern(0.5, 25)
     for (let i = 0; i < 8; i++) {
       const t = (i / 8) * 2000 // one full period at 0.5 Hz
       const floorXY = runPipelineTick(circleFloor, circlePattern, t)
@@ -1429,56 +1366,6 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
     return panTiltDmxToSphericalXY(panDmx, tiltDmx, config)
   }
 
-  it('mixed real-world calibration: Nod keeps top and bottom stage position aligned', () => {
-    const nodPattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'linear-sweep' },
-        linearSweepAxis: { source: 'literal', value: 'vertical' },
-        speed: { source: 'literal', value: 2 },
-        size: { source: 'literal', value: 20 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-
-    for (let i = 0; i < 8; i++) {
-      const t = (i / 8) * 500
-      const topXY = runPipelineTick(mixedTopCfg, nodPattern, t)
-      const bottomXY = runPipelineTick(mixedBottomCfg, nodPattern, t)
-      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
-      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
-    }
-  })
-
-  it('mixed real-world calibration: Clockwise circle keeps top and bottom stage position aligned', () => {
-    const circlePattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'circle' },
-        bearing: { source: 'literal', value: 180 },
-        speed: { source: 'literal', value: 1 },
-        size: { source: 'literal', value: 30 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-
-    for (let i = 0; i < 12; i++) {
-      const t = (i / 12) * 1000
-      const topXY = runPipelineTick(mixedTopCfg, circlePattern, t)
-      const bottomXY = runPipelineTick(mixedBottomCfg, circlePattern, t)
-      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
-      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
-    }
-  })
-
-  it('mixed real-world calibration: direction mode keeps DS/US/SL/SR aligned across mounts', () => {
-    const bearings = [180, 0, 270, 90]
-    for (const bearing of bearings) {
-      const topXY = runDirectionTargetPreview(mixedTopCfg, bearing, 30)
-      const bottomXY = runDirectionTargetPreview(mixedBottomCfg, bearing, 30)
-      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(40)
-      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(40)
-    }
-  })
-
   /**
    * Fixtures with an asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
    *
@@ -1505,89 +1392,95 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
     invertPan: false,
     invertTilt: false,
   }
+  // tiltHome=24% → stage-equivalent of floor 76% (100−76=24) via waveform tiltDir path
+  const asymBottomCfg: FixtureConfig = {
+    ...defaultMh,
+    panHome: 100,
+    panMax: 200,
+    panDirectionCW: true,
+    panStageDeg: 540,
+    tiltHome: 24,
+    tiltStageDeg: 93,
+    invertPan: true,
+    invertTilt: true,
+  }
+  // tiltHome=27% → actualHome≈48.6°, canonical phi0=93−48.6≈44.4° ≈ floor phi0=43.8°
+  const asymCircleBottomCfg: FixtureConfig = { ...asymBottomCfg, tiltHome: 27 }
 
-  it('asymmetric tiltStageDeg (≠90°): Nod keeps top and bottom stage position aligned', () => {
-    // tiltHome=24% → stage-equivalent of floor 76% (100−76=24) via waveform tiltDir path
-    const asymNodBottomCfg: FixtureConfig = {
-      ...defaultMh,
-      panHome: 100,
-      panMax: 200,
-      panDirectionCW: true,
-      panStageDeg: 540,
-      tiltHome: 24,
-      tiltStageDeg: 93,
-      invertPan: true,
-      invertTilt: true,
-    }
-    const nodPattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'linear-sweep' },
-        linearSweepAxis: { source: 'literal', value: 'vertical' },
-        speed: { source: 'literal', value: 2 },
-        size: { source: 'literal', value: 20 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-    for (let i = 0; i < 8; i++) {
-      const t = (i / 8) * 500
-      const topXY = runPipelineTick(asymTopCfg, nodPattern, t)
-      const bottomXY = runPipelineTick(asymNodBottomCfg, nodPattern, t)
-      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
-      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
-    }
-  })
+  it.each([
+    {
+      calibration: 'mixed real-world calibration: Nod',
+      top: mixedTopCfg,
+      bottom: mixedBottomCfg,
+      pattern: resolveNodPattern(),
+      samples: 8,
+      periodMs: 500,
+      tolerance: 2,
+    },
+    {
+      calibration: 'mixed real-world calibration: Clockwise circle',
+      top: mixedTopCfg,
+      bottom: mixedBottomCfg,
+      pattern: resolveCirclePattern(1, 30),
+      samples: 12,
+      periodMs: 1000,
+      tolerance: 2,
+    },
+    {
+      calibration: 'asymmetric tiltStageDeg (≠90°): Nod',
+      top: asymTopCfg,
+      bottom: asymBottomCfg,
+      pattern: resolveNodPattern(),
+      samples: 8,
+      periodMs: 500,
+      tolerance: 3.5,
+    },
+    {
+      calibration: 'asymmetric tiltStageDeg (≠90°): Circle',
+      top: asymTopCfg,
+      bottom: asymCircleBottomCfg,
+      pattern: resolveCirclePattern(1, 25),
+      samples: 12,
+      periodMs: 1000,
+      tolerance: 3.5,
+    },
+  ])(
+    '$calibration keeps top and bottom stage position aligned',
+    ({ top, bottom, pattern, samples, periodMs, tolerance }) => {
+      for (let i = 0; i < samples; i++) {
+        const t = (i / samples) * periodMs
+        const topXY = runPipelineTick(top, pattern, t)
+        const bottomXY = runPipelineTick(bottom, pattern, t)
+        expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(tolerance)
+        expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(tolerance)
+      }
+    },
+  )
 
-  it('asymmetric tiltStageDeg (≠90°): Circle keeps top and bottom stage position aligned', () => {
-    // tiltHome=27% → actualHome≈48.6°, canonical phi0=93−48.6≈44.4° ≈ floor phi0=43.8°
-    const asymCircleBottomCfg: FixtureConfig = {
-      ...defaultMh,
-      panHome: 100,
-      panMax: 200,
-      panDirectionCW: true,
-      panStageDeg: 540,
-      tiltHome: 27,
-      tiltStageDeg: 93,
-      invertPan: true,
-      invertTilt: true,
-    }
-    const circlePattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'circle' },
-        bearing: { source: 'literal', value: 180 },
-        speed: { source: 'literal', value: 1 },
-        size: { source: 'literal', value: 25 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-    for (let i = 0; i < 12; i++) {
-      const t = (i / 12) * 1000
-      const topXY = runPipelineTick(asymTopCfg, circlePattern, t)
-      const bottomXY = runPipelineTick(asymCircleBottomCfg, circlePattern, t)
-      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
-      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
-    }
-  })
-
-  it('asymmetric tiltStageDeg (≠90°): direction mode keeps DS/US/SL/SR aligned across mounts', () => {
-    const asymDirBottomCfg: FixtureConfig = {
-      ...defaultMh,
-      panHome: 100,
-      panMax: 200,
-      panDirectionCW: true,
-      panStageDeg: 540,
-      tiltHome: 24,
-      tiltStageDeg: 93,
-      invertPan: true,
-      invertTilt: true,
-    }
-    const bearings = [180, 0, 270, 90]
-    for (const bearing of bearings) {
-      const topXY = runDirectionTargetPreview(asymTopCfg, bearing, 30)
-      const bottomXY = runDirectionTargetPreview(asymDirBottomCfg, bearing, 30)
-      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(42)
-      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(42)
-    }
-  })
+  it.each([
+    {
+      calibration: 'mixed real-world calibration',
+      top: mixedTopCfg,
+      bottom: mixedBottomCfg,
+      tolerance: 40,
+    },
+    {
+      calibration: 'asymmetric tiltStageDeg (≠90°)',
+      top: asymTopCfg,
+      bottom: asymBottomCfg,
+      tolerance: 42,
+    },
+  ])(
+    '$calibration: direction mode keeps DS/US/SL/SR aligned across mounts',
+    ({ top, bottom, tolerance }) => {
+      for (const bearing of [180, 0, 270, 90]) {
+        const topXY = runDirectionTargetPreview(top, bearing, 30)
+        const bottomXY = runDirectionTargetPreview(bottom, bearing, 30)
+        expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(tolerance)
+        expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(tolerance)
+      }
+    },
+  )
 
   /**
    * Orbit direction does not depend on the sign of phi0.
@@ -1670,15 +1563,6 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       tiltRangeDeg: 180,
       ...calibration,
     }
-    const circlePattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'circle' },
-        bearing: { source: 'literal', value: 180 },
-        speed: { source: 'literal', value: 1 },
-        size: { source: 'literal', value: 20 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-    assertCircleCW(config, circlePattern)
+    assertCircleCW(config, resolveCirclePattern(1, 20))
   })
 })

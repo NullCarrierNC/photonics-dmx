@@ -1,5 +1,10 @@
 import { performance } from 'perf_hooks'
-import { ISongEventHandler, ILayerManager, ITransitionEngine } from './interfaces'
+import {
+  ISongEventHandler,
+  ILayerManager,
+  ITransitionEngine,
+  SongEventCondition,
+} from './interfaces'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
 
 /**
@@ -189,61 +194,7 @@ export class SongEventHandler implements ISongEventHandler {
    *
    * @param eventType The type of event
    */
-  public handleEvent(
-    eventType:
-      | 'beat'
-      | 'measure'
-      | 'keyframe'
-      | 'keyframe-first'
-      | 'keyframe-next'
-      | 'keyframe-previous'
-      | 'drum-kick'
-      | 'drum-red'
-      | 'drum-yellow'
-      | 'drum-blue'
-      | 'drum-green'
-      | 'drum-yellow-cymbal'
-      | 'drum-blue-cymbal'
-      | 'drum-green-cymbal'
-      | 'guitar-open'
-      | 'guitar-green'
-      | 'guitar-red'
-      | 'guitar-yellow'
-      | 'guitar-blue'
-      | 'guitar-orange'
-      | 'bass-open'
-      | 'bass-green'
-      | 'bass-red'
-      | 'bass-yellow'
-      | 'bass-blue'
-      | 'bass-orange'
-      | 'keys-open'
-      | 'keys-green'
-      | 'keys-red'
-      | 'keys-yellow'
-      | 'keys-blue'
-      | 'keys-orange'
-      | 'vocal-note'
-      | 'vocal-note-off'
-      | 'led-1'
-      | 'led-2'
-      | 'led-3'
-      | 'led-4'
-      | 'led-5'
-      | 'led-6'
-      | 'led-7'
-      | 'led-8'
-      | 'led-1-off'
-      | 'led-2-off'
-      | 'led-3-off'
-      | 'led-4-off'
-      | 'led-5-off'
-      | 'led-6-off'
-      | 'led-7-off'
-      | 'led-8-off'
-      | 'fog-on'
-      | 'fog-off',
-  ): void {
+  public handleEvent(eventType: SongEventCondition): void {
     const currentTime = performance.now()
 
     // Guard against processing while transitions are being globally cleared
@@ -290,10 +241,9 @@ export class SongEventHandler implements ISongEventHandler {
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
             released = true
           }
-        }
-
-        // Handle waitUntilCondition with count-based logic
-        if (
+        } else if (
+          // Handle waitUntilCondition with count-based logic. One event starts a transition or ends
+          // its hold, never both, so a hold on the event it waited for lasts until the next one.
           activeEffect.state === 'waitingUntil' &&
           currentTransition.waitUntilCondition === eventType
         ) {

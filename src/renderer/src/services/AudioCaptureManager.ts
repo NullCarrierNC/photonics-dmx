@@ -111,6 +111,7 @@ export class AudioCaptureManager {
   private lastAudioData: AudioLightingData | null = null
   private frequencyBuffer: Uint8Array | null = null
   private timeDomainBuffer: Float32Array | null = null
+  private gatedBuffer: Uint8Array | null = null
   private readonly VALUE_CHANGE_THRESHOLD = 0.01 // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
@@ -405,8 +406,8 @@ export class AudioCaptureManager {
     }
     this.lastFrameTime = now
 
-    // Get frequency data from analyser (built-in FFT). The buffers are reused across frames, so
-    // the loop allocates nothing at the analysis rate.
+    // Get frequency data from analyser (built-in FFT). The analyser and noise-gate buffers are
+    // reused across frames. The result sent over IPC is built fresh each frame.
     if (!this.frequencyBuffer || this.frequencyBuffer.length !== this.analyser.frequencyBinCount) {
       this.frequencyBuffer = new Uint8Array(this.analyser.frequencyBinCount)
     }
@@ -478,14 +479,15 @@ export class AudioCaptureManager {
 
     // Apply noise floor gate: zero out bins below threshold
     const noiseFloor = this.config.noiseFloor ?? DEFAULT_AUDIO_CONFIG.noiseFloor
-    let gatedData: Uint8Array
+    let gatedData: Uint8Array = frequencyData
     if (noiseFloor > 0) {
-      gatedData = new Uint8Array(frequencyData.length)
+      if (this.gatedBuffer?.length !== frequencyData.length) {
+        this.gatedBuffer = new Uint8Array(frequencyData.length)
+      }
+      gatedData = this.gatedBuffer
       for (let i = 0; i < frequencyData.length; i++) {
         gatedData[i] = frequencyData[i] >= noiseFloor ? frequencyData[i] : 0
       }
-    } else {
-      gatedData = frequencyData
     }
 
     // Overall energy (0-1)
@@ -505,13 +507,7 @@ export class AudioCaptureManager {
     }
 
     // Bass energy for beat detection (20-220 Hz); same algorithm as EQ preview and trigger nodes
-    const bassEnergy = getBandEnergy(
-      Array.from(gatedData),
-      sampleRate,
-      fftSize,
-      BASS_MIN_HZ,
-      BASS_MAX_HZ,
-    )
+    const bassEnergy = getBandEnergy(gatedData, sampleRate, fftSize, BASS_MIN_HZ, BASS_MAX_HZ)
     // Beat detection uses unscaled analysis energy; timing from frame-based internal time
     const { beatDetected, bpm, bpmConfidence } = this.beatDetector.processFrame(
       scaledEnergy,

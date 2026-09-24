@@ -3,7 +3,6 @@
  * The raw DMX slider, which holds whatever it is given inside the range the wire carries.
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { DmxSlider } from './DmxSlider'
 

@@ -1,7 +1,9 @@
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import type { DmxRig } from '../../../../photonics-dmx/types'
 import { ConfigStrobeType } from '../../../../photonics-dmx/types'
 import { saveDmxRig } from '../../ipcApi'
+import { orThrow } from '../../ipc/ipcResult'
+import { newRigName } from './lightsLayoutHelpers'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('LightsLayoutRigSection')
 
@@ -31,6 +33,11 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
   onDuplicate,
   onDelete,
 }) => {
+  // A rig save restarts the controllers, so a second click lands inside the first create. The ref
+  // turns that click away at once and the state greys the button until the create has finished.
+  const creatingRef = useRef(false)
+  const [creating, setCreating] = useState(false)
+
   const selectRig = async (nextId: string): Promise<void> => {
     if (!(await onBeforeDiscardingUnsaved())) return
     setActiveRigId(nextId)
@@ -40,7 +47,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
     if (!(await onBeforeDiscardingUnsaved())) return
     const newRig: DmxRig = {
       id: crypto.randomUUID(),
-      name: `Rig ${rigs.length + 1}`,
+      name: newRigName(rigs.map((rig) => rig.name)),
       active: true,
       config: {
         numLights: 0,
@@ -52,13 +59,22 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
       },
     }
     try {
-      await saveDmxRig(newRig)
+      orThrow(await saveDmxRig(newRig))
       onRigsChange([...rigs, newRig])
       setActiveRigId(newRig.id)
       setRigName(newRig.name)
     } catch (error) {
       log.error('Failed to create new rig:', error)
     }
+  }
+
+  const addRigOnce = async (): Promise<void> => {
+    if (creatingRef.current) return
+    creatingRef.current = true
+    setCreating(true)
+    await addRig().catch((error: unknown) => log.error('Failed to create new rig:', error))
+    creatingRef.current = false
+    setCreating(false)
   }
 
   return (
@@ -79,8 +95,9 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
         </div>
 
         <button
-          onClick={() => void addRig()}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
+          onClick={() => void addRigOnce()}
+          disabled={creating}
+          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
           New Rig
         </button>
 

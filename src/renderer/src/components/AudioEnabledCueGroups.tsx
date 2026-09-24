@@ -7,6 +7,7 @@ import {
   getDisabledAudioCues,
   setDisabledAudioCues,
 } from '../ipcApi'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   CueGroupsPanel,
   type CueGroupsDomain,
@@ -36,6 +37,7 @@ const AUDIO_DOMAIN: CueGroupsDomain<AudioCueGroup, AudioCueInfo> = {
   getDisabled: getDisabledAudioCues,
   setDisabled: setDisabledAudioCues,
   getCues: getAvailableAudioCues,
+  changedEvent: RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED,
   renderCueLabel: (cue) => cueLabel(cue.id, cue.description),
   emptyLabel: NO_CUES_LABEL,
   cuesHeading: lightingCuesHeading,

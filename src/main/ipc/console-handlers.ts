@@ -10,11 +10,12 @@ import type { FixtureConfig } from '../../photonics-dmx/types'
 const log = createLogger('console-handlers')
 
 /**
- * DMX Console: exclusive manual buffer mode and channel configuration updates.
+ * DMX Console: exclusive manual buffer mode and moving-head configuration updates.
  */
 export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // The page each console session is bound to, so re-enabling from the same page does not stack
-  // another set of listeners on it.
+  // another set of listeners on it. Cleared when that binding releases, so a page that reloads and
+  // opens the console again is followed again.
   let boundSender: WebContents | null = null
 
   handleInvoke(ipcMain, LIGHT.CONSOLE_ENABLE, log, async (event, data: unknown) => {
@@ -23,8 +24,14 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
     const result = await controllerManager.enableConsoleMode(data.rigId)
     if (result.success && boundSender !== event.sender) {
-      boundSender = event.sender
-      bindConsoleModeToRenderer(event.sender, () => controllerManager.disableConsoleMode())
+      const sender = event.sender
+      boundSender = sender
+      bindConsoleModeToRenderer(sender, () => {
+        if (boundSender === sender) {
+          boundSender = null
+        }
+        return controllerManager.disableConsoleMode()
+      })
     }
     return result
   })
@@ -45,46 +52,6 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
       }
     }
     controllerManager.getConsoleModeController().sendConsoleDmx(buffer)
-  })
-
-  handleInvoke(ipcMain, LIGHT.CONSOLE_UPDATE_CHANNEL, log, async (_, data: unknown) => {
-    if (
-      !isPlainObject(data) ||
-      typeof data.rigId !== 'string' ||
-      typeof data.lightId !== 'string' ||
-      typeof data.fixtureId !== 'string' ||
-      typeof data.channelName !== 'string' ||
-      typeof data.channelNumber !== 'number'
-    ) {
-      return { success: false as const, error: 'Invalid console channel update payload' }
-    }
-    return await controllerManager.getConsoleModeController().updateConsoleChannel({
-      rigId: data.rigId,
-      lightId: data.lightId,
-      fixtureId: data.fixtureId,
-      channelName: data.channelName,
-      channelNumber: data.channelNumber,
-    })
-  })
-
-  handleInvoke(ipcMain, LIGHT.CONSOLE_SET_HOME, log, async (_, data: unknown) => {
-    if (
-      !isPlainObject(data) ||
-      typeof data.rigId !== 'string' ||
-      typeof data.lightId !== 'string' ||
-      typeof data.fixtureId !== 'string' ||
-      typeof data.panHome !== 'number' ||
-      typeof data.tiltHome !== 'number'
-    ) {
-      return { success: false as const, error: 'Invalid console set home payload' }
-    }
-    return await controllerManager.getConsoleModeController().setConsoleHome({
-      rigId: data.rigId,
-      lightId: data.lightId,
-      fixtureId: data.fixtureId,
-      panHome: data.panHome,
-      tiltHome: data.tiltHome,
-    })
   })
 
   handleInvoke(ipcMain, LIGHT.CONSOLE_SET_FIXTURE_CONFIG, log, async (_, data: unknown) => {

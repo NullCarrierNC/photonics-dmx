@@ -1,6 +1,6 @@
 import React from 'react'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
-import { DraftNumberField, DraftTextField } from '../controls/DraftField'
+import { DraftNumberField, DraftTextField, type CommitOutcome } from '../controls/DraftField'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../../shared/sacnUniverse'
 
 export interface SacnConfig {
@@ -20,7 +20,7 @@ interface SacnConfigCardProps {
   networkInterfaces: Array<{ name: string; value: string; family: string }>
   expanded: boolean
   onToggle: () => void
-  onConfigChange: (field: keyof SacnConfig, value: string | number | boolean) => void
+  onConfigChange: (field: keyof SacnConfig, value: string | number | boolean) => CommitOutcome
 }
 
 export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
@@ -78,7 +78,7 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
           </label>
           <select
             value={config.networkInterface ?? ''}
-            onChange={(e) => onConfigChange('networkInterface', e.target.value)}
+            onChange={(e) => void onConfigChange('networkInterface', e.target.value)}
             className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
             <option value="">Auto-detect (recommended)</option>
             {networkInterfaces.map((iface) => (
@@ -94,7 +94,7 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
               type="checkbox"
               id="sacn-unicast"
               checked={config.useUnicast ?? false}
-              onChange={(e) => onConfigChange('useUnicast', e.target.checked)}
+              onChange={(e) => void onConfigChange('useUnicast', e.target.checked)}
               className="form-checkbox h-4 w-4 text-blue-600 rounded"
             />
             <label
