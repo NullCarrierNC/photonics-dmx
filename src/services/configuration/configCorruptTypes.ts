@@ -4,8 +4,8 @@ import * as path from 'path'
  * Report from ConfigFile when a stored file could not be used as it was. For 'read', 'parse' and
  * 'schema' the original file is preserved under a `.corrupt-*` name and defaults are used. For
  * 'repaired' only the named fields went back to their defaults, and the rest of the file was kept.
- * For 'newerVersion' the file came from a newer build: it is used as it is and nothing is saved
- * over it.
+ * For 'newerVersion' the file came from a newer build and nothing is saved over it: it is used as
+ * it is, or with `leftInPlace` set, this build cannot read it and defaults are used.
  */
 export type ConfigCorruptReason = 'read' | 'parse' | 'schema' | 'repaired' | 'newerVersion'
 
@@ -15,7 +15,7 @@ export interface ConfigCorruptInfo {
   reason: ConfigCorruptReason
   /** human-readable, for logs and optional UI */
   message?: string
-  /** Set when a file that would not load could not be moved aside, so it is still there. */
+  /** Set when a file that would not load is still there, with defaults in use. */
   leftInPlace?: boolean
 }
 

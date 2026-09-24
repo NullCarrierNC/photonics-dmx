@@ -40,6 +40,17 @@ describe('configRecoveryMessages', () => {
     expect(messages[0]).not.toContain('backup')
   })
 
+  it('reports a newer version file this version cannot read as kept, with defaults in use', () => {
+    const messages = configRecoveryMessages([
+      { fileName: 'lightsLayout.json', reason: 'newerVersion', leftInPlace: true },
+    ])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('cannot read')
+    expect(messages[0]).toContain('defaults are in use')
+    expect(messages[0]).toContain('lightsLayout.json')
+    expect(messages[0]).not.toMatch(/relaunch/i)
+  })
+
   it('gives each kind its own message when both happened', () => {
     expect(
       configRecoveryMessages([

@@ -3,25 +3,29 @@ export interface ConfigRecoveryFile {
   fileName: string
   /**
    * 'repaired' when only some values went back to their defaults, 'newerVersion' when a newer build
-   * wrote the file and it is used as it is.
+   * wrote the file, which is never saved over.
    */
   reason?: string
   message?: string
-  /** Set when a file that would not load could not be moved aside, so it is still there. */
+  /**
+   * Set when a file that would not load is still there: one that could not be moved aside, or a
+   * newer version's file this version cannot read.
+   */
   leftInPlace?: boolean
 }
 
 /**
  * What to tell the user about settings files recovered at startup: one message for files that
  * were replaced by defaults, one for files that would not load and are still in place, one for
- * files where only some values were reset, and one for files from a newer version that are not
- * saved to.
+ * files where only some values were reset, and one each for files from a newer version that are in
+ * use or unreadable, neither of which is saved to.
  */
 export function configRecoveryMessages(files: readonly ConfigRecoveryFile[]): string[] {
   const messages: string[] = []
   const repaired = files.filter((f) => f.reason === 'repaired')
-  const newer = files.filter((f) => f.reason === 'newerVersion')
-  const leftInPlace = files.filter((f) => f.leftInPlace === true)
+  const newer = files.filter((f) => f.reason === 'newerVersion' && f.leftInPlace !== true)
+  const newerUnreadable = files.filter((f) => f.reason === 'newerVersion' && f.leftInPlace === true)
+  const leftInPlace = files.filter((f) => f.reason !== 'newerVersion' && f.leftInPlace === true)
   const replaced = files.filter(
     (f) => f.reason !== 'repaired' && f.reason !== 'newerVersion' && f.leftInPlace !== true,
   )
@@ -49,6 +53,12 @@ export function configRecoveryMessages(files: readonly ConfigRecoveryFile[]): st
     const list = newer.map((f) => f.fileName).join(', ')
     messages.push(
       `A settings file was saved by a newer version of Photonics. Its settings are in use, but changes are not saved while this version runs. (${list})`,
+    )
+  }
+  if (newerUnreadable.length > 0) {
+    const list = newerUnreadable.map((f) => f.fileName).join(', ')
+    messages.push(
+      `A settings file was saved by a newer version of Photonics that this version cannot read, so defaults are in use. The file is kept as it is and changes are not saved while this version runs. (${list})`,
     )
   }
   return messages

@@ -64,7 +64,13 @@ type RecoveryDetail = { parseOrMigrateError?: unknown; schemaText?: string }
 /** A stored file's text read into data, or why it could not be. */
 type DecodedFile<T> =
   | { ok: true; data: T; version: number; needsPersist: boolean }
-  | { ok: false; reason: ConfigCorruptReason; detail: RecoveryDetail }
+  | {
+      ok: false
+      reason: ConfigCorruptReason
+      detail: RecoveryDetail
+      /** Set when a newer build stamped the file, which stays in place, read-only. */
+      newerVersion?: number
+    }
 
 /**
  * Handles individual configuration file operations
@@ -224,11 +230,15 @@ export class ConfigFile<T> {
 
     const decoded = this.decode(fileContent)
     if (!decoded.ok) {
+      if (decoded.newerVersion !== undefined) {
+        this.holdNewerFile(decoded.newerVersion, false)
+        return this.freshDefaults()
+      }
       return this.recoverToDefault(decoded.reason, decoded.detail)
     }
 
     if (decoded.version > this.currentVersion) {
-      this.holdNewerFile(decoded.version)
+      this.holdNewerFile(decoded.version, true)
     } else if (decoded.needsPersist) {
       this.save(decoded.data).catch((err) =>
         log.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
@@ -246,15 +256,24 @@ export class ConfigFile<T> {
   }
 
   /**
-   * A file from a newer build is used as it is and never saved over, so it keeps the version the
-   * newer build stamped.
+   * A file from a newer build is never saved over, so it keeps the version the newer build stamped.
+   * Its settings are in use when this build can read them, and defaults are otherwise.
    */
-  private holdNewerFile(version: number): void {
+  private holdNewerFile(version: number, settingsInUse: boolean): void {
     this.newerVersionOnDisk = version
     const fileName = path.basename(this.filePath)
-    const message = `Written by a newer version of Photonics (format ${version}, this version reads up to ${this.currentVersion}). Its settings are in use, and changes are not saved to it while this version runs.`
+    const inUse = settingsInUse
+      ? 'Its settings are in use'
+      : 'This version cannot read its settings, so defaults are in use'
+    const message = `Written by a newer version of Photonics (format ${version}, this version reads up to ${this.currentVersion}). ${inUse}, and changes are not saved to it while this version runs.`
     log.warn(`[Photonics Config] ${fileName}: ${message}`)
-    this.onCorruptRecovery?.({ fileName, filePath: this.filePath, reason: 'newerVersion', message })
+    this.onCorruptRecovery?.({
+      fileName,
+      filePath: this.filePath,
+      reason: 'newerVersion',
+      message,
+      ...(settingsInUse ? {} : { leftInPlace: true }),
+    })
   }
 
   /**
@@ -277,17 +296,17 @@ export class ConfigFile<T> {
       return { ok: false, reason: 'schema', detail: { schemaText } }
     }
 
+    const version = this.isVersionedFormat(parsed) ? parsed.version : 0
+    // A newer build's file is held whatever this build makes of its shape.
+    const newer = version > this.currentVersion ? { newerVersion: version } : {}
+
     let data: T
-    let version: number
     let migratedNeedsPersist = false
     try {
       if (this.isVersionedFormat(parsed)) {
         data = parsed.data
-        version = parsed.version
       } else {
-        const raw = this.coerceUnversioned ? this.coerceUnversioned(parsed) : (parsed as T)
-        data = raw
-        version = 0
+        data = this.coerceUnversioned ? this.coerceUnversioned(parsed) : (parsed as T)
       }
       if (version < this.currentVersion) {
         data = this.migrateData(data, version, this.currentVersion)
@@ -314,7 +333,7 @@ export class ConfigFile<T> {
         `[Photonics Config] Migration or shape handling failed for ${this.filePath}:`,
         error,
       )
-      return { ok: false, reason: 'schema', detail: { parseOrMigrateError: error } }
+      return { ok: false, reason: 'schema', detail: { parseOrMigrateError: error }, ...newer }
     }
 
     if (this.validate) {
@@ -322,7 +341,7 @@ export class ConfigFile<T> {
       if (!v.valid) {
         const schemaText = v.errors.join('; ')
         log.error(`[Photonics Config] Schema validation failed for ${this.filePath}:`, schemaText)
-        return { ok: false, reason: 'schema', detail: { schemaText } }
+        return { ok: false, reason: 'schema', detail: { schemaText }, ...newer }
       }
     }
 
@@ -514,8 +533,11 @@ export class ConfigFile<T> {
       this.corruptFileInPlace = false
       log.info(`[Photonics Config] Adopted the repaired ${path.basename(this.filePath)}`)
       if (decoded.version > this.currentVersion) {
-        this.holdNewerFile(decoded.version)
+        this.holdNewerFile(decoded.version, true)
       }
+    } else if (decoded.newerVersion !== undefined) {
+      this.corruptFileInPlace = false
+      this.holdNewerFile(decoded.newerVersion, false)
     }
   }
 
