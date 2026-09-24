@@ -86,6 +86,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     getIsInitialized: () => boolean
     getIsRb3Enabled: () => boolean
     getIsYargEnabled: () => boolean
+    getIsAudioEnabled: () => boolean
     getDmxPublisher: () => null
     getVenueFrameProcessor: () => { getVenuePostProcessing: () => 'Default' }
     init: jest.Mock
@@ -116,6 +117,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
       getIsYargEnabled: () => false,
+      getIsAudioEnabled: () => false,
       getDmxPublisher: () => null,
       getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
       init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),

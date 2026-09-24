@@ -49,6 +49,7 @@ const mockControllerManager = withCollaboratorGetters({
   getVenueFrameProcessor: jest.fn(() => ({ getVenuePostProcessing: () => 'Default' })),
   getIsYargEnabled: jest.fn().mockReturnValue(false),
   getIsRb3Enabled: jest.fn().mockReturnValue(false),
+  getIsAudioEnabled: jest.fn().mockReturnValue(false),
   init: jest.fn(),
   startTestEffect: jest.fn(),
   stopTestEffect: jest.fn(),

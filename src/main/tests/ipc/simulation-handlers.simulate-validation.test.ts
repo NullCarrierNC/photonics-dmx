@@ -38,6 +38,7 @@ describe('simulate channel payloads', () => {
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
       getIsYargEnabled: () => false,
+      getIsAudioEnabled: () => false,
       ensureChainsHaveHandlersForSimulation: jest.fn(),
       getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
       init: jest.fn(),

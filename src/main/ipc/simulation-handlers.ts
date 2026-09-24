@@ -58,8 +58,8 @@ export function setupSimulationHandlers(
   }
 
   controllerManager.getConsoleModeController().setOnConsoleEnter(stopMotionSimAndNotify)
-  // Enabling RB3E hands the rig chains to the listener; stop any running simulation with the
-  // same teardown so the renderer's motion-sim state clears too.
+  // Enabling an input hands it the rig chains. Stop any running simulation with the same teardown,
+  // so the renderer's motion-sim state clears too.
   controllerManager.setOnSimulationPreempt(stopMotionSimAndNotify)
 
   // Every simulated frame reports the venue effect output is actually getting, the same way a real
@@ -70,11 +70,12 @@ export function setupSimulationHandlers(
       ...options,
     })
 
-  // Simulation dispatches through the same chain cue handlers a live listener drives, so simulation
-  // requests are refused while YARG or RB3E is enabled.
-  const liveInput = (): 'YARG' | 'RB3E' | null => {
+  // Simulation dispatches through the same chains a live input drives, so simulation requests are
+  // refused while YARG, RB3E or audio is enabled.
+  const liveInput = (): 'YARG' | 'RB3E' | 'Audio' | null => {
     if (controllerManager.getIsRb3Enabled()) return 'RB3E'
-    return controllerManager.getIsYargEnabled() ? 'YARG' : null
+    if (controllerManager.getIsYargEnabled()) return 'YARG'
+    return controllerManager.getIsAudioEnabled() ? 'Audio' : null
   }
   const liveInputRefusal = (): { success: false; error: string } | null => {
     const live = liveInput()

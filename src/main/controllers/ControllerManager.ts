@@ -260,6 +260,12 @@ export class ControllerManager {
     await this.rb3TestEffectRunner.stopTestEffect()
   }
 
+  /** Stop the simulations. Every input enable runs this first, as the input owns the rig chains. */
+  private async preemptSimulation(): Promise<void> {
+    await this.stopTestEffect()
+    this.onSimulationPreempt?.()
+  }
+
   /**
    * Enable YARG listener. Runs on the shared lifecycle queue with the other toggles and controller
    * restarts, so enable/disable cannot interleave with each other or with teardown/reinit, and
@@ -267,8 +273,7 @@ export class ControllerManager {
    */
   public async enableYarg(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
-      await this.stopTestEffect()
-      this.onSimulationPreempt?.()
+      await this.preemptSimulation()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
@@ -281,14 +286,10 @@ export class ControllerManager {
     })
   }
 
-  /**
-   * Enable Rb3 listener. Running simulations are stopped first — the listener owns the rig
-   * chains from here and simulation IPC is refused while RB3E is enabled.
-   */
+  /** Enable Rb3 listener. */
   public async enableRb3(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
-      await this.stopTestEffect()
-      this.onSimulationPreempt?.()
+      await this.preemptSimulation()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
     })
@@ -385,7 +386,7 @@ export class ControllerManager {
     }
   }
 
-  /** Called when a listener takes over the rig chains (RB3E enable) so running simulations stop. */
+  /** Called when an input takes over the rig chains, so running simulations stop. */
   public setOnSimulationPreempt(callback: (() => void) | null): void {
     this.onSimulationPreempt = callback
   }
@@ -500,6 +501,7 @@ export class ControllerManager {
   /** Enable audio listener and processor. */
   public async enableAudio(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
+      await this.preemptSimulation()
       await this.listenerLifecycle.yargRb3.disableYarg()
       await this.listenerLifecycle.yargRb3.disableRb3()
       await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())

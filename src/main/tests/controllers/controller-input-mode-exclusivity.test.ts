@@ -109,6 +109,7 @@ describe('one input drives the rig at a time', () => {
   it.each([
     ['YARG', 'enableYarg', 'enableYarg'],
     ['RB3', 'enableRb3', 'enableRb3'],
+    ['audio', 'enableAudio', 'enableAudio'],
   ] as const)(
     'ends a running simulation before %s takes the rig',
     async (_, enable, listenerEnable) => {
@@ -118,9 +119,9 @@ describe('one input drives the rig at a time', () => {
 
       await manager[enable]()
 
-      expect(mocks.stopYargTestEffect).toHaveBeenCalled()
-      expect(mocks.stopRb3TestEffect).toHaveBeenCalled()
-      expect(preempt).toHaveBeenCalled()
+      expect(mocks.stopYargTestEffect).toHaveBeenCalledTimes(1)
+      expect(mocks.stopRb3TestEffect).toHaveBeenCalledTimes(1)
+      expect(preempt).toHaveBeenCalledTimes(1)
       const enabledAt = mocks[listenerEnable].mock.invocationCallOrder[0]
       expect(mocks.stopYargTestEffect.mock.invocationCallOrder[0]).toBeLessThan(enabledAt)
       expect(preempt.mock.invocationCallOrder[0]).toBeLessThan(enabledAt)

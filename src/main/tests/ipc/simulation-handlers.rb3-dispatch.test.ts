@@ -43,6 +43,7 @@ describe('START_RB3_TEST_EFFECT while RB3E is disabled', () => {
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
       getIsYargEnabled: () => false,
+      getIsAudioEnabled: () => false,
       startRb3TestEffect,
       init: jest.fn(),
     })

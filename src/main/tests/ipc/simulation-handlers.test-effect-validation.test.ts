@@ -36,6 +36,7 @@ describe('START_TEST_EFFECT payload', () => {
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
       getIsYargEnabled: () => false,
+      getIsAudioEnabled: () => false,
       startTestEffect,
       init: jest.fn(),
     })

@@ -23,6 +23,7 @@ describe('simulation handlers console integration', () => {
       getMotionCueSimulator: () => motionCueSimulator,
       getIsRb3Enabled: () => false,
       getIsYargEnabled: () => false,
+      getIsAudioEnabled: () => false,
     } as any)
 
     setupSimulationHandlers(ipcMain, controllerManager)

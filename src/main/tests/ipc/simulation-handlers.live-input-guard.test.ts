@@ -14,9 +14,10 @@ import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 type Handler = (...args: unknown[]) => Promise<unknown> | unknown
 
 describe.each([
-  { listener: 'RB3E', rb3: true, yarg: false },
-  { listener: 'YARG', rb3: false, yarg: true },
-])('simulation IPC handlers while $listener is enabled', ({ listener, rb3, yarg }) => {
+  { listener: 'RB3E', rb3: true, yarg: false, audio: false },
+  { listener: 'YARG', rb3: false, yarg: true, audio: false },
+  { listener: 'Audio', rb3: false, yarg: false, audio: true },
+])('simulation IPC handlers while $listener is enabled', ({ listener, rb3, yarg, audio }) => {
   const BLOCKED = { success: false, error: `Disable ${listener} before simulating cues` }
   let handlers: Map<string, Handler>
   let onBeat: jest.Mock
@@ -61,6 +62,7 @@ describe.each([
       getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => undefined }),
       getIsRb3Enabled: () => rb3,
       getIsYargEnabled: () => yarg,
+      getIsAudioEnabled: () => audio,
       startTestEffect,
       startRb3TestEffect,
       setRb3SimulationLedState,
