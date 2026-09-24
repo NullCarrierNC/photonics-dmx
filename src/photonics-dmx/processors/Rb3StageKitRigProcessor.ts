@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- colour sets from the StageKit colour helpers are untyped */
 /**
  * Owns one rig's worth of RB3 StageKit render state and operations: the cached
  * `StageKitLightMapper` sized to that rig's light count, per-DMX-light colour-bank
@@ -453,7 +452,7 @@ export class Rb3StageKitRigProcessor {
     this.pendingUpdates.get(lightIndex)!.timeout = timeout
   }
 
-  private applyColorToLight(lightIndex: number, color: any): void {
+  private applyColorToLight(lightIndex: number, color: RGBIO): void {
     const lights = this.lightManager.getLights(['front', 'back'], 'all')
     if (lights && lights[lightIndex]) {
       this.sequencer.setState([lights[lightIndex]], color, 1)
@@ -523,28 +522,16 @@ export class Rb3StageKitRigProcessor {
     return colorMap[normalized] ?? 'black'
   }
 
-  private addColors(colors: any[]): any {
+  private addColors(colors: RGBIO[]): RGBIO {
     if (colors.length === 0) return getColor('black', 'medium')
     if (colors.length === 1) return colors[0]
     const result = { ...colors[0] }
     for (let i = 1; i < colors.length; i++) {
       const color = colors[i]
-      if (result.red !== undefined && color.red !== undefined) {
-        result.red = Math.min(255, result.red + color.red)
-      }
-      if (result.green !== undefined && color.green !== undefined) {
-        result.green = Math.min(255, result.green + color.green)
-      }
-      if (result.blue !== undefined && color.blue !== undefined) {
-        result.blue = Math.min(255, result.blue + color.blue)
-      }
-      if (result.intensity !== undefined && color.intensity !== undefined) {
-        result.intensity = Math.min(255, result.intensity + color.intensity)
-      }
-      result.rp = Math.min(result.rp || 255, color.rp || 255)
-      result.gp = Math.min(result.gp || 255, color.gp || 255)
-      result.bp = Math.min(result.bp || 255, color.bp || 255)
-      result.ip = Math.min(result.ip || 255, color.ip || 255)
+      result.red = Math.min(255, result.red + color.red)
+      result.green = Math.min(255, result.green + color.green)
+      result.blue = Math.min(255, result.blue + color.blue)
+      result.intensity = Math.min(255, result.intensity + color.intensity)
     }
     return result
   }

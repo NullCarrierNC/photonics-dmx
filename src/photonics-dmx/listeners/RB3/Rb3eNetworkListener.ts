@@ -1,6 +1,6 @@
 import * as dgram from 'dgram'
 import { EventEmitter } from 'events'
-import { Rb3ePacketType, Rb3GameState } from './rb3eTypes'
+import { Rb3ePacketType, Rb3GameState, type Rb3GameStateEvent } from './rb3eTypes'
 import { CueData, StrobeState } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
 import {
@@ -12,12 +12,15 @@ import {
   parseStageKitData,
   readNullTerminatedString,
 } from './rb3ePacketParser'
-import type { StageKitPersistentState } from './rb3ePacketParser'
+import type { Rb3ePacketHeader, StageKitPersistentState } from './rb3ePacketParser'
 
 const log = createLogger('Rb3eNetworkListener')
 
 // Use the same port that RB3Enhanced sends to.
 const PORT = 21070
+
+/** The last packet the listener took, kept to drop an identical repeat. */
+type ReceivedPacket = { header: Rb3ePacketHeader; payload: Buffer; cueData: CueData }
 
 /**
  * RB3Enhanced Network Listener
@@ -61,8 +64,7 @@ const PORT = 21070
 export class Rb3eNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
   private listening = false
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- packet header shape from parser
-  private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null
+  private lastData: ReceivedPacket | null = null
   // Track persistent strobe state across all packet types
   private _currentStrobeState: StrobeState = 'Strobe_Off'
   // Track persistent fog state (StageKit FogOn/FogOff commands) across all packet types
@@ -262,8 +264,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic packet comparison
-  private isDataEqual(data1: any, data2: any): boolean {
+  private isDataEqual(data1: ReceivedPacket, data2: ReceivedPacket): boolean {
     if (data1.header.type !== data2.header.type) return false
     if (data1.payload.length !== data2.payload.length) return false
     return data1.payload.equals(data2.payload)
@@ -421,12 +422,13 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     // Emit this packet's parsed data. lastData is assigned only at the end of deserializePacket,
     // so it still holds the previous packet here; read from the cueData parameter instead.
-    this.emit('rb3e:gameState', {
+    const event: Rb3GameStateEvent = {
       gameState,
       platform: cueData.rb3Platform || 'Unknown',
       timestamp: Date.now(),
       cueData,
-    })
+    }
+    this.emit('rb3e:gameState', event)
   }
 
   private handleSongName(payload: Buffer, cueData: CueData) {
