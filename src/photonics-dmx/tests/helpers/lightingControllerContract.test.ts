@@ -137,4 +137,46 @@ describe.each([
       expect(waiter).toHaveBeenCalledWith(true)
     })
   })
+
+  it('ends a zero-length blackout at once', () => {
+    withSubject((s) => {
+      void s.controller.blackout(0)
+
+      expect(s.controller.isBlackoutActive()).toBe(false)
+    })
+  })
+
+  it('cancels a held waiter on a zero-length blackout', () => {
+    withSubject((s) => {
+      const waiter = jest.fn()
+      s.controller.addEffectWithCallback('held', s.effect(), waiter)
+      s.frame()
+
+      void s.controller.blackout(0)
+      s.frame()
+
+      expect(waiter).toHaveBeenCalledWith(true)
+    })
+  })
+
+  it('leaves an effect running when it is removed by name from another layer', () => {
+    withSubject((s) => {
+      const waiter = jest.fn()
+      s.controller.addEffectWithCallback('layered', s.effect(), waiter)
+      s.frame()
+
+      s.controller.removeEffect('layered', 7)
+
+      expect(waiter).not.toHaveBeenCalled()
+    })
+  })
+
+  it('refuses an unblocked-name submission of a name a callback-less effect runs', () => {
+    withSubject((s) => {
+      s.controller.addEffect('plain', s.effect())
+      s.frame()
+
+      expect(s.controller.addEffectUnblockedName('plain', s.effect())).toBe(false)
+    })
+  })
 })

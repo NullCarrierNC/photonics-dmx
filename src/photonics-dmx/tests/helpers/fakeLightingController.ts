@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals'
 import type { ILightingController } from '../../controllers/sequencer/interfaces'
+import type { Effect } from '../../types'
 import { CLOCK_RATE_MS_DEFAULT } from '../../../shared/clockRate'
 
 type Member = keyof ILightingController
@@ -103,22 +104,24 @@ export type CompletingLightingController = FakeLightingController & {
 export function completingLightingController(
   overrides: Partial<ILightingController> = {},
 ): CompletingLightingController {
-  let held: Array<{ name: string; onComplete: (cancelled: boolean) => void }> = []
+  /** A submission still running: its layer, and its completion callback when it has one. */
+  type Run = { name: string; layer: number; onComplete?: (cancelled: boolean) => void }
+  let runs: Run[] = []
   let blackouts: Array<() => void> = []
   const wipeListeners = new Set<() => void>()
-  const hold = (name: string, onComplete: (cancelled: boolean) => void): void => {
-    held.push({ name, onComplete })
+  const start = (name: string, effect: Effect, onComplete?: (cancelled: boolean) => void): void => {
+    runs.push({ name, layer: effect.transitions[0]?.layer ?? 0, onComplete })
   }
-  const release = (cancelled: boolean): void => {
-    const due = held
-    held = []
-    for (const { onComplete } of due) onComplete(cancelled)
+  const end = (matches: (run: Run) => boolean, cancelled: boolean): void => {
+    const due = runs.filter(matches)
+    runs = runs.filter((run) => !matches(run))
+    for (const run of due) run.onComplete?.(cancelled)
   }
-  const cancelHeld = (matches: (name: string) => boolean): void => {
-    const due = held.filter((entry) => matches(entry.name))
-    held = held.filter((entry) => !matches(entry.name))
-    for (const { onComplete } of due) onComplete(true)
-  }
+  const cancelAll = (): void => end(() => true, true)
+  const named =
+    (name: string) =>
+    (run: Run): boolean =>
+      run.name === name
   const blackoutPending = (): boolean => blackouts.length > 0
   const settleBlackouts = (): void => {
     const due = blackouts
@@ -126,42 +129,50 @@ export function completingLightingController(
     for (const resolve of due) resolve()
   }
   const fake = fakeLightingController({
-    setEffect: () => cancelHeld(() => true),
-    addEffectWithCallback: (name, _effect, onComplete) => hold(name, onComplete),
-    setEffectWithCallback: (name, _effect, onComplete) => {
-      cancelHeld(() => true)
-      hold(name, onComplete)
+    addEffect: (name, effect) => start(name, effect),
+    setEffect: (name, effect) => {
+      cancelAll()
+      start(name, effect)
     },
-    replaceEffectWithCallback: (name, _effect, onComplete) => {
-      cancelHeld((heldName) => heldName === name)
-      hold(name, onComplete)
+    addEffectWithCallback: (name, effect, onComplete) => start(name, effect, onComplete),
+    setEffectWithCallback: (name, effect, onComplete) => {
+      cancelAll()
+      start(name, effect, onComplete)
+    },
+    replaceEffectWithCallback: (name, effect, onComplete) => {
+      end(named(name), true)
+      start(name, effect, onComplete)
       return true
     },
-    addEffectUnblockedName: (name) =>
-      !blackoutPending() && !held.some((entry) => entry.name === name),
-    setEffectUnblockedName: () => {
+    addEffectUnblockedName: (name, effect) => {
+      if (blackoutPending() || runs.some(named(name))) return false
+      start(name, effect)
+      return true
+    },
+    setEffectUnblockedName: (name, effect) => {
       if (blackoutPending()) return false
-      cancelHeld(() => true)
+      cancelAll()
+      start(name, effect)
       return true
     },
-    addEffectUnblockedNameWithCallback: (name, _effect, onComplete) => {
+    addEffectUnblockedNameWithCallback: (name, effect, onComplete) => {
       if (blackoutPending()) return false
-      hold(name, onComplete)
+      start(name, effect, onComplete)
       return true
     },
-    setEffectUnblockedNameWithCallback: (name, _effect, onComplete) => {
+    setEffectUnblockedNameWithCallback: (name, effect, onComplete) => {
       if (blackoutPending()) return false
-      cancelHeld(() => true)
-      hold(name, onComplete)
+      cancelAll()
+      start(name, effect, onComplete)
       return true
     },
-    removeEffect: (name) => cancelHeld((heldName) => heldName === name),
+    removeEffect: (name, layer) => end((run) => run.name === name && run.layer === layer, true),
     removeEffectCallback: (name) => {
-      held = held.filter((entry) => entry.name !== name)
+      for (const run of runs.filter(named(name))) run.onComplete = undefined
     },
     removeAllEffects: () => {
       settleBlackouts()
-      release(true)
+      cancelAll()
       for (const listener of Array.from(wipeListeners)) listener()
     },
     onMotionPatternsCleared: (listener) => {
@@ -170,7 +181,13 @@ export function completingLightingController(
         wipeListeners.delete(listener)
       }
     },
-    blackout: () => new Promise<void>((resolve) => blackouts.push(resolve)),
+    blackout: (duration) => {
+      if (duration <= 0) {
+        cancelAll()
+        return Promise.resolve()
+      }
+      return new Promise<void>((resolve) => blackouts.push(resolve))
+    },
     cancelBlackout: settleBlackouts,
     isBlackoutActive: () => blackouts.length > 0,
     ...overrides,
@@ -178,8 +195,8 @@ export function completingLightingController(
   return Object.assign(fake, {
     tick: () => {
       settleBlackouts()
-      release(false)
+      end(() => true, false)
     },
-    heldCompletions: () => held.map((entry) => entry.name),
+    heldCompletions: () => runs.filter((run) => run.onComplete).map((run) => run.name),
   })
 }
