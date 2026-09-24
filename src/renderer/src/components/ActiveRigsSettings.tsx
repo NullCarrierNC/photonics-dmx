@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAtom } from 'jotai'
 import { activeRigIdAtom, dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import { DmxRig, WIRE_SENDER_IDS, WireSenderId } from '../../../photonics-dmx/types'
@@ -86,6 +86,10 @@ const ActiveRigsSettings: React.FC = () => {
   const [layoutRigId, setLayoutRigId] = useAtom(activeRigIdAtom)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // A rig write restarts the controllers, so a click that lands inside one is turned away at once
+  // and the controls grey out until it has finished.
+  const writingRef = useRef(false)
+  const [writing, setWriting] = useState(false)
 
   const allowMultipleActiveRigs = prefs.allowMultipleActiveRigs ?? false
   // Routing is per-rig and only meaningful when at least two rigs exist AND the user has opted
@@ -122,6 +126,15 @@ const ActiveRigsSettings: React.FC = () => {
       setSaveError(`Saved, but the lights did not restart. ${result.restartError}`)
     }
     return true
+  }
+
+  const oneWriteAtATime = async (write: () => Promise<void>): Promise<void> => {
+    if (writingRef.current) return
+    writingRef.current = true
+    setWriting(true)
+    await write().catch((error: unknown) => log.error('Failed to write a rig:', error))
+    writingRef.current = false
+    setWriting(false)
   }
 
   const handleActiveToggle = async (rigId: string, newActive: boolean) => {
@@ -291,7 +304,10 @@ const ActiveRigsSettings: React.FC = () => {
             type="checkbox"
             id="allowMultipleActiveRigs"
             checked={allowMultipleActiveRigs}
-            onChange={(e) => void handleAllowMultipleActiveRigsChange(e.target.checked)}
+            onChange={(e) =>
+              void oneWriteAtATime(() => handleAllowMultipleActiveRigsChange(e.target.checked))
+            }
+            disabled={writing}
             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
           />
           <label
@@ -362,7 +378,10 @@ const ActiveRigsSettings: React.FC = () => {
                       <input
                         type="checkbox"
                         checked={rig.active}
-                        onChange={(e) => void handleActiveToggle(rig.id, e.target.checked)}
+                        onChange={(e) =>
+                          void oneWriteAtATime(() => handleActiveToggle(rig.id, e.target.checked))
+                        }
+                        disabled={writing}
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                       />
                     ) : (
@@ -370,7 +389,10 @@ const ActiveRigsSettings: React.FC = () => {
                         type="radio"
                         name="activeRig"
                         checked={rig.active}
-                        onChange={() => void handleActiveToggle(rig.id, true)}
+                        onChange={() =>
+                          void oneWriteAtATime(() => handleActiveToggle(rig.id, true))
+                        }
+                        disabled={writing}
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                       />
                     )}
@@ -386,8 +408,11 @@ const ActiveRigsSettings: React.FC = () => {
                           id={`rig-${rig.id}-mirror-horiz`}
                           checked={rig.mirrorHoriz === true}
                           onChange={(e) =>
-                            void handleMirrorToggle(rig.id, 'horiz', e.target.checked)
+                            void oneWriteAtATime(() =>
+                              handleMirrorToggle(rig.id, 'horiz', e.target.checked),
+                            )
                           }
+                          disabled={writing}
                           className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                         />
                         Horiz
@@ -401,8 +426,11 @@ const ActiveRigsSettings: React.FC = () => {
                           id={`rig-${rig.id}-mirror-vert`}
                           checked={rig.mirrorVert === true}
                           onChange={(e) =>
-                            void handleMirrorToggle(rig.id, 'vert', e.target.checked)
+                            void oneWriteAtATime(() =>
+                              handleMirrorToggle(rig.id, 'vert', e.target.checked),
+                            )
                           }
+                          disabled={writing}
                           className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                         />
                         Vert
@@ -425,8 +453,11 @@ const ActiveRigsSettings: React.FC = () => {
                                 id={inputId}
                                 checked={checked}
                                 onChange={(e) =>
-                                  void handleOutputToggle(rig.id, senderId, e.target.checked)
+                                  void oneWriteAtATime(() =>
+                                    handleOutputToggle(rig.id, senderId, e.target.checked),
+                                  )
                                 }
+                                disabled={writing}
                                 className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                               />
                               {WIRE_SENDER_LABELS[senderId]}
@@ -446,8 +477,9 @@ const ActiveRigsSettings: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-600 dark:text-gray-400">Confirm?</span>
                         <button
-                          onClick={() => void handleDelete(rig.id)}
-                          className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs">
+                          onClick={() => void oneWriteAtATime(() => handleDelete(rig.id))}
+                          disabled={writing}
+                          className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
                           Yes
                         </button>
                         <button
@@ -459,7 +491,8 @@ const ActiveRigsSettings: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => setShowDeleteConfirm(rig.id)}
-                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs">
+                        disabled={writing}
+                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
                         Delete
                       </button>
                     )}

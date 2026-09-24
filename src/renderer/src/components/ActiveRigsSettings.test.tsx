@@ -10,7 +10,7 @@
  * silently stuck on a routing decision the user can no longer see.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
+import { screen, fireEvent, waitFor, act, cleanup, within } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
@@ -386,6 +386,74 @@ describe('ActiveRigsSettings rig writes', () => {
     expect(saveDmxRigMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1', active: true }))
     const radios = screen.getAllByRole('radio') as HTMLInputElement[]
     expect(radios.map((r) => r.checked)).toEqual([true, false, false])
+  })
+})
+
+describe('ActiveRigsSettings while a rig write is in flight', () => {
+  /** Holds every rig write open until the returned function answers it. */
+  function holdRigWrites(): () => Promise<void> {
+    let answer: (value: { success: true }) => void = () => undefined
+    const pending = new Promise<{ success: true }>((resolve) => {
+      answer = resolve
+    })
+    saveDmxRigMock.mockReturnValue(pending)
+    deleteDmxRigMock.mockReturnValue(pending)
+    return async () => {
+      await act(async () => {
+        answer({ success: true })
+        await pending
+      })
+    }
+  }
+
+  const threeRigs = () => [
+    makeRig('r1', 'Rig A'),
+    makeRig('r2', 'Rig B', undefined, false),
+    makeRig('r3', 'Rig C', undefined, false),
+  ]
+
+  it('turns away a second active rig click until the first write lands', async () => {
+    const finish = holdRigWrites()
+    renderWith({ rigs: threeRigs(), allowMultipleActiveRigs: false })
+    await screen.findByText('Rig C')
+
+    fireEvent.click(screen.getAllByRole('radio')[1]!)
+    fireEvent.click(screen.getAllByRole('radio')[2]!)
+    await finish()
+
+    expect(saveDmxRigMock).toHaveBeenCalledTimes(1)
+    expect(saveDmxRigMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'r2' }))
+    fireEvent.click(screen.getAllByRole('radio')[2]!)
+    await waitFor(() => expect(saveDmxRigMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('turns away a second active checkbox click until the first write lands', async () => {
+    const finish = holdRigWrites()
+    renderWith({ rigs: threeRigs(), allowMultipleActiveRigs: true })
+    await screen.findByText('Rig C')
+    const activeBox = (index: number) =>
+      within(screen.getAllByRole('row')[index + 1]!).getAllByRole('checkbox')[0]!
+
+    fireEvent.click(activeBox(1))
+    fireEvent.click(activeBox(2))
+    await finish()
+
+    expect(saveDmxRigMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('turns away a second Delete and a rig switch while a delete is in flight', async () => {
+    const finish = holdRigWrites()
+    renderWith({ rigs: threeRigs(), allowMultipleActiveRigs: false })
+    await screen.findByText('Rig C')
+
+    fireEvent.click(screen.getAllByText('Delete')[2]!)
+    fireEvent.click(screen.getByText('Yes'))
+    fireEvent.click(screen.getByText('Yes'))
+    fireEvent.click(screen.getAllByRole('radio')[1]!)
+    await finish()
+
+    expect(deleteDmxRigMock).toHaveBeenCalledTimes(1)
+    expect(saveDmxRigMock).not.toHaveBeenCalled()
   })
 })
 
