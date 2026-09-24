@@ -20,22 +20,31 @@ type CheckHandler = (
   details: Record<string, unknown>,
 ) => boolean
 
+type HeadersListener = (
+  details: { responseHeaders?: Record<string, string[]> },
+  callback: (response: { responseHeaders: Record<string, string | string[]> }) => void,
+) => void
+
 const setPermissionRequestHandler = jest.fn<(h: RequestHandler) => void>()
 const setPermissionCheckHandler = jest.fn<(h: CheckHandler) => void>()
+const onHeadersReceived = jest.fn<(listener: HeadersListener) => void>()
 
 jest.mock('electron', () => ({
   session: {
     defaultSession: {
       setPermissionRequestHandler: (h: RequestHandler) => setPermissionRequestHandler(h),
       setPermissionCheckHandler: (h: CheckHandler) => setPermissionCheckHandler(h),
-      webRequest: { onHeadersReceived: jest.fn() },
+      webRequest: { onHeadersReceived: (l: HeadersListener) => onHeadersReceived(l) },
     },
   },
 }))
 
 jest.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 
-import { installDefaultSessionPermissionHandlers } from '../rendererSessionSecurity'
+import {
+  installDefaultSessionContentSecurityPolicy,
+  installDefaultSessionPermissionHandlers,
+} from '../rendererSessionSecurity'
 
 /** Install the handlers and return them in a form a test can call directly. */
 function installed(): {
@@ -107,5 +116,45 @@ describe('renderer session permissions', () => {
       expect(request(permission)).toBe(false)
       expect(check(permission)).toBe(false)
     }
+  })
+})
+
+describe('renderer content security policy', () => {
+  /** The response headers the installed listener hands back for a response carrying `prior`. */
+  function answered(prior: Record<string, string[]>): Record<string, string | string[]> {
+    onHeadersReceived.mockReset()
+    installDefaultSessionContentSecurityPolicy()
+    const listener = onHeadersReceived.mock.calls[0][0]
+    let headers: Record<string, string | string[]> = {}
+    listener({ responseHeaders: prior }, (response) => {
+      headers = response.responseHeaders
+    })
+    return headers
+  }
+
+  /** Each directive of a policy by name, with its sources. */
+  function directives(policy: string): Map<string, string[]> {
+    return new Map(
+      policy
+        .split(';')
+        .map((part) => part.trim().split(/\s+/))
+        .filter((words) => words[0] !== '')
+        .map(([name, ...sources]) => [name, sources]),
+    )
+  }
+
+  it('sets the production policy on every response', () => {
+    const policy = answered({})['content-security-policy']
+
+    expect(policy).toEqual([expect.any(String)])
+    const byName = directives((policy as string[])[0])
+    expect(byName.get('default-src')).toEqual(["'self'"])
+    expect(byName.get('script-src')).toEqual(["'self'"])
+    expect(byName.get('connect-src')).toEqual(["'self'"])
+    expect(byName.get('worker-src')).toEqual(["'self'", 'blob:'])
+  })
+
+  it('keeps the headers a response already carries', () => {
+    expect(answered({ 'x-frame-options': ['DENY'] })['x-frame-options']).toEqual(['DENY'])
   })
 })
