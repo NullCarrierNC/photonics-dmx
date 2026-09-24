@@ -249,6 +249,27 @@ describe('useRigImportExport commit', () => {
     return view
   }
 
+  it('imports one rig when the import is confirmed twice while it saves', async () => {
+    const view = await pickedView()
+    let answerSave: (value: unknown) => void = () => {}
+    jest.mocked(ipcApi.saveDmxRig).mockReturnValue(
+      new Promise((resolve) => {
+        answerSave = resolve
+      }) as never,
+    )
+
+    await act(async () => {
+      void view.result.current.commitPendingImport('Club')
+      void view.result.current.commitPendingImport('Club')
+    })
+    await act(async () => {
+      answerSave({ success: true })
+    })
+
+    expect(ipcApi.saveMyLights).toHaveBeenCalledTimes(1)
+    expect(ipcApi.saveDmxRig).toHaveBeenCalledTimes(1)
+  })
+
   it('saves new templates before the rig, then selects the saved rig', async () => {
     const view = await pickedView()
     jest.mocked(ipcApi.getDmxRigs).mockImplementation(async () => [RIG_A, RIG_B, savedRig()])

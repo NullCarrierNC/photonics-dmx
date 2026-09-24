@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { DmxFixture, DmxRig, LightingConfiguration } from '../../../../photonics-dmx/types'
 import {
   reconcileImportedTemplates,
@@ -171,7 +171,7 @@ export function useRigImportExport({
 
   const clearPendingImport = useCallback(() => setPendingImport(null), [])
 
-  const commitPendingImport = useCallback(
+  const commitImport = useCallback(
     async (rigName: string) => {
       if (!pendingImport) return
       const pending = pendingImport
@@ -207,6 +207,19 @@ export function useRigImportExport({
       }
     },
     [pendingImport, myFixtureLibrary, rigs, setMyFixtureLibrary, selectSavedRig, showToast],
+  )
+
+  // The imported rig is saved active, and that save restarts the controllers, so a second confirm
+  // lands inside the first commit. It is turned away until the first has finished.
+  const committingRef = useRef(false)
+  const commitPendingImport = useCallback(
+    async (rigName: string) => {
+      if (committingRef.current) return
+      committingRef.current = true
+      await commitImport(rigName)
+      committingRef.current = false
+    },
+    [commitImport],
   )
 
   const handleDuplicate = useCallback(async () => {

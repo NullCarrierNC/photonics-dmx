@@ -5,6 +5,7 @@ import { randomUUID as nodeRandomUUID } from 'node:crypto'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../../ipcApi'
+import { ConfigStrobeType, type DmxRig } from '../../../../photonics-dmx/types'
 import LightsLayoutRigSection from './LightsLayoutRigSection'
 
 jest.mock(
@@ -22,9 +23,25 @@ if (typeof (globalThis.crypto as Crypto | undefined)?.randomUUID !== 'function')
   })
 }
 
-function renderSection() {
+function rigNamed(name: string): DmxRig {
+  return {
+    id: name,
+    name,
+    active: false,
+    config: {
+      numLights: 0,
+      lightLayout: { id: 'front', label: 'Front only' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [],
+      backLights: [],
+      strobeLights: [],
+    },
+  }
+}
+
+function renderSection(rigs: DmxRig[] = []) {
   const props = {
-    rigs: [],
+    rigs,
     activeRigId: null,
     setActiveRigId: jest.fn(),
     rigName: '',
@@ -66,5 +83,41 @@ describe('LightsLayoutRigSection New Rig', () => {
 
     expect(props.onRigsChange).not.toHaveBeenCalled()
     expect(props.setActiveRigId).not.toHaveBeenCalled()
+  })
+})
+
+describe('LightsLayoutRigSection New Rig while a rig is being created', () => {
+  it('creates one rig for a double click', async () => {
+    let answerSave: (value: unknown) => void = () => {}
+    jest.mocked(ipcApi.saveDmxRig).mockReturnValue(
+      new Promise((resolve) => {
+        answerSave = resolve
+      }) as never,
+    )
+    const props = renderSection([rigNamed('Rig 1')])
+    const newRig = screen.getByRole('button', { name: 'New Rig' })
+
+    await act(async () => {
+      fireEvent.click(newRig)
+      fireEvent.click(newRig)
+    })
+    expect(newRig).toBeDisabled()
+    await act(async () => {
+      answerSave({ success: true })
+    })
+
+    expect(ipcApi.saveDmxRig).toHaveBeenCalledTimes(1)
+    expect(props.onRigsChange).toHaveBeenCalledTimes(1)
+    expect(newRig).toBeEnabled()
+  })
+
+  it('names the rig after the numbers already taken', async () => {
+    renderSection([rigNamed('Rig 1'), rigNamed('rig 3')])
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'New Rig' }))
+    })
+
+    expect(ipcApi.saveDmxRig).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rig 4' }))
   })
 })
