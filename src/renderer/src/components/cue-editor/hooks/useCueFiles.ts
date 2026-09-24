@@ -184,6 +184,7 @@ const useCueFiles = ({
     setIsDirty,
     setCueKind,
     loadCueIntoFlow,
+    rememberLastFilePath,
     refreshFiles: fileIO.refreshFiles,
     refreshEffectFiles: fileIO.refreshEffectFiles,
     onError,
