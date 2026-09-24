@@ -103,14 +103,4 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       .setPreference('complex', style === 'complex')
       .catch((err) => log.error('Failed to save cue style preference:', err))
   })
-
-  // Get YARG enabled state
-  handleInvoke(ipcMain, CUE.GET_YARG_ENABLED, log, () => {
-    return controllerManager.getIsYargEnabled()
-  })
-
-  // Get RB3 enabled state
-  handleInvoke(ipcMain, CUE.GET_RB3_ENABLED, log, () => {
-    return controllerManager.getIsRb3Enabled()
-  })
 }

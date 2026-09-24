@@ -51,17 +51,6 @@ describe('NetworkDebug', () => {
     jest.useRealTimers()
   })
 
-  it('reads which listeners run from the window state without asking main', async () => {
-    renderPage({ yarg: true })
-
-    await act(async () => {
-      jest.advanceTimersByTime(5000)
-    })
-
-    expect(jest.mocked(ipcApi.getYargEnabled)).not.toHaveBeenCalled()
-    expect(jest.mocked(ipcApi.getRb3Enabled)).not.toHaveBeenCalled()
-  })
-
   it('asks for the cue data again when a listener starts', () => {
     const { store } = renderPage()
     expect(setListenCueData).toHaveBeenLastCalledWith(true)

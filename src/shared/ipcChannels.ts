@@ -61,8 +61,6 @@ export const CUE = {
   DISABLE_RB3: 'disable-rb3',
   RB3E_GET_MODE: 'rb3e-get-mode',
   RB3E_GET_STATS: 'rb3e-get-stats',
-  GET_YARG_ENABLED: 'get-yarg-enabled',
-  GET_RB3_ENABLED: 'get-rb3-enabled',
   YARG_LISTENER_ENABLED: 'yarg-listener-enabled',
   YARG_LISTENER_DISABLED: 'yarg-listener-disabled',
   RB3E_LISTENER_ENABLED: 'rb3e-listener-enabled',

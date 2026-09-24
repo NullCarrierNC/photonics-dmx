@@ -14,7 +14,6 @@ import {
   getMyLights,
   getPrefs,
 } from './config'
-import { getRb3Enabled, getYargEnabled } from './listeners'
 import { getLifecyclePhase } from './appShell'
 
 const getters: Array<[string, () => Promise<unknown>]> = [
@@ -25,8 +24,6 @@ const getters: Array<[string, () => Promise<unknown>]> = [
   ['getDmxRigs', getDmxRigs],
   ['getDmxRig', () => getDmxRig('rig-1')],
   ['getActiveRigs', getActiveRigs],
-  ['getYargEnabled', getYargEnabled],
-  ['getRb3Enabled', getRb3Enabled],
   ['getLifecyclePhase', getLifecyclePhase],
 ]
 

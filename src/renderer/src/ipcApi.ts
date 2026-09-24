@@ -168,10 +168,8 @@ export {
   disableYarg,
   enableRb3,
   enableYarg,
-  getRb3Enabled,
   getRb3Mode,
   getRb3Stats,
-  getYargEnabled,
   setCueStyle,
   setListenCueData,
 } from './ipc/listeners'

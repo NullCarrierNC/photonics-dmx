@@ -2,7 +2,6 @@
  * RB3E and the game listeners.
  */
 import { CUE } from '../../../shared/ipcChannels'
-import { orThrow } from './ipcResult'
 
 // ---------------------------------------------------------------------------
 // RB3E
@@ -23,10 +22,6 @@ export const disableYarg = () => window.api.send(CUE.YARG_LISTENER_DISABLED, und
 export const enableRb3 = () => window.api.send(CUE.RB3E_LISTENER_ENABLED, undefined)
 
 export const disableRb3 = () => window.api.send(CUE.RB3E_LISTENER_DISABLED, undefined)
-
-export const getYargEnabled = () => window.api.invoke(CUE.GET_YARG_ENABLED, undefined).then(orThrow)
-
-export const getRb3Enabled = () => window.api.invoke(CUE.GET_RB3_ENABLED, undefined).then(orThrow)
 
 export const setListenCueData = (shouldListen: boolean) =>
   window.api.send(CUE.SET_LISTEN_CUE_DATA, shouldListen)
