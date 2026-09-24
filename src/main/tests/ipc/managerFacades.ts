@@ -45,6 +45,7 @@ export function withCollaboratorGetters<T extends Record<string, unknown>>(mock:
         setActiveAudioMotionCueRef: flat('setActiveAudioMotionCueRef'),
         updateAudioConfig: flat('updateAudioConfig'),
         setBroadcastAudioMirror: flat('setAudioMirrorBroadcaster'),
+        setOpenCaptureWindow: flat('setOpenCaptureWindow'),
       },
     })
   }

@@ -107,6 +107,23 @@ describe('AudioController enable and disable', () => {
     expect(announced()).toEqual([{ enabled: true }, { enabled: false }])
   })
 
+  it('opens the capture window before it tells the windows audio has started', async () => {
+    const made = makeController(() => Promise.resolve())
+    controller = made.controller
+    const openCaptureWindow = jest.fn()
+    controller.setOpenCaptureWindow(openCaptureWindow)
+
+    await controller.enableAudioInternal()
+
+    expect(openCaptureWindow).toHaveBeenCalledTimes(1)
+    const announcedAt = made.sendToAllWindows.mock.calls.findIndex(
+      ([channel]) => channel === RENDERER_RECEIVE.AUDIO_ENABLE,
+    )
+    expect(openCaptureWindow.mock.invocationCallOrder[0]).toBeLessThan(
+      made.sendToAllWindows.mock.invocationCallOrder[announcedAt],
+    )
+  })
+
   it('keeps audio running when the active cue type cannot be stored', async () => {
     controller = makeController(() => Promise.reject(new Error('read only'))).controller
 

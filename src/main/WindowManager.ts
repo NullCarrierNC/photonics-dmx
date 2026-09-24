@@ -395,6 +395,13 @@ export class WindowManager {
     this.front(window)
   }
 
+  /** Opens the main window for audio capture, unless one is open or a Quit is under way. */
+  public ensureMainWindow(): void {
+    if (!this.quitting && !this.openWindow('main')) {
+      this.createMainWindow()
+    }
+  }
+
   /** Records whether a page holds unsaved changes, as the page reports it. */
   public setUnsavedChanges(webContents: WebContents, unsaved: boolean): void {
     if (unsaved) {

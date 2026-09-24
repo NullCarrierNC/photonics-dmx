@@ -36,6 +36,8 @@ export class AudioController {
   private isAudioEnabled = false
   private audioDataHandler: AudioDataHandler | null = null
   private broadcastAudioMirror: ((data: AudioLightingData) => void) | null = null
+  /** Opens the main window, where capture runs, when there is none. Set by the window layer. */
+  private openCaptureWindow: (() => void) | null = null
   /** Throttle logs for invalid renderer audio frames (can arrive at high rate). */
   private invalidAudioFrameCount = 0
   private invalidAudioFrameLastLogMs = 0
@@ -56,6 +58,10 @@ export class AudioController {
 
   public setBroadcastAudioMirror(fn: ((data: AudioLightingData) => void) | null): void {
     this.broadcastAudioMirror = fn
+  }
+
+  public setOpenCaptureWindow(fn: (() => void) | null): void {
+    this.openCaptureWindow = fn
   }
 
   public async enableAudio(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
@@ -143,6 +149,9 @@ export class AudioController {
         this.broadcastAudioMirror?.(lightingData)
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
+      // The Audio Preview window can switch audio on with the main window closed. A main window
+      // opened here misses the announcement below and picks the running audio up once it loads.
+      this.openCaptureWindow?.()
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
       log.info('Sent audio:enable to renderer')
       this.isAudioEnabled = true

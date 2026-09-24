@@ -79,6 +79,22 @@ describe('WindowManager.focusMainWindow', () => {
     expect(window.focus).not.toHaveBeenCalled()
   })
 
+  it('opens a main window for audio capture only when there is none', () => {
+    manager.ensureMainWindow()
+    manager.ensureMainWindow()
+
+    expect(builtWindows()).toHaveLength(1)
+    expect(builtWindows()[0].focus).not.toHaveBeenCalled()
+  })
+
+  it('opens no main window for audio capture while a Quit closes the windows', async () => {
+    await manager.closeWindowsForQuit()
+
+    manager.ensureMainWindow()
+
+    expect(builtWindows()).toHaveLength(0)
+  })
+
   it('forgets the main window once it closes', () => {
     manager.createMainWindow()
     const [window] = builtWindows()

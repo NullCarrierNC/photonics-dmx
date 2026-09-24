@@ -39,7 +39,9 @@ export function setupIpcHandlers(
   setupWindowHandlers(ipcMain, windowManager)
   setupLifecycleHandlers(ipcMain, controllerManager)
 
-  controllerManager.getListenerLifecycle().audio.setBroadcastAudioMirror((data) => {
+  const audio = controllerManager.getListenerLifecycle().audio
+  audio.setBroadcastAudioMirror((data) => {
     windowManager.broadcastAudioMirror(data)
   })
+  audio.setOpenCaptureWindow(() => windowManager.ensureMainWindow())
 }
