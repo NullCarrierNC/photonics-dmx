@@ -373,4 +373,57 @@ describe('AudioNodeCue level mode', () => {
     cue.onStop()
     expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 20)
   })
+
+  it.each([
+    ['on layer 0', 0],
+    ['with no layer', undefined],
+  ] as const)('goes dark when the level drops and when the look ends, %s', async (_, layer) => {
+    const action = setColor('sc1', { source: 'literal', value: 'front' })
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-base',
+      cueTypeId: 'level-base',
+      name: 'Level base',
+      style: 'primary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [layer === undefined ? { ...action, layer: undefined } : action],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    }
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+    const red = (): number => h.getLightState(h.frontLightIds[0])?.red ?? 0
+    const advance = (ms: number): void => {
+      for (let t = 0; t < ms; t += 10) h.advanceBy(10)
+    }
+
+    try {
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      advance(50)
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      advance(50)
+      expect(red()).toBeGreaterThan(0)
+
+      await cue.execute(audioCueData(0), h.sequencer, h.lightManager)
+      advance(300)
+      expect(red()).toBe(0)
+
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      advance(50)
+      expect(red()).toBeGreaterThan(0)
+      cue.stopAndClearEffects()
+      advance(300)
+      expect(red()).toBe(0)
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
+  })
 })

@@ -23,7 +23,40 @@ import { evaluateBandTrigger } from '../../audio/bandReactivity'
 import { createLogger } from '../../../../shared/logger'
 import { monotonicNowMs } from '../../../../shared/time'
 import { dropGroupStore } from '../../registries/cueRegistrySupport'
+import type { RGBIO, TrackedLight } from '../../../types'
 const log = createLogger('BaseAudioNodeCue')
+
+/** A level-mode effect on the sequencer, as {@link BaseAudioNodeCue} submitted it. */
+interface LevelEffect {
+  layer: number
+  lights: TrackedLight[]
+}
+
+/** What a level look on the base layer leaves its lights at once it ends. */
+const LEVEL_BASE_OFF: RGBIO = {
+  red: 0,
+  green: 0,
+  blue: 0,
+  intensity: 0,
+  opacity: 1,
+  blendMode: 'replace',
+}
+
+/**
+ * Take a level effect off the sequencer. The sequencer keeps a light's layer-0 state once the
+ * effect there ends, so a look on the base layer also sets its lights to black, unless a blackout
+ * running now is already taking them there.
+ */
+function endLevelEffect(
+  sequencer: ILightingController,
+  effectKey: string,
+  { layer, lights }: LevelEffect,
+): void {
+  sequencer.removeEffect(effectKey, layer)
+  if (layer === 0 && !sequencer.isBlackoutActive()) {
+    sequencer.setState(lights, LEVEL_BASE_OFF, 0)
+  }
+}
 
 /**
  * Per-rig (per-sequencer) runtime state for an audio node cue. Each rig running the same cue
@@ -36,7 +69,8 @@ interface AudioCueRunState {
   triggerPhase: Map<string, 'idle' | 'active'>
   triggerEnterTime: Map<string, number>
   lastTriggerTime: Map<string, number>
-  activeLevelEffects: Map<string, number>
+  /** Each running level-mode effect by key, with the layer and lights it was submitted on. */
+  activeLevelEffects: Map<string, LevelEffect>
   smoothedBandEnergy: Map<string, number>
   /** Wall-clock ms of the last band-energy smoothing update per trigger, for frame-rate-independent attack/release. */
   bandSmoothTime: Map<string, number>
@@ -292,12 +326,14 @@ export abstract class BaseAudioNodeCue {
               sequencer.removeEffect(effectKey, layer)
               sequencer.addEffect(effectKey, effect)
             }
-            state.activeLevelEffects.set(effectKey, layer)
+            state.activeLevelEffects.set(effectKey, { layer, lights })
           }
-        } else if (state.activeLevelEffects.has(effectKey)) {
-          const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
-          sequencer.removeEffect(effectKey, layer)
-          state.activeLevelEffects.delete(effectKey)
+        } else {
+          const running = state.activeLevelEffects.get(effectKey)
+          if (running) {
+            endLevelEffect(sequencer, effectKey, running)
+            state.activeLevelEffects.delete(effectKey)
+          }
         }
       }
     }
@@ -356,8 +392,8 @@ export abstract class BaseAudioNodeCue {
       // so cancelAll never sees them. Take them off by the layer each was recorded against before
       // dropping the tracking, or they stay lit with nothing left holding a reference to them.
       if (!skipEffectRemoval) {
-        for (const [effectKey, layer] of state.activeLevelEffects) {
-          sequencer.removeEffect(effectKey, layer)
+        for (const [effectKey, running] of state.activeLevelEffects) {
+          endLevelEffect(sequencer, effectKey, running)
         }
       }
       state.activeLevelEffects.clear()
