@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
   createFakeBrowserWindow as mockCreateFakeBrowserWindow,
   type FakeBrowserWindow,
@@ -23,10 +23,14 @@ jest.mock('../rendererSessionSecurity', () => ({ denyWebContentsWillNavigate: je
 import { BrowserWindow } from 'electron'
 import { WindowManager } from '../WindowManager'
 
+function lastWindow(): FakeBrowserWindow {
+  const results = (BrowserWindow as unknown as jest.Mock).mock.results
+  return results[results.length - 1].value as FakeBrowserWindow
+}
+
 /** The geometry the manager built its last window with. */
 function lastWindowBounds(): Record<string, unknown> {
-  const results = (BrowserWindow as unknown as jest.Mock).mock.results
-  const { options } = results[results.length - 1].value as FakeBrowserWindow
+  const { options } = lastWindow()
   return { x: options.x, y: options.y, width: options.width, height: options.height }
 }
 
@@ -99,8 +103,7 @@ describe('WindowManager saved bounds', () => {
       }),
     } as never)
     wm.createMainWindow()
-    const results = (BrowserWindow as unknown as jest.Mock).mock.results
-    const window = results[results.length - 1].value as FakeBrowserWindow
+    const window = lastWindow()
     window.bounds = { ...PRIMARY }
     window.normalBounds = { x: 100, y: 120, width: 900, height: 700 }
 
@@ -108,6 +111,41 @@ describe('WindowManager saved bounds', () => {
 
     expect(saved).toContainEqual({ windowState: { x: 100, y: 120, width: 900, height: 700 } })
   })
+})
+
+describe('WindowManager saving geometry as the window moves', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it.each(['move', 'resize', 'moved', 'resized'])(
+    'saves the geometry once the window settles after %s',
+    async (event) => {
+      const saved: Array<Record<string, unknown>> = []
+      const wm = new WindowManager()
+      wm.setControllerManager({
+        getConfig: () => ({
+          getPreference: () => undefined,
+          updatePreferences: async (updates: Record<string, unknown>) => {
+            saved.push(updates)
+          },
+        }),
+      } as never)
+      wm.createMainWindow()
+      const window = lastWindow()
+      window.bounds = { x: 300, y: 200, width: 1000, height: 800 }
+
+      window.emit(event)
+      await jest.advanceTimersByTimeAsync(600)
+
+      expect(saved).toEqual([{ windowState: { x: 300, y: 200, width: 1000, height: 800 } }])
+    },
+  )
 })
 
 describe('WindowManager DevTools', () => {

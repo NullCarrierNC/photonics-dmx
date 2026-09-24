@@ -196,8 +196,12 @@ export class WindowManager {
     })
     this.windows.set(role, window)
 
-    window.on('resized', () => this.scheduleSave(role))
-    window.on('moved', () => this.scheduleSave(role))
+    // Linux emits only `move` and `resize`. The save waits for the window to settle either way.
+    const save = (): void => this.scheduleSave(role)
+    window.on('resized', save)
+    window.on('moved', save)
+    window.on('resize', save)
+    window.on('move', save)
     window.on('ready-to-show', () => window.show())
     window.on('closed', () => {
       if (this.windows.get(role) === window) {
