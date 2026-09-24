@@ -23,6 +23,7 @@
     "size:budget": "node tools/size-budget.mjs",
     "paths:check": "node tools/referenced-paths-check.mjs",
     "coverage:check": "node tools/coverage-threshold-check.mjs",
+    "verify:quick": "node tools/verify-quick.mjs",
     "prestart": "install-electron",
     "start": "electron-vite preview",
     "predev": "install-electron",
