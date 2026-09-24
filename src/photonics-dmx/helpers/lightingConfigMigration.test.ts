@@ -16,7 +16,51 @@ import {
   migrateUserLightsSchema,
 } from './lightingConfigMigration'
 
+function rgbLight(id: string, group: 'front' | 'back'): DmxLight {
+  return {
+    id,
+    fixtureId: 'tpl-1',
+    position: 1,
+    fixture: FixtureTypes.RGB,
+    label: id,
+    name: id,
+    isStrobeEnabled: false,
+    group,
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+    mount: 'floor',
+  }
+}
+
 describe('migrateLightingConfiguration', () => {
+  it('brings a numLights above the front and back light count down to it', () => {
+    const { config, changed } = migrateLightingConfiguration({
+      numLights: 4,
+      lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [rgbLight('a', 'front'), rgbLight('b', 'front')],
+      backLights: [rgbLight('c', 'back')],
+      strobeLights: [],
+    })
+    expect(changed).toBe(true)
+    expect(config.numLights).toBe(3)
+    expect(config.frontLights).toHaveLength(2)
+    expect(config.backLights).toHaveLength(1)
+  })
+
+  it('leaves the numLights of a rig with no lights yet alone', () => {
+    const input = {
+      numLights: 4,
+      lightLayout: { id: 'front', label: 'Front' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [],
+      backLights: [],
+      strobeLights: [],
+    }
+    const { config, changed } = migrateLightingConfiguration(input, { skipLegacyRename: true })
+    expect(changed).toBe(false)
+    expect(config).toBe(input)
+  })
+
   it('renames legacy front-back to two-rows', () => {
     const { config, changed } = migrateLightingConfiguration({
       numLights: 2,
@@ -187,6 +231,25 @@ describe('migrateDmxRigsConfig', () => {
     expect(changed).toBe(false)
     expect(config.rigs[0]!.config.lightLayout.id).toBe('front-back')
     expect(config.rigs[0]).toBe(rig)
+  })
+
+  it('brings a hand-edited numLights above the rig light count down on read', () => {
+    const rig: DmxRig = {
+      id: 'r1',
+      name: 'Rig',
+      active: true,
+      config: {
+        ...emptyMigratedConfig,
+        numLights: 4,
+        frontLights: [rgbLight('a', 'front'), rgbLight('b', 'front'), rgbLight('c', 'front')],
+      },
+    }
+    const { config, changed } = migrateDmxRigsConfig({
+      rigs: [rig],
+      schemaVersion: CURRENT_RIGS_SCHEMA_VERSION,
+    })
+    expect(changed).toBe(true)
+    expect(config.rigs[0]!.config.numLights).toBe(3)
   })
 
   it('stamps schemaVersion on first load even when rigs array is empty', () => {
