@@ -25,6 +25,7 @@ import {
   validateStringUnion,
 } from '../../ipc/inputValidation'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
+import { CUE_CONSISTENCY_WINDOW_MS_MAX } from '../../../shared/cueConsistencyWindow'
 import {
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
@@ -941,6 +942,16 @@ describe('inputValidation', () => {
   })
 
   describe('validatePreferencesPayload', () => {
+    it('holds cueConsistencyWindow to the range the settings box offers', () => {
+      const atCeiling = validatePreferencesPayload({
+        cueConsistencyWindow: CUE_CONSISTENCY_WINDOW_MS_MAX,
+      })
+      expect(atCeiling.ok).toBe(true)
+      expect(
+        validatePreferencesPayload({ cueConsistencyWindow: CUE_CONSISTENCY_WINDOW_MS_MAX + 1 }).ok,
+      ).toBe(false)
+    })
+
     it('clamps sacnConfig.refreshRateHz into allowed range', () => {
       const r = validatePreferencesPayload({
         sacnConfig: { universe: 1, useUnicast: false, refreshRateHz: 300 },

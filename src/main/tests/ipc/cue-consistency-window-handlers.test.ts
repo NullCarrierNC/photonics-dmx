@@ -52,6 +52,7 @@ jest.mock('../../../photonics-dmx/cues/registries/cueRegistries', () => ({
 }))
 
 import { setupCueSelectionPrefsHandlers } from '../../ipc/cue-selection-prefs-handlers'
+import { CUE_CONSISTENCY_WINDOW_MS_MAX } from '../../../shared/cueConsistencyWindow'
 
 describe('SET_CUE_CONSISTENCY_WINDOW', () => {
   let handlers: Map<string, (event: unknown, ...args: any[]) => Promise<any>>
@@ -83,6 +84,16 @@ describe('SET_CUE_CONSISTENCY_WINDOW', () => {
     expect(mockConfig.setPreference).not.toHaveBeenCalled()
     expect(yargRegistry.setCueConsistencyWindow).not.toHaveBeenCalled()
     expect(rb3Registry.setCueConsistencyWindow).not.toHaveBeenCalled()
+  })
+
+  it('accepts the settings box ceiling and refuses anything above it', async () => {
+    const set = handlers.get(LIGHT.SET_CUE_CONSISTENCY_WINDOW)!
+
+    expect(await set({}, CUE_CONSISTENCY_WINDOW_MS_MAX)).toEqual({
+      success: true,
+      windowMs: CUE_CONSISTENCY_WINDOW_MS_MAX,
+    })
+    expect((await set({}, CUE_CONSISTENCY_WINDOW_MS_MAX + 1)).success).toBe(false)
   })
 
   it('reads the stored window back through the getter', async () => {

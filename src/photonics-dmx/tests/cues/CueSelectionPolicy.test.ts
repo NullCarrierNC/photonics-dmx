@@ -322,12 +322,13 @@ describe('CueSelectionPolicy', () => {
       expect(seen.every((u) => u.groupId === seen[0].groupId)).toBe(true)
     })
 
-    it('allows a re-roll once the window expires without a resolution', () => {
+    it('allows a re-roll once the window expires after another cue', () => {
       registerPair(CueStyle.Primary)
       policy.setCueConsistencyWindow(2000)
 
       jest.spyOn(Math, 'random').mockReturnValue(0)
       policy.selectCue(CueType.Chorus)
+      policy.selectCue(CueType.Verse)
       const pinned = seen[0].groupId
       const candidates = catalog.getActiveGroupsImplementing(CueType.Chorus)
       const otherIndex = candidates.findIndex((groupId) => groupId !== pinned)
@@ -336,7 +337,7 @@ describe('CueSelectionPolicy', () => {
       jest.spyOn(Math, 'random').mockReturnValue(otherIndex / candidates.length)
       policy.selectCue(CueType.Chorus)
 
-      expect(seen[1].groupId).toBe(candidates[otherIndex])
+      expect(seen[2].groupId).toBe(candidates[otherIndex])
     })
 
     it('stays on the current group when the stage kit priority changes', () => {

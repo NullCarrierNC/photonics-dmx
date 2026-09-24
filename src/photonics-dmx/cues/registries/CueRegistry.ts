@@ -185,7 +185,8 @@ export class CueRegistry {
   }
 
   /**
-   * Set the cue consistency window to prevent rapid randomization changes.
+   * Set how long a cue called again after another cue reuses the group it last got. A held cue
+   * keeps its group whatever the window.
    * @param windowMs The consistency window in milliseconds (default: 2000ms)
    */
   public setCueConsistencyWindow(windowMs: number): void {

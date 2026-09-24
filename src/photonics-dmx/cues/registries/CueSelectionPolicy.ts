@@ -94,7 +94,7 @@ export class CueSelectionPolicy {
   private readonly primaryRole: CueRoleState = newCueRoleState('primary', 100)
   private readonly secondaryRole: CueRoleState = newCueRoleState('secondary', 50)
 
-  /** Cue consistency throttling to prevent rapid randomization changes */
+  /** Reuse window for a cue called again after another cue, and the last pick per cue type */
   private cueConsistencyWindow: number = 2000 // 2 seconds in milliseconds
   private lastCueExecutionTime: Map<CueType, number> = new Map()
   private lastCueGroupSelection: Map<CueType, { groupId: string; isFallback: boolean }> = new Map()
@@ -255,7 +255,8 @@ export class CueSelectionPolicy {
   }
 
   /**
-   * Set the cue consistency window to prevent rapid randomization changes.
+   * Set how long a cue called again after another cue reuses the group it last got. A held cue
+   * keeps its group whatever the window.
    * @param windowMs The consistency window in milliseconds (default: 2000ms)
    */
   public setCueConsistencyWindow(windowMs: number): void {
@@ -489,16 +490,17 @@ export class CueSelectionPolicy {
   }
 
   /**
-   * Whether a cue type called again keeps the group it last got. Inside the window it does. A
-   * window of 0 keeps it only while the cue type is still the one its role is playing, so a held
-   * cue never changes group and the chart calling it again after another cue rolls a new one.
+   * Whether a cue type called again keeps the group it last got. A cue type that is still the one
+   * its role is playing is held and always keeps its group, whatever the window and however far
+   * apart its keepalives arrive. The window decides only a cue type the chart calls again after
+   * another cue: inside it the group is reused, and at 0 or past it a new one is rolled.
    */
   private withinConsistencyWindow(cueType: CueType, groupId: string, sinceLastMs: number): boolean {
-    if (this.cueConsistencyWindow > 0) {
-      return sinceLastMs < this.cueConsistencyWindow
-    }
     const cue = this.catalog.cueFrom(groupId, cueType)
-    return cue !== null && this.roleFor(cue).lastCueName === cueType
+    if (cue !== null && this.roleFor(cue).lastCueName === cueType) {
+      return true
+    }
+    return sinceLastMs < this.cueConsistencyWindow
   }
 
   /** Record the execution of a cue for consistency tracking. */

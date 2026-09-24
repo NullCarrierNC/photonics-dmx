@@ -33,6 +33,11 @@ import {
 import { useProbabilitySaver } from './CueConsistencySettings/useProbabilitySaver'
 import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
+import {
+  CUE_CONSISTENCY_WINDOW_MS_MAX,
+  CUE_CONSISTENCY_WINDOW_MS_MIN,
+  clampCueConsistencyWindowMs,
+} from '../../../shared/cueConsistencyWindow'
 
 const log = createLogger('CueConsistencySettings')
 
@@ -193,7 +198,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
 
   const handleConsistencyWindowChange = useCallback(
     (value: number) => {
-      const newValue = Math.max(0, Math.min(300000, value)) // Clamp to 0-300000
+      const newValue = clampCueConsistencyWindowMs(value)
       setConsistencyWindow(newValue)
 
       return queueWrite(async () => {
@@ -246,7 +251,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 0
     // Only update the local state immediately, don't save on every keystroke
-    setConsistencyWindow(Math.max(0, Math.min(300000, value)))
+    setConsistencyWindow(clampCueConsistencyWindowMs(value))
   }
 
   /** Saves when the user finishes editing, rather than on every keystroke. */
@@ -339,11 +344,11 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         Cue Consistency Settings
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Prevents rapid randomization changes when the same cue is called within a short time window.
-        This helps maintain visual consistency during rapid cue transitions. I.e. if Cue A from
-        Group B was selected, each time Cue A is called within this window will use the same
-        implementation as the previous call. With &quot;Once Per Song&quot;, the cue group is chosen
-        when the song starts and stays fixed for the entire song.
+        A cue that keeps playing always stays on the group it was given. The consistency window
+        decides what happens when a cue comes back after another one. I.e. if Cue A came from Group
+        B, Cue A called again within this window uses Group B&apos;s version again, and after the
+        window a new group is picked. With &quot;Once Per Song&quot;, the cue group is chosen when
+        the song starts and stays fixed for the entire song.
       </p>
 
       <div className="space-y-4">
@@ -377,8 +382,8 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
             <input
               type="number"
               id="consistency-window"
-              min="0"
-              max="300000"
+              min={CUE_CONSISTENCY_WINDOW_MS_MIN}
+              max={CUE_CONSISTENCY_WINDOW_MS_MAX}
               step="100"
               value={consistencyWindow}
               onChange={handleInputChange}
@@ -391,8 +396,8 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Set to 0 to disable consistency throttling. Default is 10000ms (10 seconds). Maximum is
-            300000ms (5 minutes).
+            Set to 0 to pick a new group every time a cue comes back. Default is 10000ms (10
+            seconds). Maximum is 300000ms (5 minutes).
           </p>
         </div>
         <SelectionModeField
