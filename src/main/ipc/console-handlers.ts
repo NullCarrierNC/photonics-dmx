@@ -14,7 +14,8 @@ const log = createLogger('console-handlers')
  */
 export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // The page each console session is bound to, so re-enabling from the same page does not stack
-  // another set of listeners on it.
+  // another set of listeners on it. Cleared when that binding releases, so a page that reloads and
+  // opens the console again is followed again.
   let boundSender: WebContents | null = null
 
   handleInvoke(ipcMain, LIGHT.CONSOLE_ENABLE, log, async (event, data: unknown) => {
@@ -23,8 +24,14 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
     const result = await controllerManager.enableConsoleMode(data.rigId)
     if (result.success && boundSender !== event.sender) {
-      boundSender = event.sender
-      bindConsoleModeToRenderer(event.sender, () => controllerManager.disableConsoleMode())
+      const sender = event.sender
+      boundSender = sender
+      bindConsoleModeToRenderer(sender, () => {
+        if (boundSender === sender) {
+          boundSender = null
+        }
+        return controllerManager.disableConsoleMode()
+      })
     }
     return result
   })
