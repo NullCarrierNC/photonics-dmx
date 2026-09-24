@@ -149,10 +149,10 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
       await ctx.listenerLifecycle.audio.enableAudio(ctx.isInitialized(), () => ctx.init())
     }
 
-    // Restore DMX output senders from persisted preferences so that output
-    // continues without requiring a manual toggle after any config change.
     abortIfShuttingDown(ctx.lifecycle, 'before senders were restored')
-    await ctx.senderLifecycle.restoreSenderOutputsFromPrefs(activeSendersBeforeRestart ?? undefined)
+    if (activeSendersBeforeRestart) {
+      await ctx.senderLifecycle.restoreRunningSenders(activeSendersBeforeRestart)
+    }
 
     // Single source of the restart broadcast: every caller of restartControllers() used to fire
     // this itself (and SET_CLOCK_RATE forgot to), so broadcast once here after a successful restart

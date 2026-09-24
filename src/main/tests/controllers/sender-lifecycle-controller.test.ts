@@ -35,7 +35,7 @@ describe('SenderLifecycleController', () => {
     })
   })
 
-  it('restoreSenderOutputsFromPrefs restores IPC sender when snapshot requests it', async () => {
+  it('restoreRunningSenders restores IPC sender when snapshot requests it', async () => {
     const senderManager = {
       enableSender: jest.fn().mockImplementation(() => Promise.resolve()),
     }
@@ -61,7 +61,7 @@ describe('SenderLifecycleController', () => {
     sl.senderErrorHandler = () => {}
     sl.senderErrorTrackingCallback = null
 
-    await SenderLifecycleController.prototype.restoreSenderOutputsFromPrefs.call(
+    await SenderLifecycleController.prototype.restoreRunningSenders.call(
       sl as unknown as SenderLifecycleController,
       {
         sacn: false,

@@ -19,10 +19,7 @@ import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
-import {
-  SenderLifecycleController,
-  type OutputSenderStateSnapshot,
-} from './SenderLifecycleController'
+import { SenderLifecycleController } from './SenderLifecycleController'
 import { ConsoleModeController, CONSOLE_UNAVAILABLE_MESSAGE } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
@@ -510,17 +507,6 @@ export class ControllerManager {
       },
       restartTeardownListeners: () => [...(this.onControllerRestartListeners ?? [])],
     })
-  }
-
-  /**
-   * Re-enable DMX output senders based on persisted preferences.
-   * Called after controller restart so that sACN / Art-Net / USB senders
-   * resume automatically without the user needing to toggle them off and on.
-   */
-  public async restoreSenderOutputsFromPrefs(
-    activeSenders?: OutputSenderStateSnapshot,
-  ): Promise<void> {
-    return this.senderLifecycle.restoreSenderOutputsFromPrefs(activeSenders)
   }
 
   /** Enable audio listener and processor. */

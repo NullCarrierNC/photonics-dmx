@@ -128,25 +128,12 @@ export class SenderLifecycleController {
   }
 
   /**
-   * Re-enable DMX output senders based on persisted preferences.
-   * Called after controller restart so that sACN / Art-Net / USB senders
-   * resume automatically without the user needing to toggle them off and on.
-   * When `activeSenders.ipc` is true (pre-restart snapshot), restores the IPC preview sender.
+   * Re-enable the senders that were running before a controller restart, each with the
+   * configuration saved for it, so output carries on without the user toggling them again. The
+   * saved `dmxOutputConfig` flags say which outputs the Status page offers, not which run.
    */
-  public async restoreSenderOutputsFromPrefs(
-    activeSenders?: OutputSenderStateSnapshot,
-  ): Promise<void> {
+  public async restoreRunningSenders(sendersToRestore: OutputSenderStateSnapshot): Promise<void> {
     const prefs = this.getConfig().getAllPreferences()
-    const outputConfig = prefs.dmxOutputConfig
-    if (!outputConfig) return
-
-    const sendersToRestore: OutputSenderStateSnapshot = activeSenders ?? {
-      sacn: outputConfig.sacnEnabled,
-      artnet: outputConfig.artNetEnabled,
-      enttecpro: outputConfig.enttecProEnabled,
-      opendmx: outputConfig.openDmxEnabled,
-      ipc: false,
-    }
 
     this.ensureSenderManager()
     const sm = this.senderManager!

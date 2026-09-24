@@ -92,7 +92,7 @@ export function senderLifecycleStub() {
   return {
     getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
     resetSenderForControllerRestart: jest.fn(async () => {}),
-    restoreSenderOutputsFromPrefs: jest.fn(async (_snapshot?: unknown) => {}),
+    restoreRunningSenders: jest.fn(async (_snapshot: unknown) => {}),
     shutdownSenderOnAppExit: jest.fn(async () => {}),
     getSenderManager: jest.fn(),
   }

@@ -153,8 +153,8 @@ describe('ControllerManager restart', () => {
 
     expect(senders.resetSenderForControllerRestart).toHaveBeenCalledTimes(1)
     expect(init).toHaveBeenCalledTimes(1)
-    expect(senders.restoreSenderOutputsFromPrefs).toHaveBeenCalledTimes(1)
-    expect(senders.restoreSenderOutputsFromPrefs).toHaveBeenCalledWith(snapshot)
+    expect(senders.restoreRunningSenders).toHaveBeenCalledTimes(1)
+    expect(senders.restoreRunningSenders).toHaveBeenCalledWith(snapshot)
     expect(lifecycle.phase).toBe('running')
     // The restart announces itself once, for every window.
     expect(jest.mocked(sendToAllWindows)).toHaveBeenCalledWith(
@@ -170,7 +170,7 @@ describe('ControllerManager restart', () => {
 
     await manager.restartControllers()
 
-    expect(senders.restoreSenderOutputsFromPrefs).toHaveBeenCalledWith({
+    expect(senders.restoreRunningSenders).toHaveBeenCalledWith({
       ...SNAPSHOT_NONE,
       ipc: true,
     })
@@ -250,7 +250,7 @@ describe('ControllerManager restart', () => {
     await expect(manager.restartControllers()).rejects.toBeInstanceOf(LifecycleAbortedError)
 
     expect(listeners.yargRb3.enableYarg).not.toHaveBeenCalled()
-    expect(senders.restoreSenderOutputsFromPrefs).not.toHaveBeenCalled()
+    expect(senders.restoreRunningSenders).not.toHaveBeenCalled()
     expect(lifecycle.phase).toBe('shuttingDown')
   })
 
@@ -522,7 +522,7 @@ function senderLifecycleWith(prefs: Record<string, unknown>) {
   return { lifecycle, enableSender }
 }
 
-describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
+describe('SenderLifecycleController.restoreRunningSenders', () => {
   it('restores an enabled sACN sender with its saved mapping', async () => {
     const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
@@ -539,7 +539,7 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
     expect(enableSender).toHaveBeenCalledTimes(1)
     expect(enableSender).toHaveBeenCalledWith('sacn', 'sacn', {
@@ -566,7 +566,12 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       openDmxConfig: { port: '', dmxSpeed: 40 },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({
+      ...SNAPSHOT_NONE,
+      artnet: true,
+      enttecpro: true,
+      opendmx: true,
+    })
 
     expect(enableSender).not.toHaveBeenCalled()
   })
@@ -586,7 +591,7 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       openDmxConfig: { port: 'COM4', dmxSpeed: stored },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, opendmx: true })
 
     expect(enableSender).toHaveBeenCalledWith('opendmx', 'opendmx', {
       sender: 'opendmx',
@@ -614,7 +619,7 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, artnet: true })
 
     expect(enableSender).not.toHaveBeenCalled()
   })
@@ -630,12 +635,12 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       sacnConfig: { universe: 70000, useUnicast: false, unicastDestination: '' },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
     expect(enableSender).not.toHaveBeenCalled()
   })
 
-  it('follows an explicit active-sender snapshot over the saved flags', async () => {
+  it('restores only the senders that ran, whatever outputs the saved flags offer', async () => {
     const { lifecycle, enableSender } = senderLifecycleWith({
       dmxOutputConfig: {
         sacnEnabled: true,
@@ -654,7 +659,7 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       openDmxConfig: { port: '/dev/tty.usbserial-OPEN', dmxSpeed: 40 },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs({ ...SNAPSHOT_NONE, sacn: true })
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
     expect(enableSender).toHaveBeenCalledTimes(1)
     expect(enableSender).toHaveBeenCalledWith('sacn', 'sacn', {
@@ -684,8 +689,8 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       },
     })
 
-    await lifecycle.restoreSenderOutputsFromPrefs()
-    await lifecycle.restoreSenderOutputsFromPrefs()
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
+    await lifecycle.restoreRunningSenders({ ...SNAPSHOT_NONE, sacn: true })
 
     const restored = {
       sender: 'sacn' as const,
