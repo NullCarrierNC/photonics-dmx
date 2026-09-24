@@ -53,10 +53,10 @@ const WINDOW_SPECS: Record<WindowRole, WindowSpec> = {
 
 const WINDOW_ROLES = Object.keys(WINDOW_SPECS) as WindowRole[]
 
-/** A Quit closes the main window last, so a page that keeps the app open keeps it too. */
-const QUIT_CLOSE_ORDER: WindowRole[] = ['cueEditor', 'audioPreview', 'main']
+/** The order a Quit asks about pages with unsaved changes, the main window last. */
+const QUIT_ASK_ORDER: WindowRole[] = ['cueEditor', 'audioPreview', 'main']
 
-/** How long a closing page has to answer before a Quit carries on without it. */
+/** How long a closing page has to answer before a Quit carries on without it. Pages share it. */
 const CLOSE_ANSWER_MS = 5000
 
 /** How long a window's geometry has to settle after a move or resize before it is saved. */
@@ -413,7 +413,7 @@ export class WindowManager {
     for (const role of WINDOW_ROLES) {
       await this.saveWindowState(role)
     }
-    for (const role of QUIT_CLOSE_ORDER) {
+    for (const role of QUIT_ASK_ORDER) {
       const window = this.openWindow(role)
       if (window && this.unsavedPages.has(window.webContents.id)) {
         if (!(await this.confirmLeave(window))) {
@@ -422,12 +422,10 @@ export class WindowManager {
       }
     }
     this.quitting = true
-    for (const role of QUIT_CLOSE_ORDER) {
-      const window = this.openWindow(role)
-      if (window) {
-        await this.closeWithin(window)
-      }
-    }
+    const open = WINDOW_ROLES.map((role) => this.openWindow(role)).filter(
+      (window) => window !== null,
+    )
+    await Promise.all(open.map((window) => this.closeWithin(window)))
     return true
   }
 

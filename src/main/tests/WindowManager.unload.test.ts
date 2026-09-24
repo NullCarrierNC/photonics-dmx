@@ -286,6 +286,23 @@ describe('WindowManager windows closed for a Quit', () => {
     expect(main.destroyed).toBe(true)
   })
 
+  it('gives every page that never answers the close one shared wait', async () => {
+    jest.useFakeTimers()
+    const { wm, main, editor } = managerWithMainAndEditor({ main: false, editor: false })
+    editor.close.mockImplementation(() => {})
+    main.close.mockImplementation(() => {})
+    let settled = false
+
+    const quit = wm.closeWindowsForQuit().then((closed) => {
+      settled = true
+      return closed
+    })
+    await jest.advanceTimersByTimeAsync(5000)
+
+    expect(settled).toBe(true)
+    await expect(quit).resolves.toBe(true)
+  })
+
   it('asks nothing when no page holds unsaved changes', async () => {
     const { wm, main, editor } = managerWithMainAndEditor({ main: false, editor: false })
 
