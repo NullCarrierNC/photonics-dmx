@@ -317,4 +317,43 @@ describe('MotionSelectionCoordinator', () => {
       expect.anything(),
     )
   })
+
+  describe('after a cue file reload', () => {
+    it('runs the reloaded instance of the running cue from the next dispatch', () => {
+      const old = makeFakeCue('motion-a')
+      const reloaded = makeFakeCue('motion-a')
+      jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(old)
+      const coordinator = build({ getMotionCueMinimumHoldMs: () => 60_000 })
+      coordinator.select({}, { cueKey: 'Verse' })
+
+      jest
+        .spyOn(registry, 'findMotionCueRef')
+        .mockImplementation((cue) => (cue === reloaded ? REF : null))
+      jest.spyOn(registry, 'getMotionCueImplementation').mockReturnValue(reloaded)
+      emit.mockClear()
+
+      expect(coordinator.select({}, { cueKey: 'Verse' })).toBe(reloaded)
+      expect(old.onStop).toHaveBeenCalledTimes(1)
+      expect(emit).toHaveBeenCalledWith(
+        RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+        expect.objectContaining({ ref: REF }),
+      )
+    })
+
+    it('picks again when the running cue is gone from the reloaded files', () => {
+      const old = makeFakeCue('motion-a')
+      const other = makeFakeCue('motion-b')
+      jest.spyOn(registry, 'getRandomMotionCue').mockReturnValueOnce(old).mockReturnValue(other)
+      const coordinator = build({ getMotionCueMinimumHoldMs: () => 60_000 })
+      coordinator.select({}, { cueKey: 'Verse' })
+
+      jest
+        .spyOn(registry, 'findMotionCueRef')
+        .mockImplementation((cue) => (cue === other ? REF : null))
+      jest.spyOn(registry, 'getMotionCueImplementation').mockReturnValue(null)
+
+      expect(coordinator.select({}, { cueKey: 'Verse' })).toBe(other)
+      expect(old.onStop).toHaveBeenCalledTimes(1)
+    })
+  })
 })

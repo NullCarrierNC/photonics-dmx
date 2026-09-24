@@ -495,6 +495,9 @@ describe('CueHandler requestMotionRepick (RB3 external trigger)', () => {
   it('respects the min-hold floor (no re-pick within the hold window)', () => {
     const motion = makeFakeCue(CueStyle.Primary, 'motion')
     const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+    jest
+      .spyOn(registry, 'findMotionCueRef')
+      .mockReturnValue({ groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' })
     const handler = new CueHandler(makeLightManager(), makeSequencer(), {
       registry,
       getMotionCueMinimumHoldMs: () => 60_000,

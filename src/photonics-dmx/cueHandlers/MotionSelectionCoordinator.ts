@@ -81,6 +81,8 @@ export class MotionSelectionCoordinator<TCue extends StoppableMotionCue = INetCu
   private currentMotionCue: TCue | null = null
   private currentMotionCueStartTime: number | null = null
   private currentPick: { source: 'manual' | 'auto'; manualFallback: boolean } | null = null
+  /** The ref the running cue was picked under, which finds it again after a reload. */
+  private currentRef: MotionCueRef | null = null
   private manualMotionRef: MotionCueRef | null = null
   /** The manual ref the last pick used, undefined until a pick has looked at it. */
   private lastManualMotionRefForMotion: MotionCueRef | null | undefined = undefined
@@ -212,6 +214,7 @@ export class MotionSelectionCoordinator<TCue extends StoppableMotionCue = INetCu
   }
 
   private decide(request: MotionSelectRequest): TCue | null {
+    this.followReload()
     const isNewCue = request.cueKey !== undefined && request.cueKey !== this.lastCueKey
     const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
     const now = monotonicNowMs()
@@ -272,10 +275,35 @@ export class MotionSelectionCoordinator<TCue extends StoppableMotionCue = INetCu
     }
     this.currentPick = { source, manualFallback }
     const ref = this.registry.findMotionCueRef(motionCue)
+    this.currentRef = ref
     if (ref) {
       this.emit(ref, source, manualFallback)
     }
     return motionCue
+  }
+
+  /**
+   * A cue file reload registers new instances and leaves the running one orphaned. The instance now
+   * registered under the running cue's ref takes over with the hold kept, and a cue the reload
+   * removed makes the next decision pick again.
+   */
+  private followReload(): void {
+    const running = this.currentMotionCue
+    if (!running || this.registry.findMotionCueRef(running) !== null) {
+      return
+    }
+    const reloaded = this.currentRef
+      ? this.registry.getMotionCueImplementation(this.currentRef)
+      : null
+    if (!reloaded) {
+      this.repickPending = true
+      return
+    }
+    running.onStop?.()
+    this.currentMotionCue = reloaded
+    if (this.currentRef && this.currentPick) {
+      this.emit(this.currentRef, this.currentPick.source, this.currentPick.manualFallback)
+    }
   }
 
   /** Stop the running cue and broadcast that nothing runs, keeping the last cue key. */
@@ -292,6 +320,7 @@ export class MotionSelectionCoordinator<TCue extends StoppableMotionCue = INetCu
     this.currentMotionCue = null
     this.currentMotionCueStartTime = null
     this.currentPick = null
+    this.currentRef = null
   }
 
   private emit(
