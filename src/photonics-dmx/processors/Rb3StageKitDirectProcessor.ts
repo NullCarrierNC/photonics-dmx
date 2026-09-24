@@ -25,6 +25,7 @@ import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { StrobeWatchdog } from './strobeWatchdog'
 import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 import {
   buildInGameClearCueData,
   buildMenusCueData,
@@ -57,6 +58,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   // The strobe type the rigs are running, so a repeated packet is not a second start.
   private _currentStrobeType: StrobeSpeedSlot | null = null
+  // When the running strobe began, which every rig takes its flash phase from.
+  private _strobeStartedAt = 0
 
   // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
   // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
@@ -125,7 +128,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         this.rigs.set(rig.rigId, rig)
         // A rig that joins during a strobe strobes with the others straight away.
         if (this._currentStrobeType) {
-          rig.applyStrobeEffect(this._currentStrobeType)
+          rig.applyStrobeEffect(this._currentStrobeType, this._strobeStartedAt)
         }
       } catch (err) {
         // Most likely the chain has <4 lights — skip it but keep the others working.
@@ -408,7 +411,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest'): void {
     for (const rig of this.rigs.values()) {
       try {
-        rig.applyStrobeEffect(strobeType)
+        rig.applyStrobeEffect(strobeType, this._strobeStartedAt)
       } catch (error) {
         log.error(`Rig ${rig.rigId}: applyStrobeEffect failed:`, error)
       }
@@ -421,6 +424,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   private setStrobeType(strobeType: StrobeSpeedSlot | null): void {
     this._currentStrobeType = strobeType
+    if (strobeType) this._strobeStartedAt = monotonicNowMs()
     this.chainFanout.strobeState.setActive(strobeType, 'net')
   }
 

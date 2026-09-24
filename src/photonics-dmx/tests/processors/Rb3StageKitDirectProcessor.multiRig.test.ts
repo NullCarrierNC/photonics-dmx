@@ -5,6 +5,7 @@
  * from the same LED positions.
  */
 import { EventEmitter } from 'events'
+import * as perfHooks from 'perf_hooks'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
@@ -38,6 +39,24 @@ function makeEightLightConfig(prefix = 'b') {
     ),
     backLights: [],
     strobeLights: [],
+  })
+}
+
+/** Four lights with the first one strobe-capable, named by `prefix`. */
+function makeStrobeConfig(prefix: string) {
+  const lights = Array.from({ length: 4 }, (_, i) =>
+    createMockDmxLight({
+      id: `${prefix}-f${i}`,
+      position: i,
+      fixtureId: `${prefix}-f${i}`,
+      isStrobeEnabled: i === 0,
+    }),
+  )
+  return createMockLightingConfig({
+    numLights: 4,
+    frontLights: lights,
+    backLights: [],
+    strobeLights: [lights[0]],
   })
 }
 
@@ -590,5 +609,39 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
 
     expect(a.blackout).toHaveBeenCalled()
     expect(b.blackout).toHaveBeenCalled()
+  })
+
+  it('keeps a rig added during a strobe in step with the rigs already strobing', () => {
+    jest.setSystemTime(0)
+    jest.spyOn(perfHooks.performance, 'now').mockImplementation(() => Date.now())
+    const flashTimes = (setState: jest.Mock): number[] => {
+      const times: number[] = []
+      setState.mockImplementation((...args: unknown[]) => {
+        const color = args[1] as { red: number; green: number; blue: number }
+        if (color.red === 255 && color.green === 255 && color.blue === 255) times.push(Date.now())
+      })
+      return times
+    }
+    const a = makeChain('a', true, makeStrobeConfig('a'))
+    fanout.setChains([a.chain])
+    processor = new Rb3StageKitDirectProcessor(fanout)
+    processor.startListening(networkListener)
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      strobeEffect: 'slow',
+      timestamp: Date.now(),
+    })
+    jest.advanceTimersByTime(300)
+
+    const c = makeChain('c', false, makeStrobeConfig('c'))
+    fanout.setChains([a.chain, c.chain])
+    processor.refreshRigs()
+    const aFlashes = flashTimes(a.setState)
+    const cFlashes = flashTimes(c.setState)
+    jest.advanceTimersByTime(1000)
+
+    expect(aFlashes.length).toBeGreaterThan(1)
+    expect(cFlashes).toEqual(aFlashes)
   })
 })

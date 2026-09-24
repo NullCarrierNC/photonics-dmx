@@ -17,6 +17,7 @@ import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { getColor } from '../helpers/dmxHelpers'
 import { Color, RGBIO, TrackedLight } from '../types'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('Rb3StageKitRigProcessor')
 
 type StrobeType = 'slow' | 'medium' | 'fast' | 'fastest'
@@ -24,7 +25,8 @@ type StrobeType = 'slow' | 'medium' | 'fast' | 'fastest'
 interface ActiveStrobeEffect {
   type: StrobeType
   positions: number[]
-  interval?: NodeJS.Timeout
+  /** Cancels the run's timers. */
+  stop?: () => void
   targetLights: TrackedLight[]
 }
 
@@ -96,7 +98,11 @@ export class Rb3StageKitRigProcessor {
     this.updateColorBank(color, dmxLightIndices)
   }
 
-  public applyStrobeEffect(strobeType: StrobeType): void {
+  /**
+   * Strobe the rig's strobe lights. `startedAt` (monotonic ms) is when the strobe began, which sets
+   * the flash phase, so a rig that joins a running strobe flashes with the rigs already on it.
+   */
+  public applyStrobeEffect(strobeType: StrobeType, startedAt = monotonicNowMs()): void {
     const strobeLights = this.lightManager.getLights(['strobe'], 'all')
     const allLights = this.lightManager.getLights(['front', 'back'], 'all')
 
@@ -170,7 +176,14 @@ export class Rb3StageKitRigProcessor {
       positions: dmxLightIndices,
       targetLights,
     })
-    this.startStrobeEffect(effectName, targetLights, white, strobeInterval, dmxLightIndices)
+    this.startStrobeEffect(
+      effectName,
+      targetLights,
+      white,
+      strobeInterval,
+      dmxLightIndices,
+      startedAt,
+    )
   }
 
   /** The one name a given strobe type runs under on this rig. */
@@ -182,10 +195,10 @@ export class Rb3StageKitRigProcessor {
   private stopStrobeEffect(effectName: string): void {
     const effectData = this.activeStrobeEffects.get(effectName)
     this.activeStrobeEffects.delete(effectName)
-    if (!effectData?.interval) {
+    if (!effectData?.stop) {
       return
     }
-    clearInterval(effectData.interval)
+    effectData.stop()
     if (effectData.targetLights) {
       // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
       // pass the stored DMX indices (effectData.positions).
@@ -271,7 +284,7 @@ export class Rb3StageKitRigProcessor {
     }
     this.pendingUpdates.clear()
     for (const effectData of this.activeStrobeEffects.values()) {
-      if (effectData.interval) clearInterval(effectData.interval)
+      effectData.stop?.()
     }
     this.activeStrobeEffects.clear()
     this.strobedLights.clear()
@@ -330,12 +343,18 @@ export class Rb3StageKitRigProcessor {
     color: RGBIO,
     interval: number,
     dmxLightIndices: number[],
+    startedAt: number,
   ): void {
-    let isOn = false
+    // Each half of a flash starts on a multiple of the interval since the strobe began.
+    const elapsed = Math.max(0, monotonicNowMs() - startedAt)
+    let isOn = Math.floor(elapsed / interval) % 2 === 1
     for (const lightIndex of dmxLightIndices) {
       this.strobedLights.add(lightIndex)
     }
-    const strobeInterval = setInterval(() => {
+    if (isOn) {
+      this.sequencer.setState(targetLights, color, 0)
+    }
+    const toggle = (): void => {
       if (isOn) {
         try {
           this.restoreColorsAfterStrobe(targetLights, dmxLightIndices)
@@ -347,8 +366,19 @@ export class Rb3StageKitRigProcessor {
         this.sequencer.setState(targetLights, color, 0)
         isOn = true
       }
-    }, interval)
-    this.activeStrobeEffects.get(effectName)!.interval = strobeInterval
+    }
+    let repeat: NodeJS.Timeout | null = null
+    const first = setTimeout(
+      () => {
+        toggle()
+        repeat = setInterval(toggle, interval)
+      },
+      interval - (elapsed % interval),
+    )
+    this.activeStrobeEffects.get(effectName)!.stop = () => {
+      clearTimeout(first)
+      if (repeat) clearInterval(repeat)
+    }
   }
 
   private restoreColorsAfterStrobe(_targetLights: TrackedLight[], lightIndices: number[]): void {
