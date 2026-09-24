@@ -10,8 +10,9 @@ const { createRequire } = require('node:module')
 const yaml = createRequire(require.resolve('app-builder-lib'))('js-yaml')
 
 /**
- * Fuses every build sets. Off: running the binary as plain Node, NODE_OPTIONS and --inspect. On:
- * the archive integrity check and loading the app from the archive alone.
+ * Fuses every build sets. Off: running the binary as plain Node, NODE_OPTIONS, --inspect and the
+ * extra privileges of file:// pages. On: the archive integrity check and loading the app from the
+ * archive alone.
  */
 const REQUIRED = {
   RunAsNode: false,
@@ -19,6 +20,7 @@ const REQUIRED = {
   EnableNodeCliInspectArguments: false,
   EnableEmbeddedAsarIntegrityValidation: true,
   OnlyLoadAppFromAsar: true,
+  GrantFileProtocolExtraPrivileges: false,
 }
 
 /**
@@ -26,7 +28,6 @@ const REQUIRED = {
  * electron-builder.yml says why each is not set yet.
  */
 const HARDENED_WHEN_SET = {
-  GrantFileProtocolExtraPrivileges: false,
   EnableCookieEncryption: true,
 }
 

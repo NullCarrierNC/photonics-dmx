@@ -65,6 +65,8 @@ jest.mock('../rendererSessionSecurity', () => ({
   installDefaultSessionPermissionHandlers: installPermissionHandlers,
 }))
 
+jest.mock('../rendererScheme', () => ({ serveRendererFromScheme: jest.fn() }))
+
 jest.mock('../logging/fileLogSink', () => ({
   createFileLogSink: (...args: unknown[]) => createFileLogSink(...args),
 }))

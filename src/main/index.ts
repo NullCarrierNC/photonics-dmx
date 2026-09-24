@@ -7,6 +7,7 @@ import {
 } from './rendererSessionSecurity'
 import { Application } from './application'
 import { refuseDebuggingSwitches } from './debuggingSwitches'
+import { serveRendererFromScheme } from './rendererScheme'
 import { createFileLogSink } from './logging/fileLogSink'
 import {
   consoleLogSink,
@@ -19,6 +20,7 @@ import {
 const log = createLogger('Main')
 
 refuseDebuggingSwitches()
+serveRendererFromScheme()
 
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('disable-http-cache')

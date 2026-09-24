@@ -1,7 +1,7 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 
 const mockLoadFile = jest.fn(() => Promise.resolve())
-const mockLoadURL = jest.fn(() => Promise.resolve())
+const mockLoadURL = jest.fn((_url: string) => Promise.resolve())
 
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn(() => ({
@@ -45,11 +45,20 @@ async function withCapturedEntries(fn: () => void): Promise<LogEntry[]> {
 describe('WindowManager renderer loads', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockLoadFile.mockReturnValue(Promise.resolve())
+    mockLoadURL.mockReturnValue(Promise.resolve())
+  })
+
+  it('loads the built renderer from its own scheme', async () => {
+    await withCapturedEntries(() => {
+      new WindowManager().createMainWindow()
+    })
+
+    expect(mockLoadURL).toHaveBeenCalledWith('photonics://renderer/index.html')
+    expect(mockLoadFile).not.toHaveBeenCalled()
   })
 
   it('names the window that failed to load', async () => {
-    mockLoadFile.mockReturnValueOnce(Promise.reject(new Error('boom')))
+    mockLoadURL.mockReturnValueOnce(Promise.reject(new Error('boom')))
 
     const entries = await withCapturedEntries(() => {
       new WindowManager().createMainWindow()

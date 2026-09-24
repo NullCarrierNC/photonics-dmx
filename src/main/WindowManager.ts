@@ -5,6 +5,7 @@ import type { ControllerManager } from './controllers/ControllerManager'
 import { RENDERER_RECEIVE } from '../shared/ipcChannels'
 import type { AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
 import { denyWebContentsWillNavigate } from './rendererSessionSecurity'
+import { rendererPageUrl } from './rendererScheme'
 import { createLogger } from '../shared/logger'
 import { centredIn, fitWindowBounds, type WindowBounds } from './windowBounds'
 const log = createLogger('WindowManager')
@@ -247,12 +248,8 @@ export class WindowManager {
     const failed = onLoadFailure(spec.label)
     if (is.dev && devUrl) {
       window.loadURL(spec.query ? `${devUrl}?window=${spec.query}` : devUrl).catch(failed)
-    } else if (spec.query) {
-      window
-        .loadFile(join(__dirname, '../renderer/index.html'), { query: { window: spec.query } })
-        .catch(failed)
     } else {
-      window.loadFile(join(__dirname, '../renderer/index.html')).catch(failed)
+      window.loadURL(rendererPageUrl(spec.query)).catch(failed)
     }
 
     return window

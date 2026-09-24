@@ -24,6 +24,7 @@ electronFuses:
   enableNodeCliInspectArguments: false
   enableEmbeddedAsarIntegrityValidation: true
   onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
   resetAdHocDarwinSignature: true
 directories:
   buildResources: build
@@ -37,6 +38,7 @@ describe('readElectronFuses', () => {
       EnableNodeCliInspectArguments: false,
       EnableEmbeddedAsarIntegrityValidation: true,
       OnlyLoadAppFromAsar: true,
+      GrantFileProtocolExtraPrivileges: false,
     })
   })
 
@@ -76,7 +78,7 @@ describe('readElectronFuses', () => {
 })
 
 describe('fuseConfigProblems', () => {
-  it('passes the hardened five with the other two left unset', () => {
+  it('passes the hardened six with the other two left unset', () => {
     expect(fuseConfigProblems(readElectronFuses(HARDENED, KNOWN))).toEqual([])
   })
 
@@ -92,10 +94,10 @@ describe('fuseConfigProblems', () => {
     ])
   })
 
-  it('holds the file-protocol and cookie fuses to their hardened setting once set', () => {
+  it('holds the file-protocol fuse off, and the cookie fuse on once set', () => {
     const set = HARDENED.replace(
-      '  resetAdHocDarwinSignature',
-      '  grantFileProtocolExtraPrivileges: true\n  enableCookieEncryption: false\n  resetAdHocDarwinSignature',
+      'grantFileProtocolExtraPrivileges: false',
+      'grantFileProtocolExtraPrivileges: true\n  enableCookieEncryption: false',
     )
 
     expect(fuseConfigProblems(readElectronFuses(set, KNOWN))).toEqual([
@@ -117,10 +119,10 @@ describe('fuseConfigProblems', () => {
     ])
   })
 
-  it('passes the file-protocol and cookie fuses set to their hardened setting', () => {
+  it('passes the cookie fuse set to its hardened setting', () => {
     const set = HARDENED.replace(
       '  resetAdHocDarwinSignature',
-      '  grantFileProtocolExtraPrivileges: false\n  enableCookieEncryption: true\n  resetAdHocDarwinSignature',
+      '  enableCookieEncryption: true\n  resetAdHocDarwinSignature',
     )
 
     expect(readElectronFuses(set, KNOWN)).toMatchObject({
