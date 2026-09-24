@@ -119,4 +119,4 @@ function budgetVerdict({ counts, recordedText, write, label, file, counted, note
   }
 }
 
-module.exports = { readBudget, renderBudget, budgetVerdict }
+module.exports = { readBudget, budgetVerdict }

@@ -17,7 +17,7 @@ export function saveFailureMessage(what: string): string {
 }
 
 /** What a panel shows when a write landed and the controller restart after it failed. */
-export function restartFailureMessage(restartError: string): string {
+function restartFailureMessage(restartError: string): string {
   return `Saved, but the lights did not restart. ${restartError}`
 }
 

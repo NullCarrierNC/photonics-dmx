@@ -6,7 +6,7 @@ import { app, protocol } from 'electron'
  * The scheme a built renderer loads from. A page under file:// can read any local file its script
  * asks for, and a page under this scheme reaches the built renderer folder and nothing else.
  */
-export const RENDERER_SCHEME = 'photonics'
+const RENDERER_SCHEME = 'photonics'
 const RENDERER_HOST = 'renderer'
 
 /** Content types for what the build writes into out/renderer. */

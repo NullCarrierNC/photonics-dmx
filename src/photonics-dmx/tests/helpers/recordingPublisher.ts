@@ -8,7 +8,7 @@ import { noopRuntimeBroadcaster } from '../../runtime/broadcaster'
 import type { DmxRig } from '../../types'
 
 /** One buffer as it reached the sender, stamped with the clock the publisher reads. */
-export interface WireFrame {
+interface WireFrame {
   atMs: number
   buffer: Readonly<Record<number, number>>
 }

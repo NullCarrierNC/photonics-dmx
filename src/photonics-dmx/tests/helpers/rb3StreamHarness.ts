@@ -16,10 +16,10 @@ import { createRecordingPublisher, type RecordingPublisher } from './recordingPu
 import { createMockDmxLight, createMockLightingConfig } from './testFixtures'
 
 /** Light indices (0-based, front row) that are strobe-enabled. */
-export const RB3_STREAM_STROBE_LIGHTS = [0, 4]
+const RB3_STREAM_STROBE_LIGHTS = [0, 4]
 
 /** What one light put on the wire. Light `i` owns channels 1 + 4i to 4 + 4i. */
-export interface WireLevel {
+interface WireLevel {
   dimmer: number
   red: number
   green: number
