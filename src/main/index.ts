@@ -22,7 +22,7 @@ if (!app.isPackaged) {
 }
 
 /**
- * Scopes kept at `info` when a packaged build raises the floor to `error`.
+ * Scopes kept at `info` when a packaged build raises the floor to `warn`.
  *
  * These record what became of the user's own files: which one was loaded, what a migration
  * rewrote, and what a recovery replaced. The failure itself logs at `error`, and these are the
@@ -131,7 +131,7 @@ function onReady(): void {
   // Named while the floor is still info, so the log file records where it is.
   log.info(`Writing logs to ${logsDir}`)
   if (!process.env.PHOTONICS_LOG_LEVEL && app.isPackaged) {
-    setMinLogLevel('error')
+    setMinLogLevel('warn')
     for (const scope of STARTUP_ACCOUNT_SCOPES) {
       setScopeMinLogLevel(scope, 'info')
     }

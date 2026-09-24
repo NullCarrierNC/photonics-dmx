@@ -246,6 +246,23 @@ describe('main startup', () => {
     expect(entries.map((e) => e.scope)).toEqual(['ConfigFile', 'Main'])
   })
 
+  it('keeps warnings when a packaged build raises the floor', async () => {
+    mockIsPackaged = true
+
+    const entries: LogEntry[] = []
+    await startUp()
+    const logger = await loadedLogger()
+    logger.setLogSink((entry) => entries.push(entry))
+    try {
+      logger.createLogger('LightTransitionController').warn('a sender fell behind')
+      logger.createLogger('LightTransitionController').info('frame chatter')
+    } finally {
+      logger.resetLogConfiguration()
+    }
+
+    expect(entries.map((e) => `${e.level} ${e.message}`)).toEqual(['warn a sender fell behind'])
+  })
+
   it.each(['SIGINT', 'SIGTERM'] as const)(
     'flushes the log before a forced exit on %s',
     async (signal) => {
