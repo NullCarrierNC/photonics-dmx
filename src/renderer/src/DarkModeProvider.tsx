@@ -29,6 +29,17 @@ export const DarkModeProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('darkMode', String(isDarkMode))
   }, [isDarkMode])
 
+  // Every window of the app shares this storage, and a write raises a storage event in each window
+  // but the one that wrote it, so the other windows follow a toggle.
+  useEffect(() => {
+    const followOtherWindow = (event: StorageEvent) => {
+      if (event.key !== 'darkMode' || event.newValue === null) return
+      setIsDarkMode(event.newValue === 'true')
+    }
+    window.addEventListener('storage', followOtherWindow)
+    return () => window.removeEventListener('storage', followOtherWindow)
+  }, [])
+
   const toggleDarkMode = () => {
     setIsDarkMode((prevMode) => !prevMode)
   }
