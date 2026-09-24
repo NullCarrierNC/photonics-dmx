@@ -5,6 +5,7 @@ import {
   currentPageAtom,
   dmxLightsLibraryAtom,
   dmxRigsAtom,
+  dmxRigsLoadedAtom,
   isSenderErrorAtom,
   lightingPrefsAtom,
   myDmxLightsAtom,
@@ -67,6 +68,7 @@ export const App = (): JSX.Element => {
   const setMyLights = useSetAtom(myDmxLightsAtom)
   const setLightLibrary = useSetAtom(dmxLightsLibraryAtom)
   const setDmxRigs = useSetAtom(dmxRigsAtom)
+  const setDmxRigsLoaded = useSetAtom(dmxRigsLoadedAtom)
   const [, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [currentPage] = useAtom(currentPageAtom)
   const { isDarkMode, toggleDarkMode } = useDarkMode()
@@ -397,13 +399,14 @@ export const App = (): JSX.Element => {
       try {
         const rigs = await getDmxRigs()
         setDmxRigs(rigs || [])
+        setDmxRigsLoaded(true)
       } catch (error) {
         log.error('Failed to load DMX rigs:', error)
       }
     }
 
     void loadDmxRigs()
-  }, [setDmxRigs])
+  }, [setDmxRigs, setDmxRigsLoaded])
 
   useAppIpcListeners({
     setAppVer,

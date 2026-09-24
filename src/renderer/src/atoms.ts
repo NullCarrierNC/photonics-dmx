@@ -95,6 +95,12 @@ export const confirmRequestAtom = atom<ConfirmRequest | null>(null)
 export const dmxRigsAtom = atom<DmxRig[]>([])
 
 /**
+ * Whether the rigs have been read from main, so an empty {@link dmxRigsAtom} means there are
+ * none.
+ */
+export const dmxRigsLoadedAtom = atom(false)
+
+/**
  * Atom for tracking the currently selected rig ID for editing
  */
 export const activeRigIdAtom = atom<string | null>(null)
