@@ -5,6 +5,9 @@ jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test') },
 }))
 
+// The graph build seeds the bundled cues into appData, which a suite must not touch.
+jest.mock('../../utils/copyDefaultData', () => ({ copyDefaultData: jest.fn(async () => {}) }))
+
 // Broadcasts to the windows go nowhere under test.
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
@@ -20,8 +23,10 @@ import {
   lifecycleShuttingDownOn,
   listenerStub,
   senderLifecycleStub,
+  stubConfig,
   stubbedManager,
 } from '../controllers/lifecycleStub'
+import { CUE_DOMAIN_BINDINGS } from '../../controllers/cueDomainBindings'
 import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -135,6 +140,29 @@ describe('ControllerManager restart', () => {
 
     expect(graph.disposeChainsForRestart).toHaveBeenCalledTimes(1)
     expect(listeners.yargRb3.enableRb3).not.toHaveBeenCalled()
+  })
+
+  it('rebuilds through its own graph build, loading the registries and reconciling groups', async () => {
+    const order: string[] = []
+    const step = (name: string) => jest.fn(async () => void order.push(name))
+    const registryInit = {
+      initializeCueRegistry: step('registry'),
+      initializeEffectLoader: step('effects'),
+      initializeNodeCueLoader: step('node cues'),
+    }
+    const config = Object.assign(stubConfig({ cueDomains: {} }), {
+      updateCueDomain: jest.fn(async () => {}),
+    })
+    const { manager, graph, listeners } = stubbedManager({ ownInit: { registryInit, config } })
+
+    await manager.restartControllers()
+
+    expect(manager.getLifecyclePhase()).toBe('running')
+    expect(graph.buildChains).toHaveBeenCalledTimes(1)
+    expect(order.filter((s) => s === 'registry')).toHaveLength(CUE_DOMAIN_BINDINGS.length)
+    expect(order.slice(-2)).toEqual(['effects', 'node cues'])
+    expect(listeners.audio.refreshAudioCueSelection).toHaveBeenCalled()
+    expect(graph.buildPrimaryYargHandler).toHaveBeenCalledTimes(1)
   })
 
   it('reports the phase its lifecycle holds', () => {

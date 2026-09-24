@@ -56,6 +56,7 @@ export function listenerStub() {
       getIsAudioEnabled: jest.fn().mockReturnValue(false),
       disableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
       enableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
+      refreshAudioCueSelection: jest.fn(),
     },
   }
 }
@@ -72,6 +73,8 @@ export function restartGraph(): ControllerGraph {
     resetStrobeState: jest.fn(),
     destroyClock: jest.fn(),
     clearBuildRefs: jest.fn(),
+    buildChains: jest.fn(),
+    buildPrimaryYargHandler: jest.fn(),
     getChains: jest.fn().mockReturnValue([]),
     getDmxPublisher: jest.fn().mockReturnValue(null),
   } as unknown as ControllerGraph
@@ -95,6 +98,8 @@ export function senderLifecycleStub() {
     restoreRunningSenders: jest.fn(async (_snapshot: unknown) => {}),
     shutdownSenderOnAppExit: jest.fn(async () => {}),
     getSenderManager: jest.fn(),
+    ensureSenderManager: jest.fn(),
+    setSenderErrorTrackingCallback: jest.fn(),
   }
 }
 
@@ -118,6 +123,8 @@ export interface StubbedManagerOptions {
    * Stands in for the graph build. Brings the lifecycle to running unless a suite says otherwise.
    */
   init?: (lifecycle: ControllerLifecycle) => Promise<void>
+  /** The registry loaders and `config` for the manager's own graph build over the stubs. */
+  ownInit?: { registryInit: Record<string, unknown>; config: ConfigurationManager }
 }
 
 export interface StubbedManager {
@@ -142,7 +149,7 @@ export function stubbedManager(options: StubbedManagerOptions = {}): StubbedMana
   const consoleMode = options.consoleMode ?? consoleModeStub()
   const testEffects = () => ({ cancel: jest.fn(), stopTestEffect: jest.fn(async () => {}) })
   const manager = new ControllerManager({
-    config: stubConfig(),
+    config: options.ownInit?.config ?? stubConfig(),
     lifecycle,
     graph,
     collaborators: {
@@ -152,7 +159,7 @@ export function stubbedManager(options: StubbedManagerOptions = {}): StubbedMana
       motionCueSimulator: { reset: jest.fn() },
       testEffectRunner: testEffects(),
       rb3TestEffectRunner: testEffects(),
-      registryInit: {},
+      registryInit: options.ownInit?.registryInit ?? {},
     } as never,
   })
   const init = jest.fn(
@@ -163,9 +170,11 @@ export function stubbedManager(options: StubbedManagerOptions = {}): StubbedMana
   )
   const internals = manager as unknown as { isInitialized: boolean; init: () => Promise<void> }
   internals.isInitialized = true
-  internals.init = async () => {
-    await init(lifecycle)
-    internals.isInitialized = true
+  if (!options.ownInit) {
+    internals.init = async () => {
+      await init(lifecycle)
+      internals.isInitialized = true
+    }
   }
   return { manager, lifecycle, graph, listeners, senders, consoleMode, init }
 }
