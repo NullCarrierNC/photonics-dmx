@@ -16,7 +16,6 @@ import {
 } from '../../photonics-dmx/types'
 import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
-import equal from 'fast-deep-equal'
 
 import {
   type AudioConfig,
@@ -98,7 +97,7 @@ export class ConfigurationManager {
       onCorruptRecovery: onCorrupt,
       validate: validateLightingLayoutData,
     })
-    // The ConfigFile envelope version stays at 1; rig migrations run on read through a separate
+    // The ConfigFile envelope version stays at 1, and rig migrations run at load through a separate
     // internal schemaVersion (migrateDmxRigsConfig) because they need the userLights library to
     // realign each rig against its template, which ConfigFile.applyMigration has no access to.
     this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1, {
@@ -112,6 +111,25 @@ export class ConfigurationManager {
       lightingLayout: this.lightingLayout,
       dmxRigs: this.dmxRigs,
     })
+    this.reconcileDmxRigsAtLoad()
+  }
+
+  /**
+   * Brings rigs up to the current rig schema ({@link migrateDmxRigsConfig}) and aligns their light
+   * snapshots to the MyLights templates ({@link syncRigsConfigWithUserLights}). Runs at load and on
+   * every rig or template write, so reads return the stored rigs as they are.
+   */
+  private reconcileRigs(config: DmxRigsConfig): { config: DmxRigsConfig; changed: boolean } {
+    const migrated = migrateDmxRigsConfig(config)
+    const synced = syncRigsConfigWithUserLights(migrated.config, this.getUserLights())
+    return { config: synced.config, changed: migrated.changed || synced.changed }
+  }
+
+  private reconcileDmxRigsAtLoad(): void {
+    const { config, changed } = this.reconcileRigs(this.dmxRigs.get())
+    if (changed) {
+      this.dmxRigs.applyLoadMigration(config)
+    }
   }
 
   // Preferences Methods
@@ -288,13 +306,6 @@ export class ConfigurationManager {
   }
 
   /**
-   * Updates the user's lights
-   */
-  async updateUserLights(lights: DmxFixture[]): Promise<void> {
-    await this.userLights.update({ lights })
-  }
-
-  /**
    * Saves the fixture templates and realigns every rig to them. A rig write that fails puts the
    * previous templates back, so a failed save leaves both files as they were. Returns true when at
    * least one rig changed.
@@ -318,8 +329,8 @@ export class ConfigurationManager {
   }
 
   /**
-   * Changes one fixture template, starting from the stored one. Writes nothing when the template
-   * is gone by the time the change runs.
+   * Changes one fixture template, starting from the stored one, and realigns the rigs to it. Writes
+   * no template when it is gone by the time the change runs.
    */
   async updateUserLight(
     fixtureId: string,
@@ -334,13 +345,14 @@ export class ConfigurationManager {
       lights[index] = change(lights[index])
       return { ...current, lights }
     })
+    await this.syncRigsWithUserLights()
   }
 
   /**
    * Resets user's lights to default values (empty)
    */
   async resetUserLightsToDefaults(): Promise<void> {
-    await this.userLights.update(DEFAULT_USER_LIGHTS)
+    await this.saveUserLights(DEFAULT_USER_LIGHTS.lights)
   }
 
   // Light Library Methods (Default Templates)
@@ -441,38 +453,9 @@ export class ConfigurationManager {
 
   // DMX Rigs Methods
 
-  /**
-   * Gets all DMX rigs. Two reconciliation passes run on read and persist if anything changed:
-   *  1. {@link migrateDmxRigsConfig} — one-time schema migrations (layout rename, mount backfill,
-   *     strobe-channel schema upgrade, …).
-   *  2. {@link syncRigsConfigWithUserLights} — rig lights aligned to their current MyLights
-   *     templates so template edits (e.g. adding a Strobe Channel) reach the rig automatically.
-   */
+  /** Gets all DMX rigs, migrated and aligned to their templates at load and on every write. */
   getDmxRigs(): DmxRig[] {
-    const current = this.dmxRigs.get()
-    const { config: migrated, changed: migrationChanged } = migrateDmxRigsConfig(current)
-    const { config: synced, changed: syncChanged } = syncRigsConfigWithUserLights(
-      migrated,
-      this.getUserLights(),
-    )
-    if (migrationChanged || syncChanged) {
-      // The heal is queued as a turn rather than written directly. Reads come in bursts, so several
-      // callers detect the same repair, and a turn both orders them behind any user edit in flight
-      // and re-derives the repair from the freshest data. A repair that is already applied by the
-      // time its turn runs returns the input unchanged and writes nothing.
-      this.dmxRigs
-        .mutate((latest) => {
-          const healed = syncRigsConfigWithUserLights(
-            migrateDmxRigsConfig(latest).config,
-            this.getUserLights(),
-          ).config
-          return equal(healed, latest) ? latest : healed
-        })
-        .catch((err) =>
-          log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
-        )
-    }
-    return synced.rigs
+    return this.dmxRigs.get().rigs
   }
 
   /**
@@ -522,7 +505,7 @@ export class ConfigurationManager {
         rigs.push(rig)
       }
 
-      return { ...current, rigs }
+      return this.reconcileRigs({ ...current, rigs }).config
     })
   }
 

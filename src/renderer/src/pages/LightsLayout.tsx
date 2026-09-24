@@ -411,8 +411,8 @@ const LightsLayout = () => {
         return
       }
 
-      // getDmxRigs() returns the backend-canonical rigs: migration + template-sync run on read
-      // and materialize defaults (e.g. strobeValues/config) and recomputed channels that the
+      // getDmxRigs() returns the backend-canonical rigs: migration + template-sync run on every
+      // rig write and materialize defaults (e.g. strobeValues/config) and recomputed channels that the
       // editor's raw config omits. Adopt that shape for both atoms so the editor baseline and the
       // saved rig the dirty check compares stay identical; the unsaved indicator then reflects
       // real edits only. Fall back to the local objects if the re-read fails or the rig is gone.

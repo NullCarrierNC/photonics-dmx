@@ -25,7 +25,6 @@ const mockConfig = {
   getLightLibrary: jest.fn().mockReturnValue([]),
   getUserLights: jest.fn().mockReturnValue([]),
   getLightingLayout: jest.fn().mockReturnValue(null),
-  updateUserLights: jest.fn().mockImplementation(() => Promise.resolve()),
   getAllPreferences: jest.fn().mockReturnValue({}),
   getPreference: jest.fn().mockReturnValue(undefined),
   updatePreferences: jest.fn().mockImplementation(() => Promise.resolve()),

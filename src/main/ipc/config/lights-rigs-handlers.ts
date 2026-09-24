@@ -151,7 +151,7 @@ export function registerLightsRigsConfigHandlers(
   })
 
   // Export a rig to a portable file (rig + the MyLights templates its lights reference). Built from
-  // the canonical saved rig (getDmxRig applies migration + template sync) so the snapshot is
+  // the canonical saved rig (migrated and template-synced on every write) so the snapshot is
   // self-consistent; the editor's unsaved edits are not included.
   handleInvoke(ipcMain, RIGS.EXPORT, log, async (_, rigId: unknown) => {
     if (typeof rigId !== 'string' || rigId.trim().length === 0) {

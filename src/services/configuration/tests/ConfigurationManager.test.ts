@@ -143,7 +143,7 @@ describe('ConfigurationManager', () => {
           channels: { red: 1, green: 2, blue: 3, masterDimmer: 4 },
         },
       ]
-      await configManager.updateUserLights(mockLights)
+      await configManager.saveUserLights(mockLights)
       expect(fsPromises.writeFile).toHaveBeenCalled()
     })
 
@@ -157,10 +157,10 @@ describe('ConfigurationManager', () => {
         isStrobeEnabled: false,
         channels: { red: 1, green: 2, blue: 3, masterDimmer: 4 },
       })
-      await configManager.updateUserLights([light('1', 'One')])
+      await configManager.saveUserLights([light('1', 'One')])
 
       await Promise.all([
-        configManager.updateUserLights([light('1', 'One'), light('2', 'Two')]),
+        configManager.saveUserLights([light('1', 'One'), light('2', 'Two')]),
         configManager.updateUserLight('1', (stored) => ({ ...stored, name: 'Renamed' })),
       ])
 
@@ -338,7 +338,9 @@ describe('ConfigurationManager', () => {
       await testConfigManager.setPreference('effectDebounce', 100)
 
       // Verify the saved data includes version information (writeFile is called with temp path and content)
-      const writeCalls = (fsPromises.writeFile as jest.Mock).mock.calls
+      const writeCalls = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
+        String(c[0]).includes('prefs.json'),
+      )
       expect(writeCalls.length).toBeGreaterThanOrEqual(1)
       const lastWriteCall = writeCalls[writeCalls.length - 1]
       const content = lastWriteCall[1]
@@ -496,10 +498,10 @@ describe('ConfigurationManager', () => {
   })
 
   describe('Rig sync against fixture templates', () => {
-    it('aligns stale rig snapshots to current templates on getDmxRigs() and persists the result', async () => {
+    it('aligns stale rig snapshots to current templates at load and persists the result', async () => {
       // The user's saved rig was created before Strobe Channel? was enabled on the template, so
       // its frontLights[0].channels record is missing strobeChannel and there is no strobeValues.
-      // The current template (lights.json) has both — getDmxRigs() should reconcile.
+      // The current template (lights.json) has both, and the load reconciles them.
       ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
         if (path.includes('prefs.json')) {
           return JSON.stringify({ effectDebounce: 0 })
@@ -589,16 +591,16 @@ describe('ConfigurationManager', () => {
       expect(synced.isStrobeEnabled).toBe(true)
       expect(synced.mount).toBe('floor')
       // change was persisted back to disk
+      await new Promise((resolve) => setImmediate(resolve))
       const rigsWrites = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
         String(c[0]).includes('dmxRigs.json'),
       )
       expect(rigsWrites.length).toBeGreaterThan(0)
     })
 
-    it('coalesces identical heal-writes across a getDmxRigs() read storm', async () => {
-      // Same stale-rig setup: the saved rig is missing strobeChannel/strobeValues, so getDmxRigs()
-      // heals it. getActiveRigs/getDmxRig call getDmxRigs() in bursts, so a single read storm must
-      // persist the heal only once, not once per call.
+    it('writes nothing when the rigs are read', async () => {
+      // Same stale-rig setup: the saved rig is missing strobeChannel/strobeValues, which the load
+      // heals. getActiveRigs/getDmxRig call getDmxRigs() in bursts, and none of them writes.
       ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
         if (path.includes('prefs.json')) {
           return JSON.stringify({ effectDebounce: 0 })
@@ -663,6 +665,7 @@ describe('ConfigurationManager', () => {
       })
 
       const cm = new ConfigurationManager()
+      await new Promise((resolve) => setImmediate(resolve))
       ;(fsPromises.writeFile as jest.Mock).mockClear()
 
       cm.getDmxRigs()
@@ -670,13 +673,19 @@ describe('ConfigurationManager', () => {
       cm.getActiveRigs()
       cm.getDmxRig('rig-1')
 
-      // Saves are serialized onto a promise chain, so the heal-write lands a microtask later.
+      // Saves are serialized onto a promise chain, so any write lands a macrotask later.
       await new Promise((resolve) => setImmediate(resolve))
 
       const rigsWrites = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
         String(c[0]).includes('dmxRigs.json'),
       )
-      expect(rigsWrites.length).toBe(1)
+      expect(rigsWrites).toEqual([])
+      expect(cm.getDmxRigs()[0]!.config.frontLights[0]!.strobeValues).toEqual({
+        slow: 10,
+        medium: 100,
+        fast: 200,
+        fastest: 250,
+      })
     })
 
     it('syncRigsWithUserLights returns false when nothing changed', async () => {
