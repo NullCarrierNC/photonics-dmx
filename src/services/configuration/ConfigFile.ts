@@ -33,6 +33,14 @@ function renameSyncWithRetry(from: string, to: string): void {
   }
 }
 
+/**
+ * A version a build could have stamped: a whole number from 0 up. A file without the envelope is
+ * legacy and reads as version 0 without passing through here.
+ */
+function isStoredVersion(version: unknown): version is number {
+  return typeof version === 'number' && Number.isSafeInteger(version) && version >= 0
+}
+
 declare global {
   /** Set by the first ConfigFile constructed in the process, so the storage directory is logged once
    *  however many config files are opened. */
@@ -281,6 +289,13 @@ export class ConfigFile<T> {
     } catch (error) {
       log.error(`[Photonics Config] JSON parse failed for ${this.filePath}:`, error)
       return { ok: false, reason: 'parse', detail: { parseOrMigrateError: error } }
+    }
+
+    // Migration walks up one whole version at a time, so it needs a whole number to start from.
+    if (this.isVersionedFormat(parsed) && !isStoredVersion(parsed.version)) {
+      const schemaText = `version must be a whole number of 0 or more, got ${JSON.stringify(parsed.version)}`
+      log.error(`[Photonics Config] Unusable version in ${this.filePath}: ${schemaText}`)
+      return { ok: false, reason: 'schema', detail: { schemaText } }
     }
 
     let data: T
