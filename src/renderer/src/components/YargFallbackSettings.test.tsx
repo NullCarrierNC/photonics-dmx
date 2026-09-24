@@ -64,5 +64,6 @@ describe('YargFallbackSettings', () => {
 
     await waitFor(() => expect(save).toHaveBeenCalledWith(30000))
     await waitFor(() => expect(field).toHaveValue(20))
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the fallback time.')
   })
 })

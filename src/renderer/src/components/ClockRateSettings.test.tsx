@@ -97,5 +97,33 @@ describe('ClockRateSettings', () => {
 
     await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(25))
     await waitFor(() => expect(field).toHaveValue(10))
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the clock rate.')
+  })
+
+  it('says so when the save lands and the lights do not restart', async () => {
+    setClockRateMock.mockResolvedValue({ success: true, restartError: 'sACN port busy' } as never)
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '25' } })
+    fireEvent.blur(field)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Saved, but the lights did not restart. sACN port busy',
+    )
+    expect(field).toHaveValue(25)
+  })
+
+  it('clears the message once a later save lands', async () => {
+    setClockRateMock.mockResolvedValueOnce({ success: false, error: 'read only' } as never)
+    const field = await renderPanel()
+    fireEvent.change(field, { target: { value: '25' } })
+    fireEvent.blur(field)
+    await screen.findByRole('alert')
+
+    fireEvent.change(field, { target: { value: '30' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(field).toHaveValue(30)
   })
 })

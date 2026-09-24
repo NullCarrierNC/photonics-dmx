@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react'
 import { setMotionEnabled } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('MotionMasterToggle')
+import { persistSetting } from '../ipc/persistPrefs'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 export interface MotionMasterToggleProps {
   /** The motion master state, which the parent reads from main and follows. */
@@ -15,21 +15,22 @@ const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({
   onMotionEnabledChange,
 }) => {
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const onChange = useCallback(
     async (next: boolean) => {
       if (saving) return
       setSaving(true)
-      try {
-        const result = await setMotionEnabled(next)
-        if (result && typeof result === 'object' && 'success' in result && result.success) {
-          onMotionEnabledChange(next)
-        }
-      } catch (e) {
-        log.error('Failed to set motion enabled', e)
-      } finally {
-        setSaving(false)
+      setSaveError(null)
+      const saved = await persistSetting(
+        () => setMotionEnabled(next),
+        'motion support',
+        setSaveError,
+      )
+      if (saved !== null) {
+        onMotionEnabledChange(next)
       }
+      setSaving(false)
     },
     [onMotionEnabledChange, saving],
   )
@@ -55,6 +56,7 @@ const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({
           Enable motion support (YARG + audio)
         </span>
       </label>
+      <SaveErrorAlert message={saveError} />
     </div>
   )
 }

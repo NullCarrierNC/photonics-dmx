@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { getClockRate, setClockRate as saveClockRateToBackend } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { persistSetting } from '../ipc/persistPrefs'
 import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 import {
   CLOCK_RATE_MS_DEFAULT,
   CLOCK_RATE_MS_MAX,
@@ -14,6 +16,7 @@ const ClockRateSettings: React.FC = () => {
   const [clockRateValue, setClockRateValue] = useState(10)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadClockRate = async () => {
@@ -39,22 +42,17 @@ const ClockRateSettings: React.FC = () => {
       const newValue = clampClockRateMs(value)
       const previous = clockRateValue
       setClockRateValue(newValue)
-
-      try {
-        setIsSaving(true)
-        const result = await saveClockRateToBackend(newValue)
-        if (result.success) {
-          setClockRateValue(newValue)
-        } else {
-          log.error('Failed to save clock rate:', result.error)
-          setClockRateValue(previous)
-        }
-      } catch (error) {
-        log.error('Failed to save clock rate:', error)
+      setSaveError(null)
+      setIsSaving(true)
+      const saved = await persistSetting(
+        () => saveClockRateToBackend(newValue),
+        'the clock rate',
+        setSaveError,
+      )
+      if (saved === null) {
         setClockRateValue(previous)
-      } finally {
-        setIsSaving(false)
       }
+      setIsSaving(false)
     },
     [isSaving, clockRateValue],
   )
@@ -102,6 +100,7 @@ const ClockRateSettings: React.FC = () => {
           </p>
         </div>
       </div>
+      <SaveErrorAlert message={saveError} />
     </div>
   )
 }
