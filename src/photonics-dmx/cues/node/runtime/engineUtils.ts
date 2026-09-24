@@ -1,7 +1,7 @@
 /**
  * Shared utilities used by both NodeExecutionEngine and EffectExecutionEngine.
  */
-import type { ActionNode, Connection } from '../../types/nodeCueTypes'
+import type { ActionNode, Connection, EventListenerNode } from '../../types/nodeCueTypes'
 
 /**
  * Collect all node IDs reachable from startNodeIds via the adjacency graph,
@@ -65,4 +65,18 @@ export function delayPlaceholderAction(nodeId: string): ActionNode {
       waitUntilTime: { source: 'literal', value: 0 },
     },
   }
+}
+
+/** Index a graph's event listeners by the event name they listen for, skipping unnamed ones. */
+export function indexEventListeners(
+  eventListenerMap: Map<string, EventListenerNode>,
+): Map<string, EventListenerNode[]> {
+  const index = new Map<string, EventListenerNode[]>()
+  for (const listener of eventListenerMap.values()) {
+    if (!listener.eventName) continue
+    const listeners = index.get(listener.eventName) ?? []
+    listeners.push(listener)
+    index.set(listener.eventName, listeners)
+  }
+  return index
 }

@@ -111,6 +111,7 @@ function normalizeAudioEventForSave(
       ...(e.outputs != null && { outputs: e.outputs }),
       ...(e.threshold != null && { threshold: e.threshold }),
       ...(e.cooldownMs != null && { cooldownMs: e.cooldownMs }),
+      ...(e.executionPolicy != null && { executionPolicy: e.executionPolicy }),
     }
   }
   return event

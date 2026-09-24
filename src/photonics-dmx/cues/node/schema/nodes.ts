@@ -15,7 +15,7 @@ import {
   ValueSource,
   NetEventNode,
 } from '../../types/nodeCueTypes'
-import { NODE_EFFECT_TYPES } from '../../types/nodeCueTypes'
+import { AUDIO_EVENT_EXECUTION_POLICIES, NODE_EFFECT_TYPES } from '../../types/nodeCueTypes'
 import { NET_EVENT_TYPES, AUDIO_EVENT_TYPES } from './helpers'
 import {
   colorSchema,
@@ -233,6 +233,11 @@ export const audioEventSchema: JSONSchemaType<AudioEventNode> = {
     threshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
     triggerMode: { type: 'string', enum: ['edge', 'level'] },
     cooldownMs: { type: 'number', nullable: true, minimum: 0 },
+    executionPolicy: {
+      type: 'string',
+      nullable: true,
+      enum: [...AUDIO_EVENT_EXECUTION_POLICIES],
+    },
     useOnsetGating: { type: 'boolean', nullable: true },
     onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
   },

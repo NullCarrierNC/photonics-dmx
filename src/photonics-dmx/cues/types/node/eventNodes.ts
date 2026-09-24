@@ -78,12 +78,29 @@ export type AudioEventType =
   | 'audio-flatness'
   | 'audio-hfc'
 
+/**
+ * What an audio event does when it fires again while a run it started is still going (cue-called
+ * fires on every audio frame, an edge on every trigger). `continuous` starts another run alongside
+ * it, `restart` cancels the run in flight and starts again, `ignore-while-running` drops the new
+ * trigger, and `latest-pending` keeps the newest trigger to start once the run in flight finishes.
+ */
+export const AUDIO_EVENT_EXECUTION_POLICIES = [
+  'continuous',
+  'restart',
+  'ignore-while-running',
+  'latest-pending',
+] as const
+
+export type AudioEventExecutionPolicy = (typeof AUDIO_EVENT_EXECUTION_POLICIES)[number]
+
 export interface AudioEventNode extends BaseEventNode {
   eventType: AudioEventType
   threshold?: number
   triggerMode: 'edge' | 'level'
   /** Minimum ms between edge triggers, 0 = no limit */
   cooldownMs?: number
+  /** Cue-called and edge events only. Omitted means `continuous`. */
+  executionPolicy?: AudioEventExecutionPolicy
   /**
    * When true (edge mode only), also require max per-band onset strength >= onsetThreshold.
    * Used to tighten beat/HFC-style events against weak or duplicate edges.

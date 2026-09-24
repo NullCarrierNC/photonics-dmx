@@ -36,7 +36,7 @@ import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
 import type { Effect, TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
-import { delayPlaceholderAction } from './engineUtils'
+import { delayPlaceholderAction, indexEventListeners } from './engineUtils'
 import { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import {
   ActionEffectFactory,
@@ -232,15 +232,7 @@ export abstract class BaseNodeExecutionEngine {
 
   /** Register all event listeners from the compiled graph into the listener index. */
   protected registerEventListeners(): void {
-    const { eventListenerMap } = this.compiled
-    for (const listener of eventListenerMap.values()) {
-      if (!listener.eventName) {
-        continue
-      }
-      const listeners = this.eventListeners.get(listener.eventName) ?? []
-      listeners.push(listener)
-      this.eventListeners.set(listener.eventName, listeners)
-    }
+    this.eventListeners = indexEventListeners(this.compiled.eventListenerMap)
   }
 
   /** Decide whether to skip a node that has already been visited in this context. */
@@ -688,12 +680,7 @@ export abstract class BaseNodeExecutionEngine {
    */
   public cancelAll(skipEffectRemoval = false): void {
     this.onCancelStart(skipEffectRemoval)
-
-    for (const [contextId, context] of this.activeContexts) {
-      this.onContextCancelled(contextId)
-      context.dispose()
-    }
-    this.activeContexts.clear()
+    this.cancelContexts()
 
     // Remove callbacks but optionally keep effects on the sequencer.
     for (const [name, layer] of this.submittedEffects) {
@@ -713,6 +700,19 @@ export abstract class BaseNodeExecutionEngine {
     this.setPositionSubmissionFingerprint.clear()
 
     this.onCancelFinish(skipEffectRemoval)
+  }
+
+  /**
+   * Cancel the running contexts, or only those started from `eventNodeId`. Their effects stay up:
+   * cancelAll removes them itself, and a restarted run replaces them by name.
+   */
+  public cancelContexts(eventNodeId?: string): void {
+    for (const [contextId, context] of this.activeContexts) {
+      if (eventNodeId !== undefined && context.eventNode.id !== eventNodeId) continue
+      this.onContextCancelled(contextId)
+      context.dispose()
+      this.activeContexts.delete(contextId)
+    }
   }
 
   /** Cancellation pre-step (cue flushes pending node activations). */

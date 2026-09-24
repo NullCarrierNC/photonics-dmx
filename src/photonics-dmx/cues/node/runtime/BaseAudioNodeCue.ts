@@ -18,6 +18,7 @@ import { createExecutionStateMachineLifecycle } from './executionStateMachineLif
 import { VariableValue, type NodeCueDebugSwitch } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
+import { AudioEventRuns } from './audioEventRuns'
 import { evaluateBandTrigger } from '../../audio/bandReactivity'
 import { createLogger } from '../../../../shared/logger'
 import { monotonicNowMs } from '../../../../shared/time'
@@ -42,6 +43,8 @@ interface AudioCueRunState {
   cueLevelVarStore: Map<string, VariableValue>
   groupLevelVarStore: Map<string, VariableValue>
   executionEngine: NodeExecutionEngine | null
+  /** The run each cue-called or edge event has in flight, under its execution policy. */
+  eventRuns: AudioEventRuns
   /** Per-context ExecutionStateMachine tracking for the engine-driven event paths. */
   esmLifecycle: ReturnType<typeof createExecutionStateMachineLifecycle>
   cueStartedFired: boolean
@@ -131,6 +134,7 @@ export abstract class BaseAudioNodeCue {
       // sync even when cue logic mutates group state during execute().
       groupLevelVarStore: this.getGroupVarStore(sequencer),
       executionEngine: null,
+      eventRuns: new AudioEventRuns(),
       esmLifecycle: createExecutionStateMachineLifecycle(),
       cueStartedFired: false,
       firstSubmissionUsesSetEffectRef: { use: false },
@@ -210,15 +214,7 @@ export abstract class BaseAudioNodeCue {
         continue
       }
       if (event.eventType === 'cue-called') {
-        const eventContext: EventContext = { eventRawValue: 1 }
-        const cueData: AudioCueData & { eventContext: EventContext } = {
-          ...safeData,
-          eventContext,
-        }
-        state.executionEngine.startExecution(
-          event,
-          cueData as unknown as import('../../types/cueTypes').CueData,
-        )
+        this.startEventRun(state, event, safeData, 1)
         continue
       }
       if (event.eventType === 'audio-trigger') {
@@ -240,15 +236,7 @@ export abstract class BaseAudioNodeCue {
           state.lastTriggerTime.set(event.id, now)
         }
 
-        const eventContext: EventContext = { eventRawValue: evaluation.intensity }
-        const cueData: AudioCueData & { eventContext: EventContext } = {
-          ...safeData,
-          eventContext,
-        }
-        state.executionEngine.startExecution(
-          event,
-          cueData as unknown as import('../../types/cueTypes').CueData,
-        )
+        this.startEventRun(state, event, safeData, evaluation.intensity)
       } else {
         const eventContext: EventContext = { eventRawValue: evaluation.intensity }
         const cueData: AudioCueData & { eventContext: EventContext } = {
@@ -319,6 +307,25 @@ export abstract class BaseAudioNodeCue {
     }
   }
 
+  /** Start a cue-called or edge event's graph under the event's execution policy. */
+  private startEventRun(
+    state: AudioCueRunState,
+    event: AudioEventNode,
+    data: AudioCueData,
+    eventRawValue: number,
+  ): void {
+    const cueData: AudioCueData & { eventContext: EventContext } = {
+      ...data,
+      eventContext: { eventRawValue },
+    }
+    state.eventRuns.start(
+      state.executionEngine!,
+      event,
+      event.executionPolicy,
+      cueData as unknown as import('../../types/cueTypes').CueData,
+    )
+  }
+
   onStop(): void {
     this.stopEveryState(this.skipEffectRemovalOnStop())
   }
@@ -338,6 +345,7 @@ export abstract class BaseAudioNodeCue {
         state.executionEngine.cancelAll(skipEffectRemoval)
       }
       state.esmLifecycle.cancelAll()
+      state.eventRuns.clear()
       state.executionEngine = null
       state.cueStartedFired = false
       state.eventStates.clear()
