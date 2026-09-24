@@ -356,13 +356,6 @@ export class ConfigurationManager {
   }
 
   /**
-   * Sets audio configuration
-   */
-  async setAudioConfig(config: AppPreferences['audioConfig']): Promise<void> {
-    await this.setPreference('audioConfig', config)
-  }
-
-  /**
    * Updates audio configuration (partial update)
    * Note: The 'enabled' field is never persisted (runtime-only state)
    */

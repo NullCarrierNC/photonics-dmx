@@ -194,7 +194,7 @@ export class AudioController {
   /**
    * Applies an already-persisted config to the running processor. Persistence belongs to the
    * caller: a write here races the caller's write and puts the runtime-only `enabled` flag on
-   * disk, which setAudioConfig does not strip.
+   * disk.
    */
   public updateAudioConfig(config: AudioConfig): void {
     if (!this.isAudioEnabled || !this.audioProcessor) {
