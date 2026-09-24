@@ -17,6 +17,20 @@ describe('countTypeEscapes', () => {
     expect(countTypeEscapes(text, 'a.ts')).toEqual({ casts: 3, directives: 0 })
   })
 
+  it('counts a cast through never', () => {
+    const text = [
+      'const a = input as never as Target',
+      'const b = (input as never) as Target',
+      'const c = <Target>(<never>input)',
+    ].join('\n')
+
+    expect(countTypeEscapes(text, 'a.ts')).toEqual({ casts: 3, directives: 0 })
+  })
+
+  it('leaves out a cast whose operand is a call returning never', () => {
+    expect(countTypeEscapes('const a = compile(input as never) as never', 'a.ts').casts).toBe(0)
+  })
+
   it('counts the angle-bracket form in a .ts file', () => {
     expect(countTypeEscapes('const a = <Target>(<unknown>input)', 'a.ts').casts).toBe(1)
   })

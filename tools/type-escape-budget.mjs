@@ -1,6 +1,6 @@
 /**
- * Counts casts through `unknown` or `any` and the comment directives that switch type checking
- * off, in every source under `src/` with the tests included, against
+ * Counts casts through `unknown`, `any` or `never` and the comment directives that switch type
+ * checking off, in every source under `src/` with the tests included, against
  * metrics/type-escape-budget.txt.
  */
 import { readdirSync, readFileSync } from 'node:fs'
@@ -31,6 +31,6 @@ runCountBudget({
   budgetFile: 'metrics/type-escape-budget.txt',
   label: 'Type escapes',
   counted:
-    'casts through unknown or any, and @ts-expect-error, @ts-ignore and @ts-nocheck directives, under src/ with the tests included.',
+    'casts through unknown, any or never, and @ts-expect-error, @ts-ignore and @ts-nocheck directives, under src/ with the tests included.',
   note: 'Lower this when removing type escapes. Do not raise it without a deliberate pass.',
 })
