@@ -141,6 +141,21 @@ describe('a corrupt prefs.json left in place at launch', () => {
     expect(fs.readdirSync(dir).filter((f) => f.startsWith('prefs.corrupt-'))).toEqual([])
   })
 
+  itWhenRenameCanBeRefused(
+    'moves the file aside at the next save when it is left as it is',
+    async () => {
+      const dir = freshConfigDir()
+      const cm = launchOverCorruptPrefsLeftInPlace(dir)
+
+      await cm.setPreference('complex', false)
+
+      const backups = fs.readdirSync(dir).filter((f) => f.startsWith('prefs.corrupt-'))
+      expect(backups).toHaveLength(1)
+      expect(fs.readFileSync(path.join(dir, backups[0]), 'utf8')).toContain('not json')
+      expect(readData(dir, 'prefs.json')).toMatchObject({ complex: false })
+    },
+  )
+
   itWhenRenameCanBeRefused('says a relaunch reads a repaired file', () => {
     const cm = launchOverCorruptPrefsLeftInPlace(freshConfigDir())
 
@@ -168,5 +183,22 @@ describe('a prefs.json written by a newer version', () => {
     expect(events).toEqual([
       expect.objectContaining({ fileName: 'prefs.json', reason: 'newerVersion' }),
     ])
+  })
+})
+
+describe('a prefs.json whose data is null', () => {
+  it('moves it aside and starts from the defaults', async () => {
+    const dir = freshConfigDir()
+    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 6, data: null }))
+
+    const cm = new ConfigurationManager()
+    await cm.setPreference('complex', false)
+
+    expect(cm.drainConfigCorruptRecovery()).toEqual([
+      expect.objectContaining({ fileName: 'prefs.json', reason: 'schema' }),
+    ])
+    expect(cm.getPreference('clockRate')).toBe(DEFAULT_PREFERENCES.clockRate)
+    expect(fs.readdirSync(dir).filter((f) => f.startsWith('prefs.corrupt-'))).toHaveLength(1)
+    expect(readData(dir, 'prefs.json')).toMatchObject({ complex: false })
   })
 })
