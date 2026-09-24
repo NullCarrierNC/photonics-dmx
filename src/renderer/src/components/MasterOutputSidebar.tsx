@@ -1,12 +1,10 @@
 import React, { useCallback } from 'react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { savePrefs } from '../ipcApi'
+import { persistPrefs } from '../ipc/persistPrefs'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { useToast } from '../hooks/useToast'
 import { applyMasterOutputAtom, masterOutputAtom, toggleBlackoutAtom } from '../state/masterOutput'
-import { createLogger } from '../../../shared/logger'
-
-const log = createLogger('MasterOutputSidebar')
 
 /** The content column in App reserves this much on the right, since the sidebar is `fixed`. */
 export const MASTER_OUTPUT_SIDEBAR_WIDTH_PX = 99
@@ -60,6 +58,12 @@ const MasterOutputSidebar: React.FC = () => {
   const setMaster = useSetAtom(masterOutputAtom)
   const applyLive = useSetAtom(applyMasterOutputAtom)
   const toggleBlackout = useSetAtom(toggleBlackoutAtom)
+  const { showToast } = useToast()
+  // The sidebar is too narrow for a message of its own, so a refused save reports as a toast.
+  const reportFailure = useCallback(
+    (message: string) => showToast(message, 'error', 5000),
+    [showToast],
+  )
 
   const handleDimmerChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -70,35 +74,34 @@ const MasterOutputSidebar: React.FC = () => {
     [applyLive, setMaster],
   )
 
-  /** Persists on gesture end only. The value is already live by the time this runs. */
+  /**
+   * Persists on gesture end only. The value is already live by the time this runs, and stays live
+   * when the save is refused.
+   */
   const commitDimmer = useCallback((): void => {
     if (prefs.masterDimmerPercent === dimmerPercent) return
-    savePrefs({ masterDimmerPercent: dimmerPercent })
-      .then((result) => {
-        if (!result.success) {
-          log.error('Failed to save master dimmer level', result.error)
-          return
-        }
-        setPrefs((prev) => ({ ...prev, masterDimmerPercent: dimmerPercent }))
-      })
-      .catch((err) => log.error('Failed to save master dimmer level', err))
-  }, [dimmerPercent, prefs.masterDimmerPercent, setPrefs])
+    void persistPrefs(
+      { masterDimmerPercent: dimmerPercent },
+      'the master dimmer level',
+      reportFailure,
+    ).then((saved) => {
+      if (saved) setPrefs((prev) => ({ ...prev, masterDimmerPercent: dimmerPercent }))
+    })
+  }, [dimmerPercent, prefs.masterDimmerPercent, reportFailure, setPrefs])
   const dimmerRelease = useCommitOnRelease(commitDimmer)
 
   const toggleStrobe = useCallback((): void => {
     const next = !strobeEnabled
     setMaster((prev) => ({ ...prev, strobeOutputEnabled: next }))
     void applyLive({ strobeOutputEnabled: next })
-    savePrefs({ strobeOutputEnabled: next })
-      .then((result) => {
-        if (!result.success) {
-          log.error('Failed to save strobe output preference', result.error)
-          return
-        }
-        setPrefs((prev) => ({ ...prev, strobeOutputEnabled: next }))
-      })
-      .catch((err) => log.error('Failed to save strobe output preference', err))
-  }, [strobeEnabled, applyLive, setMaster, setPrefs])
+    void persistPrefs(
+      { strobeOutputEnabled: next },
+      'the strobe output setting',
+      reportFailure,
+    ).then((saved) => {
+      if (saved) setPrefs((prev) => ({ ...prev, strobeOutputEnabled: next }))
+    })
+  }, [strobeEnabled, applyLive, reportFailure, setMaster, setPrefs])
 
   return (
     <div
