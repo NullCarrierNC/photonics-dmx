@@ -8,6 +8,7 @@ Shared services used across main and (where applicable) renderer. Currently focu
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ConfigurationManager`  | Manages `AppPreferences` (including per-domain cue preferences), user lights, lighting layout, DMX rigs, audio config. Runs the startup migrations on construction               |
 | `ConfigFile`            | Async atomic JSON file I/O (write-temp-then-rename). Versioned persistence with migration, plus `validate`, `coerceUnversioned`, `normalizeLoaded` and `onCorruptRecovery` hooks |
+| `configFileRename`      | The renames `ConfigFile` saves and moves files aside with, retried through transient file locks                                                                                  |
 | `PreferencesConfigFile` | Typed preferences persistence layered on `ConfigFile`. Carries the prefs version and its migration chain, and seeds cue domains missing from an older file                       |
 | `configurationDefaults` | The `AppPreferences` shape, `DEFAULT_PREFERENCES`, and the value normalizers preferences are read through                                                                        |
 | `startupMigrations`     | One-time migrations that span several config files: legacy lights format, fixture schema, stray sender keys, and the move to DMX rigs                                            |

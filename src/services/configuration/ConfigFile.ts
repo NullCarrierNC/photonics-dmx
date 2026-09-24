@@ -7,31 +7,10 @@ import {
   type ConfigCorruptInfo,
   type ConfigCorruptReason,
 } from './configCorruptTypes'
+import { renameSyncWithRetry, renameWithRetry } from './configFileRename'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
-
-/** Rename failures another process holding the file can cause, which a short wait clears. */
-const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'])
-const RENAME_RETRY_DELAYS_MS = [10, 20, 40, 80, 160]
-
-function isTransientRenameFailure(error: unknown, attempt: number): boolean {
-  const code = (error as NodeJS.ErrnoException)?.code
-  return !!code && TRANSIENT_RENAME_CODES.has(code) && attempt < RENAME_RETRY_DELAYS_MS.length
-}
-
-/** The load path is synchronous, so its move-aside waits out a transient failure in place. */
-function renameSyncWithRetry(from: string, to: string): void {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      fs.renameSync(from, to)
-      return
-    } catch (error) {
-      if (!isTransientRenameFailure(error, attempt)) throw error
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RENAME_RETRY_DELAYS_MS[attempt])
-    }
-  }
-}
 
 /**
  * A version a build could have stamped: a whole number from 0 up. A file without the envelope is
@@ -420,7 +399,7 @@ export class ConfigFile<T> {
     try {
       if (this.corruptFileInPlace) {
         try {
-          await this.renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
+          await renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
           log.info(`[Photonics Config] Moved the corrupt ${basename} aside before saving`)
         } catch (error) {
           // A file deleted or moved by hand since the load leaves nothing to preserve.
@@ -429,7 +408,7 @@ export class ConfigFile<T> {
         this.corruptFileInPlace = false
       }
       await fsPromises.writeFile(tempPath, content, 'utf-8')
-      await this.renameWithRetry(tempPath, this.filePath)
+      await renameWithRetry(tempPath, this.filePath)
     } catch (error) {
       try {
         await fsPromises.unlink(tempPath).catch(() => {})
@@ -438,34 +417,6 @@ export class ConfigFile<T> {
       }
       log.error(`Error saving configuration to ${this.filePath}:`, error)
       throw new Error(`Failed to save configuration: ${error}`)
-    }
-  }
-
-  /**
-   * Renames with retry-and-backoff for transient Windows file-lock errors.
-   *
-   * On Windows, rename() fails with EPERM/EACCES/EBUSY when the source temp file or
-   * the destination is momentarily held open by another process — antivirus real-time
-   * scanning, Controlled Folder Access, cloud-sync of AppData, or the search indexer.
-   * These locks clear within tens of milliseconds, so a short backoff almost always
-   * succeeds. Non-transient errors (e.g. ENOSPC, ENOENT) are re-thrown immediately.
-   */
-  private async renameWithRetry(from: string, to: string): Promise<void> {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await fsPromises.rename(from, to)
-        return
-      } catch (error) {
-        if (!isTransientRenameFailure(error, attempt)) {
-          throw error
-        }
-        const delay = RENAME_RETRY_DELAYS_MS[attempt]
-        const code = (error as NodeJS.ErrnoException).code
-        log.warn(
-          `Rename of ${to} hit ${code}, retrying in ${delay}ms (attempt ${attempt + 1}/${RENAME_RETRY_DELAYS_MS.length})`,
-        )
-        await new Promise((resolve) => setTimeout(resolve, delay))
-      }
     }
   }
 
