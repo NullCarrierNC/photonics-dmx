@@ -1,0 +1,6 @@
+files 4
+exports 116
+types 142
+duplicates 15
+Auto-generated: knip issues by type: unused files, unused exports, unused exported types and duplicate exports.
+Lower these when removing dead code. Do not raise them without a deliberate pass.
