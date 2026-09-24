@@ -251,6 +251,22 @@ describe('ControllerManager restart', () => {
     expect(lifecycle.phase).toBe('consoleMode')
   })
 
+  it('returns to running when the console closes while the controllers restart', async () => {
+    const consoleMode = consoleModeStub()
+    consoleMode.getConsoleRestore.mockReturnValue({ yarg: false, rb3: false, audio: false })
+    const { manager, lifecycle } = stubbedManager({
+      lifecycle: lifecycleAt('consoleMode'),
+      consoleMode,
+      init: async () => {
+        consoleMode.getConsoleRestore.mockReturnValue(null)
+      },
+    })
+
+    await manager.restartControllers()
+
+    expect(lifecycle.phase).toBe('running')
+  })
+
   it('aborts without rebuilding when a shutdown begins between teardown and rebuild', async () => {
     const senders = senderLifecycleStub()
     const { manager, lifecycle, init } = stubbedManager({ senders })

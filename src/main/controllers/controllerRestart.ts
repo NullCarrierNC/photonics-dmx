@@ -56,7 +56,6 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
   const wasRb3Enabled = ctx.listenerLifecycle.yargRb3.getIsRb3Enabled()
   const wasAudioEnabled = ctx.listenerLifecycle.audio.getIsAudioEnabled()
   const activeSendersBeforeRestart = ctx.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
-  const wasConsoleMode = ctx.consoleMode.getConsoleRestore() !== null
 
   let teardownSucceeded = false
   try {
@@ -131,7 +130,9 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
   try {
     await ctx.init()
     abortIfShuttingDown(ctx.lifecycle, 'during reinitialization')
-    ctx.lifecycle.setPhaseUnlessShuttingDown(wasConsoleMode ? 'consoleMode' : 'running')
+    // The console page can close while the controllers restart, so its state is read here.
+    const consoleOpen = ctx.consoleMode.getConsoleRestore() !== null
+    ctx.lifecycle.setPhaseUnlessShuttingDown(consoleOpen ? 'consoleMode' : 'running')
     ctx.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
     if (wasYargEnabled) {
