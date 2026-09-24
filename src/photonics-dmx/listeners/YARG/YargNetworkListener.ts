@@ -501,60 +501,59 @@ export class YargNetworkListener extends EventEmitter {
   }
 
   /**
-   * Handle scene transitions, particularly Menu -> Gameplay to clear menu lighting
+   * Handle scene transitions. Gameplay reached from any other scene, or seen on the first frame of
+   * a session (a controller restart or a listener enabled mid-song), starts a song: the rig blacks
+   * out to clear whatever the previous screen lit, and the song's group selection begins.
    * @param currentScene The current scene from the YARG packet
    */
   private handleSceneTransition(
     currentScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice',
   ): void {
-    // Check if we have a scene change
     if (this.lastScene !== null && this.lastScene !== currentScene) {
       log.info(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
+    }
 
-      // Handle Menu -> Gameplay transition (song start)
-      if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
-        log.info('YARG: Song starting - triggering blackout to clear menu lighting')
-        // Reset the fallback window so it starts fresh from song start.
-        this.lastCueReceivedAt = monotonicNowMs()
-        this.fallbackActive = false
-        this.inNonDrivingRun = false
-        // Trigger a fast blackout to clear any menu lighting. The song-start notice follows it
-        // because it ends the chart-blackout hold that blackout arms, so a strobe the chart opens
-        // with plays.
-        void this.cueHandler.handleCue(CueType.Blackout_Fast, {
-          datagramVersion: 0,
-          platform: 'Unknown',
-          currentScene: currentScene,
-          pauseState: 'Unpaused',
-          venueSize: 'NoVenue',
-          beatsPerMinute: 0,
-          songSection: 'None',
-          guitarNotes: [],
-          bassNotes: [],
-          drumNotes: [],
-          keysNotes: [],
-          vocalNote: 0,
-          harmony0Note: 0,
-          harmony1Note: 0,
-          harmony2Note: 0,
-          lightingCue: 'Blackout_Fast',
-          postProcessing: 'Default',
-          fogState: false,
-          strobeState: 'Strobe_Off',
-          performer: 0,
-          trackMode: 'tracked',
-          beat: 'Off',
-          keyframe: 'Off',
-          bonusEffect: false,
-        })
-        this.cueHandler.notifySongStart()
-      }
+    if (currentScene === 'Gameplay' && this.lastScene !== 'Gameplay') {
+      log.info('YARG: Song starting - triggering blackout to clear the previous lighting')
+      // Reset the fallback window so it starts fresh from song start.
+      this.lastCueReceivedAt = monotonicNowMs()
+      this.fallbackActive = false
+      this.inNonDrivingRun = false
+      // Trigger a fast blackout to clear the previous lighting. The song-start notice follows it
+      // because it ends the chart-blackout hold that blackout arms, so a strobe the chart opens
+      // with plays.
+      void this.cueHandler.handleCue(CueType.Blackout_Fast, {
+        datagramVersion: 0,
+        platform: 'Unknown',
+        currentScene: currentScene,
+        pauseState: 'Unpaused',
+        venueSize: 'NoVenue',
+        beatsPerMinute: 0,
+        songSection: 'None',
+        guitarNotes: [],
+        bassNotes: [],
+        drumNotes: [],
+        keysNotes: [],
+        vocalNote: 0,
+        harmony0Note: 0,
+        harmony1Note: 0,
+        harmony2Note: 0,
+        lightingCue: 'Blackout_Fast',
+        postProcessing: 'Default',
+        fogState: false,
+        strobeState: 'Strobe_Off',
+        performer: 0,
+        trackMode: 'tracked',
+        beat: 'Off',
+        keyframe: 'Off',
+        bonusEffect: false,
+      })
+      this.cueHandler.notifySongStart()
+    }
 
-      // Handle Gameplay -> other (song end)
-      if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
-        this.fallbackActive = false
-        this.cueHandler.notifySongEnd()
-      }
+    if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
+      this.fallbackActive = false
+      this.cueHandler.notifySongEnd()
     }
 
     // Update the last scene
