@@ -10,6 +10,7 @@ import type { EffectSelector } from '../../../../photonics-dmx/types'
 import { getAvailableCues, getAvailableRb3Cues, getPrefs } from '../../ipcApi'
 import { useDebouncedSave } from '../../hooks/useDebouncedSave'
 import { persistPrefs } from '../../ipc/persistPrefs'
+import { MAX_BPM, MIN_BPM } from '../../../../photonics-dmx/listeners/YARG/yargFieldBounds'
 import { createLogger } from '../../../../shared/logger'
 import { sameSimulationSettings, type SimulationSettings } from './simulationSettings'
 
@@ -97,7 +98,7 @@ export function useSimulationSettings(
       if (!saved) return NOTHING_STORED
       if (saved.registryType) setRegistryType(saved.registryType)
       if (saved.venueSize) setVenueSize(saved.venueSize)
-      if (saved.bpm) setBpm(saved.bpm)
+      if (saved.bpm >= MIN_BPM && saved.bpm <= MAX_BPM) setBpm(saved.bpm)
       if (saved.instrument) setInstrument(saved.instrument)
       return { groupId: saved.groupId ?? '', effectId: saved.effectId ?? null }
     }

@@ -8,6 +8,7 @@ import {
   getRb3CueGroups,
 } from '../ipcApi'
 import { DraftNumberField } from './controls/DraftField'
+import { MAX_BPM, MIN_BPM } from '../../../photonics-dmx/listeners/YARG/yargFieldBounds'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('CueRegistrySelector')
 
@@ -167,8 +168,8 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         </label>
         <DraftNumberField
           aria-label="BPM"
-          min={60}
-          max={200}
+          min={MIN_BPM}
+          max={MAX_BPM}
           value={selectedBpm}
           onCommit={onBpmChange}
           className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10 w-20"

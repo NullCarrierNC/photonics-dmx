@@ -207,6 +207,19 @@ describe('CueSimulation settings', () => {
     expect(savedSettings()).toEqual([])
   })
 
+  it.each([
+    [240, 240],
+    [1000, 120],
+  ])('reopens with a stored BPM of %s showing %s', async (bpm, shown) => {
+    prefsAnswer = { simulationSettings: { ...STORED, bpm } }
+    cueGroupsAnswer = [ALPHA, ZETA]
+    renderPage()
+
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('zeta'))
+
+    expect(screen.getByLabelText('BPM')).toHaveValue(shown)
+  })
+
   it('says so when the settings cannot be stored', async () => {
     savePrefsAnswer = { success: false, error: 'read only' }
     renderPage()

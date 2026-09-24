@@ -207,4 +207,28 @@ describe('CueRegistrySelector', () => {
     fireEvent.blur(field)
     expect(onBpmChange).toHaveBeenCalledWith(140)
   })
+
+  it.each([
+    ['30', 30],
+    ['300', 300],
+    ['10', 20],
+    ['500', 400],
+  ])('holds a typed BPM of %s to the tempo range main accepts', async (typed, reported) => {
+    const onBpmChange = jest.fn()
+    renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onBpmChange={onBpmChange}
+        onGroupChange={jest.fn()}
+        selectedGroupId="yarg-stagekit"
+        selectedRegistryType="YARG"
+      />,
+    )
+    const field = await screen.findByLabelText('BPM')
+
+    fireEvent.change(field, { target: { value: typed } })
+    fireEvent.blur(field)
+
+    expect(onBpmChange).toHaveBeenCalledWith(reported)
+  })
 })
