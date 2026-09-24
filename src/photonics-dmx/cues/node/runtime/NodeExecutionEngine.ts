@@ -308,7 +308,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
    * Start executing a node graph from an event node.
    * Creates a new ExecutionContext and begins execution.
    */
-  public startExecution(eventNode: BaseEventNode, parameters: CueData): void {
+  public startExecution(eventNode: BaseEventNode, parameters: CueData | AudioCueData): void {
     this.startExecutionWithCallback(eventNode, parameters)
   }
 
@@ -322,7 +322,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
    */
   public startExecutionWithCallback(
     eventNode: BaseEventNode,
-    parameters: CueData,
+    parameters: CueData | AudioCueData,
     onComplete?: () => void,
     options?: { fromPort?: string },
   ): void {

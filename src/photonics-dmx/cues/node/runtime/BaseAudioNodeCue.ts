@@ -235,10 +235,7 @@ export abstract class BaseAudioNodeCue {
           ...safeData,
           eventContext,
         }
-        state.executionEngine.startExecution(
-          event,
-          cueData as unknown as import('../../types/cueTypes').CueData,
-        )
+        state.executionEngine.startExecution(event, cueData)
       }
       state.cueStartedFired = true
     }
@@ -354,12 +351,7 @@ export abstract class BaseAudioNodeCue {
       ...data,
       eventContext: { eventRawValue },
     }
-    state.eventRuns.start(
-      state.executionEngine!,
-      event,
-      event.executionPolicy,
-      cueData as unknown as import('../../types/cueTypes').CueData,
-    )
+    state.eventRuns.start(state.executionEngine!, event, event.executionPolicy, cueData)
   }
 
   onStop(): void {
@@ -471,12 +463,9 @@ export abstract class BaseAudioNodeCue {
 
     for (const port of result.fire) {
       const cueData: AudioCueData = { ...data, triggerContext: result.context }
-      state.executionEngine!.startExecutionWithCallback(
-        trigger,
-        cueData as unknown as import('../../types/cueTypes').CueData,
-        undefined,
-        { fromPort: port },
-      )
+      state.executionEngine!.startExecutionWithCallback(trigger, cueData, undefined, {
+        fromPort: port,
+      })
     }
   }
 
