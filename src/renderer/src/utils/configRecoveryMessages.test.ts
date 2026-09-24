@@ -22,6 +22,14 @@ describe('configRecoveryMessages', () => {
     expect(messages[0]).not.toContain('backup')
   })
 
+  it('reports a file from a newer version as in use and not saved to', () => {
+    const messages = configRecoveryMessages([{ fileName: 'prefs.json', reason: 'newerVersion' }])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('newer version')
+    expect(messages[0]).toContain('prefs.json')
+    expect(messages[0]).not.toContain('backup')
+  })
+
   it('gives each kind its own message when both happened', () => {
     expect(
       configRecoveryMessages([

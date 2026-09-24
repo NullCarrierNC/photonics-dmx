@@ -478,7 +478,7 @@ describe('ConfigurationManager', () => {
         }
         if (path.includes('dmxRigs.json')) {
           return JSON.stringify({
-            version: 3,
+            version: 1,
             data: {
               schemaVersion: 3,
               rigs: [
@@ -567,7 +567,7 @@ describe('ConfigurationManager', () => {
         }
         if (path.includes('dmxRigs.json')) {
           return JSON.stringify({
-            version: 3,
+            version: 1,
             data: {
               schemaVersion: 3,
               rigs: [
@@ -644,7 +644,7 @@ describe('ConfigurationManager', () => {
         }
         if (path.includes('dmxRigs.json')) {
           return JSON.stringify({
-            version: 3,
+            version: 1,
             data: { schemaVersion: 3, rigs: [] },
           })
         }

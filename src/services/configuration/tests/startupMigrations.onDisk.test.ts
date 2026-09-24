@@ -150,3 +150,23 @@ describe('a corrupt prefs.json left in place at launch', () => {
     expect(event.message).toMatch(/relaunch/i)
   })
 })
+
+describe('a prefs.json written by a newer version', () => {
+  it('uses its settings and saves nothing over it', async () => {
+    const dir = freshConfigDir()
+    const newer = { ...structuredClone(DEFAULT_PREFERENCES), clockRate: 25, fromNewer: true }
+    const content = JSON.stringify({ version: 7, data: newer })
+    fs.writeFileSync(path.join(dir, 'prefs.json'), content)
+
+    const cm = new ConfigurationManager()
+    const events = cm.drainConfigCorruptRecovery()
+    await expect(cm.setPreference('complex', false)).rejects.toThrow(/newer version/)
+
+    expect(cm.getPreference('clockRate')).toBe(25)
+    expect(cm.getPreference('complex')).toBe(DEFAULT_PREFERENCES.complex)
+    expect(fs.readFileSync(path.join(dir, 'prefs.json'), 'utf8')).toBe(content)
+    expect(events).toEqual([
+      expect.objectContaining({ fileName: 'prefs.json', reason: 'newerVersion' }),
+    ])
+  })
+})

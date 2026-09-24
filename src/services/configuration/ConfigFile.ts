@@ -76,7 +76,7 @@ type RecoveryDetail = { parseOrMigrateError?: unknown; schemaText?: string }
 
 /** A stored file's text read into data, or why it could not be. */
 type DecodedFile<T> =
-  | { ok: true; data: T; needsPersist: boolean }
+  | { ok: true; data: T; version: number; needsPersist: boolean }
   | { ok: false; reason: ConfigCorruptReason; detail: RecoveryDetail }
 
 /**
@@ -99,6 +99,8 @@ export class ConfigFile<T> {
   private saveChain: Promise<void> = Promise.resolve()
   /** Set while a corrupt file could not be moved aside. No write replaces it until one can. */
   private corruptFileInPlace = false
+  /** The version of a file written by a newer build, which no write replaces. */
+  private newerVersionOnDisk: number | null = null
   // Serializes every update and read-modify-write turn. `saveChain` only orders the writes, which
   // is not enough on its own: a write publishes `this.data` after it resolves, so a caller that
   // reads while one is in flight starts from the pre-write value and its later write wins.
@@ -237,7 +239,9 @@ export class ConfigFile<T> {
       return this.recoverToDefault(decoded.reason, decoded.detail)
     }
 
-    if (decoded.needsPersist) {
+    if (decoded.version > this.currentVersion) {
+      this.holdNewerFile(decoded.version)
+    } else if (decoded.needsPersist) {
       this.save(decoded.data).catch((err) =>
         log.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
       )
@@ -251,6 +255,18 @@ export class ConfigFile<T> {
     }
 
     return decoded.data
+  }
+
+  /**
+   * A file from a newer build is used as it is and never saved over, so it keeps the version the
+   * newer build stamped.
+   */
+  private holdNewerFile(version: number): void {
+    this.newerVersionOnDisk = version
+    const fileName = path.basename(this.filePath)
+    const message = `Written by a newer version of Photonics (format ${version}, this version reads up to ${this.currentVersion}). Its settings are in use, and changes are not saved to it while this version runs.`
+    log.warn(`[Photonics Config] ${fileName}: ${message}`)
+    this.onCorruptRecovery?.({ fileName, filePath: this.filePath, reason: 'newerVersion', message })
   }
 
   /**
@@ -315,7 +331,7 @@ export class ConfigFile<T> {
       }
     }
 
-    return { ok: true, data, needsPersist: migratedNeedsPersist }
+    return { ok: true, data, version, needsPersist: migratedNeedsPersist }
   }
 
   /**
@@ -370,6 +386,11 @@ export class ConfigFile<T> {
    * Performs the actual atomic write: write to a unique temp file, then rename over the target.
    */
   private async writeAtomic(data: T): Promise<void> {
+    if (this.newerVersionOnDisk !== null) {
+      throw new Error(
+        `Failed to save configuration: ${path.basename(this.filePath)} is from a newer version of Photonics (format ${this.newerVersionOnDisk}) and is kept as it is`,
+      )
+    }
     const versionedData: ConfigWithVersion<T> = {
       version: this.currentVersion,
       data: data,
@@ -525,6 +546,9 @@ export class ConfigFile<T> {
       this.data = decoded.data
       this.corruptFileInPlace = false
       log.info(`[Photonics Config] Adopted the repaired ${path.basename(this.filePath)}`)
+      if (decoded.version > this.currentVersion) {
+        this.holdNewerFile(decoded.version)
+      }
     }
   }
 
