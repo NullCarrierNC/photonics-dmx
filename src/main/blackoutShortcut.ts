@@ -17,7 +17,8 @@ const log = createLogger('blackoutShortcut')
  * from every other application. That is only tolerable because the hook is held exclusively while
  * Photonics is in the background: as soon as one of our windows takes focus the hook is dropped and
  * the renderer's own listener takes over, which is what leaves the key free to close dialogs and
- * deselect cue nodes while the app is being used.
+ * deselect cue nodes while the app is being used. With no window open, as macOS allows,
+ * the key goes back to the other applications until a window opens again.
  */
 
 /** Long enough to swallow the blur that precedes a focus when moving between our own windows. */
@@ -54,8 +55,9 @@ export class BlackoutShortcut {
 
     // Electron says which window has focus, which stays correct for any number of windows as
     // focus passes between them.
-    const appHasFocus = BrowserWindow.getFocusedWindow() !== null
-    const wanted = this.scope === 'system-wide' && !appHasFocus ? ACCELERATORS[this.key] : null
+    const inBackground =
+      BrowserWindow.getFocusedWindow() === null && BrowserWindow.getAllWindows().length > 0
+    const wanted = this.scope === 'system-wide' && inBackground ? ACCELERATORS[this.key] : null
 
     if (wanted === this.registeredAccelerator) {
       return

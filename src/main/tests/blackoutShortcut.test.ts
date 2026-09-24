@@ -15,7 +15,7 @@ jest.mock('electron', () => ({
       )
     }),
   },
-  BrowserWindow: { getFocusedWindow: jest.fn(() => null) },
+  BrowserWindow: { getFocusedWindow: jest.fn(() => null), getAllWindows: jest.fn(() => [{}]) },
   globalShortcut: {
     register: jest.fn(() => true),
     unregister: jest.fn(),
@@ -27,6 +27,7 @@ import { BrowserWindow, globalShortcut } from 'electron'
 import { BlackoutShortcut } from '../blackoutShortcut'
 
 const getFocusedWindow = BrowserWindow.getFocusedWindow as jest.MockedFunction<() => unknown | null>
+const getAllWindows = BrowserWindow.getAllWindows as jest.MockedFunction<() => unknown[]>
 const register = globalShortcut.register as jest.MockedFunction<
   (accelerator: string, callback: () => void) => boolean
 >
@@ -54,6 +55,7 @@ beforeEach(() => {
   appListeners.clear()
   jest.useFakeTimers()
   getFocusedWindow.mockReturnValue(null)
+  getAllWindows.mockReturnValue([{}])
   register.mockReturnValue(true)
 })
 
@@ -90,6 +92,29 @@ describe('blackoutShortcut', () => {
     jest.runAllTimers()
 
     expect(unregister).toHaveBeenCalledWith(ESCAPE)
+  })
+
+  it('lets the key go once the last window closes', () => {
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
+    expect(register).toHaveBeenCalledTimes(1)
+
+    getAllWindows.mockReturnValue([])
+    emit('window-all-closed')
+    jest.runAllTimers()
+
+    expect(unregister).toHaveBeenCalledWith(ESCAPE)
+  })
+
+  it('takes the key again when a window opens in the background', () => {
+    getAllWindows.mockReturnValue([])
+    shortcut.init(toggle, { key: 'escape', scope: 'system-wide' })
+    expect(register).not.toHaveBeenCalled()
+
+    getAllWindows.mockReturnValue([{}])
+    emit('browser-window-created')
+    jest.runAllTimers()
+
+    expect(register).toHaveBeenCalledWith(ESCAPE, expect.any(Function))
   })
 
   it('does not grab the key while focus moves between two of our own windows', () => {
