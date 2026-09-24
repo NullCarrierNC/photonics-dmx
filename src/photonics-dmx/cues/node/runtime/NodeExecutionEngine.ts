@@ -602,9 +602,8 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     cueData: CueData | AudioCueData,
   ): void {
     try {
-      // Create new context for listener chain (listener has id; ExecutionContext only needs event-like shape)
       const context = new ExecutionContext(
-        listenerNode as unknown as BaseEventNode,
+        listenerNode,
         cueData,
         this.cueLevelVarStore,
         this.groupLevelVarStore,

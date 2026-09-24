@@ -2,7 +2,7 @@
  * Execution engine for effect node graphs.
  * Similar to NodeExecutionEngine but for effects triggered by cues.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- author-typed parameter values, and effect listeners passed as event nodes */
+/* eslint-disable @typescript-eslint/no-explicit-any -- author-typed parameter values */
 
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
@@ -235,7 +235,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
       // Create execution context with caller's cue data. cueLevelVarStore is the effect's
       // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
       const context = new ExecutionContext(
-        { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
+        effectListener,
         cueData, // Pass caller's cue data
         this.effectVarStore, // Use effect-local variables as "cue-level"
         new Map(), // No group-level variables for effects
@@ -358,12 +358,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     listener: EventListenerNode,
     cueData: CueData | AudioCueData,
   ): void {
-    const context = new ExecutionContext(
-      { id: listener.id, type: 'event', outputs: listener.outputs } as any,
-      cueData,
-      this.effectVarStore,
-      new Map(),
-    )
+    const context = new ExecutionContext(listener, cueData, this.effectVarStore, new Map())
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id)
