@@ -26,7 +26,6 @@ jest.mock('../../controllers/sequencer/TransitionEngine')
 jest.mock('../../controllers/sequencer/SystemEffectsController')
 jest.mock('../../controllers/sequencer/EffectManager')
 jest.mock('../../controllers/sequencer/SongEventHandler')
-jest.mock('../../controllers/sequencer/DebugMonitor')
 jest.mock('../../controllers/sequencer/Clock')
 
 describe('Sequencer', () => {
@@ -232,15 +231,6 @@ describe('Sequencer', () => {
       // source); sequencer shutdown only removes its own subscription.
       expect(clockStopSpy).not.toHaveBeenCalled()
       expect(offTickSpy).toHaveBeenCalled()
-    })
-
-    it('stops the debug monitor', () => {
-      const debugMonitor = (sequencer as unknown as { debugMonitor: { dispose: jest.Mock } })
-        .debugMonitor
-
-      sequencer.shutdown()
-
-      expect(debugMonitor.dispose).toHaveBeenCalledTimes(1)
     })
   })
 })

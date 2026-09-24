@@ -154,8 +154,6 @@ describe('Node cue chaining', () => {
       onKeysNote: () => {},
       blackout: () => Promise.resolve(),
       cancelBlackout: () => {},
-      enableDebug: () => {},
-      debugLightLayers: () => {},
       shutdown: () => {},
     }
 

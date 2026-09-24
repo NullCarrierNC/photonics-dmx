@@ -89,8 +89,6 @@ describe('Runtime Event System', () => {
       onKeysNote: jest.fn(),
       blackout: jest.fn(),
       cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
       shutdown: jest.fn(),
     } as any
 

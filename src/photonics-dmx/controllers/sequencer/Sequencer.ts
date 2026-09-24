@@ -2,7 +2,6 @@ import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/Acti
 import { Effect, RGBIO, TrackedLight } from '../../types'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
 import { LightTransitionController } from './LightTransitionController'
-import { DebugMonitor } from './DebugMonitor'
 import { EffectManager } from './EffectManager'
 import { EffectTransformer } from './EffectTransformer'
 import { SongEventHandler } from './SongEventHandler'
@@ -38,7 +37,6 @@ export class Sequencer implements ILightingController {
   private effectManager: EffectManager
   private eventHandler: SongEventHandler
   private systemEffectsController: SystemEffectsController
-  private debugMonitor: DebugMonitor
   private motionPatternEngine: MotionPatternEngine
   private readonly motionPatternsClearedListeners = new Set<() => void>()
   private clock: ClockSource
@@ -73,7 +71,6 @@ export class Sequencer implements ILightingController {
       rigLabel,
     )
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine)
-    this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager)
     this.motionPatternEngine = new MotionPatternEngine(this.lightTransitionController)
 
     // Bind frame processing to the shared clock
@@ -496,22 +493,6 @@ export class Sequencer implements ILightingController {
   }
 
   /**
-   * Enables or disables the real-time debug table
-   * @param enable Whether to enable the debug table
-   * @param refreshRateMs Optional refresh rate in milliseconds
-   */
-  public enableDebug(enable: boolean, refreshRateMs?: number): void {
-    this.debugMonitor.enableDebug(enable, refreshRateMs)
-  }
-
-  /**
-   * Prints detailed debug information about light layers
-   */
-  public debugLightLayers(): void {
-    this.debugMonitor.debugLightLayers()
-  }
-
-  /**
    * Tears down this sequencer's own resources: its tick callback on the shared `Clock` and
    * every currently-active effect. The `Clock` itself is **not** stopped
    * — it's owned externally (so it can be shared across multiple sequencers running in
@@ -526,7 +507,6 @@ export class Sequencer implements ILightingController {
       this.clock.offTick(this.handleClockTick)
 
       this.systemEffectsController.dispose()
-      this.debugMonitor.dispose()
       this.removeAllEffects()
 
       log.info('PhotonicsSequencer shutdown: completed')

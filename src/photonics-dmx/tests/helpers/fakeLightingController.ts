@@ -57,8 +57,6 @@ const accepting: ILightingController = {
   blackout: () => Promise.resolve(),
   cancelBlackout: () => {},
   isBlackoutActive: () => false,
-  enableDebug: () => {},
-  debugLightLayers: () => {},
   shutdown: () => {},
 }
 

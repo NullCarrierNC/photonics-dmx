@@ -309,18 +309,6 @@ export interface ISystemEffectsController {
 }
 
 /**
- * @interface IDebugMonitor
- * @description Debug and monitoring functionality
- */
-export interface IDebugMonitor {
-  enableDebug(enable: boolean, refreshRateMs?: number): void
-  refreshDebugTable(): void
-  printLightLayerTable(): void
-  debugLightLayers(): void
-  dispose(): void
-}
-
-/**
  * @interface ILightingController
  * @description Main interface for the lighting system
  */
@@ -472,10 +460,6 @@ export interface ILightingController {
   cancelBlackout(): void
   /** Whether a timed blackout is still fading. */
   isBlackoutActive(): boolean
-
-  // Debug methods
-  enableDebug(enable: boolean, refreshRateMs?: number): void
-  debugLightLayers(): void
 
   // Lifecycle methods
   shutdown(): void
