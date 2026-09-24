@@ -108,6 +108,24 @@ describe('DmxSettingsAccordion', () => {
     expect(screen.queryByText(NO_RIG)).toBeNull()
   })
 
+  it('offers the audio switch in Advanced Mode', async () => {
+    await renderToggles({ rigs: [rig(true)], advanced: true })
+
+    expect(screen.getByRole('switch', { name: 'Enable Audio' })).toBeTruthy()
+  })
+
+  it('leaves the audio switch out of the basic mode while audio is off', async () => {
+    await renderToggles({ rigs: [rig(true)] })
+
+    expect(screen.queryByRole('switch', { name: 'Enable Audio' })).toBeNull()
+  })
+
+  it('keeps the audio switch while audio runs, so it can still be stopped', async () => {
+    await renderToggles({ rigs: [rig(true)], audioRunning: true })
+
+    expect(screen.getByRole('switch', { name: 'Enable Audio' })).toBeTruthy()
+  })
+
   it('says nothing about rigs before they have been read', async () => {
     await renderToggles({ rigs: [], rigsLoaded: false })
 

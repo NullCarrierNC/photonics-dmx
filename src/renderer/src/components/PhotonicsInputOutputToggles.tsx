@@ -7,7 +7,13 @@ import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa'
-import { dmxRigsAtom, dmxRigsLoadedAtom, lightingPrefsAtom, myValidDmxLightsAtom } from '../atoms'
+import {
+  audioListenerEnabledAtom,
+  dmxRigsAtom,
+  dmxRigsLoadedAtom,
+  lightingPrefsAtom,
+  myValidDmxLightsAtom,
+} from '../atoms'
 import { useLifecyclePhase, isLifecycleBusy } from '../hooks/useLifecyclePhase'
 
 interface DmxSettingsProps {
@@ -21,6 +27,10 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
   const [rigs] = useAtom(dmxRigsAtom)
   const [rigsLoaded] = useAtom(dmxRigsLoadedAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
+  const [audioEnabled] = useAtom(audioListenerEnabledAtom)
+  // Audio lives in Advanced Mode, but running audio holds the game listeners, so its switch stays
+  // while it runs.
+  const showAudioToggle = advancedModeEnabled || audioEnabled
   const lifecyclePhase = useLifecyclePhase()
   // Lock listener and sender toggles while the controller graph is mid-transition (restart, shutdown, failed, etc.).
   const lifecycleLocked = isLifecycleBusy(lifecyclePhase)
@@ -51,7 +61,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
             <div className="flex flex-row gap-8 items-start flex-wrap">
               <ListenerToggle listener="yarg" disabled={togglesDisabled} />
               <ListenerToggle listener="rb3" disabled={togglesDisabled} />
-              {advancedModeEnabled && <AudioToggle disabled={togglesDisabled} />}
+              {showAudioToggle && <AudioToggle disabled={togglesDisabled} />}
             </div>
           </div>
 
