@@ -422,7 +422,10 @@ export class YargNetworkListener extends EventEmitter {
       YargCueData.strobeState !== 'Strobe_Off' &&
       (activeStrobeStates as string[]).includes(YargCueData.strobeState)
 
-    if (currentHasActiveStrobe) {
+    // While the Fallback plays, the chart is in a run of blackouts that holds any strobe back, and
+    // the strobe stays held until a driving cue ends the Fallback.
+    const strobeDispatched = currentHasActiveStrobe && !this.fallbackActive
+    if (strobeDispatched) {
       let strobeCueType: CueType
       switch (YargCueData.strobeState) {
         case 'Strobe_Slow':
@@ -441,10 +444,10 @@ export class YargNetworkListener extends EventEmitter {
           strobeCueType = CueType.Strobe_Slow
       }
       void this.cueHandler.handleCue(strobeCueType, YargCueData)
-    } else if (previousHadActiveStrobe) {
+    } else if (previousHadActiveStrobe && !currentHasActiveStrobe) {
       void this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
     }
-    this.strobeWatchdog.setStrobeRunning(currentHasActiveStrobe)
+    this.strobeWatchdog.setStrobeRunning(strobeDispatched)
 
     // After the cues, so a transition they submit to wait for this frame's beat, measure or
     // keyframe starts on it.

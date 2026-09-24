@@ -768,6 +768,36 @@ describe('YargNetworkListener', () => {
       )
     })
 
+    it('keeps a strobe the blackout run held back off while the Fallback plays', () => {
+      const blackoutWithStrobe = (): CueData =>
+        gameplayFrame(CueType.Blackout_Fast, { strobeState: 'Strobe_Fast' })
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      fbListener.processCueData(blackoutWithStrobe())
+      for (let elapsed = 0; elapsed <= FALLBACK_MS + 600; elapsed += 50) {
+        jest.advanceTimersByTime(50)
+        fbListener.processCueData(blackoutWithStrobe())
+      }
+      const calls = dispatchedCues()
+      const fallbackAt = calls.indexOf(CueType.Fallback)
+      expect(fallbackAt).toBeGreaterThanOrEqual(0)
+
+      expect(calls.slice(fallbackAt).filter((cue) => cue === CueType.Strobe_Fast)).toEqual([])
+    })
+
+    it('strobes again once a driving cue ends the Fallback', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast))
+      for (let elapsed = 0; elapsed <= FALLBACK_MS + 600; elapsed += 50) {
+        jest.advanceTimersByTime(50)
+        fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast))
+      }
+      cueHandler.handleCue.mockClear()
+
+      fbListener.processCueData(gameplayFrame(CueType.Chorus, { strobeState: 'Strobe_Fast' }))
+
+      expect(dispatchedCues()).toEqual([CueType.Chorus, CueType.Strobe_Fast])
+    })
+
     it('does not fire at the menu', () => {
       fbListener.processCueData({
         ...defaultCueData,
