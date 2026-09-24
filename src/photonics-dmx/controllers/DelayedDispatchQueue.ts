@@ -79,10 +79,14 @@ export class DelayedDispatchQueue<T> {
     this.rearm()
   }
 
-  /** Drops pending items and cancels the timer. Synchronous: teardown ordering depends on it. */
-  public clear(): void {
-    this.waiting.length = 0
+  /**
+   * Drops pending items and cancels the timer, returning the dropped items oldest first.
+   * Synchronous: teardown ordering depends on it.
+   */
+  public clear(): T[] {
+    const dropped = this.waiting.splice(0).map((waiting) => waiting.item)
     this.stopTimer()
+    return dropped
   }
 
   /** Non-finite, negative or zero reads as no delay. */

@@ -77,4 +77,41 @@ describe('WireOutputDelay', () => {
 
     expect(sent).toEqual([10, 20])
   })
+
+  it('settles a held send as dropped when clear() drops it', async () => {
+    const { wire, sent, advanceTo } = delayedWire(100)
+
+    const held = wire.send('sacn', { 1: 10 })
+    wire.clear()
+    advanceTo(500)
+
+    await expect(held).resolves.toBe('dropped')
+    expect(sent).toEqual([])
+  })
+
+  it('settles a held send as dropped when emitNow() drops it', async () => {
+    const { wire, sent } = delayedWire(100)
+
+    const held = wire.send('sacn', { 1: 10 })
+    let immediate: Promise<unknown> = Promise.resolve()
+    wire.emitNow(() => {
+      immediate = wire.send('sacn', { 1: 0 })
+    })
+
+    await expect(held).resolves.toBe('dropped')
+    await expect(immediate).resolves.toBe(true)
+    expect(sent).toEqual([0])
+  })
+
+  it('settles every held send once the delay drops to 0', async () => {
+    const { wire, advanceTo, setDelay } = delayedWire(100)
+
+    const first = wire.send('sacn', { 1: 10 })
+    advanceTo(20)
+    setDelay(0)
+    const second = wire.send('sacn', { 1: 20 })
+    advanceTo(200)
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+  })
 })

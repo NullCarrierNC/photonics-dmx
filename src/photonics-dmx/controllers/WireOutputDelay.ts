@@ -1,5 +1,5 @@
 import { DelayedDispatchQueue } from './DelayedDispatchQueue'
-import type { WireSink } from './wireSlotGovernor'
+import type { WireSendResult, WireSink } from './wireSlotGovernor'
 import type { WireSenderId } from '../types/rigs'
 
 /** Time and timers, so the publisher's injected fakes drive the hold in tests. */
@@ -7,6 +7,13 @@ export interface WireOutputDelayTiming {
   now(): number
   setTimer(cb: () => void, ms: number): ReturnType<typeof setTimeout>
   clearTimer(handle: ReturnType<typeof setTimeout>): void
+}
+
+/** A frame waiting out the delay, with the resolver its caller's promise settles through. */
+interface HeldSend {
+  wireId: WireSenderId
+  buffer: Record<number, number>
+  settle: (result: WireSendResult) => void
 }
 
 /**
@@ -17,10 +24,11 @@ export interface WireOutputDelayTiming {
  *
  * Sits below the output-rate governor, so the governor's dirty-skip and trailing timers stay on
  * real time. The buffer is copied on the way in because the governor reuses one per slot, and the
- * sender's promise is passed back so a failed send still reaches it.
+ * sender's promise is passed back so a failed send still reaches it. Every send settles: a held
+ * frame that is dropped resolves `'dropped'`.
  */
 export class WireOutputDelay implements WireSink {
-  private readonly queue: DelayedDispatchQueue<() => void>
+  private readonly queue: DelayedDispatchQueue<HeldSend>
   private passThrough = false
 
   constructor(
@@ -28,24 +36,27 @@ export class WireOutputDelay implements WireSink {
     timing: WireOutputDelayTiming,
     private readonly getDelayMs: () => number,
   ) {
-    this.queue = new DelayedDispatchQueue<() => void>((dispatch) => dispatch(), this.getDelayMs, {
-      now: () => timing.now(),
-      setTimer: (cb, ms) => timing.setTimer(cb, ms),
-      clearTimer: (handle) => timing.clearTimer(handle),
-    })
+    this.queue = new DelayedDispatchQueue<HeldSend>(
+      (held) => {
+        this.sender.send(held.wireId, held.buffer).then(held.settle, () => held.settle(false))
+      },
+      this.getDelayMs,
+      {
+        now: () => timing.now(),
+        setTimer: (cb, ms) => timing.setTimer(cb, ms),
+        clearTimer: (handle) => timing.clearTimer(handle),
+      },
+    )
   }
 
-  public send(wireId: WireSenderId, buffer: Record<number, number>): Promise<boolean> {
+  public send(wireId: WireSenderId, buffer: Record<number, number>): Promise<WireSendResult> {
     // A frame goes straight out only with nothing held, so frames still waiting after the delay
     // drops to 0 leave ahead of it.
     if (this.passThrough || (this.getDelayMs() <= 0 && this.queue.pending === 0)) {
       return this.sender.send(wireId, buffer)
     }
-    const held = { ...buffer }
-    return new Promise<boolean>((resolve) => {
-      this.queue.enqueue(() => {
-        this.sender.send(wireId, held).then(resolve, () => resolve(false))
-      })
+    return new Promise<WireSendResult>((settle) => {
+      this.queue.enqueue({ wireId, buffer: { ...buffer }, settle })
     })
   }
 
@@ -55,7 +66,7 @@ export class WireOutputDelay implements WireSink {
    * so they are dropped rather than allowed to arrive after it.
    */
   public emitNow(emit: () => void): void {
-    this.queue.clear()
+    this.clear()
     this.passThrough = true
     try {
       emit()
@@ -66,6 +77,8 @@ export class WireOutputDelay implements WireSink {
 
   /** Drops what is held. Synchronous, so a caller can clear before blacking out. */
   public clear(): void {
-    this.queue.clear()
+    for (const held of this.queue.clear()) {
+      held.settle('dropped')
+    }
   }
 }

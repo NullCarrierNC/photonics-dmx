@@ -5,8 +5,14 @@ import type { WireSenderId } from '../types/rigs'
  * output delay without the governor knowing.
  */
 export interface WireSink {
-  send(wireId: WireSenderId, universeBuffer: Record<number, number>): Promise<boolean>
+  send(wireId: WireSenderId, universeBuffer: Record<number, number>): Promise<WireSendResult>
 }
+
+/**
+ * Whether a frame reached the sender. `'dropped'` is a frame the output delay discarded unsent
+ * because newer output replaced it, which is not a failure.
+ */
+export type WireSendResult = boolean | 'dropped'
 
 export type TimerHandle = ReturnType<typeof setTimeout>
 
@@ -228,9 +234,10 @@ export class WireSlotGovernor {
     snapshotInto(slot.lastSentBuffer, buffer)
     slot.hasLastSent = true
     // Senders report failure asynchronously, so the dirty-skip cache is provisional: drop it when
-    // the send turns out to have failed, so a static scene sends its frame again.
-    void delivered.then((ok) => {
-      if (!ok) {
+    // the send turns out to have failed, so a static scene sends its frame again. A dropped frame
+    // keeps the cache, which by then describes the output that replaced it.
+    void delivered.then((result) => {
+      if (result === false) {
         slot.hasLastSent = false
       }
     })
