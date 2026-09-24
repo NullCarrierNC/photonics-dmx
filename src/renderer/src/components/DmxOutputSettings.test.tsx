@@ -335,18 +335,13 @@ describe('DmxOutputSettings sender startup payloads', () => {
   })
 })
 
-describe('DmxOutputSettings first run', () => {
-  it('seeds a missing saved config from the senders the backend reports running', async () => {
+describe('DmxOutputSettings on mount', () => {
+  it('writes no output config over one it has not read yet', async () => {
     const store = await renderPanel({}, { sacn: true, opendmx: true })
+    await act(async () => {})
 
-    await waitFor(() =>
-      expect(savePrefsMock).toHaveBeenCalledWith({
-        dmxOutputConfig: outputConfig({ sacnEnabled: true, openDmxEnabled: true }),
-      }),
-    )
-    expect(store.get(lightingPrefsAtom).dmxOutputConfig).toEqual(
-      outputConfig({ sacnEnabled: true, openDmxEnabled: true }),
-    )
+    expect(savePrefsMock).not.toHaveBeenCalled()
+    expect(store.get(lightingPrefsAtom).dmxOutputConfig).toBeUndefined()
   })
 
   it('leaves a saved config alone', async () => {

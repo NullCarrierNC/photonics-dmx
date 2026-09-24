@@ -34,7 +34,6 @@ import {
 import {
   clampRefreshRateValue,
   nextOutputConfig,
-  outputConfigFromRunningSenders,
   parseGlobalPublishingRate,
   parseOpenDmxSpeed,
   type DmxOutputFlag,
@@ -196,46 +195,6 @@ const DmxOutputSettings: React.FC = () => {
 
     void loadNetworkInterfaces()
   }, [])
-
-  // Seed the saved output config on first run from whatever the backend already has running.
-  useEffect(() => {
-    if (prefs.dmxOutputConfig) {
-      return
-    }
-    const initialConfig = outputConfigFromRunningSenders({
-      sacn: isSacnEnabled,
-      artnet: isArtNetEnabled,
-      enttecpro: isEnttecProEnabled,
-      opendmx: isOpenDmxEnabled,
-    })
-    log.info('No DMX output config in preferences, initializing from sender states:', initialConfig)
-
-    let cancelled = false
-    void (async () => {
-      const saved = await persist(
-        { dmxOutputConfig: initialConfig },
-        'the DMX output configuration',
-      )
-      if (!saved || cancelled) {
-        return
-      }
-      setPrefs((prev) => ({
-        ...prev,
-        dmxOutputConfig: initialConfig,
-      }))
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [
-    prefs.dmxOutputConfig,
-    isSacnEnabled,
-    isArtNetEnabled,
-    isEnttecProEnabled,
-    isOpenDmxEnabled,
-    setPrefs,
-    persist,
-  ])
 
   /** What one sender needs to be turned on or off: its saved flag and its backend state. */
   type SenderToggle = {
