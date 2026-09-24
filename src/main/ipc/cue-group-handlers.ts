@@ -6,6 +6,7 @@ import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistrie
 import { validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 const log = createLogger('cue-group-handlers')
 
 /**
@@ -18,6 +19,32 @@ async function coldInitSettled(controllerManager: ControllerManager): Promise<vo
     await controllerManager.init()
   } catch {
     // The init reports its own failure. The list answers with whatever the registry holds.
+  }
+}
+
+/**
+ * The cues of one group in a domain's registry. A missing or blank group id resolves to the
+ * registry's default group, then its first enabled group.
+ */
+function availableCues(domain: NetCueMode, groupId: unknown) {
+  try {
+    const registry = getCueRegistry(domain)
+    const requested = typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
+    const targetGroupId =
+      requested ?? registry.getDefaultGroupId() ?? registry.getEnabledGroups()[0]
+    const group = targetGroupId ? registry.getGroup(targetGroupId) : undefined
+    if (!group) {
+      return []
+    }
+    return Array.from(group.cues.entries()).map(([cueType, implementation]) => ({
+      id: cueType,
+      yargDescription: implementation.description,
+      rb3Description: implementation.description,
+      groupName: group.name,
+    }))
+  } catch (error) {
+    log.error(`Error getting available ${domain} cues:`, error)
+    return []
   }
 }
 
@@ -70,34 +97,13 @@ export function setupCueGroupHandlers(
       .filter((row): row is NonNullable<typeof row> => row !== null)
   })
 
-  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_RB3_CUES, log, async (_, groupId?: unknown) => {
-    try {
-      const registry = getCueRegistry('rb3')
-      const resolvedGroupId =
-        typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
-      const targetGroupId =
-        resolvedGroupId ?? registry.getDefaultGroupId() ?? registry.getEnabledGroups()[0]
-      if (!targetGroupId) {
-        return []
-      }
-      const group = registry.getGroup(targetGroupId)
-      if (!group) {
-        return []
-      }
-      return Array.from(group.cues.keys()).map((cueType) => {
-        const implementation = group.cues.get(cueType)!
-        return {
-          id: cueType,
-          yargDescription: implementation.description,
-          rb3Description: implementation.description,
-          groupName: group.name,
-        }
-      })
-    } catch (error) {
-      log.error('Error getting available RB3 cues:', error)
-      return []
-    }
-  })
+  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_CUES, log, async (_, groupId?: unknown) =>
+    availableCues('yarg', groupId),
+  )
+
+  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_RB3_CUES, log, async (_, groupId?: unknown) =>
+    availableCues('rb3', groupId),
+  )
 
   handleInvoke(ipcMain, LIGHT.GET_CUE_SOURCE_GROUP, log, async (_, cueType: unknown) => {
     const validated = validateCueType(cueType)

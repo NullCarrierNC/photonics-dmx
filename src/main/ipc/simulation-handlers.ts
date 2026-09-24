@@ -45,7 +45,7 @@ interface SimulatedMotionCue<TData> {
  */
 
 /**
- * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, available cues).
+ * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, audio cues).
  */
 export function setupSimulationHandlers(
   ipcMain: IpcMain,
@@ -101,39 +101,6 @@ export function setupSimulationHandlers(
       return registry.getCueDetails(targetGroupId)
     } catch (error) {
       log.error('Error getting available audio cues:', error)
-      return []
-    }
-  })
-
-  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_CUES, log, async (_, groupId?: unknown) => {
-    try {
-      const registry = CueRegistry.getInstance()
-      const targetGroupId =
-        typeof groupId === 'string' && groupId.trim() !== '' ? groupId : 'default'
-      const group = registry.getGroup(targetGroupId)
-      if (!group) {
-        log.error(`Group not found: ${targetGroupId}`)
-        return []
-      }
-      const availableCueTypes = Array.from(group.cues.keys())
-      log.info(`Found ${availableCueTypes.length} cue types in group ${targetGroupId}`)
-      if (availableCueTypes.length === 0) {
-        log.error(`No cue types found in group: ${targetGroupId}`)
-        return []
-      }
-      return availableCueTypes.map((cueType) => {
-        const implementation = group.cues.get(cueType)
-        const yargDescription = implementation!.description
-        return {
-          id: cueType,
-          yargDescription,
-          rb3Description:
-            'RB3E: Does not currently use cues, lights are set directly from passed LED colour values.',
-          groupName: group.name,
-        }
-      })
-    } catch (error) {
-      log.error('Error getting available cues:', error)
       return []
     }
   })
