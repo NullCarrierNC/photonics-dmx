@@ -2,9 +2,9 @@
 /**
  * Owns one rig's worth of RB3 StageKit render state and operations: the cached
  * `StageKitLightMapper` sized to that rig's light count, per-DMX-light colour-bank
- * blending state (`lightColorState`, `currentPassColors`, `colorToLights`,
- * `pendingUpdates`), the rig's active strobe effects + intervals, and every method that
- * issues `setState` / `blackout` against the rig's own `Sequencer`.
+ * blending state (`lightColorState`, `colorToLights`, `pendingUpdates`), the rig's active strobe
+ * effects + intervals, and every method that issues `setState` / `blackout` against the rig's own
+ * `Sequencer`.
  *
  * The coordinator (`Rb3StageKitDirectProcessor`) holds a `Map<rigId, Rb3StageKitRigProcessor>`
  * and fans every gameplay event out to each rig instance, so secondary rigs render the
@@ -48,7 +48,6 @@ export class Rb3StageKitRigProcessor {
 
   // Per-light colour blending state. Keys are DMX light indices.
   private lightColorState = new Map<number, Set<string>>()
-  private currentPassColors = new Map<number, Set<string>>()
   private colorToLights = new Map<string, Set<number>>()
   private pendingUpdates = new Map<number, PendingUpdate>()
 
@@ -237,9 +236,6 @@ export class Rb3StageKitRigProcessor {
       if (this.lightColorState.has(lightIndex)) {
         this.lightColorState.get(lightIndex)!.delete(color)
       }
-      if (this.currentPassColors.has(lightIndex)) {
-        this.currentPassColors.get(lightIndex)!.delete(color)
-      }
       this.triggerReblend(lightIndex)
     }
     this.colorToLights.set(color, new Set())
@@ -250,7 +246,6 @@ export class Rb3StageKitRigProcessor {
   public async turnOffAllLights(): Promise<void> {
     try {
       this.lightColorState.clear()
-      this.currentPassColors.clear()
       for (const colorSet of this.colorToLights.values()) {
         colorSet.clear()
       }
@@ -289,7 +284,6 @@ export class Rb3StageKitRigProcessor {
     this.activeStrobeEffects.clear()
     this.strobedLights.clear()
     this.lightColorState.clear()
-    this.currentPassColors.clear()
     this.colorToLights.clear()
   }
 
@@ -395,11 +389,6 @@ export class Rb3StageKitRigProcessor {
     }
     this.colorToLights.set(color, new Set())
     for (const lightIndex of newLightIndices) {
-      if (!this.currentPassColors.has(lightIndex)) {
-        this.currentPassColors.set(lightIndex, new Set())
-      }
-    }
-    for (const lightIndex of newLightIndices) {
       this.addColorToLight(lightIndex, color)
       this.colorToLights.get(color)!.add(lightIndex)
     }
@@ -409,11 +398,7 @@ export class Rb3StageKitRigProcessor {
     if (!this.lightColorState.has(lightIndex)) {
       this.lightColorState.set(lightIndex, new Set())
     }
-    if (!this.currentPassColors.has(lightIndex)) {
-      this.currentPassColors.set(lightIndex, new Set())
-    }
     this.lightColorState.get(lightIndex)!.add(color)
-    this.currentPassColors.get(lightIndex)!.add(color)
 
     const existingPending = this.pendingUpdates.get(lightIndex)
     if (existingPending) {
@@ -437,9 +422,6 @@ export class Rb3StageKitRigProcessor {
   private removeColorFromLight(lightIndex: number, color: string): void {
     if (!this.lightColorState.has(lightIndex)) return
     this.lightColorState.get(lightIndex)!.delete(color)
-    if (this.currentPassColors.has(lightIndex)) {
-      this.currentPassColors.get(lightIndex)!.delete(color)
-    }
     const existingPending = this.pendingUpdates.get(lightIndex)
     if (existingPending) {
       if (existingPending.timeout) clearTimeout(existingPending.timeout)
@@ -478,20 +460,12 @@ export class Rb3StageKitRigProcessor {
   private applyAccumulatedColors(lightIndex: number): void {
     const pendingUpdate = this.pendingUpdates.get(lightIndex)
     if (!pendingUpdate) return
-    const persistentColors = this.lightColorState.get(lightIndex) || new Set<string>()
-    const currentPassColors = this.currentPassColors.get(lightIndex) || new Set<string>()
-    if (currentPassColors.size > 0) {
-      const colorsToBlend = Array.from(currentPassColors)
-      const blendedColor = this.blendColors(colorsToBlend)
-      this.applyColorToLight(lightIndex, blendedColor)
-    } else if (persistentColors.size > 0) {
-      const colorsToBlend = Array.from(persistentColors)
-      const blendedColor = this.blendColors(colorsToBlend)
-      this.applyColorToLight(lightIndex, blendedColor)
+    const colors = this.lightColorState.get(lightIndex) || new Set<string>()
+    if (colors.size > 0) {
+      this.applyColorToLight(lightIndex, this.blendColors(Array.from(colors)))
     } else {
       this.turnOffLight(lightIndex)
       this.lightColorState.delete(lightIndex)
-      this.currentPassColors.delete(lightIndex)
     }
   }
 
@@ -501,11 +475,8 @@ export class Rb3StageKitRigProcessor {
       if (existingPending.timeout) clearTimeout(existingPending.timeout)
       this.pendingUpdates.delete(lightIndex)
     }
-    const persistentColors = this.lightColorState.get(lightIndex) || new Set<string>()
-    const currentPassColors = this.currentPassColors.get(lightIndex) || new Set<string>()
-    const colorsToBlend = Array.from(persistentColors).concat(Array.from(currentPassColors))
-    const blendedColor = this.blendColors(colorsToBlend)
-    this.applyColorToLight(lightIndex, blendedColor)
+    const colors = this.lightColorState.get(lightIndex) || new Set<string>()
+    this.applyColorToLight(lightIndex, this.blendColors(Array.from(colors)))
   }
 
   private blendColors(colors: string[]): RGBIO {
