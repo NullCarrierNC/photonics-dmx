@@ -27,6 +27,7 @@ import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 import { type AppPreferences } from './configurationDefaults'
 import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
 import { runStartupMigrations, type UserLightsConfig } from './startupMigrations'
+import { isPlainObject } from './preferencesMigration'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigurationManager')
@@ -130,11 +131,23 @@ export class ConfigurationManager {
   }
 
   /**
-   * Updates multiple preferences at once
+   * Updates multiple preferences at once. A nested settings object merges into the stored one, so
+   * the fields a partial object leaves out keep their stored values.
    */
   async updatePreferences(updates: Partial<AppPreferences>): Promise<void> {
     await this.preferences.mutate((currentPrefs) => {
-      let newPrefs: AppPreferences = { ...currentPrefs, ...updates }
+      const merged: Record<string, unknown> = { ...currentPrefs }
+      for (const [key, value] of Object.entries(updates)) {
+        const stored = merged[key]
+        merged[key] =
+          isPlainObject(value) && isPlainObject(stored) ? { ...stored, ...value } : value
+      }
+      if (updates.audioConfig && isPlainObject(merged.audioConfig)) {
+        // Whether audio runs is session state and is never stored.
+        const { enabled: _enabled, ...audioConfig } = merged.audioConfig
+        merged.audioConfig = audioConfig
+      }
+      let newPrefs = merged as unknown as AppPreferences
       if (updates.cueDomains) {
         newPrefs = {
           ...newPrefs,

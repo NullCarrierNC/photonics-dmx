@@ -83,6 +83,32 @@ describe('ConfigurationManager', () => {
       expect(fsPromises.writeFile).toHaveBeenCalled()
     })
 
+    test('merges a partial nested setting into the stored one', async () => {
+      const sacnConfig = {
+        universe: 7,
+        networkInterface: '10.0.0.5',
+        useUnicast: true,
+        unicastDestination: '10.0.0.9',
+        refreshRateHz: 30,
+      }
+      await configManager.updatePreferences({ sacnConfig })
+
+      await configManager.updatePreferences({ sacnConfig: { universe: 3 } } as never)
+
+      expect(configManager.getPreference('sacnConfig')).toEqual({ ...sacnConfig, universe: 3 })
+    })
+
+    test('never stores whether audio is running', async () => {
+      await configManager.updatePreferences({
+        audioConfig: { enabled: true, sensitivity: 3 },
+      } as never)
+
+      const stored = configManager.getPreference('audioConfig')
+      expect(stored).not.toHaveProperty('enabled')
+      expect(stored?.sensitivity).toBe(3)
+      expect(stored?.fftSize).toBeDefined()
+    })
+
     test('holds a motion selection mode to the three a motion domain can take', async () => {
       // withinSong is legal in the schema but only means something for lighting, so reading a
       // motion domain straight through would answer outside the union its channel declares.
