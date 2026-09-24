@@ -219,7 +219,10 @@ const Preferences: React.FC = () => {
             <AdvancedModeSettings />
             {advancedModeEnabled && (
               <>
-                <MotionMasterToggle onMotionEnabledChange={onMotionEnabledChange} />
+                <MotionMasterToggle
+                  enabled={motionMasterEnabled}
+                  onMotionEnabledChange={onMotionEnabledChange}
+                />
                 <CueConsistencySettings motionGloballyEnabled={motionMasterEnabled} />
                 <ClockRateSettings />
               </>
