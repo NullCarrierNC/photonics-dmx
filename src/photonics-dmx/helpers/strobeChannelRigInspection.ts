@@ -1,6 +1,7 @@
 import {
   ConfigStrobeType,
   FixtureTypes,
+  type DmxFixture,
   type DmxLight,
   type LightingConfiguration,
   type RgbDmxChannels,
@@ -11,7 +12,7 @@ import {
  * a hardware strobe-speed channel — i.e. lights where the runtime engages the latch-and-write
  * path. Excludes dedicated {@link FixtureTypes.STROBE} fixtures (separate device class).
  */
-export function isRgbFamilyWithStrobeChannel(light: DmxLight): boolean {
+export function isRgbFamilyWithStrobeChannel(light: DmxFixture): boolean {
   if (light.fixture === FixtureTypes.STROBE) {
     return false
   }

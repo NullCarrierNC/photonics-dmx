@@ -2,13 +2,18 @@
  * DmxPublisher tests: publish calls sender, updateActiveRigs, empty light map,
  * and home fallback mirroring for inverted moving-head fixtures.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
 import { SenderManager } from '../../controllers/SenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
-import { createMockRGBIP, createMockLightingConfig } from '../helpers/testFixtures'
+import {
+  createMockDmxLight,
+  createMockRGBIP,
+  createMockLightingConfig,
+} from '../helpers/testFixtures'
+import { createRecordingPublisher, type RecordingPublisher } from '../helpers/recordingPublisher'
 import type { DmxRig, FixtureConfig, LightingConfiguration, RGBIO } from '../../types'
-import { FixtureTypes } from '../../types'
+import { ConfigStrobeType, DEFAULT_STROBE_CHANNEL_VALUES, FixtureTypes } from '../../types'
 import { mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHelpers'
 
 /**
@@ -329,5 +334,62 @@ describe('DmxPublisher', () => {
     publisher.setManualBuffer({ 1: 255, 2: 255 })
 
     expect(mockSenderManager.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('DmxPublisher strobe slot before any light state', () => {
+  let recording: RecordingPublisher | null = null
+  afterEach(() => {
+    recording?.shutdown()
+    recording = null
+    jest.restoreAllMocks()
+  })
+
+  function setup(strobeEnabled: boolean): RecordingPublisher {
+    const light = createMockDmxLight({
+      id: 'f1',
+      fixtureId: 'f1',
+      isStrobeEnabled: strobeEnabled,
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 5 },
+    })
+    const config = createMockLightingConfig({
+      numLights: 1,
+      strobeType: ConfigStrobeType.AllCapable,
+      frontLights: [light],
+      strobeLights: strobeEnabled ? [light] : [],
+    })
+    return createRecordingPublisher({
+      rigs: [{ id: 'rig-a', name: 'A', active: true, config }],
+      chains: [{ rigId: 'rig-a', lightStateManager: new LightStateManager() }],
+    })
+  }
+
+  it('sends the strobe channel on the publish the slot starts', async () => {
+    recording = setup(true)
+
+    recording.strobeState.setActive('medium', 'net')
+    await Promise.resolve()
+
+    expect(recording.last()?.[5]).toBe(DEFAULT_STROBE_CHANNEL_VALUES.medium)
+  })
+
+  it('zeroes the strobe channel when the slot releases', async () => {
+    recording = setup(true)
+    recording.strobeState.setActive('fast', 'net')
+    await Promise.resolve()
+
+    recording.strobeState.setActive(null, 'net')
+    await Promise.resolve()
+
+    expect(recording.last()?.[5]).toBe(0)
+  })
+
+  it('leaves a fixture that is not strobe-enabled off the wire', async () => {
+    recording = setup(false)
+
+    recording.strobeState.setActive('medium', 'net')
+    await Promise.resolve()
+
+    expect(recording.frames).toHaveLength(0)
   })
 })

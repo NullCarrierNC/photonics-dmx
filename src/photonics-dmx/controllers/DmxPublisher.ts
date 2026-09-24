@@ -1,6 +1,5 @@
 import {
   RGBIO,
-  RgbDmxChannels,
   DmxRig,
   FixtureTypes,
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
@@ -12,7 +11,7 @@ import { DmxLightManager } from './DmxLightManager'
 import { blackoutUniverse, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
 import { scaleDmxValueByPercent } from '../helpers/brightnessScaling'
 import { resolveMovingHeadAxes, StrobePeakLatch } from './publisherLightOutput'
-import { FixtureChannelWriter, type LightOutput } from './fixtureChannelWriter'
+import { FixtureChannelWriter, strobeChannelChops, type LightOutput } from './fixtureChannelWriter'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import type {
@@ -557,15 +556,7 @@ export class DmxPublisher {
         }
         visitedLightIds.add(lightId)
 
-        const lightChannels = dmxLight.channels as RgbDmxChannels
-        const hasStrobeChannel = typeof lightChannels.strobeChannel === 'number'
-        // The "Strobe Channel?" runtime path is for RGB-family fixtures whose template declares an
-        // extra hardware strobe-speed channel. Dedicated STROBE fixtures are a separate device
-        // class (no RGB to latch, no per-cue `strobeValues` model) and are deliberately excluded.
-        const isRgbFamilyWithStrobeChannel =
-          hasStrobeChannel && dmxLight.fixture !== FixtureTypes.STROBE
-        const strobeChannelActive =
-          activeStrobeSlot != null && dmxLight.isStrobeEnabled && isRgbFamilyWithStrobeChannel
+        const strobeChannelActive = strobeChannelChops(dmxLight, activeStrobeSlot)
         // White Channel Mix Mode. Under `strobe-rgbw` either strobe mechanism counts — the flash
         // path (strobe set) or the hardware chop, whose colour the latch below resolves to the
         // flash peak. A fixture with no white emitter has no plan stage to apply this to.
@@ -649,10 +640,14 @@ export class DmxPublisher {
         )
       }
 
-      // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
-      // addressed this frame (pre-first-cue lights, or strobe-group lights excluded from cue
-      // targeting). Colour/mixable channels legitimately need a state, so only fixed writes fire.
-      this._channelWriter.writeUnvisitedFixed(manager.getAllDmxLights(), visitedLightIds)
+      // Unvisited-fixture pass: fixtures no light state addressed this frame (pre-first-cue
+      // lights, or strobe-group lights excluded from cue targeting) still get their pinned `fixed`
+      // channels and a chopping strobe channel.
+      this._channelWriter.writeUnvisited(
+        manager.getAllDmxLights(),
+        visitedLightIds,
+        activeStrobeSlot,
+      )
     }
 
     // 5. Release channels that stopped being addressed, then dispatch each wire slot through its

@@ -13,8 +13,22 @@ import {
   type ChannelMixPlan,
 } from '../helpers/colorChannelMixer'
 import { buildBrightnessScaleMap, scaleDmxValueByPercent } from '../helpers/brightnessScaling'
+import { isRgbFamilyWithStrobeChannel } from '../helpers/strobeChannelRigInspection'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('FixtureChannelWriter')
+
+/**
+ * Whether a fixture's own strobe-speed channel chops while `slot` is active: a strobe-enabled
+ * RGB-family fixture whose template declares one. Dedicated STROBE fixtures are a separate device
+ * class (no RGB to latch, no per-cue `strobeValues` model) and never do.
+ */
+export function strobeChannelChops(fixture: DmxFixture, slot: StrobeSpeedSlot | null): boolean {
+  return slot != null && fixture.isStrobeEnabled && isRgbFamilyWithStrobeChannel(fixture)
+}
+
+function strobeChannelValue(fixture: DmxFixture, slot: StrobeSpeedSlot): number {
+  return (fixture.strobeValues ?? DEFAULT_STROBE_CHANNEL_VALUES)[slot]
+}
 
 /** A light's values once the colour stages have run, ready to address. */
 export interface LightOutput {
@@ -151,12 +165,7 @@ export class FixtureChannelWriter {
           value = (dmxChannelData as MovingHeadDmxChannels).tilt
           break
         case 'strobeChannel':
-          if (strobeSlot) {
-            const values = fixture.strobeValues ?? DEFAULT_STROBE_CHANNEL_VALUES
-            value = values[strobeSlot]
-          } else {
-            value = 0
-          }
+          value = strobeSlot ? strobeChannelValue(fixture, strobeSlot) : 0
           break
         default:
           continue
@@ -175,19 +184,29 @@ export class FixtureChannelWriter {
   }
 
   /**
-   * Writes the pinned fixed channels of planned fixtures no light state reached this frame. Colour
-   * channels need a state, so only fixed writes go out.
+   * Writes what fixtures no light state reached this frame still put on the wire: the pinned fixed
+   * channels of planned fixtures, and the strobe channel of each whose hardware strobe is chopping
+   * for `strobeSlot`. Colour channels need a state, so nothing else goes out.
    */
-  public writeUnvisitedFixed(
+  public writeUnvisited(
     fixtures: ReadonlyMap<string, DmxFixture>,
     visited: ReadonlySet<string>,
+    strobeSlot: StrobeSpeedSlot | null,
   ): void {
     this._scaleMap = null
     for (const [lightId, fixture] of fixtures) {
       if (visited.has(lightId)) continue
+      this._lightId = lightId
+      const strobeChannel = (fixture.channels as RgbDmxChannels).strobeChannel
+      if (
+        strobeSlot &&
+        typeof strobeChannel === 'number' &&
+        strobeChannelChops(fixture, strobeSlot)
+      ) {
+        this._write(strobeChannel, strobeChannelValue(fixture, strobeSlot), 'strobeChannel')
+      }
       const plan = this._mixPlanFor(fixture)
       if (!plan) continue
-      this._lightId = lightId
       this._warnInvalidExtras(lightId, plan)
       for (const fw of plan.fixedWrites) this._write(fw.channel, fw.value, 'fixed channel')
     }
