@@ -41,6 +41,41 @@ export interface FixtureConfig {
   invertTilt: boolean
 }
 
+/** The config fields that hold a flag. */
+export type FixtureConfigFlagField = {
+  [K in keyof FixtureConfig]: FixtureConfig[K] extends boolean ? K : never
+}[keyof FixtureConfig]
+
+/** The config fields that hold a number. */
+export type FixtureConfigNumberField = Exclude<keyof FixtureConfig, FixtureConfigFlagField>
+
+/** Every config field, in the order the settings list them. */
+export const FIXTURE_CONFIG_FIELDS = [
+  'panHome',
+  'panMin',
+  'panMax',
+  'panRangeDeg',
+  'panDirectionCW',
+  'panStageDeg',
+  'tiltHome',
+  'tiltMin',
+  'tiltMax',
+  'tiltRangeDeg',
+  'tiltStageDeg',
+  'invertPan',
+  'invertTilt',
+] as const satisfies ReadonlyArray<keyof FixtureConfig>
+
+const FIXTURE_CONFIG_FLAG_FIELDS: ReadonlySet<string> = new Set<FixtureConfigFlagField>([
+  'panDirectionCW',
+  'invertPan',
+  'invertTilt',
+])
+
+export function isFixtureConfigFlagField(key: keyof FixtureConfig): key is FixtureConfigFlagField {
+  return FIXTURE_CONFIG_FLAG_FIELDS.has(key)
+}
+
 /** Legacy persisted field, merged in {@link normalizeFixtureConfig} into invertPan/invertTilt. */
 export type LegacyFixtureConfigFields = {
   invert?: boolean

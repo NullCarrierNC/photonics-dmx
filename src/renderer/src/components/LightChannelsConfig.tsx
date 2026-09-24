@@ -7,8 +7,12 @@ import {
   FixtureTypes,
   RgbDmxChannels,
   StrobeChannelValues,
+  FIXTURE_CONFIG_FIELDS,
   FixtureConfig,
+  FixtureConfigFlagField,
+  FixtureConfigNumberField,
   fixtureConfigFieldBounds,
+  isFixtureConfigFlagField,
   normalizeFixtureConfig,
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
@@ -183,29 +187,27 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     return resolved.master === asked
   }
 
+  const writeConfig = (updatedConfig: FixtureConfig): void => {
+    if (!light) return
+    setLocalConfig(updatedConfig)
+    onChange({ ...light, config: updatedConfig })
+  }
+
+  const handleFlagChange = (key: FixtureConfigFlagField, checked: boolean): void => {
+    if (localConfig) writeConfig({ ...localConfig, [key]: checked })
+  }
+
   /**
-   * Handles updates for any property in the config.
-   *
-   * Number fields arrive already held inside their bounds, and only once the user has finished
-   * with them, so an entry part way to a legal value is never written. Boolean fields
-   * (invertPan / invertTilt / panDirectionCW) come from a checkbox.
+   * A number field arrives already held inside its bounds, and only once the user has finished
+   * with it, so an entry part way to a legal value is never written.
    */
-  const handleConfigChange = (key: keyof FixtureConfig, value: number | boolean) => {
-    if (light && localConfig) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or boolean
-      let updatedValue: any = value
-      if (key !== 'invertPan' && key !== 'invertTilt' && key !== 'panDirectionCW') {
-        const { min, max } = fixtureConfigFieldBounds(key, localConfig)
-        const numeric = Number(value)
-        updatedValue = Number.isFinite(numeric)
-          ? Math.max(min, Math.min(max, Math.round(numeric)))
-          : localConfig[key]
-      }
-      const updatedConfig = { ...localConfig, [key]: updatedValue }
-      setLocalConfig(updatedConfig)
-      const updatedLight: DmxLight = { ...light, config: updatedConfig }
-      onChange(updatedLight)
-    }
+  const handleNumberChange = (key: FixtureConfigNumberField, value: number): void => {
+    if (!localConfig) return
+    const { min, max } = fixtureConfigFieldBounds(key, localConfig)
+    const next = Number.isFinite(value)
+      ? Math.max(min, Math.min(max, Math.round(value)))
+      : localConfig[key]
+    writeConfig({ ...localConfig, [key]: next })
   }
 
   const toggleFiringDirection = (): void => {
@@ -445,9 +447,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
             </>
           )}
           <ul className="text-sm space-y-1">
-            {Object.entries(localConfig).map(([key, value]) => {
-              // Determine input type based on value type.
-              const inputType = typeof value === 'boolean' ? 'checkbox' : 'number'
+            {FIXTURE_CONFIG_FIELDS.map((key) => {
               const isPanRangeDeg = key === 'panRangeDeg'
               const isTiltRangeDeg = key === 'tiltRangeDeg'
               const isPanStageDeg = key === 'panStageDeg'
@@ -457,22 +457,20 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
               return (
                 <li key={key} className="flex justify-between items-center">
                   <span className={noCapitalize ? '' : 'capitalize'}>{getDisplayName(key)}</span>
-                  {inputType === 'checkbox' ? (
+                  {isFixtureConfigFlagField(key) ? (
                     <input
                       type="checkbox"
-                      checked={value as boolean}
-                      onChange={(e) =>
-                        handleConfigChange(key as keyof FixtureConfig, e.target.checked)
-                      }
+                      checked={localConfig[key]}
+                      onChange={(e) => handleFlagChange(key, e.target.checked)}
                       className="ml-2"
                     />
                   ) : (
                     <DraftNumberField
                       aria-label={key}
-                      min={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).min}
-                      max={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).max}
-                      value={value as number}
-                      onCommit={(next) => handleConfigChange(key as keyof FixtureConfig, next)}
+                      min={fixtureConfigFieldBounds(key, localConfig).min}
+                      max={fixtureConfigFieldBounds(key, localConfig).max}
+                      value={localConfig[key]}
+                      onCommit={(next) => handleNumberChange(key, next)}
                       className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                     />
                   )}

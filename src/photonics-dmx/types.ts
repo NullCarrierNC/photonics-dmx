@@ -36,11 +36,15 @@ export {
   DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
   DEFAULT_PAN_RANGE_DEG,
   DEFAULT_TILT_RANGE_DEG,
+  FIXTURE_CONFIG_FIELDS,
   fixtureConfigFieldBounds,
+  isFixtureConfigFlagField,
   normalizeFixtureConfig,
 } from './types/movingHead'
 export type {
   FixtureConfig,
+  FixtureConfigFlagField,
+  FixtureConfigNumberField,
   LegacyFixtureConfigFields,
   MovingHeadDmxChannels,
 } from './types/movingHead'
