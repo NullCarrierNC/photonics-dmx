@@ -147,6 +147,37 @@ describe('ConfigurationManager', () => {
       expect(fsPromises.writeFile).toHaveBeenCalled()
     })
 
+    test('changes one template from the stored list, keeping a save that landed meanwhile', async () => {
+      const light = (id: string, name: string) => ({
+        id,
+        fixture: FixtureTypes.RGB,
+        name,
+        position: -1,
+        label: name,
+        isStrobeEnabled: false,
+        channels: { red: 1, green: 2, blue: 3, masterDimmer: 4 },
+      })
+      await configManager.updateUserLights([light('1', 'One')])
+
+      await Promise.all([
+        configManager.updateUserLights([light('1', 'One'), light('2', 'Two')]),
+        configManager.updateUserLight('1', (stored) => ({ ...stored, name: 'Renamed' })),
+      ])
+
+      expect(configManager.getUserLights().map((l) => [l.id, l.name])).toEqual([
+        ['1', 'Renamed'],
+        ['2', 'Two'],
+      ])
+    })
+
+    test('writes nothing for a template that is gone', async () => {
+      jest.mocked(fsPromises.writeFile).mockClear()
+
+      await configManager.updateUserLight('missing', (stored) => ({ ...stored, name: 'x' }))
+
+      expect(fsPromises.writeFile).not.toHaveBeenCalled()
+    })
+
     test('should get light library (default templates)', () => {
       const library = configManager.getLightLibrary()
       expect(library).toBeDefined()

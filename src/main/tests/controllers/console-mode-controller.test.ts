@@ -198,7 +198,7 @@ describe('ConsoleModeController', () => {
             }),
             getUserLights: () => [],
             saveDmxRig,
-            updateUserLights: jest.fn(),
+            updateUserLight: jest.fn(),
           }) as never,
       }),
     )
@@ -217,7 +217,7 @@ describe('ConsoleModeController', () => {
   it('answers a saved fixture edit as saved when the restart after it fails', async () => {
     const light = { id: 'mh-1', fixtureId: 'fixture-1', fixture: 'rgb/mh', config: {} }
     const saveDmxRig = jest.fn(async () => {})
-    const updateUserLights = jest.fn(async () => {})
+    const updateUserLight = jest.fn(async () => {})
     const c = new ConsoleModeController(
       baseDeps({
         getConfig: () =>
@@ -228,7 +228,7 @@ describe('ConsoleModeController', () => {
             }),
             getUserLights: () => [{ id: 'fixture-1', fixture: 'rgb/mh', config: {} }],
             saveDmxRig,
-            updateUserLights,
+            updateUserLight,
           }) as never,
         restartControllers: () => Promise.reject(new Error('rig chain would not dispose')),
       }),
@@ -243,6 +243,6 @@ describe('ConsoleModeController', () => {
 
     expect(result).toEqual({ success: true, restartError: 'rig chain would not dispose' })
     expect(saveDmxRig).toHaveBeenCalledTimes(1)
-    expect(updateUserLights).toHaveBeenCalledTimes(1)
+    expect(updateUserLight).toHaveBeenCalledTimes(1)
   })
 })

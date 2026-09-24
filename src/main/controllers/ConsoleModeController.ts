@@ -145,12 +145,13 @@ export class ConsoleModeController {
     }
     // Both the rig and its fixture template are checked before either is written, so a refusal
     // leaves neither half changed.
-    const userLights = this.deps.getConfig().getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
+    const fixture = this.deps
+      .getConfig()
+      .getUserLights()
+      .find((f) => f.id === fixtureId)
+    if (!fixture) {
       return { success: false, error: 'Fixture template not found in My Lights' }
     }
-    const fixture = userLights[fi]
     if (fixture.fixture !== FixtureTypes.RGBMH) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
@@ -161,13 +162,10 @@ export class ConsoleModeController {
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
     await this.deps.getConfig().saveDmxRig({ ...rig, config: newRigConfig })
 
-    const fBase = normalizeFixtureConfig(fixture.config)
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      config: clampMergeMovingHeadFixtureConfig(fBase, patch),
-    }
-    await this.deps.getConfig().updateUserLights(newUserLights)
+    await this.deps.getConfig().updateUserLight(fixtureId, (stored) => ({
+      ...stored,
+      config: clampMergeMovingHeadFixtureConfig(normalizeFixtureConfig(stored.config), patch),
+    }))
 
     return restartAfterSave(() => this.deps.restartControllers())
   }

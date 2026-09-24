@@ -111,6 +111,26 @@ describe('useAppIpcListeners', () => {
     expect(addSpy.mock.calls.length).toBe(n0)
   })
 
+  it('collects the recoveries main queues while the app runs', async () => {
+    let onRecoveryQueued: (() => void) | undefined
+    const addSpy = jest.spyOn(ipcHelpers, 'addIpcListener').mockImplementation((channel, cb) => {
+      if (channel === RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED) {
+        onRecoveryQueued = cb as () => void
+      }
+    })
+    const handleConfigCorruptRecovered = jest.fn()
+    renderHook(() => useAppIpcListeners(minimalParams({ handleConfigCorruptRecovered })))
+    await waitFor(() => expect(onRecoveryQueued).toBeDefined())
+    await waitFor(() => expect(getCorruptRecoveryEvents).toHaveBeenCalledTimes(1))
+    const files = [{ fileName: 'lights.json', reason: 'repairCopied' }]
+    getCorruptRecoveryEvents.mockResolvedValue({ files } as never)
+
+    onRecoveryQueued!()
+
+    await waitFor(() => expect(handleConfigCorruptRecovered).toHaveBeenCalledWith({ files }))
+    addSpy.mockRestore()
+  })
+
   it('routes YARG_ERROR IPC warnings through the real App handler without disabling YARG', async () => {
     let yargErrorCallback:
       | ((payload: {

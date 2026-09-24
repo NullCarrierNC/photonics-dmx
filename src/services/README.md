@@ -30,7 +30,9 @@ Stored in `{appData}/Photonics.rocks/`:
 | `dmxRigs.json`      | DMX rig definitions (per-rig light layout, sender-output routing, mirror flags) |
 
 A file that fails to read, parse or validate is preserved alongside the original as
-`<name>.corrupt-<timestamp>.json` and the event is surfaced to the renderer. The same folder also
+`<name>.corrupt-<timestamp>.json` and the event is surfaced to the renderer. A corrupt file that
+could not be moved aside and was then repaired by hand is adopted by the next save, and the first
+whole-file save after that keeps the repair as `<name>.repaired-<timestamp>.json`. The same folder also
 holds the `logs/` directory and the `node-data/` cue and effect trees seeded from the bundled
 defaults.
 

@@ -81,6 +81,7 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.RB3_ERROR]: { type: string; message: string; autoDisabled?: boolean }
   [RENDERER_RECEIVE.CONTROLLERS_RESTARTED]: undefined
+  [RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED]: undefined
   [RENDERER_RECEIVE.MASTER_OUTPUT_CHANGED]: MasterOutputSnapshot
   [RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED]: BlackoutShortcutBinding
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig

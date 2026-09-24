@@ -51,6 +51,21 @@ describe('configRecoveryMessages', () => {
     expect(messages[0]).not.toMatch(/relaunch/i)
   })
 
+  it('reports a hand repair replaced by a save as kept under the copy it names', () => {
+    const messages = configRecoveryMessages([
+      {
+        fileName: 'lights.json',
+        reason: 'repairCopied',
+        message:
+          'The repaired file was saved as lights.repaired-2026.json before a save replaced it.',
+      },
+    ])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('kept as a copy')
+    expect(messages[0]).toContain('lights.repaired-2026.json')
+    expect(messages[0]).not.toContain('Defaults were restored')
+  })
+
   it('gives each kind its own message when both happened', () => {
     expect(
       configRecoveryMessages([

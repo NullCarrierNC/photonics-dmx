@@ -5,9 +5,17 @@ import * as path from 'path'
  * 'schema' the original file is preserved under a `.corrupt-*` name and defaults are used. For
  * 'repaired' only the named fields went back to their defaults, and the rest of the file was kept.
  * For 'newerVersion' the file came from a newer build and nothing is saved over it: it is used as
- * it is, or with `leftInPlace` set, this build cannot read it and defaults are used.
+ * it is, or with `leftInPlace` set, this build cannot read it and defaults are used. For
+ * 'repairCopied' a hand repair of a corrupt file was replaced by a whole-file save, and the repair
+ * is kept under a `.repaired-*` name.
  */
-export type ConfigCorruptReason = 'read' | 'parse' | 'schema' | 'repaired' | 'newerVersion'
+export type ConfigCorruptReason =
+  | 'read'
+  | 'parse'
+  | 'schema'
+  | 'repaired'
+  | 'newerVersion'
+  | 'repairCopied'
 
 export interface ConfigCorruptInfo {
   fileName: string
@@ -19,13 +27,24 @@ export interface ConfigCorruptInfo {
   leftInPlace?: boolean
 }
 
-export function corruptBackupFilePath(
-  absoluteFilePath: string,
-  timestamp: Date = new Date(),
-): string {
+function timestampedSiblingPath(absoluteFilePath: string, kind: string, timestamp: Date): string {
   const dir = path.dirname(absoluteFilePath)
   const ext = path.extname(absoluteFilePath)
   const base = path.basename(absoluteFilePath, ext)
   const iso = timestamp.toISOString().replace(/:/g, '-')
-  return path.join(dir, `${base}.corrupt-${iso}${ext}`)
+  return path.join(dir, `${base}.${kind}-${iso}${ext}`)
+}
+
+export function corruptBackupFilePath(
+  absoluteFilePath: string,
+  timestamp: Date = new Date(),
+): string {
+  return timestampedSiblingPath(absoluteFilePath, 'corrupt', timestamp)
+}
+
+export function repairedCopyFilePath(
+  absoluteFilePath: string,
+  timestamp: Date = new Date(),
+): string {
+  return timestampedSiblingPath(absoluteFilePath, 'repaired', timestamp)
 }

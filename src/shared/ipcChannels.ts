@@ -263,6 +263,11 @@ export const RENDERER_RECEIVE = {
   RB3_ERROR: 'rb3-error',
   CONTROLLERS_RESTARTED: 'controllers-restarted',
   /**
+   * A settings file recovery happened while the app runs. Collect it with
+   * GET_CORRUPT_RECOVERY_EVENTS.
+   */
+  CONFIG_RECOVERY_QUEUED: 'config:recovery-queued',
+  /**
    * Blackout was latched or released by a writer other than the sidebar, so every window can
    * follow. Main holds the authoritative state but answers SET_MASTER_OUTPUT only to the caller,
    * and the blackout shortcut writes from any window and from the main process itself.

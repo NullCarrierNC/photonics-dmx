@@ -4,6 +4,7 @@ import * as path from 'path'
 import * as fsPromises from 'fs/promises'
 import {
   corruptBackupFilePath,
+  repairedCopyFilePath,
   type ConfigCorruptInfo,
   type ConfigCorruptReason,
 } from './configCorruptTypes'
@@ -77,6 +78,8 @@ export class ConfigFile<T> {
   private saveChain: Promise<void> = Promise.resolve()
   /** Set while a corrupt file could not be moved aside. No write replaces it until one can. */
   private corruptFileInPlace = false
+  /** Set when a hand repair was adopted and no whole-file replacement has copied it yet. */
+  private repairNotCopied = false
   /** The version of a file written by a newer build, which no write replaces. */
   private newerVersionOnDisk: number | null = null
   // Serializes every update and read-modify-write turn. `saveChain` only orders the writes, which
@@ -434,9 +437,40 @@ export class ConfigFile<T> {
    * the gate. `this.data` takes the new value only once the save succeeds, so a refused or failed
    * save leaves the in-memory state as it was. The write waits its turn behind every update and
    * {@link mutate} called before it.
+   *
+   * `newData` may have been built before a hand repair was adopted, so the first update after an
+   * adopt copies the file on disk aside before replacing it.
    */
   async update(newData: T): Promise<void> {
-    return this.enqueue(() => this.write(newData))
+    return this.enqueue(async () => {
+      await this.copyAdoptedRepair()
+      await this.write(newData)
+    })
+  }
+
+  /** Keeps the adopted hand repair, and whatever turns since added to it, as a sibling copy. */
+  private async copyAdoptedRepair(): Promise<void> {
+    if (!this.repairNotCopied) {
+      return
+    }
+    const dest = repairedCopyFilePath(this.filePath)
+    try {
+      await fsPromises.copyFile(this.filePath, dest)
+    } catch (error) {
+      // A file deleted or moved by hand since the adopt leaves nothing to keep.
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error
+      this.repairNotCopied = false
+      return
+    }
+    this.repairNotCopied = false
+    const fileName = path.basename(this.filePath)
+    log.info(`[Photonics Config] Kept the repaired ${fileName} as ${path.basename(dest)}`)
+    this.onCorruptRecovery?.({
+      fileName,
+      filePath: this.filePath,
+      reason: 'repairCopied',
+      message: `The repaired file was saved as ${path.basename(dest)} before a save replaced it.`,
+    })
   }
 
   private async write(newData: T): Promise<void> {
@@ -505,6 +539,7 @@ export class ConfigFile<T> {
     if (decoded.ok) {
       this.data = decoded.data
       this.corruptFileInPlace = false
+      this.repairNotCopied = true
       log.info(`[Photonics Config] Adopted the repaired ${path.basename(this.filePath)}`)
       if (decoded.version > this.currentVersion) {
         this.holdNewerFile(decoded.version, true)

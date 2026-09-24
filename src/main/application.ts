@@ -9,6 +9,8 @@ import {
   normalizeBlackoutShortcutKey,
   normalizeBlackoutShortcutScope,
 } from '../services/configuration/configurationDefaults'
+import { RENDERER_RECEIVE } from '../shared/ipcChannels'
+import { sendToAllWindows } from './utils/windowUtils'
 import { createLogger } from '../shared/logger'
 
 const log = createLogger('Application')
@@ -56,6 +58,11 @@ export class Application {
     setupIpcHandlers(ipcMain, this.controllerManager, this.windowManager, (binding) =>
       this.blackoutShortcut.set(binding),
     )
+    this.controllerManager
+      .getConfig()
+      .setRecoveryQueuedListener(() =>
+        sendToAllWindows(RENDERER_RECEIVE.CONFIG_RECOVERY_QUEUED, undefined),
+      )
 
     // Set up application menu
     setupMenu()

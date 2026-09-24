@@ -31,7 +31,7 @@ jest.mock('../controllers/ControllerManager', () => ({
   ControllerManager: jest.fn(() => ({
     init: controllerInit,
     shutdown: controllerShutdown,
-    getConfig: () => ({ getPreference: jest.fn() }),
+    getConfig: () => ({ getPreference: jest.fn(), setRecoveryQueuedListener: jest.fn() }),
   })),
 }))
 

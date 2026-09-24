@@ -65,6 +65,7 @@ export class ConfigurationManager {
   private lightingLayout: ConfigFile<LightingConfiguration>
   private dmxRigs: ConfigFile<DmxRigsConfig>
   private configCorruptRecovery: ConfigCorruptInfo[] = []
+  private onRecoveryQueued: (() => void) | undefined
 
   /** Clears and returns batched config recovery events (for one main → renderer send). */
   public drainConfigCorruptRecovery(): ConfigCorruptInfo[] {
@@ -73,9 +74,18 @@ export class ConfigurationManager {
     return out
   }
 
+  /**
+   * Called each time a recovery event is queued after startup, so a running window can collect it.
+   * Startup's own events wait for the window's first collection.
+   */
+  public setRecoveryQueuedListener(listener: () => void): void {
+    this.onRecoveryQueued = listener
+  }
+
   constructor() {
     const onCorrupt = (info: ConfigCorruptInfo): void => {
       this.configCorruptRecovery.push(info)
+      this.onRecoveryQueued?.()
     }
 
     this.preferences = new PreferencesConfigFile({ onCorruptRecovery: onCorrupt })
@@ -282,6 +292,25 @@ export class ConfigurationManager {
    */
   async updateUserLights(lights: DmxFixture[]): Promise<void> {
     await this.userLights.update({ lights })
+  }
+
+  /**
+   * Changes one fixture template, starting from the stored one. Writes nothing when the template
+   * is gone by the time the change runs.
+   */
+  async updateUserLight(
+    fixtureId: string,
+    change: (fixture: DmxFixture) => DmxFixture,
+  ): Promise<void> {
+    await this.userLights.mutate((current) => {
+      const index = current.lights.findIndex((f) => f.id === fixtureId)
+      if (index < 0) {
+        return current
+      }
+      const lights = [...current.lights]
+      lights[index] = change(lights[index])
+      return { ...current, lights }
+    })
   }
 
   /**
