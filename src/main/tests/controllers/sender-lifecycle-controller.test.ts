@@ -1,5 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals'
-import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
+import {
+  SenderLifecycleController,
+  type OutputSenderStateSnapshot,
+} from '../../controllers/SenderLifecycleController'
 import { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 
@@ -36,43 +39,70 @@ describe('SenderLifecycleController', () => {
   })
 
   it('restoreRunningSenders restores IPC sender when snapshot requests it', async () => {
-    const senderManager = {
-      enableSender: jest.fn().mockImplementation(() => Promise.resolve()),
-    }
-    const config = {
-      getAllPreferences: () => ({
-        dmxOutputConfig: {
-          sacnEnabled: false,
-          artNetEnabled: false,
-          enttecProEnabled: false,
-          openDmxEnabled: false,
-        },
-      }),
-    }
-    type SlStub = {
-      getConfig: () => typeof config
-      senderManager: typeof senderManager
-      senderErrorHandler: () => void
-      senderErrorTrackingCallback: null
-    }
-    const sl = Object.create(SenderLifecycleController.prototype) as SlStub
-    sl.getConfig = () => config
-    sl.senderManager = senderManager
-    sl.senderErrorHandler = () => {}
-    sl.senderErrorTrackingCallback = null
+    const enableSender = await restore({}, { ipc: true })
 
-    await SenderLifecycleController.prototype.restoreRunningSenders.call(
-      sl as unknown as SenderLifecycleController,
+    expect(enableSender).toHaveBeenCalledTimes(1)
+    expect(enableSender).toHaveBeenCalledWith('ipc', 'ipc', { sender: 'ipc' })
+  })
+
+  it('restores a USB sender on the serial port its config stores', async () => {
+    const enableSender = await restore(
       {
-        sacn: false,
-        artnet: false,
-        enttecpro: false,
-        opendmx: false,
-        ipc: true,
+        enttecProConfig: { port: '/dev/tty.usbserial-EN1', dmxSpeed: 40 },
+        openDmxConfig: { port: 'COM3' },
       },
+      { enttecpro: true, opendmx: true },
     )
 
-    expect(senderManager.enableSender).toHaveBeenCalledTimes(1)
-    expect(senderManager.enableSender).toHaveBeenCalledWith('ipc', 'ipc', { sender: 'ipc' })
+    expect(enableSender).toHaveBeenCalledWith(
+      'enttecpro',
+      'enttecpro',
+      expect.objectContaining({ devicePath: '/dev/tty.usbserial-EN1' }),
+    )
+    expect(enableSender).toHaveBeenCalledWith(
+      'opendmx',
+      'opendmx',
+      expect.objectContaining({ devicePath: 'COM3' }),
+    )
+  })
+
+  it('leaves a USB sender off when its stored port is not a serial device', async () => {
+    const enableSender = await restore(
+      {
+        enttecProConfig: { port: '/etc/passwd' },
+        openDmxConfig: { port: '/dev/../etc/hosts' },
+      },
+      { enttecpro: true, opendmx: true },
+    )
+
+    expect(enableSender).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * Runs restoreRunningSenders on a controller whose manager records each enable, with `prefs` as
+ * the stored preferences and the senders `running` names as the ones to bring back.
+ */
+async function restore(
+  prefs: Record<string, unknown>,
+  running: Partial<OutputSenderStateSnapshot>,
+): Promise<jest.Mock> {
+  const senderManager = { enableSender: jest.fn(() => Promise.resolve()) }
+  type SlStub = {
+    getConfig: () => { getAllPreferences: () => Record<string, unknown> }
+    senderManager: typeof senderManager
+    senderErrorHandler: () => void
+    senderErrorTrackingCallback: null
+  }
+  const sl = Object.create(SenderLifecycleController.prototype) as SlStub
+  sl.getConfig = () => ({ getAllPreferences: () => prefs })
+  sl.senderManager = senderManager
+  sl.senderErrorHandler = () => {}
+  sl.senderErrorTrackingCallback = null
+
+  await SenderLifecycleController.prototype.restoreRunningSenders.call(
+    sl as unknown as SenderLifecycleController,
+    { sacn: false, artnet: false, enttecpro: false, opendmx: false, ipc: false, ...running },
+  )
+  return senderManager.enableSender
+}

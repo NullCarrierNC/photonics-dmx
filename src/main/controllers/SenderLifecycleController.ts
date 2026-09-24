@@ -19,7 +19,11 @@ import {
   normalizeEnttecProDmxSpeedHz,
   normalizeOpenDmxSpeedHz,
 } from '../../shared/dmxOutputRefresh'
-import { validateStoredArtNetConfig, validateStoredSacnConfig } from '../ipc/inputValidation'
+import {
+  validateSerialDevicePath,
+  validateStoredArtNetConfig,
+  validateStoredSacnConfig,
+} from '../ipc/inputValidation'
 
 const log = createLogger('SenderLifecycle')
 
@@ -44,6 +48,22 @@ export function isNetworkSendError(err: unknown): err is NetworkErrorLike {
     NETWORK_SEND_ERROR_CODES.has(err.code) &&
     err.syscall === 'send'
   )
+}
+
+/**
+ * The serial port a USB sender's stored config names, held to the rule `SENDER_ENABLE` applies,
+ * because the file is editable by hand. Null when none is stored or it is not a serial device.
+ */
+function storedSerialPort(port: string | undefined, label: string): string | null {
+  if (!port) {
+    return null
+  }
+  const checked = validateSerialDevicePath(port)
+  if (!checked.ok) {
+    log.error(`Leaving the ${label} sender off, its stored port is invalid: ${checked.error}`)
+    return null
+  }
+  return checked.value
 }
 
 export type OutputSenderStateSnapshot = {
@@ -222,11 +242,12 @@ export class SenderLifecycleController {
 
     if (sendersToRestore.enttecpro) {
       const ec = prefs.enttecProConfig
-      if (ec?.port) {
+      const port = storedSerialPort(ec?.port, 'Enttec Pro')
+      if (ec && port) {
         try {
           await sm.enableSender('enttecpro', 'enttecpro', {
             sender: 'enttecpro',
-            devicePath: ec.port,
+            devicePath: port,
             dmxSpeed: normalizeEnttecProDmxSpeedHz(ec.dmxSpeed),
           })
           log.info('Restored Enttec Pro sender from preferences')
@@ -238,11 +259,12 @@ export class SenderLifecycleController {
 
     if (sendersToRestore.opendmx) {
       const oc = prefs.openDmxConfig
-      if (oc?.port) {
+      const port = storedSerialPort(oc?.port, 'OpenDMX')
+      if (oc && port) {
         try {
           await sm.enableSender('opendmx', 'opendmx', {
             sender: 'opendmx',
-            devicePath: oc.port,
+            devicePath: port,
             dmxSpeed: normalizeOpenDmxSpeedHz(oc.dmxSpeed),
           })
           log.info('Restored OpenDMX sender from preferences')
