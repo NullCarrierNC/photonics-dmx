@@ -28,7 +28,7 @@ function copyBundled(kind: 'cues' | 'effects', baseDir: string): void {
   }
 }
 
-describe('NodeCueLoader reload while a cue is held', () => {
+describe('NodeCueLoader reload', () => {
   let baseDir: string
   let yarg: CueRegistry
   let loader: NodeCueLoader
@@ -119,4 +119,13 @@ describe('NodeCueLoader reload while a cue is held', () => {
     },
     20000,
   )
+
+  it('reads each effect file once for the whole reload', async () => {
+    const reads = jest.spyOn(effectLoader, 'readFile')
+
+    await loader.reload()
+
+    const effectFiles = fs.readdirSync(path.join(baseDir, 'node-data', 'effects', 'yarg'))
+    expect(reads).toHaveBeenCalledTimes(effectFiles.length)
+  })
 })

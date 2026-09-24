@@ -8,7 +8,11 @@ import {
   NodeCueListSummary,
 } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
-import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
+import {
+  EffectLoader,
+  EffectListSummary,
+  changedEffectFileIds,
+} from '../../photonics-dmx/cues/node/loader/EffectLoader'
 import { cueDomainBinding } from './cueDomainBindings'
 import type { CueDomain } from '../../services/configuration/cueDomainTypes'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -59,12 +63,16 @@ export class RegistryInitializer {
     }
     await effectLoader.startWatching()
 
+    // Only the cue files that reference a changed effect file are loaded again.
+    let knownEffects = effectLoader.getSummary()
     const onEffectsChanged = async (payload: EffectListSummary): Promise<void> => {
       this.ctx.sendToAllWindows(RENDERER_RECEIVE.EFFECTS_CHANGED, payload)
+      const changed = changedEffectFileIds(knownEffects, payload)
+      knownEffects = payload
       const nodeCueLoader = this.ctx.getNodeCueLoader()
-      if (nodeCueLoader) {
+      if (nodeCueLoader && changed.size > 0) {
         try {
-          await nodeCueLoader.reload()
+          await nodeCueLoader.reloadFilesUsingEffects(changed)
         } catch (error) {
           log.error('Failed to reload node cues after effect change:', error)
         }

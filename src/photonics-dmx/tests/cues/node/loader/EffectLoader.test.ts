@@ -5,7 +5,7 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { EffectLoader } from '../../../../cues/node/loader/EffectLoader'
 import type { YargEffectFile } from '../../../../cues/types/nodeCueTypes'
 
@@ -144,5 +144,49 @@ describe('EffectLoader compile errors surface on the summary', () => {
     const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('broken.json'))
     expect(summary?.errors?.length).toBeGreaterThan(0)
     expect(summary?.errors?.join(' ')).toContain('Effect Listener')
+  })
+})
+
+class WatchedEffectLoader extends EffectLoader {
+  /** Reports a file change the way the directory watcher does. */
+  public reportChange(filePath: string): Promise<void> {
+    return this.handleFileChange(filePath)
+  }
+}
+
+describe('EffectLoader watcher reports', () => {
+  let tmpDir: string
+  let loader: WatchedEffectLoader
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-watch-'))
+    loader = new WatchedEffectLoader({ baseDir: tmpDir })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('does not load a file again when the watcher reports its own save', async () => {
+    const changes = jest.fn()
+    loader.on('changed', changes)
+
+    const { path: saved } = await loader.saveFile('yarg', 'e.json', minimalYargEffectFixture('g'))
+    await loader.reportChange(saved)
+
+    expect(changes).toHaveBeenCalledTimes(1)
+  })
+
+  it('loads a saved file the watcher reports once it differs from the save', async () => {
+    const changes = jest.fn()
+    loader.on('changed', changes)
+
+    const { path: saved } = await loader.saveFile('yarg', 'e.json', minimalYargEffectFixture('g'))
+    const edited = { ...minimalYargEffectFixture('g'), group: { id: 'g', name: 'Edited' } }
+    fs.writeFileSync(saved, JSON.stringify(edited), 'utf-8')
+    await loader.reportChange(saved)
+
+    expect(changes).toHaveBeenCalledTimes(2)
+    expect(loader.getSummary().yarg[0].groupName).toBe('Edited')
   })
 })

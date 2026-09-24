@@ -17,7 +17,7 @@ import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
 import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
-import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import type { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { BaseNodeFileLoader, BaseListSummary, BaseLoadResult } from './BaseNodeFileLoader'
@@ -73,7 +73,22 @@ interface FileRegistration {
   groupId: string
   /** Which strategy owns this registration, so the same one tears it down. */
   kind?: string
+  /** The effect files the file's cues reference, so a change to one loads the file again. */
+  effectFileIds: string[]
 }
+
+/**
+ * Effect files by group id per effect mode, read once and shared by every cue file built from it.
+ */
+type EffectFilesByMode = Map<EffectMode, Promise<Map<string, EffectFile>>>
+
+const effectFileIdsOf = (file: NodeCueFile): string[] => [
+  ...new Set(
+    file.cues.flatMap((cue: { effects?: EffectReference[] }) =>
+      (cue.effects ?? []).map((ref) => ref.effectFileId),
+    ),
+  ),
+]
 
 /**
  * Handles cue files of a kind the loader does not build itself.
@@ -117,12 +132,51 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   /** The debug switch every cue this loader builds hands to its engines. */
   private readonly nodeCueDebug: NodeCueDebugSwitch = { enabled: false }
 
+  /** The effect files read for the load pass in progress, or null outside one. */
+  private effectFilesPass: EffectFilesByMode | null = null
+
   constructor(private readonly options: NodeCueLoaderOptions) {
     super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'])
   }
 
   protected override onBeforeLoadAll(): void {
     this.customAudioCueTypes.clear()
+  }
+
+  public override async loadAll(): Promise<NodeCueLoadResult> {
+    return this.withEffectFilesPass(() => super.loadAll())
+  }
+
+  /**
+   * Load again every registered cue file that references one of the given effect files, and report
+   * the new summary. Cue files that use none of them keep the groups they have.
+   */
+  public async reloadFilesUsingEffects(effectFileIds: ReadonlySet<string>): Promise<void> {
+    const affected = [...this.fileRegistrations].filter(([, registration]) =>
+      registration.effectFileIds.some((id) => effectFileIds.has(id)),
+    )
+    if (affected.length === 0) {
+      return
+    }
+    await this.withEffectFilesPass(async () => {
+      for (const [filePath, registration] of affected) {
+        await this.loadFileRecordingErrors(registration.mode, filePath)
+      }
+    })
+    this.emit('changed', this.getSummary())
+  }
+
+  /** Run a load pass that reads each effect file once, however many cue files reference it. */
+  private async withEffectFilesPass<T>(load: () => Promise<T>): Promise<T> {
+    const pass: EffectFilesByMode = new Map()
+    this.effectFilesPass = pass
+    try {
+      return await load()
+    } finally {
+      if (this.effectFilesPass === pass) {
+        this.effectFilesPass = null
+      }
+    }
   }
 
   public async readFile(filePath: string): Promise<NodeCueFile> {
@@ -173,8 +227,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
 
     this.assertNoConflictingGroupIdForPath(filePath, mode, content.group.id)
 
-    await fs.mkdir(path.dirname(filePath), { recursive: true })
-    await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8')
+    await this.writeSavedFile(filePath, JSON.stringify(content, null, 2))
     await this.loadFile(mode, filePath)
 
     this.emit('changed', this.getSummary())
@@ -269,13 +322,21 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     file: NodeCueFile,
     compileErrors: string[],
   ): Promise<void> {
+    const effectFileIds = effectFileIdsOf(file)
     const strategy = strategyForFile(file)
     if (strategy) {
       this.unregisterFile(filePath)
       await strategy.registerFile(file, mode, compileErrors)
-      this.fileRegistrations.set(filePath, { mode, groupId: file.group.id, kind: strategy.kind })
+      this.fileRegistrations.set(filePath, {
+        mode,
+        groupId: file.group.id,
+        kind: strategy.kind,
+        effectFileIds,
+      })
       return
     }
+
+    const context = this.buildContext(this.effectFilesPass ?? new Map())
 
     // The group is built while the previous one keeps serving, and swapped in without an await
     // between taking the old group out and putting the new one in, so no cue resolves against a
@@ -286,14 +347,14 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       // because `cueTypeId` is the audio cue's identifier and the net cues have no such field.
       const audioFile = file as AudioNodeCueFile
       const group = await this.buildOrUnregister(filePath, () =>
-        buildAudioGroup(audioFile, compileErrors, this.buildContext()),
+        buildAudioGroup(audioFile, compileErrors, context),
       )
       this.registerAudioGroup(filePath, audioFile, group)
     } else {
       // Both net modes compile through the same path and differ only in which registry instance
       // they load into, which the per-mode map supplies.
       const group = await this.buildOrUnregister(filePath, () =>
-        buildNetGroup(file as NetNodeCueFile, compileErrors, this.buildContext()),
+        buildNetGroup(file as NetNodeCueFile, compileErrors, context),
       )
       const registry = this.options.registries[mode]
       if (this.holdsGroup(filePath, mode, group.id)) {
@@ -305,7 +366,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       registry.applyGroupDesignations(file.group, group)
     }
 
-    this.fileRegistrations.set(filePath, { mode, groupId: file.group.id })
+    this.fileRegistrations.set(filePath, { mode, groupId: file.group.id, effectFileIds })
   }
 
   /** Build a file's group, taking the file's current group out when the build fails. */
@@ -464,19 +525,20 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     return this.nodeCueDebug.enabled
   }
 
-  /** What the group builders need from this loader. */
-  private buildContext(): CueGroupBuildContext {
+  /** What the group builders need from this loader, reading effect files through `effectFiles`. */
+  private buildContext(effectFiles: EffectFilesByMode): CueGroupBuildContext {
     return {
       runtimeBroadcaster: this.options.runtimeBroadcaster,
       nodeCueDebug: this.nodeCueDebug,
       getNodeRuntimeCallbacks: this.options.getNodeRuntimeCallbacks,
-      buildEffectRegistry: (effects, mode) => this.buildEffectRegistry(effects, mode),
+      buildEffectRegistry: (effects, mode) => this.buildEffectRegistry(effects, mode, effectFiles),
     }
   }
 
   private async buildEffectRegistry(
     effectReferences: EffectReference[],
     mode: NodeCueMode,
+    effectFiles: EffectFilesByMode,
   ): Promise<EffectRegistry> {
     const registry = new EffectRegistry()
 
@@ -487,13 +549,16 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     // Which effect tree this mode raises from is the domain's to say, not the loader's: RB3 folds
     // onto the yarg tree, and a mode added later brings its own answer with its descriptor.
     const effectLoaderMode: EffectMode = getCueDomain(mode).effectMode
+    let filesForMode = effectFiles.get(effectLoaderMode)
+    if (!filesForMode) {
+      filesForMode = this.options.effectLoader.readEffectFilesByGroupId(effectLoaderMode)
+      effectFiles.set(effectLoaderMode, filesForMode)
+    }
+    const effectFilesById = await filesForMode
 
     for (const effectRef of effectReferences) {
       try {
-        const effectFile = await this.options.effectLoader.loadEffectByReference(
-          effectRef,
-          effectLoaderMode,
-        )
+        const effectFile = effectFilesById.get(effectRef.effectFileId)
 
         if (!effectFile) {
           log.warn(
