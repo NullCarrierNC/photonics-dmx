@@ -123,6 +123,22 @@ export class CueRegistry {
   }
 
   /**
+   * Swap a rebuilt group in for the registered group with the same id. The group keeps its place,
+   * its membership, its motion state and the selections pinned to it, so a held cue stays on this
+   * group and runs the rebuilt instance on its next resolution. An id not yet registered is
+   * registered.
+   */
+  public replaceGroup(group: ICueGroup): void {
+    const previous = this.catalog.getGroup(group.id)
+    if (!previous || !this.catalog.replace(group)) {
+      this.registerGroup(group)
+      return
+    }
+    releaseGroupFrom(previous)
+    this.motion.onRegisterGroup(group)
+  }
+
+  /**
    * Flag the group serving fallback lighting cues.
    * @param groupId The name of the group to set as default
    * @throws Error if the group doesn't exist

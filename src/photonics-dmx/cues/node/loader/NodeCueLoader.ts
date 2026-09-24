@@ -10,7 +10,7 @@ import {
   NodeCueKind,
 } from '../../types/nodeCueTypes'
 import { CueRegistry } from '../../registries/CueRegistry'
-import { AudioCueRegistry } from '../../registries/AudioCueRegistry'
+import { AudioCueRegistry, type AudioCueGroup } from '../../registries/AudioCueRegistry'
 import { AudioCueType } from '../../types/audioCueTypes'
 import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
@@ -269,56 +269,93 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     file: NodeCueFile,
     compileErrors: string[],
   ): Promise<void> {
-    // Registering a group enables it, so an audio file that is being reloaded would put back a
-    // group the user had turned off. Null means this file has not been loaded before, where
-    // enabled is the right starting point.
-    let audioGroupWasEnabled: boolean | null = null
-    if (mode === 'audio') {
-      const existing = this.fileRegistrations.get(filePath)
-      if (existing) {
-        audioGroupWasEnabled = this.options.registries.audio
-          .getEnabledGroups()
-          .includes(existing.groupId)
-      }
-    }
-
-    this.unregisterFile(filePath)
-
     const strategy = strategyForFile(file)
     if (strategy) {
+      this.unregisterFile(filePath)
       await strategy.registerFile(file, mode, compileErrors)
       this.fileRegistrations.set(filePath, { mode, groupId: file.group.id, kind: strategy.kind })
       return
     }
 
-    if (mode !== 'audio') {
-      // Both net modes compile through the same path and differ only in which registry instance
-      // they load into, which the per-mode map supplies.
-      const registry = this.options.registries[mode]
-      const group = await buildNetGroup(file as NetNodeCueFile, compileErrors, this.buildContext())
-      registry.registerGroup(group)
-      registry.applyGroupDesignations(file.group, group)
-    } else {
+    // The group is built while the previous one keeps serving, and swapped in without an await
+    // between taking the old group out and putting the new one in, so no cue resolves against a
+    // registry that is missing it.
+    if (mode === 'audio') {
       // Narrowed once for the whole branch: `mode` decides the file shape, but it is a separate
       // parameter, so nothing else here narrows `file` off the union. The cue loop needs it too,
       // because `cueTypeId` is the audio cue's identifier and the net cues have no such field.
       const audioFile = file as AudioNodeCueFile
-      const group = await buildAudioGroup(audioFile, compileErrors, this.buildContext())
-      this.options.registries.audio.registerGroup(group)
-      this.options.registries.audio.applyGroupDesignations(audioFile.group, group)
-      if (audioGroupWasEnabled === false) {
-        this.options.registries.audio.disableGroup(group.id)
+      const group = await this.buildOrUnregister(filePath, () =>
+        buildAudioGroup(audioFile, compileErrors, this.buildContext()),
+      )
+      this.registerAudioGroup(filePath, audioFile, group)
+    } else {
+      // Both net modes compile through the same path and differ only in which registry instance
+      // they load into, which the per-mode map supplies.
+      const group = await this.buildOrUnregister(filePath, () =>
+        buildNetGroup(file as NetNodeCueFile, compileErrors, this.buildContext()),
+      )
+      const registry = this.options.registries[mode]
+      if (this.holdsGroup(filePath, mode, group.id)) {
+        registry.replaceGroup(group)
+      } else {
+        this.unregisterFile(filePath)
+        registry.registerGroup(group)
       }
-
-      audioFile.cues.forEach((cue) => {
-        if (cue.kind === 'lighting') {
-          this.customAudioCueTypes.add(cue.cueTypeId)
-          this.warnIfCueIdShared(cue.cueTypeId)
-        }
-      })
+      registry.applyGroupDesignations(file.group, group)
     }
 
     this.fileRegistrations.set(filePath, { mode, groupId: file.group.id })
+  }
+
+  /** Build a file's group, taking the file's current group out when the build fails. */
+  private async buildOrUnregister<G>(filePath: string, build: () => Promise<G>): Promise<G> {
+    try {
+      return await build()
+    } catch (error) {
+      this.unregisterFile(filePath)
+      throw error
+    }
+  }
+
+  /** Whether the file's current registration is a built-in group with this id and mode. */
+  private holdsGroup(filePath: string, mode: NodeCueMode, groupId: string): boolean {
+    const registration = this.fileRegistrations.get(filePath)
+    return (
+      registration !== undefined &&
+      registration.kind === undefined &&
+      registration.mode === mode &&
+      registration.groupId === groupId
+    )
+  }
+
+  private registerAudioGroup(
+    filePath: string,
+    audioFile: AudioNodeCueFile,
+    group: AudioCueGroup,
+  ): void {
+    const registry = this.options.registries.audio
+    if (this.holdsGroup(filePath, 'audio', group.id)) {
+      registry.replaceGroup(group)
+    } else {
+      // Registering a group enables it, so a file whose group id changed would put back a group
+      // the user had turned off. A file not loaded before starts enabled.
+      const existing = this.fileRegistrations.get(filePath)
+      const wasEnabled = existing ? registry.getEnabledGroups().includes(existing.groupId) : true
+      this.unregisterFile(filePath)
+      registry.registerGroup(group)
+      if (!wasEnabled) {
+        registry.disableGroup(group.id)
+      }
+    }
+    registry.applyGroupDesignations(audioFile.group, group)
+
+    audioFile.cues.forEach((cue) => {
+      if (cue.kind === 'lighting') {
+        this.customAudioCueTypes.add(cue.cueTypeId)
+        this.warnIfCueIdShared(cue.cueTypeId)
+      }
+    })
   }
 
   /**

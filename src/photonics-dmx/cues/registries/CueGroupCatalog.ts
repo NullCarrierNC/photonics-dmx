@@ -59,8 +59,8 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
 
   /**
    * Enabled and active membership of each group at the moment it was unregistered, restored if the
-   * same id registers again. A cue file reload unregisters and re-registers every group, and without
-   * this the user's disabled groups would come back enabled.
+   * same id registers again. A cue file that is removed or fails to build and later loads again
+   * registers its group afresh with the enabled state the user gave it.
    */
   private readonly unregisteredMembership = new Map<string, { enabled: boolean; active: boolean }>()
 
@@ -124,7 +124,28 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
     this.groups.delete(groupId)
     this.enabledGroups.delete(groupId)
     this.activeGroups.delete(groupId)
+    this.dropDesignations(groupId)
+    this.fillEmptyFallbacks()
+    return true
+  }
 
+  /**
+   * Swap a rebuilt group in under an id that is already registered. It keeps its place and its
+   * enabled and active membership. The designations pointing at it are dropped, as an unregister
+   * drops them, for the caller to apply again from the rebuilt file.
+   * @returns false when the id is not registered
+   */
+  public replace(group: G): boolean {
+    if (!this.groups.has(group.id)) {
+      return false
+    }
+    this.groups.set(group.id, group)
+    this.dropDesignations(group.id)
+    this.fillEmptyFallbacks()
+    return true
+  }
+
+  private dropDesignations(groupId: string): void {
     if (this.defaultGroup === groupId) {
       this.defaultGroup = null
       this.defaultFlagged = false
@@ -136,8 +157,6 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
     if (this.stageKitGroup === groupId) {
       this.stageKitGroup = null
     }
-    this.fillEmptyFallbacks()
-    return true
   }
 
   /**

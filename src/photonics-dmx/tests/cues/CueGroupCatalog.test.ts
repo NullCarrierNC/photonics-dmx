@@ -117,6 +117,34 @@ describe('CueGroupCatalog', () => {
     expect(catalog.unregister('a')).toBe(false)
   })
 
+  it('replace swaps the group in place and keeps its membership', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+    catalog.register(group('c', [CueType.Chorus]))
+    catalog.setActiveGroups(['a', 'c'])
+    const rebuilt = group('a', [CueType.Chorus, CueType.Verse])
+
+    expect(catalog.replace(rebuilt)).toBe(true)
+
+    expect(catalog.getGroup('a')).toBe(rebuilt)
+    expect(catalog.getAllGroups()).toEqual(['a', 'b', 'c'])
+    expect(catalog.getEnabledGroups()).toEqual(['a', 'b', 'c'])
+    expect(catalog.getActiveGroups()).toEqual(['a', 'c'])
+    expect(catalog.replace(group('d', [CueType.Chorus]))).toBe(false)
+  })
+
+  it('replace drops the designations for the rebuilt file to apply again', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+    catalog.setDefaultGroup('b')
+    catalog.setStageKitGroup('b')
+
+    catalog.replace(group('b', [CueType.Chorus]))
+
+    expect(catalog.getDefaultGroupId()).toBe('a')
+    expect(catalog.getStageKitGroupId()).toBeNull()
+  })
+
   it('setDefaultGroup and setStageKitGroup reject unknown groups', () => {
     expect(() => catalog.setDefaultGroup('missing')).toThrow("group 'missing' not found")
     expect(() => catalog.setDefaultMotionGroup('missing')).toThrow("group 'missing' not found")

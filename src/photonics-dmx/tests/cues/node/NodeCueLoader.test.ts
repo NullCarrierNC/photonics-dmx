@@ -373,6 +373,31 @@ describe('NodeCueLoader', () => {
     expect(warnings.some((w) => w.includes('custom-audio-cue') && w.includes('group-a'))).toBe(true)
   })
 
+  it('keeps the audio group that plays a shared cue id when that group is saved again', async () => {
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    for (const [file, group] of [
+      ['a.json', 'group-a'],
+      ['b.json', 'group-b'],
+    ]) {
+      const content = audioLightingFile(group, 'custom-audio-cue')
+      fs.writeFileSync(path.join(audioDir, file), JSON.stringify(content), 'utf-8')
+    }
+    await loader.loadAll()
+    const playing = audioRegistry.getCueImplementation('custom-audio-cue')
+
+    await loader.saveFile('audio', 'a.json', audioLightingFile('group-a', 'custom-audio-cue'))
+
+    expect(audioRegistry.getEnabledGroupsProviding('custom-audio-cue')).toEqual([
+      'group-a',
+      'group-b',
+    ])
+    expect(audioRegistry.getCueImplementation('custom-audio-cue')).not.toBe(playing)
+    expect(audioRegistry.getCueImplementation('custom-audio-cue')).toBe(
+      audioRegistry.getGroup('group-a')?.cues.get('custom-audio-cue'),
+    )
+  })
+
   it('registers Audio kind motion into the group motion map', async () => {
     const file = audioMotionOnlyFile()
     const v = validateAudioNodeCueFile(file)

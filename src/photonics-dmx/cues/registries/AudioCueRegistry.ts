@@ -90,6 +90,21 @@ export class AudioCueRegistry {
   }
 
   /**
+   * Swap a rebuilt group in for the registered group with the same id, keeping its place, its
+   * enabled state and its motion state. An id not yet registered is registered.
+   */
+  public replaceGroup(group: AudioCueGroup): void {
+    const previous = this.catalog.getGroup(group.id)
+    if (!previous || !this.catalog.replace(group)) {
+      this.registerGroup(group)
+      return
+    }
+    releaseGroupFrom(previous)
+    this.cueDetailsCache.delete(group.id)
+    this.motion.onRegisterGroup(group)
+  }
+
+  /**
    * Flag the group serving fallback lighting cues. Leaves the enabled groups alone, since a
    * fallback serves whether or not its group is enabled.
    * @param groupId The ID of the group to set as default
