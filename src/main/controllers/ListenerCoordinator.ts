@@ -132,7 +132,7 @@ export class ListenerCoordinator {
         }
         // A runtime socket error closes the socket, so the listener is off whatever the toggle
         // says. Clear the enabled flag too, so the UI reports it off and a re-enable can start
-        // it again.
+        // it again, and leave the rig dark as a disable does.
         const stopped = errorData.severity !== 'warning' && errorData.type === 'runtime-error'
         if (stopped) {
           this.yargListener = null
@@ -140,6 +140,7 @@ export class ListenerCoordinator {
           this.deps.setVenuePostProcessing('Default')
           this.notifyRuntimeDisabled('yarg')
           this.clearChainHandlers('yarg')
+          void clearAndBlackOutChains(this.deps.getRigChains(), 'the YARG listener failing')
         }
         this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
           type: errorData.type,

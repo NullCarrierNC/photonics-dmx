@@ -114,6 +114,29 @@ function deferredBlackout(): { blackout: () => Promise<void>; resolve: () => voi
   return { blackout: () => promise, resolve }
 }
 
+describe('ListenerCoordinator YARG runtime socket failure', () => {
+  it('clears and blacks out every rig when the socket fails after binding', async () => {
+    const deps = makeDeps()
+    const lc = coordinator(deps)
+    await lc.enableYargInternal()
+
+    const chain = deps.getRigChains()[0]
+    const removeAllEffects = chain.sequencer.removeAllEffects as jest.Mock
+    const blackout = chain.sequencer.blackout as jest.Mock
+    removeAllEffects.mockClear()
+    blackout.mockClear()
+
+    const sockets = (dgram.createSocket as unknown as jest.Mock).mock.results
+    const socket = sockets[sockets.length - 1].value as FakeUdpSocket
+    socket.emit('error', new Error('runtime failure'))
+    await new Promise((r) => setImmediate(r))
+
+    expect(lc.getIsYargEnabled()).toBe(false)
+    expect(removeAllEffects).toHaveBeenCalled()
+    expect(blackout).toHaveBeenCalledWith(0)
+  })
+})
+
 describe('ListenerCoordinator RB3 runtime socket failure', () => {
   it('blackouts rigs when auto-disabling after a post-bind runtime error', async () => {
     const deps = makeDeps()
