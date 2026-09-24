@@ -5,6 +5,8 @@ import type {
   NodeCueFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
+import { useConfirm } from '../../../hooks/useConfirm'
+import { useToast } from '../../../hooks/useToast'
 
 type Props = {
   editorDoc: EditorDocument | null
@@ -19,6 +21,8 @@ const EventRegistry: React.FC<Props> = ({
   onEventsChange,
   getEventReferences,
 }) => {
+  const confirm = useConfirm()
+  const { showToast } = useToast()
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [editingEvent, setEditingEvent] = useState<EventDefinition | null>(null)
   const [formData, setFormData] = useState<Partial<EventDefinition>>({
@@ -58,7 +62,7 @@ const EventRegistry: React.FC<Props> = ({
 
   const handleSave = () => {
     if (!formData.name) {
-      alert('Please enter an event name')
+      showToast('Please enter an event name', 'error')
       return
     }
 
@@ -74,7 +78,7 @@ const EventRegistry: React.FC<Props> = ({
     } else {
       // Check for duplicate names
       if (updatedEvents.some((e) => e.name === newEvent.name)) {
-        alert(`An event named "${newEvent.name}" already exists`)
+        showToast(`An event named "${newEvent.name}" already exists`, 'error')
         return
       }
       updatedEvents.push(newEvent)
@@ -83,16 +87,23 @@ const EventRegistry: React.FC<Props> = ({
     closeDialog()
   }
 
-  const handleDelete = (eventName: string) => {
+  const handleDelete = async (eventName: string) => {
     const references = getEventReferences(eventName)
     if (references.length > 0) {
-      alert(`Cannot delete "${eventName}". It is referenced by: ${references.join(', ')}`)
+      showToast(
+        `Cannot delete "${eventName}". It is referenced by: ${references.join(', ')}`,
+        'error',
+      )
       return
     }
 
-    if (!confirm(`Delete event "${eventName}"?`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: 'Delete event',
+      message: `Delete event "${eventName}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
 
     const updatedEvents = cueEvents.filter((e) => e.name !== eventName)
     onEventsChange(updatedEvents)
@@ -143,7 +154,7 @@ const EventRegistry: React.FC<Props> = ({
                   </button>
                   <button
                     className="text-red-500 hover:underline text-[10px]"
-                    onClick={() => handleDelete(event.name)}>
+                    onClick={() => void handleDelete(event.name)}>
                     Del
                   </button>
                 </div>

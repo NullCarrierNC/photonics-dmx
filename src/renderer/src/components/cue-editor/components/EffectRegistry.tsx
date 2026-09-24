@@ -4,6 +4,8 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import type { EffectReference } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { listEffectFiles, readEffectFile } from '../../../ipcApi'
+import { useConfirm } from '../../../hooks/useConfirm'
+import { useToast } from '../../../hooks/useToast'
 import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('EffectRegistry')
 
@@ -22,6 +24,8 @@ type Props = {
 }
 
 const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsChange }) => {
+  const confirm = useConfirm()
+  const { showToast } = useToast()
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [editingEffect, setEditingEffect] = useState<EffectReference | null>(null)
   const [formData, setFormData] = useState<Partial<EffectReference>>({
@@ -149,7 +153,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
 
   const handleSave = () => {
     if (!formData.effectId || !formData.effectFileId || !formData.name) {
-      alert('Please fill in all required fields')
+      showToast('Please fill in all required fields', 'error')
       return
     }
 
@@ -166,7 +170,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
     } else {
       // Check for duplicate IDs
       if (updatedEffects.some((e) => e.effectId === newEffect.effectId)) {
-        alert(`An effect with ID "${newEffect.effectId}" already exists`)
+        showToast(`An effect with ID "${newEffect.effectId}" already exists`, 'error')
         return
       }
       updatedEffects.push(newEffect)
@@ -176,14 +180,14 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
     closeDialog()
   }
 
-  const handleDelete = (effectId: string) => {
-    if (
-      !confirm(
-        `Delete effect reference "${effectId}"? This will not delete the effect file itself.`,
-      )
-    ) {
-      return
-    }
+  const handleDelete = async (effectId: string) => {
+    const confirmed = await confirm({
+      title: 'Remove effect reference',
+      message: `Delete effect reference "${effectId}"? This will not delete the effect file itself.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
 
     const updatedEffects = cueEffects.filter((e) => e.effectId !== effectId)
     onEffectsChange(updatedEffects)
@@ -231,7 +235,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
                 </button>
                 <button
                   className="px-2 py-0.5 bg-red-600 text-white rounded hover:bg-red-700"
-                  onClick={() => handleDelete(effect.effectId)}>
+                  onClick={() => void handleDelete(effect.effectId)}>
                   Delete
                 </button>
               </div>
