@@ -6,7 +6,7 @@
  * and leaves a process the user cannot see or quit. The file log sink is the first thing in there
  * and it creates its directory up front, which is the throw most likely to happen in the field.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { LogEntry } from '../../shared/logger'
 
 const applicationInit = jest.fn<() => Promise<void>>()
@@ -104,8 +104,23 @@ async function startUp(): Promise<void> {
   await Promise.resolve()
 }
 
+/** The process events the entry point listens on at module scope, once per load. */
+const PROCESS_EVENTS: string[] = ['uncaughtException', 'unhandledRejection', 'SIGINT', 'SIGTERM']
+
+type ProcessListener = (...args: unknown[]) => void
+
+/** The process as a plain emitter, which takes any event name. */
+const processEvents: NodeJS.EventEmitter = process
+
+function processListeners(event: string): ProcessListener[] {
+  return processEvents.listeners(event) as ProcessListener[]
+}
+
 describe('main startup', () => {
+  let listenersBefore = new Set<ProcessListener>()
+
   beforeEach(() => {
+    listenersBefore = new Set(PROCESS_EVENTS.flatMap(processListeners))
     jest.resetModules()
     readyResolve = undefined
     applicationInit.mockReset()
@@ -127,6 +142,17 @@ describe('main startup', () => {
     appOn.mockReset()
     mockHasInstanceLock = true
     mockSwitches = []
+  })
+
+  // Each test loads a fresh copy of the entry point, which adds its own process listeners.
+  afterEach(() => {
+    for (const event of PROCESS_EVENTS) {
+      for (const listener of processListeners(event)) {
+        if (!listenersBefore.has(listener)) {
+          processEvents.removeListener(event, listener)
+        }
+      }
+    }
   })
 
   it('builds the application once Electron is ready', async () => {
