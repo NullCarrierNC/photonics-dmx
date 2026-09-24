@@ -301,15 +301,25 @@ export class YargNetworkListener extends EventEmitter {
       const result = parseYargPacket(buffer, this.getMinSupportedDatagramVersion())
 
       switch (result.kind) {
-        case 'shutdown':
+        case 'shutdown': {
           log.info('YARG shutdown notification (datagram version 0)')
+          const last = this.lastData
           this.resetSessionInputState()
+          // The game has gone, so nothing will replace the running look or reach the Fallback.
+          // Fade it out as a chart blackout would.
+          if (last) {
+            void this.cueHandler.handleCue(CueType.Blackout_Slow, {
+              ...last,
+              lightingCue: CueType.Blackout_Slow,
+            })
+          }
           this.emit('yarg-error', {
             type: 'yarg-shutdown',
             message: 'YARG Has Shutdown',
             datagramVersion: 0,
           })
           return
+        }
         case 'reject':
           if (result.reason === 'header') {
             log.warn(`Invalid YARG packet: ${result.detail}`)

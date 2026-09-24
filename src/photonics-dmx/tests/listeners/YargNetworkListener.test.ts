@@ -366,6 +366,26 @@ describe('YargNetworkListener', () => {
       expect(cueHandler.handleCue).not.toHaveBeenCalled()
     })
 
+    it('fades the rig out when YARG quits during a song', () => {
+      listener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Gameplay',
+        lightingCue: CueType.Verse,
+      })
+      cueHandler.handleCue.mockClear()
+
+      deserializePacket(listener, buildYargShutdownPacket())
+
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(
+        CueType.Blackout_Slow,
+        expect.objectContaining({ lightingCue: CueType.Blackout_Slow }),
+      )
+      expect(cueHandler.resetSessionState.mock.invocationCallOrder[0]).toBeLessThan(
+        cueHandler.handleCue.mock.invocationCallOrder[0],
+      )
+    })
+
     it('emits datagram-version-mismatch for non-zero versions below minimum supported', async () => {
       const strictListener = new YargNetworkListenerMinV2(cueHandler)
       const onError = jest.fn()
