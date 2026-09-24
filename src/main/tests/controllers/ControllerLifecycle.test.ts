@@ -331,6 +331,47 @@ describe('ControllerLifecycle', () => {
       expect(ran).toBe(true)
     })
 
+    it('awaitActiveOp waits for the queued op that is running', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      let releaseOp!: () => void
+      const op = lifecycle.runQueuedOp(
+        () =>
+          new Promise<void>((r) => {
+            releaseOp = r
+          }),
+      )
+      await new Promise((r) => setImmediate(r))
+
+      let waited = false
+      const waiter = lifecycle.awaitActiveOp().then(() => {
+        waited = true
+      })
+      await Promise.resolve()
+      expect(waited).toBe(false)
+
+      releaseOp()
+      await Promise.all([op, waiter])
+      expect(waited).toBe(true)
+    })
+
+    it('awaitActiveOp passes over a queued op still waiting on the shutdown', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      let releaseShutdown!: () => void
+      const shutdownBarrier = new Promise<void>((r) => {
+        releaseShutdown = r
+      })
+      const shutdown = lifecycle.runExclusiveShutdown(() => shutdownBarrier)
+      const queued = lifecycle.runQueuedOp(async () => {})
+      await new Promise((r) => setImmediate(r))
+
+      await expect(lifecycle.awaitActiveOp()).resolves.toBeUndefined()
+
+      releaseShutdown()
+      await Promise.all([shutdown, queued])
+    })
+
     it('awaitShutdownWork waits only on a shutdown, not a restart', async () => {
       const lifecycle = new ControllerLifecycle(() => {})
       lifecycle.setPhase('running')

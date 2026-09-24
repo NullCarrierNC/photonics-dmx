@@ -16,6 +16,7 @@ import type { ControllerGraph } from '../../controllers/ControllerGraph'
 import type { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import type { ListenerLifecycleController } from '../../controllers/ListenerLifecycleController'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
+import { stubbedManager } from './lifecycleStub'
 
 /** Preferences a freshly constructed manager reads while wiring its sub-controllers. */
 function stubConfig(): ConfigurationManager {
@@ -156,6 +157,42 @@ describe('ControllerManager.shutdown idempotency', () => {
 
     await manager.shutdown()
     expect(mocks.disposeChains).toHaveBeenCalledTimes(2)
+    expect(manager.getLifecyclePhase()).toBe('stopped')
+  })
+})
+
+describe('ControllerManager.shutdown during an input enable', () => {
+  const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
+
+  it('blacks out, then disables the listener once the enable in flight has bound it', async () => {
+    const { manager, listeners, graph } = stubbedManager()
+    const order: string[] = []
+    let bind!: () => void
+    listeners.yargRb3.enableYarg.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          bind = () => {
+            order.push('enabled')
+            resolve()
+          }
+        }),
+    )
+    listeners.yargRb3.disableYarg.mockImplementation(async () => {
+      order.push('disabled')
+    })
+
+    const enabling = manager.enableYarg()
+    await settle()
+    const shutdown = manager.shutdown()
+    await settle()
+
+    expect(graph.shutdownPublisherSafe).toHaveBeenCalledTimes(1)
+    expect(order).toEqual([])
+
+    bind()
+    await Promise.all([enabling, shutdown])
+
+    expect(order).toEqual(['enabled', 'disabled'])
     expect(manager.getLifecyclePhase()).toBe('stopped')
   })
 })

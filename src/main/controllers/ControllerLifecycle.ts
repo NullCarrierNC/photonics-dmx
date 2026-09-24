@@ -41,7 +41,8 @@ const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
  * - Queued ops exclude each other, and additionally await any in-flight shutdown. Every listener
  *   toggle, audio included, and every restart is a queued op.
  * - `runExclusiveShutdown` runs off the queue and must never drain it, since queued ops await the
- *   shutdown memo and a shutdown waiting on the queue would deadlock against them.
+ *   shutdown memo and a shutdown waiting on the queue would deadlock against them. The shutdown
+ *   waits out only the op already running past that wait (`awaitActiveOp`).
  * - A restart request joins the one in flight until that restart starts rebuilding. After that the
  *   rebuild has read its configuration, so the request gets one follow-up restart instead.
  */
@@ -61,6 +62,8 @@ export class ControllerLifecycle {
   private followUpRestart: Promise<void> | null = null
   /** Set while an initialisation is in flight so overlapping callers share the one attempt. */
   private initInFlight: Promise<void> | null = null
+  /** The queued op or restart running now, past any wait on a shutdown. */
+  private activeOp: Promise<unknown> | null = null
 
   /**
    * @param broadcastPhase Called on every real phase transition so the renderer can disable
@@ -209,7 +212,7 @@ export class ControllerLifecycle {
       return this.restartRebuildStarted ? this.queueFollowUpRestart(work) : this.restartInFlight
     }
     this.restartRebuildStarted = false
-    this.restartInFlight = this.runOp(work).finally(() => {
+    this.restartInFlight = this.runOp(() => this.runActive(work)).finally(() => {
       this.restartInFlight = null
       this.restartRebuildStarted = false
     })
@@ -262,7 +265,29 @@ export class ControllerLifecycle {
   public runQueuedOp<T>(op: () => Promise<T>): Promise<T> {
     return this.runOp(async () => {
       await this.awaitShutdownWork()
-      return op()
+      return this.runActive(op)
+    })
+  }
+
+  /**
+   * Wait for the queued op or restart that is running now to settle, so a shutdown tears down what
+   * it built. Ops still waiting on the queue or on the shutdown are not awaited, which is what
+   * keeps this from deadlocking. Errors are swallowed as the op's caller reports them.
+   */
+  public async awaitActiveOp(): Promise<void> {
+    if (!this.activeOp) return
+    try {
+      await this.activeOp
+    } catch {
+      // The op's caller reports its failure.
+    }
+  }
+
+  private runActive<T>(op: () => Promise<T>): Promise<T> {
+    const run = (async () => op())()
+    this.activeOp = run
+    return run.finally(() => {
+      if (this.activeOp === run) this.activeOp = null
     })
   }
 
