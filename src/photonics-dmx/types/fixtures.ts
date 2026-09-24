@@ -29,7 +29,7 @@ export const LEGACY_FIXTURE_RGBW_STROBE = 'rgbw/s'
 export const LEGACY_FIXTURE_RGBW = 'rgbw'
 export const LEGACY_FIXTURE_RGBW_MH = 'rgbw/mh'
 
-export interface RgbDmxChannels extends BaseDmxFixture {
+export type RgbDmxChannels = BaseDmxFixture & {
   red: number
   green: number
   blue: number
@@ -110,14 +110,14 @@ export interface ExtraChannel {
   scale?: number
 }
 
-export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxChannels {}
+export type RgbMovingHeadDmxChannels = MovingHeadDmxChannels & RgbDmxChannels
 
 /**
  * Channel record for a **dedicated** hardware strobe fixture - a colour-less light whose only
  * outputs are master dimmer + strobe speed. Distinct from {@link RgbDmxChannels.strobeChannel},
  * which is the optional strobe-speed channel exposed by some RGB-family fixtures.
  */
-export interface StrobeDmxChannels extends BaseDmxFixture {
+export type StrobeDmxChannels = BaseDmxFixture & {
   strobeChannel: number
 }
 
@@ -206,6 +206,12 @@ export interface DmxFixture {
 export interface DmxLight extends DmxFixture {
   fixtureId: string
 }
+
+/**
+ * A fixture's channels by name. Each archetype declares its own closed channel map, so code that
+ * handles every archetype reads it through this view.
+ */
+export type ChannelView = Readonly<Record<string, number | undefined>>
 
 /**
  * Light Types Definition

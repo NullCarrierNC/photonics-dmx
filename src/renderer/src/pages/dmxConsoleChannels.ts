@@ -8,6 +8,7 @@
  */
 import {
   FixtureTypes,
+  type ChannelView,
   type DmxFixture,
   type DmxLight,
   type ExtraChannel,
@@ -24,10 +25,6 @@ export function channelSortKey(name: string): number {
   return i === -1 ? order.length : i
 }
 
-function channelsAsRecord(channels: DmxFixture['channels']): Record<string, number> {
-  return channels as unknown as Record<string, number>
-}
-
 /**
  * Resolves the channel set to display for a rig light. The shape (which channels exist) comes from
  * the live fixture template, so enabling "Strobe Channel?" on a template in MyLights surfaces the
@@ -42,15 +39,20 @@ export function getTemplateAlignedChannels(
   templates: DmxFixture[],
 ): Record<string, number> {
   const template = templates.find((t) => t.id === light.fixtureId)
-  const persisted = channelsAsRecord(light.channels)
+  const persisted: ChannelView = light.channels
   if (!template) {
-    return persisted
+    return Object.fromEntries(
+      Object.entries(persisted).filter(
+        (entry): entry is [string, number] => typeof entry[1] === 'number',
+      ),
+    )
   }
-  const templateChannels = channelsAsRecord(template.channels)
+  const templateChannels: ChannelView = template.channels
   const templateMaster = templateChannels.masterDimmer ?? 0
   const lightMaster = persisted.masterDimmer ?? templateMaster
   const out: Record<string, number> = {}
   for (const [name, templateValue] of Object.entries(templateChannels)) {
+    if (templateValue === undefined) continue
     if (name === 'masterDimmer') {
       out[name] = lightMaster
     } else {
@@ -81,9 +83,9 @@ export function getTemplateAlignedExtraChannels(
   if (!template) {
     return light.extraChannels ?? []
   }
-  const templateChannels = channelsAsRecord(template.channels)
+  const templateChannels: ChannelView = template.channels
   const templateMaster = templateChannels.masterDimmer ?? 0
-  const lightMaster = channelsAsRecord(light.channels).masterDimmer ?? templateMaster
+  const lightMaster = light.channels.masterDimmer ?? templateMaster
   return deriveExtraChannelsForMaster(template.extraChannels, templateMaster, lightMaster) ?? []
 }
 

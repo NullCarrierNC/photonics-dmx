@@ -1,6 +1,7 @@
 import {
   DEFAULT_BRIGHTNESS_SCALE_PERCENT,
   isValidDmxChannel,
+  type ChannelView,
   type DmxFixture,
   type LightingConfiguration,
 } from '../types'
@@ -37,7 +38,7 @@ export function isStorableBrightnessScale(percent: unknown): percent is number {
 export function buildBrightnessScaleMap(fixture: DmxFixture): Map<number, number> | null {
   const map = new Map<number, number>()
 
-  const named = fixture.channels as unknown as Record<string, number>
+  const named: ChannelView = fixture.channels
   const scaling = fixture.brightnessScaling
   if (scaling) {
     for (const key of ['red', 'green', 'blue'] as const) {
@@ -76,7 +77,7 @@ function lightsInPublishOrder(config: LightingConfiguration): DmxFixture[] {
 
 /** True when the fixture maps a DMX address through a base or extra channel. */
 function fixtureMapsChannel(fixture: DmxFixture, channel: number): boolean {
-  const named = fixture.channels as unknown as Record<string, number>
+  const named: ChannelView = fixture.channels
   for (const value of Object.values(named)) {
     if (value === channel) return true
   }

@@ -92,9 +92,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     // Preserve the user's strobe-channel choice across RGB-family type changes. Dedicated STROBE
     // fixtures are a separate device class — they intrinsically carry a strobe channel and don't
     // consume `strobeValues`, so when switching into/out of STROBE we drop the RGB+S extras.
-    const nextChannels: Record<string, number> = {
-      ...(defaultType.channels as unknown as Record<string, number>),
-    }
+    const nextChannels: Record<string, number | undefined> = { ...defaultType.channels }
     const prevStrobe = channels.strobeChannel
     const newIsStrobeFixture = newType === FixtureTypes.STROBE
     if (newIsStrobeFixture) {
@@ -158,9 +156,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
 
   const handleStrobeChannelToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked
-    const nextChannels: Record<string, number> = {
-      ...(currentLight.channels as unknown as Record<string, number>),
-    }
+    const nextChannels: Record<string, number | undefined> = { ...currentLight.channels }
     if (checked) {
       nextChannels.strobeChannel = nextChannels.strobeChannel ?? 0
       setCurrentLight({

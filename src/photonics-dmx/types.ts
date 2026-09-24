@@ -65,6 +65,7 @@ export {
 } from './types/fixtures'
 export type {
   BrightnessScaling,
+  ChannelView,
   DmxFixture,
   DmxLight,
   ExtraChannel,

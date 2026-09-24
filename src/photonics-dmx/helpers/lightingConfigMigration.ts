@@ -1,4 +1,10 @@
-import type { DmxFixture, DmxLight, DmxRigsConfig, LightingConfiguration } from '../types'
+import type {
+  ChannelView,
+  DmxFixture,
+  DmxLight,
+  DmxRigsConfig,
+  LightingConfiguration,
+} from '../types'
 import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
@@ -63,7 +69,8 @@ export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
   const legacyFixtureKey = String(fixture.fixture)
   const isLegacyRgbStrobe = legacyFixtureKey === LEGACY_FIXTURE_RGB_STROBE
   const isLegacyRgbwStrobe = legacyFixtureKey === LEGACY_FIXTURE_RGBW_STROBE
-  const channels = (fixture.channels ?? {}) as unknown as Record<string, number>
+  // A fixture read from an older or hand-edited file may carry no channel map at all.
+  const channels: ChannelView = fixture.channels ?? {}
   const hasLegacyStrobeSpeed = Object.prototype.hasOwnProperty.call(channels, 'strobeSpeed')
   const hasStrobeChannel = Object.prototype.hasOwnProperty.call(channels, 'strobeChannel')
   const needsStrobeValuesSeed =
@@ -78,7 +85,7 @@ export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
     return { fixture, changed: false }
   }
 
-  const nextChannels: Record<string, number> = { ...channels }
+  const nextChannels: Record<string, number | undefined> = { ...channels }
   if (hasLegacyStrobeSpeed) {
     const legacyValue = nextChannels.strobeSpeed
     delete nextChannels.strobeSpeed
@@ -130,8 +137,9 @@ export function migrateFixtureWhiteToExtraChannel<T extends DmxFixture>(
     return { fixture, changed: false }
   }
 
-  const channels = (fixture.channels ?? {}) as unknown as Record<string, number>
-  const nextChannels: Record<string, number> = { ...channels }
+  // A fixture read from an older or hand-edited file may carry no channel map at all.
+  const channels: ChannelView = fixture.channels ?? {}
+  const nextChannels: Record<string, number | undefined> = { ...channels }
   const whiteChannel = nextChannels.white
   delete nextChannels.white
 

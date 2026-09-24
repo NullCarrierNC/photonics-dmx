@@ -3,7 +3,7 @@
  * moving head's physical range.
  */
 
-export interface MovingHeadDmxChannels {
+export type MovingHeadDmxChannels = {
   pan: number
   tilt: number
 }

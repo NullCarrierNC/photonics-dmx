@@ -12,11 +12,6 @@ import {
 } from '../../../photonics-dmx/helpers/dmxHelpers'
 import { normalizeFixtureConfig, type DmxLight } from '../../../photonics-dmx/types'
 
-/** Channels are declared per fixture archetype, so they are read by name rather than by shape. */
-export function channelsRecord(light: DmxLight): Record<string, number> {
-  return light.channels as unknown as Record<string, number>
-}
-
 const FULL_ON_CHANNELS = new Set(['masterDimmer', 'red', 'green', 'blue', 'white'])
 
 const isAddressable = (channel: unknown): channel is number =>
@@ -26,7 +21,7 @@ export function buildInitialConsoleBuffer(light: DmxLight): Record<number, numbe
   const config = normalizeFixtureConfig(light.config)
   const buffer: Record<number, number> = {}
 
-  for (const [name, address] of Object.entries(channelsRecord(light))) {
+  for (const [name, address] of Object.entries(light.channels)) {
     if (!isAddressable(address)) continue
     if (FULL_ON_CHANNELS.has(name)) {
       buffer[address] = 255

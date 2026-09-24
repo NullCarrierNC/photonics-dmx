@@ -3,6 +3,7 @@ import {
   FixtureTypes,
   MIXABLE_CHANNEL_TYPES,
   isValidDmxChannel,
+  type ChannelView,
   type DmxFixture,
   type MixableChannelType,
 } from '../types'
@@ -89,7 +90,7 @@ function clampByte(value: number): number {
  * the publisher on identity).
  */
 export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
-  const named = fixture.channels as unknown as Record<string, number>
+  const named: ChannelView = fixture.channels
   const extras = fixture.extraChannels ?? []
   const isStrobe = fixture.fixture === FixtureTypes.STROBE
 
