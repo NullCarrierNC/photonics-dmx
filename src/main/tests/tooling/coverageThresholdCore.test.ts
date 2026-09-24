@@ -5,6 +5,10 @@ const {
   loosenedCoverage,
   isMissingCommit,
   parsePushedRefs,
+  commandLineOverrides,
+  testCoverageScriptProblems,
+  importsOfUncounted,
+  coverageIgnoreHints,
 } = require('../../../../tools/coverageThresholdCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -191,5 +195,129 @@ describe('parsePushedRefs', () => {
 
   it('reads nothing from empty input', () => {
     expect(parsePushedRefs('')).toEqual([])
+  })
+})
+
+describe('commandLineOverrides', () => {
+  it('names a threshold passed to Jest on the command line', () => {
+    expect(commandLineOverrides(`jest --coverage --coverageThreshold='{}'`)).toEqual([
+      "`jest --coverage --coverageThreshold='{}'` passes --coverageThreshold to Jest",
+    ])
+  })
+
+  it('reads each command in a hook chain that runs Jest through npm', () => {
+    const hook =
+      'npm run lint:check && npm run test:coverage -- --randomize --collect-coverage-from=src/a.ts'
+
+    expect(commandLineOverrides(hook)).toEqual([
+      '`npm run test:coverage -- --randomize --collect-coverage-from=src/a.ts` passes --collect-coverage-from to Jest',
+    ])
+  })
+
+  it('names another config, another root and coverage switched off', () => {
+    expect(commandLineOverrides('npx jest -c other.config.js --rootDir src/main')).toHaveLength(2)
+    expect(commandLineOverrides('jest --coverage=false')).toHaveLength(1)
+    expect(commandLineOverrides('npm test -- --no-coverage')).toHaveLength(1)
+  })
+
+  it('passes options that only choose which tests run', () => {
+    expect(
+      commandLineOverrides('npm run test:coverage -- --randomize --selectProjects engine'),
+    ).toEqual([])
+  })
+
+  it('leaves out commands that do not run Jest', () => {
+    expect(
+      commandLineOverrides("bash -c 'echo --config'\nnode tools/check.mjs --config x"),
+    ).toEqual([])
+  })
+})
+
+describe('testCoverageScriptProblems', () => {
+  it('passes a test:coverage script that runs Jest with coverage', () => {
+    expect(testCoverageScriptProblems({ 'test:coverage': 'jest --coverage' })).toEqual([])
+  })
+
+  it('names a test:coverage script that does not collect coverage', () => {
+    expect(testCoverageScriptProblems({ 'test:coverage': 'jest' })).toEqual([
+      'test:coverage (`jest`) does not run Jest with --coverage',
+    ])
+    expect(testCoverageScriptProblems({})).toEqual(['package.json has no test:coverage script'])
+  })
+})
+
+describe('importsOfUncounted', () => {
+  const settings = config({
+    moduleNameMapper: { '^@renderer/(.*)$': '<rootDir>/src/renderer/src/$1' },
+    collectCoverageFrom: [
+      'src/**/*.{ts,tsx}',
+      '!src/**/tests/**',
+      '!src/**/*.test.{ts,tsx}',
+      '!src/**/*.spec.{ts,tsx}',
+      '!src/**/*.d.ts',
+    ],
+  })
+  const sources = (files: Record<string, string>) => new Map(Object.entries(files))
+
+  it('names a source file that loads code moved into a tests directory', () => {
+    const files = sources({
+      'src/main/sender.ts': "import { open } from './tests/port'\nexport const run = open",
+      'src/main/tests/port.ts': 'export const open = () => 1',
+    })
+
+    expect(importsOfUncounted(files, settings)).toEqual([
+      'src/main/sender.ts loads src/main/tests/port.ts, which coverage leaves out',
+    ])
+  })
+
+  it('names code renamed to a spec file and code reached through an alias', () => {
+    const files = sources({
+      'src/main/a.ts': "export * from './port.spec'",
+      'src/main/port.spec.ts': 'export const open = 1',
+      'src/renderer/src/page.tsx': "const m = await import('@renderer/tests/util')",
+      'src/renderer/src/tests/util.ts': 'export const u = 1',
+    })
+
+    expect(importsOfUncounted(files, settings)).toEqual([
+      'src/main/a.ts loads src/main/port.spec.ts, which coverage leaves out',
+      'src/renderer/src/page.tsx loads src/renderer/src/tests/util.ts, which coverage leaves out',
+    ])
+  })
+
+  it('passes a test loading source, a type-only import and a declaration file', () => {
+    const files = sources({
+      'src/main/a.ts': "import type { T } from './tests/types'\nimport './env'\nexport const a = 1",
+      'src/main/env.d.ts': 'declare const x: number',
+      'src/main/tests/types.ts': 'export type T = number',
+      'src/main/tests/a.test.ts': "import { a } from '../a'",
+    })
+
+    expect(importsOfUncounted(files, settings)).toEqual([])
+  })
+})
+
+describe('coverageIgnoreHints', () => {
+  it('names each ignore hint in a file coverage counts', () => {
+    const files = new Map([
+      ['src/main/a.ts', 'const a = 1\n/* v8 ignore next */\nif (a) run()'],
+      ['src/main/b.ts', '/* c8 ignore start */\nrun()\n/* c8 ignore stop */'],
+      ['src/main/c.ts', '/* istanbul ignore else */'],
+    ])
+
+    expect(coverageIgnoreHints(files, config())).toEqual([
+      'src/main/a.ts:2 carries a coverage ignore hint',
+      'src/main/b.ts:1 carries a coverage ignore hint',
+      'src/main/b.ts:3 carries a coverage ignore hint',
+      'src/main/c.ts:1 carries a coverage ignore hint',
+    ])
+  })
+
+  it('passes a hint in a test file and a source file without one', () => {
+    const files = new Map([
+      ['src/main/tests/a.test.ts', '/* v8 ignore next */'],
+      ['src/main/a.ts', '// the provider ignores nothing here'],
+    ])
+
+    expect(coverageIgnoreHints(files, config())).toEqual([])
   })
 })

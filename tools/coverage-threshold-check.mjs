@@ -10,11 +10,24 @@
  * `COVERAGE_BASE_REF` adds where HEAD meets that ref as one more base, which is how CI names the
  * commit a push or pull request starts from. A base that cannot be found, as in a shallow clone, is
  * skipped with a note.
+ *
+ * The routes around the config are checked in the working tree: a coverage option passed to Jest
+ * by an npm script, a git hook or a workflow, a test:coverage script that does not collect
+ * coverage, a counted source file that loads a file coverage leaves out, and a coverage ignore
+ * hint in counted source.
  */
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { join, dirname, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 
@@ -23,12 +36,18 @@ const {
   loosenedCoverage,
   isMissingCommit,
   parsePushedRefs,
+  commandLineOverrides,
+  testCoverageScriptProblems,
+  importsOfUncounted,
+  coverageIgnoreHints,
 } = require('./coverageThresholdCore.cjs')
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG = 'jest.config.js'
 /** Where a branch meets the mainline, for a branch with no upstream. */
 const MAINLINE = ['development', 'origin/development']
+/** Script and TypeScript sources, in every module flavour. */
+const SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 
 /** @param {string[]} args @returns {string | null} git's output, or null when git fails */
 function git(args) {
@@ -170,6 +189,47 @@ try {
   }
 } finally {
   rmSync(scratch, { recursive: true, force: true })
+}
+
+/**
+ * @param {string} dir
+ * @returns {string[]} the files directly inside it, from the repository root
+ */
+function filesIn(dir) {
+  const full = join(root, dir)
+  if (!existsSync(full)) return []
+  return readdirSync(full, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => `${dir}/${entry.name}`)
+}
+
+/** @type {string[]} */
+const routes = []
+const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts ?? {}
+routes.push(...testCoverageScriptProblems(scripts))
+for (const [name, command] of Object.entries(scripts)) {
+  for (const line of commandLineOverrides(command)) routes.push(`package.json ${name}: ${line}`)
+}
+const workflows = filesIn('.github/workflows').filter((file) => /\.ya?ml$/.test(file))
+for (const file of [...filesIn('.husky'), ...workflows]) {
+  for (const line of commandLineOverrides(readFileSync(join(root, file), 'utf8'))) {
+    routes.push(`${file}: ${line}`)
+  }
+}
+
+/** @type {Map<string, string>} */
+const sources = new Map()
+for (const entry of readdirSync(join(root, 'src'), { recursive: true, withFileTypes: true })) {
+  if (!entry.isFile() || !SOURCE.test(entry.name)) continue
+  const path = join(entry.parentPath ?? entry.path, entry.name)
+  sources.set(relative(root, path).split(sep).join('/'), readFileSync(path, 'utf8'))
+}
+const config = (await workingTree) ?? {}
+routes.push(...importsOfUncounted(sources, config), ...coverageIgnoreHints(sources, config))
+
+for (const line of routes) {
+  console.error(`the working tree: ${line}`)
+  failed = true
 }
 
 if (failed) {
