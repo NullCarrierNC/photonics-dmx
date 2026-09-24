@@ -26,6 +26,7 @@ export interface FakeBrowserWindow {
   loadFile: jest.Mock<(...args: unknown[]) => Promise<void>>
   loadURL: jest.Mock<(...args: unknown[]) => Promise<void>>
   webContents: {
+    id: number
     send: jest.Mock<(...args: unknown[]) => void>
     setWindowOpenHandler: jest.Mock<(...args: unknown[]) => void>
     reload: jest.Mock<() => void>
@@ -47,6 +48,8 @@ function eventHub() {
   }
 }
 
+let nextWebContentsId = 1
+
 export function createFakeBrowserWindow(options: Record<string, unknown> = {}): FakeBrowserWindow {
   const windowEvents = eventHub()
   const window: FakeBrowserWindow = {
@@ -67,6 +70,7 @@ export function createFakeBrowserWindow(options: Record<string, unknown> = {}): 
     loadFile: jest.fn(() => Promise.resolve()),
     loadURL: jest.fn(() => Promise.resolve()),
     webContents: {
+      id: nextWebContentsId++,
       send: jest.fn(),
       setWindowOpenHandler: jest.fn(),
       reload: jest.fn(),

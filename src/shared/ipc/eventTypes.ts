@@ -129,6 +129,7 @@ export type IpcEventChannel = keyof IpcEventMap
 
 export interface IpcRendererSendMap {
   [RENDERER_SEND.AUDIO_DATA]: AudioLightingData
+  [RENDERER_SEND.UNSAVED_CHANGES]: boolean
 }
 
 export type IpcRendererSendChannel = keyof IpcRendererSendMap

@@ -51,6 +51,7 @@ function unloadRefusedByPage(window: FakeBrowserWindow): boolean {
   return event.preventDefault.mock.calls.length > 0
 }
 
+/** A main window and a Cue Editor, each page reporting whether it holds unsaved changes. */
 function managerWithMainAndEditor(dirty: { main: boolean; editor: boolean }) {
   const wm = new WindowManager()
   wm.createMainWindow()
@@ -59,6 +60,8 @@ function managerWithMainAndEditor(dirty: { main: boolean; editor: boolean }) {
   const editor = lastBuiltWindow()
   closesLikeAPage(main, dirty.main)
   closesLikeAPage(editor, dirty.editor)
+  wm.setUnsavedChanges(main.webContents as never, dirty.main)
+  wm.setUnsavedChanges(editor.webContents as never, dirty.editor)
   return { wm, main, editor }
 }
 
@@ -192,6 +195,36 @@ describe('WindowManager windows closed for a Quit', () => {
     answerPrompt(LEAVE)
 
     await expect(quit).resolves.toBe(true)
+    expect(editor.destroyed).toBe(true)
+    expect(main.destroyed).toBe(true)
+  })
+
+  it('closes no window when the user stays on any page it asks about', async () => {
+    const { wm, main, editor } = managerWithMainAndEditor({ main: true, editor: true })
+
+    const quit = wm.closeWindowsForQuit()
+    await flush()
+    answerPrompt(LEAVE)
+    await flush()
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(2)
+    answerPrompt(STAY)
+
+    await expect(quit).resolves.toBe(false)
+    expect(editor.close).not.toHaveBeenCalled()
+    expect(main.close).not.toHaveBeenCalled()
+  })
+
+  it('asks each page once and then closes them all', async () => {
+    const { wm, main, editor } = managerWithMainAndEditor({ main: true, editor: true })
+
+    const quit = wm.closeWindowsForQuit()
+    await flush()
+    answerPrompt(LEAVE)
+    await flush()
+    answerPrompt(LEAVE)
+
+    await expect(quit).resolves.toBe(true)
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(2)
     expect(editor.destroyed).toBe(true)
     expect(main.destroyed).toBe(true)
   })

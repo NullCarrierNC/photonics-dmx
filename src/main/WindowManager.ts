@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, shell, screen } from 'electron'
+import { BrowserWindow, dialog, shell, screen, type WebContents } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import type { ControllerManager } from './controllers/ControllerManager'
@@ -78,10 +78,8 @@ export class WindowManager {
   private controllerManager: ControllerManager | null = null
   /** Set once the app closes its windows to quit. No page is asked to stay after that. */
   private quitting = false
-  /** Called when the user keeps a page a Quit is closing. */
-  private readonly closeRefused = new Map<BrowserWindow, () => void>()
-  /** Called when a page a Quit is closing starts asking, so the Quit waits for the answer. */
-  private readonly closeAnswering = new Map<BrowserWindow, () => void>()
+  /** The pages that report unsaved changes, by web contents id. */
+  private readonly unsavedPages = new Set<number>()
 
   /**
    * Sets the controller manager for accessing preferences
@@ -203,7 +201,9 @@ export class WindowManager {
     window.on('resize', save)
     window.on('move', save)
     window.on('ready-to-show', () => window.show())
+    const webContentsId = window.webContents.id
     window.on('closed', () => {
+      this.unsavedPages.delete(webContentsId)
       if (this.windows.get(role) === window) {
         this.windows.delete(role)
       }
@@ -269,7 +269,6 @@ export class WindowManager {
       event.preventDefault()
       return
     }
-    this.closeAnswering.get(window)?.()
     if (unload.asking) {
       return
     }
@@ -282,7 +281,6 @@ export class WindowManager {
         return
       }
       if (!leave) {
-        this.closeRefused.get(window)?.()
         return
       }
       unload.leaving = true
@@ -374,10 +372,24 @@ export class WindowManager {
     window.focus()
   }
 
+  /** Records whether a page holds unsaved changes, as the page reports it. */
+  public setUnsavedChanges(webContents: WebContents, unsaved: boolean): void {
+    if (unsaved) {
+      this.unsavedPages.add(webContents.id)
+    } else {
+      this.unsavedPages.delete(webContents.id)
+    }
+  }
+
+  /** Whether the app is closing its windows to quit or shut down. */
+  public isQuitting(): boolean {
+    return this.quitting
+  }
+
   /**
-   * Saves every open window's geometry, then closes each the way the user closing it would, so a
-   * page with unsaved changes asks first. True once every window has gone, false as soon as the
-   * user stays on one, which leaves it and the windows after it open.
+   * Saves every open window's geometry and asks about each page with unsaved changes before any
+   * window closes, so a Stay leaves every window as it was. Once every page is let go the windows
+   * close, and true comes back once they have gone.
    */
   public async closeWindowsForQuit(): Promise<boolean> {
     for (const role of WINDOW_ROLES) {
@@ -385,29 +397,31 @@ export class WindowManager {
     }
     for (const role of QUIT_CLOSE_ORDER) {
       const window = this.openWindow(role)
-      if (window && !(await this.closeAsking(window))) {
-        return false
+      if (window && this.unsavedPages.has(window.webContents.id)) {
+        if (!(await this.confirmLeave(window))) {
+          return false
+        }
+      }
+    }
+    this.quitting = true
+    for (const role of QUIT_CLOSE_ORDER) {
+      const window = this.openWindow(role)
+      if (window) {
+        await this.closeWithin(window)
       }
     }
     return true
   }
 
-  /**
-   * Closes a window and answers whether it went. A page that never answers counts as gone, and one
-   * that asks the user waits for the answer.
-   */
-  private closeAsking(window: BrowserWindow): Promise<boolean> {
+  /** Closes a window and settles once it has gone. A page that never answers counts as gone. */
+  private closeWithin(window: BrowserWindow): Promise<void> {
     return new Promise((resolve) => {
-      const settle = (closed: boolean): void => {
+      const settle = (): void => {
         clearTimeout(timer)
-        this.closeRefused.delete(window)
-        this.closeAnswering.delete(window)
-        resolve(closed)
+        resolve()
       }
-      const timer = setTimeout(() => settle(true), CLOSE_ANSWER_MS)
-      this.closeRefused.set(window, () => settle(false))
-      this.closeAnswering.set(window, () => clearTimeout(timer))
-      window.on('closed', () => settle(true))
+      const timer = setTimeout(settle, CLOSE_ANSWER_MS)
+      window.on('closed', settle)
       window.close()
     })
   }

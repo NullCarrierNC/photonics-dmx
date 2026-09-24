@@ -15,6 +15,7 @@ export {
   openAudioPreviewWindow,
   openCueEditorWindow,
   openPath,
+  reportUnsavedChanges,
   retryControllerInit,
   showItemInFolder,
 } from './ipc/appShell'

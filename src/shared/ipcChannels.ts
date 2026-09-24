@@ -329,4 +329,6 @@ export const RENDERER_RECEIVE = {
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */
 export const RENDERER_SEND = {
   AUDIO_DATA: 'audio:data',
+  /** Whether the page holds unsaved changes, so a Quit can ask about it before closing anything. */
+  UNSAVED_CHANGES: 'window:unsaved-changes',
 } as const

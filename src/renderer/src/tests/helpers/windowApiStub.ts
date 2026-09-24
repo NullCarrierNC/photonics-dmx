@@ -14,6 +14,7 @@ type Handler = (payload: unknown) => void
 export interface WindowApiStub {
   invoke: jest.Mock<(channel: string, payload?: unknown) => Promise<unknown>>
   send: jest.Mock<(channel: string, payload?: unknown) => void>
+  sendToMain: jest.Mock<(channel: string, payload?: unknown) => void>
   receive: jest.Mock<(channel: string, handler: Handler) => () => void>
 }
 
@@ -30,6 +31,7 @@ export function installWindowApi(
   const api: WindowApiStub = {
     invoke: jest.fn(async (channel: string, payload?: unknown) => answer(channel, payload)),
     send: jest.fn(),
+    sendToMain: jest.fn(),
     receive: jest.fn((channel: string, handler: Handler) => {
       let onChannel = subscribers.get(channel)
       if (!onChannel) {
