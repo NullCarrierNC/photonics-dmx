@@ -9,6 +9,7 @@ const controllerInit = jest.fn<() => Promise<void>>()
 const controllerShutdown = jest.fn<() => Promise<void>>()
 const closeAllWindows = jest.fn(async () => {})
 const closeWindowsForQuit = jest.fn(async () => true)
+const isQuitting = jest.fn(() => false)
 
 jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test'), quit: jest.fn() },
@@ -22,6 +23,7 @@ jest.mock('../WindowManager', () => ({
     getMainWindow,
     closeAllWindows,
     closeWindowsForQuit,
+    isQuitting,
   })),
 }))
 
@@ -145,6 +147,16 @@ describe('Application activate', () => {
     new Application().handleActivate()
 
     expect(createMainWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens no window while the app closes its windows to quit', () => {
+    getMainWindow.mockReturnValue(null)
+    isQuitting.mockReturnValue(true)
+
+    new Application().handleActivate()
+
+    expect(createMainWindow).not.toHaveBeenCalled()
+    isQuitting.mockReturnValue(false)
   })
 
   it('leaves an open main window where it is', () => {
