@@ -12,6 +12,7 @@ import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types
 import { BeatByte } from '../../listeners/YARG/yargTypes'
 import { buildYargPacket, buildYargShutdownPacket } from '../helpers/yargPacket'
 import { FRAME_KEEPALIVE_MS } from '../../listeners/YARG/yargFrameDispatch'
+import { resetLogConfiguration, setLogSink, setMinLogLevel } from '../../../shared/logger'
 
 function deserializePacket(listener: YargNetworkListener, buffer: Buffer): void {
   ;(listener as unknown as { deserializePacket(buf: Buffer): void }).deserializePacket(buffer)
@@ -222,6 +223,31 @@ describe('YargNetworkListener', () => {
         CueType.Frenzy,
         expect.objectContaining({ lightingCue: CueType.Frenzy }),
       )
+    })
+
+    it('warns once per unrecognised lighting cue value however many frames carry it', () => {
+      const warnings: string[] = []
+      setMinLogLevel('debug')
+      setLogSink((entry) => {
+        if (entry.level === 'warn') warnings.push(entry.message)
+      })
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      const perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      try {
+        for (let i = 0; i < 60; i++) {
+          listener.processCueData({ ...defaultCueData, lightingCue: 'Unknown (99)' })
+          jest.advanceTimersByTime(FRAME_KEEPALIVE_MS + 1)
+        }
+        listener.processCueData({ ...defaultCueData, lightingCue: 'Unknown (98)' })
+      } finally {
+        perfNowSpy.mockRestore()
+        jest.useRealTimers()
+        resetLogConfiguration()
+      }
+
+      expect(warnings.filter((w) => w.includes('Unknown (99)'))).toHaveLength(1)
+      expect(warnings.filter((w) => w.includes('Unknown (98)'))).toHaveLength(1)
     })
 
     it('drops an unrecognised lighting cue value instead of dispatching it', () => {

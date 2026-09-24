@@ -45,6 +45,9 @@ export class YargNetworkListener extends EventEmitter {
   /** One-shot latch for newer-than-known datagram version warnings. */
   private newerVersionWarningEmitted = false
 
+  /** Unknown lighting cue values already warned about this session, each warned about once. */
+  private readonly unknownCuesWarned = new Set<string>()
+
   // Track the last scene to detect transitions
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
     null
@@ -112,6 +115,7 @@ export class YargNetworkListener extends EventEmitter {
     return new Promise<void>((resolve, reject) => {
       this.startBindReject = reject
       this.newerVersionWarningEmitted = false
+      this.unknownCuesWarned.clear()
       this.resetSessionInputState()
       sock.bind(PORT, () => {
         // A stop while the bind was pending has already rejected this start and closed the socket.
@@ -403,7 +407,8 @@ export class YargNetworkListener extends EventEmitter {
         }
         this.inNonDrivingRun = nonDriving
       }
-    } else {
+    } else if (!this.unknownCuesWarned.has(YargCueData.lightingCue)) {
+      this.unknownCuesWarned.add(YargCueData.lightingCue)
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
 
