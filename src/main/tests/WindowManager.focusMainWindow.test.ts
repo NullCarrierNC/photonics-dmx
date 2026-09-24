@@ -89,3 +89,28 @@ describe('WindowManager.focusMainWindow', () => {
     expect(manager.getMainWindow()).toBeNull()
   })
 })
+
+describe.each([
+  ['Cue Editor', 'openCueEditorWindow'],
+  ['Audio Preview', 'openAudioPreviewWindow'],
+] as const)('WindowManager reopening the %s window', (_, open) => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('brings a minimised window back before focusing it', () => {
+    const manager = new WindowManager()
+    manager[open]()
+    const [window] = builtWindows()
+    window.minimized = true
+
+    manager[open]()
+
+    expect(builtWindows()).toHaveLength(1)
+    expect(window.restore).toHaveBeenCalledTimes(1)
+    expect(window.focus).toHaveBeenCalledTimes(1)
+    expect(window.restore.mock.invocationCallOrder[0]).toBeLessThan(
+      window.focus.mock.invocationCallOrder[0],
+    )
+  })
+})

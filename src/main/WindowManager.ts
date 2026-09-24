@@ -329,11 +329,20 @@ export class WindowManager {
     }
   }
 
+  /** Brings a window to the front, restoring it first when it is minimised. */
+  private front(window: BrowserWindow): void {
+    if (window.isMinimized()) {
+      window.restore()
+    }
+    window.show()
+    window.focus()
+  }
+
   /** Fronts the window open in a role, or creates it. */
   private openOrFocus(role: WindowRole): BrowserWindow {
     const window = this.openWindow(role)
     if (window) {
-      window.focus()
+      this.front(window)
       return window
     }
     return this.createWindow(role)
@@ -383,11 +392,7 @@ export class WindowManager {
       this.createMainWindow()
       return
     }
-    if (window.isMinimized()) {
-      window.restore()
-    }
-    window.show()
-    window.focus()
+    this.front(window)
   }
 
   /** Records whether a page holds unsaved changes, as the page reports it. */
