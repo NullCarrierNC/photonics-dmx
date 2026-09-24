@@ -7,7 +7,8 @@ import { jest } from '@jest/globals'
  * `getConsoleModeController()`, `getTestEffectRunner(domain)`, `getListenerLifecycle()` and
  * `getSenderLifecycle()`. The mocks in these suites are flat objects with jest.fn members named
  * after the old delegate methods; this maps each collaborator method back onto the flat member
- * (when the suite defined one, so its assertions keep observing calls) or a fresh jest.fn.
+ * (when the suite defined one, so its assertions keep observing calls) or a fresh jest.fn. A suite
+ * that sets no lifecycle phase runs as `running`.
  */
 export function withCollaboratorGetters<T extends Record<string, unknown>>(mock: T): T {
   const m = mock as Record<string, unknown>
@@ -48,6 +49,9 @@ export function withCollaboratorGetters<T extends Record<string, unknown>>(mock:
         setOpenCaptureWindow: flat('setOpenCaptureWindow'),
       },
     })
+  }
+  if (!('getLifecyclePhase' in m)) {
+    m.getLifecyclePhase = () => 'running'
   }
   if (!('getSenderLifecycle' in m)) {
     m.getSenderLifecycle = () => ({

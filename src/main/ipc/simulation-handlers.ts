@@ -71,15 +71,18 @@ export function setupSimulationHandlers(
     })
 
   // Simulation dispatches through the same chains a live input drives, so simulation requests are
-  // refused while YARG, RB3E or audio is enabled.
+  // refused while YARG, RB3E or audio is enabled, and while the controllers are held failed.
   const liveInput = (): 'YARG' | 'RB3E' | 'Audio' | null => {
     if (controllerManager.getIsRb3Enabled()) return 'RB3E'
     if (controllerManager.getIsYargEnabled()) return 'YARG'
     return controllerManager.getIsAudioEnabled() ? 'Audio' : null
   }
-  const liveInputRefusal = (): { success: false; error: string } | null => {
+  const simulationRefusal = (): { success: false; error: string } | null => {
     const live = liveInput()
-    return live ? { success: false, error: `Disable ${live} before simulating cues` } : null
+    if (live) return { success: false, error: `Disable ${live} before simulating cues` }
+    return controllerManager.getLifecyclePhase() === 'failed'
+      ? { success: false, error: 'Restart the lighting controllers before simulating cues' }
+      : null
   }
 
   handleInvoke(ipcMain, LIGHT.GET_AUDIO_CUE_GROUPS, log, async () => {
@@ -108,7 +111,7 @@ export function setupSimulationHandlers(
 
   handleInvoke(ipcMain, LIGHT.START_TEST_EFFECT, log, async (_, data: unknown) => {
     try {
-      const refused = liveInputRefusal()
+      const refused = simulationRefusal()
       if (refused) return refused
       const request = validateTestEffectPayload(data)
       if (!request.ok) {
@@ -138,7 +141,7 @@ export function setupSimulationHandlers(
   // (same guard as every simulate handler).
   handleInvoke(ipcMain, LIGHT.START_RB3_TEST_EFFECT, log, async (_, data: unknown) => {
     try {
-      const refused = liveInputRefusal()
+      const refused = simulationRefusal()
       if (refused) return refused
       const request = validateTestEffectPayload(data)
       if (!request.ok) {
@@ -163,7 +166,7 @@ export function setupSimulationHandlers(
       data: { red?: unknown; green?: unknown; blue?: unknown; yellow?: unknown; fog?: unknown },
     ) => {
       try {
-        const refused = liveInputRefusal()
+        const refused = simulationRefusal()
         if (refused) return refused
         // Clamp each bank to a valid 8-bit mask; ignore non-numeric input rather than throw.
         const mask = (v: unknown): number => {
@@ -202,7 +205,7 @@ export function setupSimulationHandlers(
     LIGHT.SIMULATE_POST_PROCESSING,
     log,
     async (_, data?: { state?: unknown }) => {
-      if (liveInput() || !controllerManager.getIsInitialized()) return false
+      if (simulationRefusal() || !controllerManager.getIsInitialized()) return false
       const state = data?.state
       if (!isPostProcessingState(state)) {
         log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
@@ -248,7 +251,7 @@ export function setupSimulationHandlers(
       // Answers true once the event fired and false for anything else, a throw included, since the
       // renderer reads the answer as a boolean.
       async (_, data: unknown) => {
-        if (liveInput() || !controllerManager.getIsInitialized()) return false
+        if (simulationRefusal() || !controllerManager.getIsInitialized()) return false
         const context = validateSimulationContextPayload(data)
         if (!context.ok) {
           log.warn(`Refusing a simulated ${timing.what}: ${context.error}`)
@@ -299,7 +302,7 @@ export function setupSimulationHandlers(
       }
       const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup } = payload.value
       const effectId = payload.value.effectId
-      const refused = liveInputRefusal()
+      const refused = simulationRefusal()
       if (refused) return refused
       if (!controllerManager.getIsInitialized()) {
         return { success: false, error: 'Lighting system not initialized' }
@@ -371,7 +374,7 @@ export function setupSimulationHandlers(
     cueDataFor: (groupId: string) => TData,
     remember: (cue: TCue) => void,
   ) {
-    const refused = liveInputRefusal()
+    const refused = simulationRefusal()
     if (refused) return refused
     if (!isPlainObject(data)) {
       return ipcError(new Error('Invalid motion simulation payload'))
