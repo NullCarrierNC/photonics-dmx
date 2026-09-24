@@ -50,7 +50,6 @@ const mockMasterOutput = {
 const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn().mockImplementation(() => Promise.resolve()),
-  refreshActiveRigs: jest.fn(),
   setConsoleFixtureConfig: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
@@ -158,7 +157,6 @@ describe('SAVE_DMX_RIG config propagation', () => {
     const rig = makeRig('rig-1', false)
     await handler({}, rig)
     expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
-    expect(mockControllerManager.refreshActiveRigs).not.toHaveBeenCalled()
   })
 
   it('returns { success: true } on a valid save', async () => {
@@ -228,12 +226,11 @@ describe('DELETE_DMX_RIG propagation', () => {
     expect(mockControllerManager.restartControllers).toHaveBeenCalledTimes(1)
   })
 
-  it('does not call restartControllers or refreshActiveRigs when deleting an inactive rig', async () => {
+  it('does not call restartControllers when deleting an inactive rig', async () => {
     mockConfig.getDmxRig.mockReturnValue({ active: false })
     const handler = handlers.get(CONFIG.DELETE_DMX_RIG)!
     await handler({}, 'rig-1')
     expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
-    expect(mockControllerManager.refreshActiveRigs).not.toHaveBeenCalled()
   })
 
   it('returns { success: true } on a valid delete', async () => {

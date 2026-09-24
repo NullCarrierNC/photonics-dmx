@@ -184,11 +184,6 @@ describe('ControllerGraph teardown steps', () => {
     }
   })
 
-  it('refreshActiveRigs is a no-op without a publisher', () => {
-    const graph = makeGraph()
-    expect(() => graph.refreshActiveRigs()).not.toThrow()
-  })
-
   it('fans motion toggles and manual refs out to every chain handler', () => {
     const graph = makeGraph()
     const yargA = { setMotionEnabled: jest.fn(), setManualMotionRef: jest.fn() }

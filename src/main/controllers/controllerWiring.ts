@@ -49,7 +49,6 @@ export interface ControllerHost {
   pauseYarg(): Promise<void>
   pauseRb3(): Promise<void>
   pauseAudio(): Promise<void>
-  refreshActiveRigs(): void
   restartControllers(): Promise<void>
 }
 
@@ -190,7 +189,6 @@ export function buildControllerCollaborators(
       pauseYarg: () => host.pauseYarg(),
       pauseRb3: () => host.pauseRb3(),
       pauseAudio: () => host.pauseAudio(),
-      refreshActiveRigs: () => host.refreshActiveRigs(),
       restartControllers: () => host.restartControllers(),
     })
 

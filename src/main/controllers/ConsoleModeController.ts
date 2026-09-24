@@ -34,7 +34,6 @@ export interface ConsoleModeControllerDeps {
   pauseYarg: () => Promise<void>
   pauseRb3: () => Promise<void>
   pauseAudio: () => Promise<void>
-  refreshActiveRigs: () => void
   restartControllers: () => Promise<void>
 }
 

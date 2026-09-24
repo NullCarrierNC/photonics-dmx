@@ -90,7 +90,6 @@ describe('console mode follows the page that opened it', () => {
       pauseYarg: async () => {},
       pauseRb3: async () => {},
       pauseAudio: async () => {},
-      refreshActiveRigs: () => {},
       restartControllers: async () => {},
     })
     await consoleMode.enableConsoleMode('rig-1')

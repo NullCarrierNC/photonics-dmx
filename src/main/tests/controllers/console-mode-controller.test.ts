@@ -15,7 +15,6 @@ function baseDeps(
     pauseYarg: () => Promise.resolve(),
     pauseRb3: () => Promise.resolve(),
     pauseAudio: () => Promise.resolve(),
-    refreshActiveRigs: () => {},
     restartControllers: () => Promise.resolve(),
     ...overrides,
   }

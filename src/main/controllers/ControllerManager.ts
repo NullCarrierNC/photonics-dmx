@@ -186,7 +186,6 @@ export class ControllerManager {
       pauseYarg: () => this.listenerLifecycle.yargRb3.disableYarg(),
       pauseRb3: () => this.listenerLifecycle.yargRb3.disableRb3(),
       pauseAudio: () => this.listenerLifecycle.audio.disableAudio(),
-      refreshActiveRigs: () => this.refreshActiveRigs(),
       restartControllers: () => this.restartControllers(),
     }
   }
@@ -468,17 +467,6 @@ export class ControllerManager {
 
   public getIsRb3Enabled(): boolean {
     return this.listenerLifecycle.yargRb3.getIsRb3Enabled()
-  }
-
-  /**
-   * Refresh which rigs are active for DMX output without restarting controllers.
-   * Use this when only the active-rig set changes so senders stay running.
-   */
-  public refreshActiveRigs(): void {
-    if (!this.isInitialized) {
-      return
-    }
-    this.graph.refreshActiveRigs()
   }
 
   /**

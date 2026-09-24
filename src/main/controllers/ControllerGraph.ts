@@ -280,19 +280,6 @@ export class ControllerGraph {
     })
   }
 
-  /**
-   * Refresh which rigs are active for DMX output without restarting controllers.
-   * Use this when only the active-rig set changes so senders stay running.
-   */
-  public refreshActiveRigs(): void {
-    if (!this.dmxPublisher) {
-      return
-    }
-    const activeRigs = this.deps.getConfig().getActiveRigs()
-    this.dmxPublisher.updateActiveRigs(activeRigs)
-    log.info('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
-  }
-
   /** Apply the motion master toggle to every chain's YARG and RB3 handlers. */
   public setMotionEnabledOnChains(enabled: boolean): void {
     for (const chain of this.rigChains) {

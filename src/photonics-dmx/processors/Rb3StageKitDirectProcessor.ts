@@ -101,9 +101,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Synchronise `this.rigs` with the current chain list. Constructs a new rig processor
    * for chains that joined; disposes processors for chains that left. Chains whose light
    * count is below StageKit's 4-light minimum are skipped with a warning so a misconfigured
-   * rig can't break RB3 on its siblings.
-   *
-   * Public via `refreshRigs()` so future `refreshActiveRigs` integration can call it.
+   * rig can't break RB3 on its siblings. Public via `refreshRigs()`.
    */
   private rebuildRigProcessorsFromChains(): void {
     const chains = this.chainFanout.getChains()
@@ -140,9 +138,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     }
   }
 
-  /** Public entry point for re-syncing the rig processors with the chain list — used by
-   *  the listener controller after `refreshActiveRigs` so rig add/remove takes effect
-   *  without restarting controllers. Idempotent. */
+  /** Public entry point for re-syncing the rig processors with the chain list. Idempotent. */
   public refreshRigs(): void {
     this.rebuildRigProcessorsFromChains()
   }

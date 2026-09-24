@@ -62,7 +62,6 @@ const mockConfig = {
 const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn(async () => {}),
-  refreshActiveRigs: jest.fn(),
   setMotionEnabledGlobal: jest.fn(),
   setActiveAudioMotionCueRef: jest.fn(),
   setActiveYargMotionCueRef: jest.fn(),
