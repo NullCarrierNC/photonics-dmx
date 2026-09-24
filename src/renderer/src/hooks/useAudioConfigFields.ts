@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useDebouncedSave } from './useDebouncedSave'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -9,9 +8,6 @@ import { createLogger } from '../../../shared/logger'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 
 const log = createLogger('useAudioConfigFields')
-
-/** How long a burst of changes has to go quiet before saveSoon writes. */
-const SAVE_QUIET_MS = 300
 
 export interface AudioSaveOutcome {
   /** False when the save threw or main refused it, in which case the old values are back. */
@@ -37,8 +33,6 @@ export interface AudioConfigFields<T> {
    * commit that follows puts back the value from before the first `set` if it is refused.
    */
   set: (patch: Partial<T>) => void
-  /** Apply a change locally and persist it once the changes stop arriving. */
-  saveSoon: (patch: Partial<T>, quietMs?: number) => void
   /** Persist whatever is currently held locally. */
   commit: () => Promise<AudioSaveOutcome>
 }
@@ -69,10 +63,6 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   const loading = useRef<Promise<void> | null>(null)
   // The value each field had before `set` first moved it, which a refused save or commit puts back.
   const unsaved = useRef<Partial<T>>({})
-  // A debounced save holds the values from before the burst began, so a revert goes back to what
-  // was stored rather than to the middle of a drag, along with the fields it touched.
-  const burstPrevious = useRef<T | null>(null)
-  const burstFields = useRef<Set<K>>(new Set())
 
   const apply = useCallback((patch: Partial<T>): T => {
     const next = { ...latest.current, ...patch }
@@ -110,11 +100,19 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   }, [apply, owned])
 
   // Main pushes the whole config when something else changes it, so the panel follows rather than
-  // showing a value the engine is no longer using.
+  // showing a value the engine is no longer using. A field mid-drag keeps the value being dragged,
+  // and the pushed value becomes the one a refused save of it puts back.
   useEffect(
     () =>
       registerIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, (config) => {
-        apply(owned(config))
+        const pushed = owned(config)
+        for (const key of Object.keys(pushed) as K[]) {
+          if (key in unsaved.current) {
+            unsaved.current[key] = pushed[key]
+            delete pushed[key]
+          }
+        }
+        apply(pushed)
       }),
     [apply, owned],
   )
@@ -185,45 +183,10 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     [apply],
   )
 
-  /** Write what the burst left behind, putting back only the fields it touched if that is refused. */
-  const writeBurst = useCallback(async (): Promise<void> => {
-    if (burstPrevious.current === null) {
-      return
-    }
-    const before = burstPrevious.current
-    const touched = [...burstFields.current]
-    burstPrevious.current = null
-    burstFields.current = new Set()
-    const revert = {} as Partial<T>
-    for (const key of touched) {
-      revert[key] = before[key]
-    }
-    await loading.current
-    await persist(latest.current, revert)
-  }, [persist])
-
-  const burstSaver = useDebouncedSave<void>(writeBurst, { quietMs: SAVE_QUIET_MS })
-
-  const saveSoon = useCallback(
-    (patch: Partial<T>, quietMs: number = SAVE_QUIET_MS): void => {
-      if (burstPrevious.current === null) {
-        burstPrevious.current = latest.current
-      }
-      for (const key of Object.keys(patch) as K[]) {
-        burstFields.current.add(key)
-      }
-      apply(patch)
-      // The values to write are held on the panel's own state, so the burst carries no value of
-      // its own, only the fact that one is due.
-      burstSaver.saveSoon(undefined, quietMs)
-    },
-    [apply, burstSaver],
-  )
-
   const commit = useCallback(async (): Promise<AudioSaveOutcome> => {
     await loading.current
     return persist(latest.current, takeRevert(Object.keys(unsaved.current) as K[]))
   }, [persist, takeRevert])
 
-  return { values, isSaving, saveError, loaded, save, set, saveSoon, commit }
+  return { values, isSaving, saveError, loaded, save, set, commit }
 }

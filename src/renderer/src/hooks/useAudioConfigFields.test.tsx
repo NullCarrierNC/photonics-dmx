@@ -48,14 +48,6 @@ function Panel(): JSX.Element {
       <button onClick={() => audio.set({ sensitivity: 3 })}>set</button>
       <button onClick={() => audio.set({ sensitivity: 3.5 })}>set more</button>
       <button onClick={() => void audio.commit()}>commit</button>
-      <button
-        onClick={() => {
-          audio.saveSoon({ sensitivity: 5 }, 20)
-          audio.saveSoon({ sensitivity: 6 }, 20)
-          audio.saveSoon({ sensitivity: 7 }, 20)
-        }}>
-        drag
-      </button>
     </div>
   )
 }
@@ -209,35 +201,6 @@ describe('useAudioConfigFields', () => {
     )
   })
 
-  it('writes once when a burst of changes goes quiet', async () => {
-    getAudioConfig.mockImplementation(async () =>
-      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
-    )
-    render(<Panel />)
-    await waitFor(() => expect(sensitivity()).toBe('1.5'))
-
-    fireEvent.click(screen.getByText('drag'))
-    expect(sensitivity()).toBe('7')
-
-    await waitFor(() =>
-      expect(saveAudioConfig).toHaveBeenCalledWith({ sensitivity: 7, noiseFloor: 60 }),
-    )
-    expect(saveAudioConfig).toHaveBeenCalledTimes(1)
-  })
-
-  it('puts the values from before a burst back when its save is refused', async () => {
-    getAudioConfig.mockImplementation(async () =>
-      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
-    )
-    saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
-    render(<Panel />)
-    await waitFor(() => expect(sensitivity()).toBe('1.5'))
-
-    fireEvent.click(screen.getByText('drag'))
-
-    await waitFor(() => expect(sensitivity()).toBe('1.5'))
-  })
-
   it('reports a warning main sent back with the save', async () => {
     saveAudioConfig.mockImplementation(async () => ({ success: true, warning: 'capture stopped' }))
     let outcome: AudioSaveOutcome | undefined
@@ -296,20 +259,32 @@ describe('useAudioConfigFields', () => {
     expect(screen.getByTestId('noiseFloor').textContent).toBe('120')
   })
 
-  it('writes a pending burst on the way out rather than dropping it', async () => {
+  it('keeps a field mid-drag when main pushes a config', async () => {
     render(<Panel />)
     await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+    fireEvent.click(screen.getByText('set'))
 
-    fireEvent.click(screen.getByText('drag'))
-    expect(saveAudioConfig).not.toHaveBeenCalled()
-
-    await act(async () => {
-      cleanup()
+    act(() => {
+      emitIpc(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, { sensitivity: 0.9, noiseFloor: 120 })
     })
 
-    await waitFor(() =>
-      expect(saveAudioConfig).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 7 })),
-    )
+    expect(sensitivity()).toBe('3')
+    expect(screen.getByTestId('noiseFloor').textContent).toBe('120')
+  })
+
+  it('puts back the pushed value when the drag it arrived during is refused', async () => {
+    saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
+    render(<Panel />)
+    await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+    fireEvent.click(screen.getByText('set'))
+    act(() => {
+      emitIpc(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, { sensitivity: 0.9, noiseFloor: 60 })
+    })
+
+    fireEvent.click(screen.getByText('commit'))
+
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalled())
+    await waitFor(() => expect(sensitivity()).toBe('0.9'))
   })
 
   it('puts back only the field whose save was refused', async () => {
