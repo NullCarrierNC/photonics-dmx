@@ -95,6 +95,19 @@ describe('AudioSensitivityControls', () => {
     )
   })
 
+  it('puts the slider back and says so when the gain a drag ended on is refused', async () => {
+    saveAudioConfig.mockResolvedValue({ success: false, error: 'disk full' } as never)
+    const slider = await renderControls()
+    await waitFor(() => expect(slider).not.toBeDisabled())
+
+    fireEvent.change(slider, { target: { value: '3' } })
+    fireEvent.change(slider, { target: { value: '4.5' } })
+    fireEvent.pointerUp(slider)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save the audio settings.')
+    expect(slider.value).toBe('2.5')
+  })
+
   it('shows a gain as it is typed and stores it once the box is left', async () => {
     await renderControls()
     const box = screen.getByLabelText('Global sensitivity numeric') as HTMLInputElement

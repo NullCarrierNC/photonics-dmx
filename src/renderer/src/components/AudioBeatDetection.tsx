@@ -2,6 +2,7 @@ import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioBeatDetection: React.FC = () => {
   const audio = useAudioConfigFields({
@@ -162,6 +163,7 @@ const AudioBeatDetection: React.FC = () => {
       </div>
 
       {isSaving && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Saving...</p>}
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioSmoothingSettings: React.FC = () => {
   const audio = useAudioConfigFields({ smoothing: { enabled: true, alpha: 0.7 } })
@@ -98,6 +99,7 @@ const AudioSmoothingSettings: React.FC = () => {
       )}
 
       {isSaving && <p className="text-xs text-gray-500 dark:text-gray-400">Saving...</p>}
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

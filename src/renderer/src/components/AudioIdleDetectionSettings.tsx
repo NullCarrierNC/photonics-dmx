@@ -9,6 +9,7 @@ import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 const log = createLogger('AudioIdleDetectionSettings')
 
 const COLORS: Color[] = [
@@ -191,6 +192,7 @@ const AudioIdleDetectionSettings: React.FC = () => {
           </select>
         </div>
       </div>
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

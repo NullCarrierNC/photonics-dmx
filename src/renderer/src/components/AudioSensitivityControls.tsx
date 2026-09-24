@@ -2,6 +2,7 @@ import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { DraftNumberField } from './controls/DraftField'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 interface AudioSensitivityControlsProps {
   /** Omit long helper copy (e.g. DMX Preview quick controls). */
@@ -174,7 +175,12 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
   )
 
   if (!compact) {
-    return <div className="space-y-4">{levels}</div>
+    return (
+      <div className="space-y-4">
+        {levels}
+        <SaveErrorAlert message={audio.saveError} />
+      </div>
+    )
   }
 
   return (
@@ -224,6 +230,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
           onCommit={(value) => void audio.save({ strobeProbability: value })}
         />
       </div>
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

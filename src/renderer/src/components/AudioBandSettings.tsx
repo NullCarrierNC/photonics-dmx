@@ -14,6 +14,7 @@ import {
   AUDIO_BAND_GAIN_MIN,
   type AudioBandDefinition,
 } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const PRESET_OPTIONS = (() => {
   const copy = [...AUDIO_BAND_PRESETS]
@@ -197,6 +198,7 @@ const AudioBandSettings: React.FC = () => {
           Reset to Rhythm Game preset
         </button>
       </div>
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }

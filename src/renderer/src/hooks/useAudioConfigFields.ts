@@ -4,6 +4,7 @@ import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { wasRefused } from '../ipc/ipcResult'
+import { saveFailureMessage } from '../ipc/persistPrefs'
 import { createLogger } from '../../../shared/logger'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 
@@ -25,11 +26,16 @@ export interface AudioConfigFields<T> {
   values: T
   /** True while a save is in flight, so a panel can hold its controls. */
   isSaving: boolean
+  /** What to show when the last save was refused or threw, null once one lands. */
+  saveError: string | null
   /** Whether the stored config has been read yet. */
   loaded: boolean
   /** Apply a change locally and persist it, putting the old values back if the save fails. */
   save: (patch: Partial<T>) => Promise<AudioSaveOutcome>
-  /** Apply a change locally without persisting, for controls that commit on release. */
+  /**
+   * Apply a change locally without persisting, for controls that commit on release. The save or
+   * commit that follows puts back the value from before the first `set` if it is refused.
+   */
   set: (patch: Partial<T>) => void
   /** Apply a change locally and persist it once the changes stop arriving. */
   saveSoon: (patch: Partial<T>, quietMs?: number) => void
@@ -53,6 +59,7 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
 
   const [values, setValues] = useState<T>(defaults)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   // The values every callback works from, so none of them depend on the render they were made in.
   const latest = useRef<T>(defaults)
@@ -60,6 +67,8 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   // field list is what matters, and that does not change.
   const fields = useRef(Object.keys(defaults) as K[])
   const loading = useRef<Promise<void> | null>(null)
+  // The value each field had before `set` first moved it, which a refused save or commit puts back.
+  const unsaved = useRef<Partial<T>>({})
   // A debounced save holds the values from before the burst began, so a revert goes back to what
   // was stored rather than to the middle of a drag, along with the fields it touched.
   const burstPrevious = useRef<T | null>(null)
@@ -119,17 +128,20 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
    */
   const persist = useCallback(async (next: T, revert: Partial<T>): Promise<AudioSaveOutcome> => {
     setIsSaving(true)
+    setSaveError(null)
     try {
       const result = await saveAudioConfig(next)
       if (wasRefused(result)) {
         log.error('Audio settings were refused:', result.error)
         apply(revert)
+        setSaveError(saveFailureMessage('the audio settings'))
         return { ok: false, error: result.error }
       }
       return { ok: true, warning: result?.warning }
     } catch (error) {
       log.error('Failed to save audio settings:', error)
       apply(revert)
+      setSaveError(saveFailureMessage('the audio settings'))
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     } finally {
       setIsSaving(false)
@@ -138,11 +150,16 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** The current values of the named fields, as the patch that would put them back. */
-  const snapshotOf = useCallback((keys: Iterable<K>): Partial<T> => {
+  /**
+   * The values the named fields had before this change, as the patch that would put them back: the
+   * value from before a field's first `set`, or its current value when nothing has set it since.
+   * The fields leave the unsaved record, since the write about to run covers them.
+   */
+  const takeRevert = useCallback((keys: Iterable<K>): Partial<T> => {
     const taken = {} as Partial<T>
     for (const key of keys) {
-      taken[key] = latest.current[key]
+      taken[key] = key in unsaved.current ? unsaved.current[key] : latest.current[key]
+      delete unsaved.current[key]
     }
     return taken
   }, [])
@@ -150,14 +167,19 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   const save = useCallback(
     async (patch: Partial<T>): Promise<AudioSaveOutcome> => {
       await loading.current
-      const revert = snapshotOf(Object.keys(patch) as K[])
+      const revert = takeRevert(Object.keys(patch) as K[])
       return persist(apply(patch), revert)
     },
-    [apply, persist, snapshotOf],
+    [apply, persist, takeRevert],
   )
 
   const set = useCallback(
     (patch: Partial<T>): void => {
+      for (const key of Object.keys(patch) as K[]) {
+        if (!(key in unsaved.current)) {
+          unsaved.current[key] = latest.current[key]
+        }
+      }
       apply(patch)
     },
     [apply],
@@ -200,9 +222,8 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
 
   const commit = useCallback(async (): Promise<AudioSaveOutcome> => {
     await loading.current
-    // Nothing to put back: a commit writes what the panel already shows.
-    return persist(latest.current, {})
-  }, [persist])
+    return persist(latest.current, takeRevert(Object.keys(unsaved.current) as K[]))
+  }, [persist, takeRevert])
 
-  return { values, isSaving, loaded, save, set, saveSoon, commit }
+  return { values, isSaving, saveError, loaded, save, set, saveSoon, commit }
 }

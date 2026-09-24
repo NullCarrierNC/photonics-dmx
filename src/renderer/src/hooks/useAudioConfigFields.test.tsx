@@ -42,9 +42,11 @@ function Panel(): JSX.Element {
       <span data-testid="sensitivity">{audio.values.sensitivity}</span>
       <span data-testid="noiseFloor">{audio.values.noiseFloor}</span>
       <span data-testid="saving">{String(audio.isSaving)}</span>
+      <span data-testid="error">{audio.saveError ?? ''}</span>
       <button onClick={() => void audio.save({ sensitivity: 4 })}>save</button>
       <button onClick={() => void audio.save({ noiseFloor: 30 })}>save floor</button>
       <button onClick={() => audio.set({ sensitivity: 3 })}>set</button>
+      <button onClick={() => audio.set({ sensitivity: 3.5 })}>set more</button>
       <button onClick={() => void audio.commit()}>commit</button>
       <button
         onClick={() => {
@@ -127,6 +129,70 @@ describe('useAudioConfigFields', () => {
     fireEvent.click(screen.getByText('save'))
 
     await waitFor(() => expect(sensitivity()).toBe('1.5'))
+  })
+
+  it('puts the value from before a drag back when the save on release is refused', async () => {
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
+    saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
+    render(<Panel />)
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+
+    fireEvent.click(screen.getByText('set'))
+    fireEvent.click(screen.getByText('set more'))
+    fireEvent.click(screen.getByText('save'))
+
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalled())
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+  })
+
+  it('puts the value from before a drag back when its commit is refused', async () => {
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
+    saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
+    render(<Panel />)
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+
+    fireEvent.click(screen.getByText('set'))
+    fireEvent.click(screen.getByText('set more'))
+    fireEvent.click(screen.getByText('commit'))
+
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalled())
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+  })
+
+  it('reverts to the value the last commit stored', async () => {
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
+    render(<Panel />)
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+    fireEvent.click(screen.getByText('set'))
+    fireEvent.click(screen.getByText('commit'))
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalledTimes(1))
+
+    saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
+    fireEvent.click(screen.getByText('set more'))
+    fireEvent.click(screen.getByText('commit'))
+
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(sensitivity()).toBe('3'))
+  })
+
+  it('says a save failed until the next one lands', async () => {
+    saveAudioConfig.mockImplementationOnce(async () => ({ success: false, error: 'nope' }))
+    render(<Panel />)
+    await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('error').textContent).toBe('Could not save the audio settings.'),
+    )
+
+    fireEvent.click(screen.getByText('save floor'))
+    await waitFor(() => expect(screen.getByTestId('error').textContent).toBe(''))
   })
 
   it('holds a local change until it is committed', async () => {

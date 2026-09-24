@@ -1,6 +1,7 @@
 import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioStrobeSettings: React.FC = () => {
   const audio = useAudioConfigFields({
@@ -137,6 +138,7 @@ const AudioStrobeSettings: React.FC = () => {
           </div>
         </div>
       </div>
+      <SaveErrorAlert message={audio.saveError} />
     </div>
   )
 }
