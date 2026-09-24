@@ -123,20 +123,11 @@ const bindings: CueDomainRegistryBinding[] = [
     ...cueDomainStorage('audio'),
     applyStartupSettings: (config) => {
       const registry = AudioCueRegistry.getInstance()
-      const enabledGroupIds = config.getPreference('cueDomains').audio.enabledGroups
-      if (enabledGroupIds && enabledGroupIds.length > 0) {
-        registry.setEnabledGroups(enabledGroupIds)
-        log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
-      } else {
-        const allGroups = registry.getAllGroups()
-        registry.setEnabledGroups(allGroups)
-        if (allGroups.length > 0) {
-          config
-            .updateCueDomain('audio', { enabledGroups: allGroups })
-            .catch((err) => log.error('Failed to persist default audio enabled groups:', err))
-        }
-        log.info('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
-      }
+      // An empty selection is one the user chose, so it is applied as it is. First-run defaults
+      // come from the reconcile, which enables every group it has not seen before.
+      const enabledGroupIds = config.getPreference('cueDomains').audio.enabledGroups ?? []
+      registry.setEnabledGroups(enabledGroupIds)
+      log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
       registry.setDisabledCues(config.getPreference('cueDomains').audio.disabledCues)
     },
   },
