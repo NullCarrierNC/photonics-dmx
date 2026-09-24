@@ -51,6 +51,7 @@ describe('preload IPC channel allowlist (M-11)', () => {
 
   it('allows EVERY channel of EVERY group (groups share key names, so a key-merged set loses values)', async () => {
     const groups = { NODE_CUES, EFFECTS, RIGS, WINDOW, SHELL, LIFECYCLE, CUE, LIGHT, CONFIG }
+    const sendOnly: readonly string[] = ALL_SEND_CHANNELS
     for (const [groupName, group] of Object.entries(groups)) {
       for (const channel of Object.values(group)) {
         // Completeness of the shared union constant...
@@ -59,10 +60,20 @@ describe('preload IPC channel allowlist (M-11)', () => {
           channel,
           allowed: true,
         })
-        // ...and of the live preload allowlist built from it.
-        await expect(api.invoke(channel, undefined)).resolves.toBe('ok')
+        // ...and of the live preload allowlist built from it, which leaves out the send channels.
+        if (!sendOnly.includes(channel)) {
+          await expect(api.invoke(channel, undefined)).resolves.toBe('ok')
+        }
       }
     }
+  })
+
+  it('rejects invoke on every send-only channel without reaching ipcRenderer', async () => {
+    ipcRenderer.invoke.mockClear()
+    for (const channel of ALL_SEND_CHANNELS) {
+      await expect(api.invoke(channel, undefined)).rejects.toThrow('Unknown IPC channel')
+    }
+    expect(ipcRenderer.invoke).not.toHaveBeenCalled()
   })
 
   it('rejects invoke on an unknown channel without reaching ipcRenderer', async () => {

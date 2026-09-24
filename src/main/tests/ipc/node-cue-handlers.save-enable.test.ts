@@ -45,7 +45,10 @@ describe('node-cue save opts the saved group in', () => {
         Object.assign(stored[domain], patch)
       }),
     }
-    const loader = { saveFile: jest.fn(async () => ({ success: true })) }
+    const loader = {
+      saveFile: jest.fn(async () => ({ success: true })),
+      getModes: () => ['yarg', 'audio', 'rb3'],
+    }
     const controllerManager = {
       getConfig: () => config,
       getNodeCueLoader: () => loader,
@@ -83,7 +86,10 @@ describe('node-cue save opts the saved group in', () => {
         throw new Error('Failed to save configuration: disk full')
       }),
     }
-    const loader = { saveFile: jest.fn(async () => ({ success: true, path: '/cues/yarg/f.json' })) }
+    const loader = {
+      saveFile: jest.fn(async () => ({ success: true, path: '/cues/yarg/f.json' })),
+      getModes: () => ['yarg', 'audio', 'rb3'],
+    }
     const controllerManager = {
       getConfig: () => config,
       getNodeCueLoader: () => loader,

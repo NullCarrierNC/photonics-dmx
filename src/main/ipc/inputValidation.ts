@@ -50,7 +50,14 @@ export {
   validateLightingConfiguration,
   validateDmxRigPayload,
   validateDmxFixturesArray,
+  validateRigId,
 } from './validation/fixtureValidation'
+
+export {
+  validateNodeCueSavePayload,
+  validateEffectSavePayload,
+  validateCueTypesPayload,
+} from './validation/cueFileValidation'
 
 export { validateOpenablePath, validatePathUnderAllowedRoots } from './validation/pathValidation'
 

@@ -3,13 +3,14 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
 import { ipcError, validationRefusal } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
+import { validateCueTypesPayload, validateNodeCueSavePayload } from './inputValidation'
 
 const log = createLogger('node-cue-handlers')
 
@@ -19,12 +20,6 @@ const ensureLoader = (controllerManager: ControllerManager) => {
     throw new Error('Node cue loader is not initialized.')
   }
   return loader
-}
-
-interface SavePayload {
-  mode: NodeCueMode
-  filename: string
-  content: NodeCueFile
 }
 
 interface ValidatePayload {
@@ -73,8 +68,13 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return loader.readFile(filePath)
   })
 
-  handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, payload: SavePayload) => {
+  handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, data: unknown) => {
     const loader = ensureLoader(controllerManager)
+    const validation = validateNodeCueSavePayload(data, loader.getModes())
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const payload = validation.value
     const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
     try {
       await persistGroupEnableAfterNodeCueSave(
@@ -116,15 +116,14 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
   })
 
-  handleInvoke(
-    ipcMain,
-    NODE_CUES.GET_CUE_TYPES,
-    log,
-    async (_event, payload: { mode: NodeCueMode; kind?: NodeCueKind }) => {
-      const loader = ensureLoader(controllerManager)
-      return loader.getAvailableCueTypes(payload.mode, payload.kind)
-    },
-  )
+  handleInvoke(ipcMain, NODE_CUES.GET_CUE_TYPES, log, async (_event, data: unknown) => {
+    const loader = ensureLoader(controllerManager)
+    const validation = validateCueTypesPayload(data, loader.getModes())
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    return loader.getAvailableCueTypes(validation.value.mode, validation.value.kind)
+  })
 
   handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: NodeCueMode) => {
     const result = await dialog.showOpenDialog({

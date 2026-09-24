@@ -9,6 +9,7 @@ import {
   validateLightingConfiguration,
   validateDmxFixturesArray,
   validateDmxRigPayload,
+  validateRigId,
 } from '../inputValidation'
 import {
   buildRigExportFile,
@@ -86,7 +87,12 @@ export function registerLightsRigsConfigHandlers(
     }
   })
 
-  handleInvoke(ipcMain, CONFIG.GET_DMX_RIG, log, async (_, id: string) => {
+  handleInvoke(ipcMain, CONFIG.GET_DMX_RIG, log, async (_, data: unknown) => {
+    const validation = validateRigId(data)
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const id = validation.value
     try {
       return controllerManager.getConfig().getDmxRig(id)
     } catch (error) {
@@ -128,7 +134,12 @@ export function registerLightsRigsConfigHandlers(
     return { success: true }
   })
 
-  handleInvoke(ipcMain, CONFIG.DELETE_DMX_RIG, log, async (_, id: string) => {
+  handleInvoke(ipcMain, CONFIG.DELETE_DMX_RIG, log, async (_, data: unknown) => {
+    const validation = validateRigId(data)
+    if (!validation.ok) {
+      return { success: false, error: validation.error }
+    }
+    const id = validation.value
     const config = controllerManager.getConfig()
     const rig = config.getDmxRig(id)
     const wasActive = rig?.active ?? false

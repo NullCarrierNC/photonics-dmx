@@ -16,21 +16,25 @@ import {
   validateCueGroupSelectionMode,
   validateCueRefPayload,
   validateCueType,
+  validateCueTypesPayload,
   validateDisabledCuesMap,
   validateDmxFixturesArray,
   validateDmxRigPayload,
+  validateEffectSavePayload,
   validateLightingConfiguration,
   validateMotionSelectionMode,
+  validateNodeCueSavePayload,
   validateNumberInRange,
   validateOptionalStringArray,
   validatePathUnderAllowedRoots,
   validatePreferencesPayload,
+  validateRigId,
   validateSenderEnablePayload,
   validateStageKitPriority,
   validateTestEffectPayload,
 } from '../../ipc/inputValidation'
 import type { IpcInvokeMap } from '../../../shared/ipcTypes'
-import { CONFIG, LIGHT, SHELL } from '../../../shared/ipcChannels'
+import { CONFIG, EFFECTS, LIGHT, NODE_CUES, SHELL } from '../../../shared/ipcChannels'
 
 type ValidatorOk<F> = F extends (
   ...args: never[]
@@ -206,6 +210,36 @@ type ValidatorMapAlignment = [
       IpcInvokeMap[typeof LIGHT.START_RB3_TEST_EFFECT]['request']
     >
   >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateNodeCueSavePayload>,
+      IpcInvokeMap[typeof NODE_CUES.SAVE]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateCueTypesPayload>,
+      IpcInvokeMap[typeof NODE_CUES.GET_CUE_TYPES]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateEffectSavePayload>,
+      IpcInvokeMap[typeof EFFECTS.SAVE]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateRigId>,
+      IpcInvokeMap[typeof CONFIG.GET_DMX_RIG]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateRigId>,
+      IpcInvokeMap[typeof CONFIG.DELETE_DMX_RIG]['request']
+    >
+  >,
 ]
 
 describe('IpcInvokeMap ↔ inputValidation contract', () => {
@@ -240,7 +274,12 @@ describe('IpcInvokeMap ↔ inputValidation contract', () => {
       true,
       true,
       true,
+      true,
+      true,
+      true,
+      true,
+      true,
     ]
-    expect(_alignmentProof).toHaveLength(27)
+    expect(_alignmentProof).toHaveLength(32)
   })
 })

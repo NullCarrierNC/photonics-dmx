@@ -75,6 +75,11 @@ export abstract class BaseNodeFileLoader<
     }
   }
 
+  /** The mode discriminants this loader handles, which IPC payloads are checked against. */
+  public getModes(): readonly TMode[] {
+    return this.modes
+  }
+
   // ---- per-loader specifics -------------------------------------------------
 
   /** Parse, validate and register a single file; returns its summary. */
