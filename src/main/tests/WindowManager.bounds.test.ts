@@ -146,6 +146,31 @@ describe('WindowManager saving geometry as the window moves', () => {
       expect(saved).toEqual([{ windowState: { x: 300, y: 200, width: 1000, height: 800 } }])
     },
   )
+
+  it('saves geometry still settling when the window closes', async () => {
+    const saved: Array<Record<string, unknown>> = []
+    const wm = new WindowManager()
+    wm.setControllerManager({
+      getConfig: () => ({
+        getPreference: () => undefined,
+        updatePreferences: async (updates: Record<string, unknown>) => {
+          saved.push(updates)
+        },
+      }),
+    } as never)
+    wm.openCueEditorWindow()
+    const editor = lastWindow()
+    editor.bounds = { x: 300, y: 200, width: 1200, height: 900 }
+
+    editor.emit('moved')
+    await jest.advanceTimersByTimeAsync(100)
+    editor.emit('close')
+    editor.destroyed = true
+    editor.emit('closed')
+    await jest.advanceTimersByTimeAsync(1000)
+
+    expect(saved).toEqual([{ cueEditorWindowState: { x: 300, y: 200, width: 1200, height: 900 } }])
+  })
 })
 
 describe('WindowManager DevTools', () => {

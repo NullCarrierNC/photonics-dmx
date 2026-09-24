@@ -148,6 +148,17 @@ export class WindowManager {
     )
   }
 
+  /** Saves a window's geometry now when a save is waiting for it to settle. */
+  private flushSave(role: WindowRole): void {
+    const pending = this.saveTimers.get(role)
+    if (!pending) {
+      return
+    }
+    clearTimeout(pending)
+    this.saveTimers.delete(role)
+    void this.saveWindowState(role)
+  }
+
   /**
    * The saved geometry for a role, kept on screen, or its default size centred in the primary work
    * area. A saved window always has a position, so a stored size without one was never the user's
@@ -200,6 +211,8 @@ export class WindowManager {
     window.on('moved', save)
     window.on('resize', save)
     window.on('move', save)
+    // The last chance to read the geometry, so a save still waiting to settle runs now.
+    window.on('close', () => this.flushSave(role))
     window.on('ready-to-show', () => window.show())
     const webContentsId = window.webContents.id
     window.on('closed', () => {
