@@ -3,7 +3,7 @@
  * The idle-detection times that decide when a quiet room stops counting as a performance.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
@@ -57,6 +57,22 @@ describe('AudioIdleDetectionSettings', () => {
           idleDetection: expect.objectContaining({ minIdleSeconds: 30 }),
         }),
       ),
+    )
+  })
+
+  it('stores the threshold once the slider is let go, however long it is held', async () => {
+    await renderPanel()
+    const slider = screen.getByRole('slider')
+
+    fireEvent.change(slider, { target: { value: '30' } })
+    fireEvent.change(slider, { target: { value: '40' } })
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    expect(saveAudioConfig).not.toHaveBeenCalled()
+
+    fireEvent.pointerUp(slider)
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalledTimes(1))
+    expect(saveAudioConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ idleDetection: expect.objectContaining({ thresholdPct: 40 }) }),
     )
   })
 

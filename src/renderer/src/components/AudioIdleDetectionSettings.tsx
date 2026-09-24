@@ -6,6 +6,7 @@ import { getAudioGameMode } from '../ipcApi'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { DEFAULT_AUDIO_IDLE_DETECTION } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioIdleDetectionSettings')
@@ -59,6 +60,7 @@ const AudioIdleDetectionSettings: React.FC = () => {
   const write = (patch: Partial<typeof idle>): void => {
     void audio.save({ idleDetection: { ...idle, ...patch } })
   }
+  const thresholdRelease = useCommitOnRelease(() => void audio.commit())
 
   if (!audio.loaded) {
     return <p className="text-sm text-gray-600 dark:text-gray-400">Loading idle detection…</p>
@@ -105,14 +107,16 @@ const AudioIdleDetectionSettings: React.FC = () => {
           className="w-full max-w-md h-2 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           value={idle.thresholdPct}
           disabled={fieldsDisabled}
-          onChange={(e) =>
-            audio.saveSoon({
+          onChange={(e) => {
+            audio.set({
               idleDetection: {
                 ...idle,
                 thresholdPct: Math.max(0, Math.min(100, Math.round(Number(e.target.value)))),
               },
             })
-          }
+            thresholdRelease.changed()
+          }}
+          {...thresholdRelease.props}
         />
       </div>
 
