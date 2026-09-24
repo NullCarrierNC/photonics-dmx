@@ -9,7 +9,9 @@ import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import {
+  enttecProComPortAtom,
   lightingPrefsAtom,
+  openDmxComPortAtom,
   senderArtNetEnabledAtom,
   senderEnttecProEnabledAtom,
   senderOpenDmxEnabledAtom,
@@ -630,6 +632,55 @@ describe('DmxOutputSettings Enttec Pro refresh rate', () => {
     await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
     expect(updateEnttecConfigMock).not.toHaveBeenCalled()
     expect(store.get(lightingPrefsAtom).enttecProConfig).toEqual({ port: 'COM7', dmxSpeed: 40 })
+  })
+})
+
+describe('DmxOutputSettings serial ports', () => {
+  it('hands the Enttec Pro toggle a port only once it is stored', async () => {
+    const release = holdFirstPrefsWrite()
+    const store = await renderPanel({
+      dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
+      dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
+      enttecProConfig: { port: 'COM7', dmxSpeed: 40 },
+    })
+
+    commit(screen.getByPlaceholderText('COM3'), 'COM9')
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect(store.get(enttecProComPortAtom)).toBe('COM7')
+
+    await release()
+    await waitFor(() => expect(store.get(enttecProComPortAtom)).toBe('COM9'))
+  })
+
+  it('hands the OpenDMX toggle a port only once it is stored', async () => {
+    const release = holdFirstPrefsWrite()
+    const store = await renderPanel({
+      dmxOutputConfig: outputConfig({ openDmxEnabled: true }),
+      dmxSettingsPrefs: expansion({ openDmxExpanded: true }),
+      openDmxConfig: { port: 'COM5', dmxSpeed: 30 },
+    })
+
+    commit(screen.getByPlaceholderText('COM4'), 'COM8')
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect(store.get(openDmxComPortAtom)).toBe('COM5')
+
+    await release()
+    await waitFor(() => expect(store.get(openDmxComPortAtom)).toBe('COM8'))
+  })
+
+  it('keeps the stored port for the toggle when the port save is refused', async () => {
+    savePrefsMock.mockResolvedValueOnce({ success: false, error: 'disk full' })
+    const store = await renderPanel({
+      dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
+      dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
+      enttecProConfig: { port: 'COM7', dmxSpeed: 40 },
+    })
+
+    commit(screen.getByPlaceholderText('COM3'), 'COM9')
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    await act(async () => {})
+    expect(store.get(enttecProComPortAtom)).toBe('COM7')
   })
 })
 

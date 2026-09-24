@@ -108,7 +108,8 @@ const DmxOutputSettings: React.FC = () => {
   )
 
   /**
-   * Persists Enttec port/rate atomically and pushes the merged config to main. The push goes out
+   * Persists Enttec port/rate atomically and pushes the merged config to main. The port atom the
+   * Status toggle starts the sender from takes the port once it is stored. The push goes out
    * whether or not this render thinks the sender runs, because a sender enabled a moment ago may
    * not show as running here yet. Main applies it to a running or starting sender and ignores it
    * otherwise.
@@ -116,7 +117,10 @@ const DmxOutputSettings: React.FC = () => {
   const commitEnttecConfig = useSerializedConfigCommit({
     stored: prefs.enttecProConfig ?? ENTTEC_PRO_DEFAULT_CONFIG,
     persist: (config, what) => persist({ enttecProConfig: config }, what),
-    setStored: (config) => setPrefs((prev) => ({ ...prev, enttecProConfig: config })),
+    setStored: (config) => {
+      setPrefs((prev) => ({ ...prev, enttecProConfig: config }))
+      setComPort(config.port)
+    },
     applyToRunningSender: (config, what) =>
       applyToRunningSender(
         () => updateEnttecConfig({ devicePath: config.port, dmxSpeed: config.dmxSpeed }),
@@ -124,11 +128,17 @@ const DmxOutputSettings: React.FC = () => {
       ),
   })
 
-  /** Persists OpenDMX port/rate atomically. OpenDMX has no live-update channel to push to. */
+  /**
+   * Persists OpenDMX port/rate atomically, and hands the port atom the port once it is stored.
+   * OpenDMX has no live-update channel to push to.
+   */
   const commitOpenDmxConfig = useSerializedConfigCommit({
     stored: prefs.openDmxConfig ?? OPEN_DMX_DEFAULT_CONFIG,
     persist: (config, what) => persist({ openDmxConfig: config }, what),
-    setStored: (config) => setPrefs((prev) => ({ ...prev, openDmxConfig: config })),
+    setStored: (config) => {
+      setPrefs((prev) => ({ ...prev, openDmxConfig: config }))
+      setOpenDmxComPort(config.port)
+    },
   })
 
   /** Persists the whole resolved ArtNet config and hands it to the sender if it runs. */
@@ -294,12 +304,8 @@ const DmxOutputSettings: React.FC = () => {
     return commitArtNetConfig({ [field]: parsed }, 'the ArtNet configuration')
   }
 
-  const handleComPortChange = async (newPort: string): Promise<boolean> => {
-    setComPort(newPort)
-    const saved = await commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
-    if (!saved) setComPort(storedEnttecPort)
-    return saved
-  }
+  const handleComPortChange = (newPort: string): Promise<boolean> =>
+    commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
 
   const handleEnttecProSpeedChange = (hz: number): Promise<boolean> =>
     commitEnttecConfig(
@@ -307,12 +313,8 @@ const DmxOutputSettings: React.FC = () => {
       'the Enttec Pro refresh rate',
     )
 
-  const handleOpenDmxComPortChange = async (newPort: string): Promise<boolean> => {
-    setOpenDmxComPort(newPort)
-    const saved = await commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
-    if (!saved) setOpenDmxComPort(storedOpenDmxPort)
-    return saved
-  }
+  const handleOpenDmxComPortChange = (newPort: string): Promise<boolean> =>
+    commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
 
   const handleOpenDmxSpeedChange = (hz: number): Promise<boolean> =>
     commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
