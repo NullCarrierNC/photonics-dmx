@@ -485,6 +485,7 @@ describe('StageKit direct mode configuration', () => {
 describe('StageKit strobe watchdog', () => {
   let networkListener: EventEmitter
   let processor: Rb3StageKitDirectProcessor
+  let chainFanout: ChainFanout
   const WINDOW_MS = 2000
 
   /** A rig with a strobe fixture, so a strobe command produces a real effect to observe. */
@@ -525,7 +526,7 @@ describe('StageKit strobe watchdog', () => {
     networkListener = new EventEmitter()
     const lightManager = new DmxLightManager(makeStrobeRigConfig())
     const sequencer = fakeLightingController()
-    const chainFanout = new ChainFanout()
+    chainFanout = new ChainFanout()
     chainFanout.setChains([
       {
         rigId: 'strobe-rig',
@@ -591,6 +592,45 @@ describe('StageKit strobe watchdog', () => {
     const running = processor.getStatus().activeStrobeEffects
     expect(running).toHaveLength(1)
     expect(running[0]).toContain('fastest')
+  })
+
+  it('drives the hardware strobe slot while a strobe runs', () => {
+    emitStrobe('fast')
+    expect(chainFanout.strobeState.getActive()).toBe('fast')
+
+    emitStrobe('slow')
+    expect(chainFanout.strobeState.getActive()).toBe('slow')
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      strobeEffect: 'off',
+      timestamp: Date.now(),
+    })
+    expect(chainFanout.strobeState.getActive()).toBeNull()
+  })
+
+  it('frees the hardware strobe slot when the strobe is cut', () => {
+    emitStrobe('fastest')
+
+    jest.advanceTimersByTime(WINDOW_MS + 500)
+
+    expect(chainFanout.strobeState.getActive()).toBeNull()
+  })
+
+  it('frees the hardware strobe slot on DisableAll', () => {
+    emitStrobe('medium')
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
+
+    expect(chainFanout.strobeState.getActive()).toBeNull()
   })
 
   it('starts a fresh strobe after one is cut and the console asks again', () => {

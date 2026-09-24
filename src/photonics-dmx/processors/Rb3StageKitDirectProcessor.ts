@@ -23,6 +23,7 @@ import {
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { StrobeWatchdog } from './strobeWatchdog'
+import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
 import { createLogger } from '../../shared/logger'
 import {
   buildInGameClearCueData,
@@ -55,7 +56,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private readonly strobeWatchdog: StrobeWatchdog
 
   // The strobe type the rigs are running, so a repeated packet is not a second start.
-  private _currentStrobeType: 'slow' | 'medium' | 'fast' | 'fastest' | null = null
+  private _currentStrobeType: StrobeSpeedSlot | null = null
 
   // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
   // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
@@ -277,13 +278,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
     if (strobeEffect === 'off') {
       this.strobeWatchdog.setStrobeRunning(false)
-      this._currentStrobeType = null
       this.clearStrobeEffectsAtPositions(positions)
     } else if (strobeEffect) {
       this.strobeWatchdog.setStrobeRunning(true)
       // RB3E repeats the packet for as long as the strobe holds, so only the edge is work.
       if (strobeEffect !== this._currentStrobeType) {
-        this._currentStrobeType = strobeEffect
+        this.setStrobeType(strobeEffect)
         this.applyStrobeEffect(strobeEffect)
       }
     } else if (color !== 'off') {
@@ -415,8 +415,17 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     }
   }
 
+  /**
+   * Record the strobe the rigs run and put it on the shared strobe slot, which drives the hardware
+   * strobe channels the way a cue-mode strobe does.
+   */
+  private setStrobeType(strobeType: StrobeSpeedSlot | null): void {
+    this._currentStrobeType = strobeType
+    this.chainFanout.strobeState.setActive(strobeType, 'net')
+  }
+
   private clearStrobeEffectsAtPositions(positions: number[]): void {
-    this._currentStrobeType = null
+    this.setStrobeType(null)
     for (const rig of this.rigs.values()) {
       try {
         rig.clearStrobeEffectsAtPositions(positions)
@@ -427,7 +436,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private async turnOffAllRigs(): Promise<void> {
-    this._currentStrobeType = null
+    this.setStrobeType(null)
     await Promise.allSettled(Array.from(this.rigs.values()).map((r) => r.turnOffAllLights()))
   }
 
@@ -511,7 +520,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   private handleDisableAll(event: StageKitData): void {
     this.strobeWatchdog.setStrobeRunning(false)
-    this._currentStrobeType = null
+    this.setStrobeType(null)
     this.ledBanks.reset()
     this.emit('stagekit:processed', {
       positions: event.positions,
