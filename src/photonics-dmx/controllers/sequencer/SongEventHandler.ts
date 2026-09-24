@@ -241,10 +241,9 @@ export class SongEventHandler implements ISongEventHandler {
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
             released = true
           }
-        }
-
-        // Handle waitUntilCondition with count-based logic
-        if (
+        } else if (
+          // Handle waitUntilCondition with count-based logic. One event starts a transition or ends
+          // its hold, never both, so a hold on the event it waited for lasts until the next one.
           activeEffect.state === 'waitingUntil' &&
           currentTransition.waitUntilCondition === eventType
         ) {
