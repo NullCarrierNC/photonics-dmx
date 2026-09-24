@@ -106,6 +106,11 @@ export function blendWithOpacity(current: RGBIO, newState: RGBIO): RGBIO {
   return out
 }
 
+/** A layer that aims a moving head and draws no colour, as a set-position move leaves behind. */
+export function isPositionOnly(state: RGBIO): boolean {
+  return (state.opacity ?? 1) === 0 && (state.pan !== undefined || state.tilt !== undefined)
+}
+
 /**
  * Returns a "transparent" color with all channels = 0.
  */

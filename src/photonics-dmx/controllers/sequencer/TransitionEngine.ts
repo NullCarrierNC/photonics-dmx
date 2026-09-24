@@ -2,6 +2,7 @@ import { applyWaitUntil, delayWaitMs } from './waitUntil'
 import { performance } from 'perf_hooks'
 import { EffectTransition, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
+import { isPositionOnly } from './lightBlending'
 import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
 import { IEffectManager } from './interfaces'
 import { createLogger } from '../../../shared/logger'
@@ -138,7 +139,10 @@ export class TransitionEngine implements ITransitionEngine {
       }
       const hasNewEffect = this.layerManager.getActiveEffect(layer, lightId) !== undefined
       const hasQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId) !== undefined
-      if (!hasNewEffect && !hasQueuedEffect) {
+      // A finished move leaves its aim on the layer, so the head holds it and the next move eases
+      // from it. Stopping motion clears the aim through the pan/tilt clear.
+      const holdsAim = isPositionOnly(this.lightTransitionController.getLightState(lightId, layer))
+      if (!hasNewEffect && !hasQueuedEffect && !holdsAim) {
         this.lightTransitionController.removeLightLayer(lightId, layer)
         // Clear only THIS light's stored state on the layer — other lights on the same layer may
         // still be running and must keep their state.

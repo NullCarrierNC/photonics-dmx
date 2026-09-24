@@ -1,5 +1,6 @@
 import { RGBIO, Transition } from '../../types'
 import { blendWithOpacity, opaqueBlack, transparentColor } from './lightBlending'
+import { copyAims, dropAims, restoreLayers } from './positionLayers'
 import {
   cleanupOrphanedTransitions,
   emergencyStateReset,
@@ -182,7 +183,8 @@ export class LightTransitionController {
   /**
    * Clears every transition. By default every light goes black and is published at once. With
    * `holdLook`, the lights keep showing the previous look until the next frame, which the look that
-   * replaces it draws over, so a cue change never passes through black.
+   * replaces it draws over, so a cue change never passes through black. A set replaces the look and
+   * not the aim, so `holdLook` keeps position-only layers and the moves heading to one.
    */
   public clearAllTransitions(holdLook = false): void {
     // Set the clearing flag to prevent new transitions from being added
@@ -197,13 +199,16 @@ export class LightTransitionController {
       this._transitionsByLight.forEach((_v, id) => idSet.add(id))
       this._currentLayerStates.forEach((_v, id) => idSet.add(id))
       const allLightIds = Array.from(idSet)
+      const aims = holdLook ? copyAims(this._currentLayerStates, this._transitionsByLight) : null
 
       // Clear all transitions
       this._transitionsByLight.clear()
       this._currentLayerStates.clear()
       this._heldLook.clear()
 
-      if (holdLook) {
+      if (aims) {
+        restoreLayers(this._currentLayerStates, aims.states)
+        restoreLayers(this._transitionsByLight, aims.transitions)
         for (const lightId of allLightIds) {
           const showing = this._lightStateManager.getLightState(lightId)
           if (showing) {
@@ -266,9 +271,11 @@ export class LightTransitionController {
 
   /**
    * Strips pan/tilt from every layer state so merged output omits them and DmxPublisher
-   * can fall back to fixture panHome/tiltHome. Invoked on the frame after motion cues stop.
+   * can fall back to fixture panHome/tiltHome. A layer that only aims goes altogether, with any
+   * move heading to one. Invoked on the frame after motion cues stop.
    */
   public clearPanTilt(): void {
+    dropAims(this._currentLayerStates, this._transitionsByLight)
     for (const [lightId, layerMap] of this._currentLayerStates) {
       for (const [layer, state] of layerMap) {
         const next: RGBIO = { ...state }
