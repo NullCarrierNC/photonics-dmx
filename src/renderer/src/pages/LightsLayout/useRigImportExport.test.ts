@@ -317,6 +317,26 @@ describe('useRigImportExport commit', () => {
 })
 
 describe('useRigImportExport duplicate', () => {
+  it('duplicates once when Duplicate is clicked twice while it saves', async () => {
+    const view = renderRigs()
+    let answerSave: (value: unknown) => void = () => {}
+    jest.mocked(ipcApi.saveDmxRig).mockReturnValue(
+      new Promise((resolve) => {
+        answerSave = resolve
+      }) as never,
+    )
+
+    await act(async () => {
+      void view.result.current.handleDuplicate()
+      void view.result.current.handleDuplicate()
+    })
+    await act(async () => {
+      answerSave({ success: true })
+    })
+
+    expect(ipcApi.saveDmxRig).toHaveBeenCalledTimes(1)
+  })
+
   it('duplicates the active rig and selects the copy', async () => {
     jest.mocked(ipcApi.getDmxRigs).mockImplementation(async () => [RIG_A, RIG_B, savedRig()])
     const view = renderRigs()

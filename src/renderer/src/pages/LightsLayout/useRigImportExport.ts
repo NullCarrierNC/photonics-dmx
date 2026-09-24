@@ -209,20 +209,22 @@ export function useRigImportExport({
     [pendingImport, myFixtureLibrary, rigs, setMyFixtureLibrary, selectSavedRig, showToast],
   )
 
-  // The imported rig is saved active, and that save restarts the controllers, so a second confirm
-  // lands inside the first commit. It is turned away until the first has finished.
-  const committingRef = useRef(false)
+  // An imported or duplicated rig is saved active, and that save restarts the controllers, so a
+  // second request lands inside the first. It is turned away until the first has finished.
+  const creatingRef = useRef(false)
+  const oneCreateAtATime = useCallback(async (create: () => Promise<void>) => {
+    if (creatingRef.current) return
+    creatingRef.current = true
+    await create()
+    creatingRef.current = false
+  }, [])
+
   const commitPendingImport = useCallback(
-    async (rigName: string) => {
-      if (committingRef.current) return
-      committingRef.current = true
-      await commitImport(rigName)
-      committingRef.current = false
-    },
-    [commitImport],
+    (rigName: string) => oneCreateAtATime(() => commitImport(rigName)),
+    [oneCreateAtATime, commitImport],
   )
 
-  const handleDuplicate = useCallback(async () => {
+  const duplicateActiveRig = useCallback(async () => {
     if (!(await onBeforeDiscardingUnsaved())) return
     const source = rigs.find((r) => r.id === activeRigId)
     if (!source) {
@@ -246,6 +248,11 @@ export function useRigImportExport({
       showToast('Failed to duplicate layout.', 'error', 5000)
     }
   }, [onBeforeDiscardingUnsaved, rigs, activeRigId, selectSavedRig, showToast])
+
+  const handleDuplicate = useCallback(
+    () => oneCreateAtATime(duplicateActiveRig),
+    [oneCreateAtATime, duplicateActiveRig],
+  )
 
   const handleDelete = useCallback(async () => {
     if (!activeRigId) return
