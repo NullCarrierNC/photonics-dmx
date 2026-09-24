@@ -17,6 +17,8 @@ type EffectSummary = {
   description?: string
 }
 
+const NO_EFFECTS: EffectSummary[] = []
+
 type Props = {
   editorDoc: EditorDocument | null
   selectedCueId: string | null
@@ -34,60 +36,64 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
     name: '',
   })
   const [availableFiles, setAvailableFiles] = useState<EffectFileSummary[]>([])
-  const [availableEffects, setAvailableEffects] = useState<EffectSummary[]>([])
+  // Tagged with the file they were read from, so only the chosen file's effects are offered.
+  const [loadedEffects, setLoadedEffects] = useState<{
+    path: string
+    effects: EffectSummary[]
+  } | null>(null)
   const [selectedFile, setSelectedFile] = useState<string>('')
-  const [loadingEffects, setLoadingEffects] = useState(false)
   const dialogTitleId = useId()
+  const effectsLoaded = selectedFile !== '' && loadedEffects?.path === selectedFile
+  const availableEffects = effectsLoaded ? loadedEffects.effects : NO_EFFECTS
+  const loadingEffects = selectedFile !== '' && !effectsLoaded
 
-  // Load available effect files when dialog opens
+  // Load available effect files when dialog opens. A list that answers after it closes is dropped.
   useEffect(() => {
-    if (showDialog && !editingEffect) {
-      void loadEffectFiles()
+    if (!showDialog || editingEffect) return
+    let cancelled = false
+    listEffectFiles().then(
+      (summary) => {
+        if (cancelled) return
+        const allFiles = [...summary.yarg, ...summary.audio].sort((a, b) =>
+          (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, { sensitivity: 'base' }),
+        )
+        setAvailableFiles(allFiles)
+      },
+      (error: unknown) => log.error('Failed to load effect files', error),
+    )
+    return () => {
+      cancelled = true
     }
   }, [showDialog, editingEffect])
 
-  // Load effects from selected file
+  // Load effects from the selected file. A read that answers after another file was chosen or the
+  // dialog closed is dropped.
   useEffect(() => {
-    if (selectedFile) {
-      void loadEffectsFromFile(selectedFile)
-    } else {
-      setAvailableEffects([])
+    if (!selectedFile) return
+    let cancelled = false
+    readEffectFile(selectedFile).then(
+      (file) => {
+        if (cancelled) return
+        const effects = file.effects
+          .map((e) => ({
+            id: e.id,
+            name: e.name,
+            description: e.description,
+          }))
+          .sort((a, b) =>
+            (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+          )
+        setLoadedEffects({ path: selectedFile, effects })
+      },
+      (error: unknown) => {
+        log.error('Failed to load effects from file', error)
+        if (!cancelled) setLoadedEffects({ path: selectedFile, effects: NO_EFFECTS })
+      },
+    )
+    return () => {
+      cancelled = true
     }
   }, [selectedFile])
-
-  const loadEffectFiles = async () => {
-    try {
-      const summary = await listEffectFiles()
-      const allFiles = [...summary.yarg, ...summary.audio].sort((a, b) =>
-        (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, { sensitivity: 'base' }),
-      )
-      setAvailableFiles(allFiles)
-    } catch (error) {
-      log.error('Failed to load effect files', error)
-    }
-  }
-
-  const loadEffectsFromFile = async (filePath: string) => {
-    setLoadingEffects(true)
-    try {
-      const file = await readEffectFile(filePath)
-      const effects = file.effects
-        .map((e) => ({
-          id: e.id,
-          name: e.name,
-          description: e.description,
-        }))
-        .sort((a, b) =>
-          (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
-        )
-      setAvailableEffects(effects)
-    } catch (error) {
-      log.error('Failed to load effects from file', error)
-      setAvailableEffects([])
-    } finally {
-      setLoadingEffects(false)
-    }
-  }
 
   // Effects are only available in cue mode (cues can reference effects)
   const currentCue =
@@ -124,7 +130,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
       name: '',
     })
     setSelectedFile('')
-    setAvailableEffects([])
+    setLoadedEffects(null)
   }
 
   const handleFileSelect = (filePath: string) => {
