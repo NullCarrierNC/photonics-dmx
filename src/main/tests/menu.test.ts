@@ -1,57 +1,103 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import type { MenuItemConstructorOptions } from 'electron'
 
-let mockIsPackaged = false
-const buildFromTemplate = jest.fn((template: MenuItemConstructorOptions[]) => template)
+const mockApp = { name: 'Photonics', isPackaged: false, getVersion: () => '1.2.3' }
+const mockSetApplicationMenu = jest.fn((_menu: { template: MenuItemConstructorOptions[] }) => {})
+const mockShowMessageBox = jest.fn((_options: unknown) => Promise.resolve({ response: 0 }))
 
 jest.mock('electron', () => ({
-  app: {
-    get isPackaged() {
-      return mockIsPackaged
-    },
-    name: 'Photonics',
-    getVersion: () => '0.0.0',
-  },
+  app: mockApp,
   Menu: {
-    buildFromTemplate: (template: MenuItemConstructorOptions[]) => buildFromTemplate(template),
-    setApplicationMenu: jest.fn(),
+    buildFromTemplate: (template: unknown) => ({ template }),
+    setApplicationMenu: mockSetApplicationMenu,
   },
-  dialog: { showMessageBox: jest.fn() },
+  dialog: { showMessageBox: mockShowMessageBox },
 }))
 
 import { setupMenu } from '../menu'
 
-/** The roles the View menu offers. */
-function viewRoles(): string[] {
+const realPlatform = process.platform
+
+function buildMenu(platform: NodeJS.Platform, packaged: boolean): MenuItemConstructorOptions[] {
+  Object.defineProperty(process, 'platform', { value: platform })
+  mockApp.isPackaged = packaged
   setupMenu()
-  const template = buildFromTemplate.mock.calls.at(-1)![0]
-  const view = template.find((item) => item.label === 'View')!
-  return (view.submenu as MenuItemConstructorOptions[]).flatMap((item) =>
-    item.role ? [item.role] : [],
+  return mockSetApplicationMenu.mock.lastCall![0].template
+}
+
+/** Each top-level menu as its label and the role, label or type of each item in order. */
+function outline(template: MenuItemConstructorOptions[]): Record<string, string[]> {
+  return Object.fromEntries(
+    template.map((menu) => [
+      menu.label,
+      (menu.submenu as MenuItemConstructorOptions[]).map(
+        (item) => item.role ?? item.label ?? item.type ?? '',
+      ),
+    ]),
   )
 }
 
-describe('View menu', () => {
-  beforeEach(() => {
-    buildFromTemplate.mockClear()
+describe('setupMenu', () => {
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: realPlatform })
+    mockSetApplicationMenu.mockClear()
+    mockShowMessageBox.mockClear()
   })
 
-  it('offers reload and DevTools while developing', () => {
-    mockIsPackaged = false
-
-    expect(viewRoles()).toEqual(expect.arrayContaining(['reload', 'forceReload', 'toggleDevTools']))
+  it('builds the macOS menus with the app menu first', () => {
+    expect(outline(buildMenu('darwin', true))).toEqual({
+      Photonics: [
+        'About',
+        'separator',
+        'services',
+        'separator',
+        'hide',
+        'hideOthers',
+        'unhide',
+        'separator',
+        'quit',
+      ],
+      File: ['close'],
+      Edit: ['undo', 'redo', 'separator', 'cut', 'copy', 'paste'],
+      View: ['resetZoom', 'zoomIn', 'zoomOut', 'separator', 'togglefullscreen'],
+      Window: ['minimize', 'zoom', 'separator', 'front', 'separator', 'window'],
+    })
   })
 
-  it('offers neither in a packaged build, and keeps zoom and full screen', () => {
-    mockIsPackaged = true
+  it('quits from File and closes from Window elsewhere, with no app menu', () => {
+    expect(outline(buildMenu('win32', true))).toEqual({
+      File: ['quit'],
+      Edit: ['undo', 'redo', 'separator', 'cut', 'copy', 'paste'],
+      View: ['resetZoom', 'zoomIn', 'zoomOut', 'separator', 'togglefullscreen'],
+      Window: ['minimize', 'zoom', 'close'],
+    })
+  })
 
-    const roles = viewRoles()
+  it('offers reload and DevTools in View only when not packaged', () => {
+    expect(outline(buildMenu('linux', false)).View).toEqual([
+      'reload',
+      'forceReload',
+      'toggleDevTools',
+      'separator',
+      'resetZoom',
+      'zoomIn',
+      'zoomOut',
+      'separator',
+      'togglefullscreen',
+    ])
+  })
 
-    expect(roles).not.toEqual(expect.arrayContaining(['reload']))
-    expect(roles).not.toContain('forceReload')
-    expect(roles).not.toContain('toggleDevTools')
-    expect(roles).toEqual(
-      expect.arrayContaining(['resetZoom', 'zoomIn', 'zoomOut', 'togglefullscreen']),
+  it('shows the app name and version from About', () => {
+    const [appMenu] = buildMenu('darwin', true)
+    const about = (appMenu.submenu as MenuItemConstructorOptions[])[0]
+
+    about.click!({} as never, undefined, {} as never)
+
+    expect(mockShowMessageBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'About Photonics',
+        message: 'Photonics PREVIEW v1.2.3',
+      }),
     )
   })
 })
