@@ -535,8 +535,7 @@ export class EffectManager implements IEffectManager {
       this.layerManager.clearAllActiveEffects()
       this.layerManager.clearAllQueuedEffects()
 
-      // 2. Clear all layer states and tracking (prevents stale state)
-      this.layerManager.clearAllLayerStates()
+      // 2. Clear layer tracking (prevents stale state)
       this.layerManager.clearAllLayerTracking()
 
       // 3. Clear the transitions, publishing black unless the look is held for its replacement

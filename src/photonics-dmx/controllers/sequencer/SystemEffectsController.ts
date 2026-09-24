@@ -221,7 +221,6 @@ export class SystemEffectsController implements ISystemEffectsController {
       this.layerManager.removeActiveEffect(layer, 'all')
       this.layerManager.removeQueuedEffect(layer, 'all')
     }
-    this.layerManager.clearAllLayerStates()
     this.lightTransitionController.immediateBlackout()
     this.onBlackoutCompleteCallback?.()
   }

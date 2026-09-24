@@ -55,7 +55,6 @@ describe('SystemEffectsController', () => {
       getAllLayers: jest.fn().mockReturnValue([0, 200, 255]),
       removeActiveEffect: jest.fn(),
       removeQueuedEffect: jest.fn(),
-      clearAllLayerStates: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
     // Create mock for Clock

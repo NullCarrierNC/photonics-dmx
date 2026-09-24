@@ -101,18 +101,13 @@ export class EffectScheduler {
     const initialStates = new Map<string, RGBIO>()
 
     lights.forEach((light) => {
-      // Try to get existing state from layer manager
-      let initialState = this.layerManager.getLightState(layer, light.id)
-
-      // Try transition controller if layer manager has no state. A first transition that waits
-      // starts once the held look has gone dark, so it starts from transparent.
-      if (!initialState) {
-        initialState = this.lightTransitionController.getLightState(
-          light.id,
-          layer,
-          !firstTransitionWaits(transitions, light.id),
-        )
-      }
+      // A first transition that waits starts once the held look has gone dark, so it starts from
+      // transparent.
+      let initialState: RGBIO | undefined = this.lightTransitionController.getLightState(
+        light.id,
+        layer,
+        !firstTransitionWaits(transitions, light.id),
+      )
 
       // If no state exists, use default (create once per light)
       if (!initialState) {

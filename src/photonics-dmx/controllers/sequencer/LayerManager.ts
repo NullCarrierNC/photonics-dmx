@@ -13,7 +13,6 @@ import { RGBIO, TrackedLight } from '../../types'
  * - Tracks layer usage with timestamps for cleanup operations
  * - Prevents "stuck" lights by cleaning up unused layers after grace periods
  * - Provides blackout threshold control for layer-specific operations
- * - Manages light state persistence between effects
  *
  * Layer conventions:
  * - Layer 0: Base layer (preserved by design)
@@ -32,9 +31,6 @@ export class LayerManager implements ILayerManager {
   private _layerLastUsed: Map<number, number> = new Map()
   private _blackoutLayersUnder: number = 255
   private _lightTransitionController: LightTransitionController
-
-  // New property for storing layer states
-  private _layerStates: Map<number, Map<string, RGBIO>> = new Map()
 
   /**
    * Creates a new LayerManager instance
@@ -219,7 +215,6 @@ export class LayerManager implements ILayerManager {
           this._activeEffects.delete(layer)
           this._effectQueue.delete(layer)
           this._layerLastUsed.delete(layer)
-          this._layerStates.delete(layer)
         }
       }
     })
@@ -290,99 +285,16 @@ export class LayerManager implements ILayerManager {
     const stateMap = new Map<string, RGBIO>()
 
     lights.forEach((light) => {
-      // First check if we have a stored state for this light/layer
-      const storedState = this.getLightState(layer, light.id)
-      if (storedState) {
-        // Use stored state if available
-        stateMap.set(light.id, storedState)
+      const currentState = this._lightTransitionController.getLightState(light.id, layer)
+      if (currentState) {
+        stateMap.set(light.id, { ...currentState })
       } else {
-        // Otherwise get current state from LightTransitionController
-        const currentState = this._lightTransitionController.getLightState(light.id, layer)
-        if (currentState) {
-          stateMap.set(light.id, { ...currentState })
-        } else {
-          // Default to transparent if no current state exists
-          stateMap.set(light.id, this.transparentState())
-        }
+        // Default to transparent if no current state exists
+        stateMap.set(light.id, this.transparentState())
       }
     })
 
     return stateMap
-  }
-
-  /**
-   * Captures the final states for an active effect's lights before the effect is removed.
-   * This ensures subsequent effects can transition smoothly from these final states.
-   *
-   * @param layer The layer to capture states for
-   * @param lights The lights to capture final states for
-   */
-  public captureFinalStates(layer: number, lights: TrackedLight[]): void {
-    if (!this._layerStates.has(layer)) {
-      this._layerStates.set(layer, new Map<string, RGBIO>())
-    }
-
-    const layerStates = this._layerStates.get(layer)!
-
-    lights.forEach((light) => {
-      // First try to get the target state from the active effect (what it was trying to achieve)
-      const activeEffect = this.getActiveEffect(layer, light.id)
-      if (activeEffect && activeEffect.lastEndState) {
-        // Use the effect's target state, not the current interpolated state
-        layerStates.set(light.id, { ...activeEffect.lastEndState })
-      }
-      // Fallback to current state if no target state available
-      else {
-        const currentState = this._lightTransitionController.getLightState(light.id, layer)
-        if (currentState) {
-          // Store deep copy of state
-          layerStates.set(light.id, { ...currentState })
-        } else {
-          layerStates.set(light.id, this.transparentState())
-        }
-      }
-    })
-  }
-
-  /**
-   * Gets the stored state for a light on a layer
-   *
-   * @param layer The layer to get state from
-   * @param lightId The light ID to get state for
-   * @returns The state if found, undefined otherwise
-   */
-  public getLightState(layer: number, lightId: string): RGBIO | undefined {
-    const layerStates = this._layerStates.get(layer)
-    if (layerStates) {
-      return layerStates.get(lightId)
-    }
-    return undefined
-  }
-
-  /**
-   * Clears stored states for a layer
-   *
-   * @param layer The layer to clear states for
-   */
-  public clearLayerStates(layer: number): void {
-    this._layerStates.delete(layer)
-  }
-
-  /**
-   * Clears the stored state for a single light on a layer, leaving other lights on that layer
-   * intact. Used when one light's effect on a shared layer ends and the whole layer must not be
-   * wiped out from under the lights still running there.
-   *
-   * @param layer The layer to clear the light's state on
-   * @param lightId The light whose stored state should be removed
-   */
-  public clearLightLayerState(layer: number, lightId: string): void {
-    const layerStates = this._layerStates.get(layer)
-    if (!layerStates) return
-    layerStates.delete(lightId)
-    if (layerStates.size === 0) {
-      this._layerStates.delete(layer)
-    }
   }
 
   private transparentState(): RGBIO {
@@ -422,13 +334,6 @@ export class LayerManager implements ILayerManager {
    */
   public clearAllQueuedEffects(): void {
     this._effectQueue.clear()
-  }
-
-  /**
-   * Clears all layer states across all layers
-   */
-  public clearAllLayerStates(): void {
-    this._layerStates.clear()
   }
 
   /**

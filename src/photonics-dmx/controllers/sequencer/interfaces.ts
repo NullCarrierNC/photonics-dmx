@@ -96,10 +96,6 @@ export interface ILayerManager {
 
   // State management methods
   captureInitialStates(layer: number, lights: TrackedLight[]): Map<string, RGBIO>
-  captureFinalStates(layer: number, lights: TrackedLight[]): void
-  getLightState(layer: number, lightId: string): RGBIO | undefined
-  clearLayerStates(layer: number): void
-  clearLightLayerState(layer: number, lightId: string): void
   getLightTransitionController(): LightTransitionController
 
   // Per-light effect management
@@ -110,7 +106,6 @@ export interface ILayerManager {
   // Clear methods for immediate state reset
   clearAllActiveEffects(): void
   clearAllQueuedEffects(): void
-  clearAllLayerStates(): void
   clearAllLayerTracking(): void
 }
 
@@ -153,8 +148,6 @@ export interface ITransitionEngine {
     transition: EffectTransition,
     currentTime: number,
   ): void
-  getFinalState(lightId: string, layer: number): RGBIO | undefined
-  clearFinalStates(layer: number): void
   getLightTransitionController(): LightTransitionController
 }
 

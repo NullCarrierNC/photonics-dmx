@@ -69,15 +69,11 @@ describe('EffectManager', () => {
       getAllLayers: jest.fn().mockReturnValue([]),
       getLightTransitionController: jest.fn().mockReturnValue(lightTransitionController),
       setLayerLastUsed: jest.fn(),
-      getLightState: jest.fn(),
-      clearLayerStates: jest.fn(),
-      captureFinalStates: jest.fn(),
       resetLayerTracking: jest.fn(),
       captureInitialStates: jest.fn().mockReturnValue(new Map()),
       // New bulk clear methods
       clearAllActiveEffects: jest.fn(),
       clearAllQueuedEffects: jest.fn(),
-      clearAllLayerStates: jest.fn(),
       clearAllLayerTracking: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
@@ -88,8 +84,6 @@ describe('EffectManager', () => {
       handleTransitioning: jest.fn(),
       handleWaitingUntil: jest.fn(),
       getLightTransitionController: jest.fn().mockReturnValue(lightTransitionController),
-      getFinalState: jest.fn(),
-      clearFinalStates: jest.fn(),
       setEffectManager: jest.fn(),
     } as unknown as jest.Mocked<TransitionEngine>
 
@@ -1329,7 +1323,6 @@ describe('EffectManager', () => {
       // Verify bulk clear methods were called
       expect(layerManager.clearAllActiveEffects).toHaveBeenCalled()
       expect(layerManager.clearAllQueuedEffects).toHaveBeenCalled()
-      expect(layerManager.clearAllLayerStates).toHaveBeenCalled()
       expect(layerManager.clearAllLayerTracking).toHaveBeenCalled()
 
       // Since we can't easily test the internal implementation, let's just verify that

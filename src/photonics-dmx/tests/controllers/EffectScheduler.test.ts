@@ -64,7 +64,6 @@ describe('EffectScheduler', () => {
       getQueuedEffect: jest.fn(),
       getActiveEffects: jest.fn().mockReturnValue(new Map()),
       getEffectQueue: jest.fn().mockReturnValue(new Map()),
-      getLightState: jest.fn(),
       resetLayerTracking: jest.fn(),
     } as unknown as jest.Mocked<ILayerManager>
 
