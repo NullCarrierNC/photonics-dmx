@@ -7,6 +7,8 @@
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createLogger } from '../../../../shared/logger'
+import type { IpcEventChannel } from '../../../../shared/ipcTypes'
+import { addIpcListener, removeIpcListener } from '../../utils/ipcHelpers'
 import { CueGroupEnableList } from './CueGroupEnableList'
 import { CueGroupRow } from './CueGroupRow'
 import { useCueGroupRovingTabIndex } from './useCueGroupRovingTabIndex'
@@ -39,6 +41,8 @@ export interface CueGroupsDomain<G extends CueGroupRowData, C extends CueRowData
   getDisabled: () => Promise<Record<string, string[]>>
   setDisabled: (disabled: Record<string, string[]>) => Promise<SaveResult>
   getCues: (groupId: string) => Promise<C[]>
+  /** Broadcast when the enabled groups or disabled cues change outside this panel. */
+  changedEvent?: IpcEventChannel
   /** What one cue's row reads, since a motion program is named differently to a lighting cue. */
   renderCueLabel: (cue: C) => React.ReactNode
   /** Shown in place of the cue list when an expanded group holds none. */
@@ -117,6 +121,45 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
   useEffect(() => {
     void fetchGroups()
   }, [fetchGroups])
+
+  // Another window, or a cue saved in the Cue Editor, can change the selection. It is read again
+  // behind any write in flight, so the next write builds on what the domain holds.
+  const refreshQueued = useRef(false)
+  const refreshSelection = useCallback(async () => {
+    refreshQueued.current = false
+    const [all, enabled, disabled] = await Promise.all([
+      domain.getGroups(),
+      domain.getEnabled(),
+      domain.getDisabled(),
+    ])
+    saved.current = { enabled, disabled }
+    setEnabledGroupIds(enabled)
+    setDisabledByGroup(disabled)
+    setAllGroups((prev) =>
+      all
+        .map((group) => {
+          const shown = prev.find((g) => g.id === group.id)
+          return { ...group, cues: shown?.cues ?? [], isExpanded: shown?.isExpanded ?? false }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    )
+  }, [domain])
+
+  useEffect(() => {
+    const event = domain.changedEvent
+    if (!event) return
+    const onChanged = () => {
+      if (refreshQueued.current) return
+      refreshQueued.current = true
+      const run = writes.current.then(refreshSelection)
+      writes.current = run.catch((error: unknown) => {
+        refreshQueued.current = false
+        log.error(`Could not read the ${domain.label} cue groups again:`, error)
+      })
+    }
+    addIpcListener(event, onChanged)
+    return () => removeIpcListener(event, onChanged)
+  }, [domain, log, refreshSelection])
 
   const clearPersistError = useCallback((groupId: string) => {
     setPersistErrorByGroup((prev) => {

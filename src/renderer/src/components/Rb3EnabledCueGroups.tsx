@@ -7,6 +7,7 @@ import {
   getDisabledRb3Cues,
   setDisabledRb3Cues,
 } from '../ipcApi'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { CueGroupsPanel, type CueGroupsDomain } from './cue-groups/CueGroupsPanel'
 import {
   cueLabel,
@@ -28,6 +29,7 @@ const RB3_DOMAIN: CueGroupsDomain<CueGroup, LightingCueInfo> = {
   getDisabled: getDisabledRb3Cues,
   setDisabled: setDisabledRb3Cues,
   getCues: getAvailableRb3Cues,
+  changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
   // RB3 cues carry their own wording where they have it, and fall back to the YARG description.
   renderCueLabel: (cue) => cueLabel(cue.id, cue.rb3Description || cue.yargDescription),
   emptyLabel: NO_CUES_LABEL,

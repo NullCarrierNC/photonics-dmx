@@ -19,6 +19,7 @@ import {
   getDisabledRb3MotionCues,
   setDisabledRb3MotionCues,
 } from '../ipcApi'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   CueGroupsPanel,
   type CueGroupsDomain,
@@ -77,6 +78,7 @@ function motionDomain(
         getDisabled: getDisabledYargMotionCues,
         setDisabled: setDisabledYargMotionCues,
         getCues: getAvailableYargMotionCues,
+        changedEvent: RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED,
       }
     case 'rb3':
       return {
@@ -92,6 +94,7 @@ function motionDomain(
         getDisabled: getDisabledRb3MotionCues,
         setDisabled: setDisabledRb3MotionCues,
         getCues: getAvailableRb3MotionCues,
+        changedEvent: RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED,
       }
     case 'audio':
     default:
@@ -108,6 +111,7 @@ function motionDomain(
         getDisabled: getDisabledAudioMotionCues,
         setDisabled: setDisabledAudioMotionCues,
         getCues: getAvailableAudioMotionCues,
+        changedEvent: RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED,
       }
   }
 }

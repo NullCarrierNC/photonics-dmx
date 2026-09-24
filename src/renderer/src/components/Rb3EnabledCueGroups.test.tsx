@@ -1,10 +1,20 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { emitIpc } from '@renderer/tests/helpers/ipcListenerStub'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcApi from '../ipcApi'
 import Rb3EnabledCueGroups from './Rb3EnabledCueGroups'
+
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 jest.mock(
   '../ipcApi',
@@ -112,5 +122,17 @@ describe('Rb3EnabledCueGroups', () => {
     expect(await screen.findByText(/rb3 wording/)).toBeInTheDocument()
     expect(screen.getByText(/shared wording/)).toBeInTheDocument()
     expect(screen.queryByText(/yarg wording/)).toBeNull()
+  })
+
+  it('shows a group enabled elsewhere', async () => {
+    seedHappyPath()
+    renderWithProviders(<Rb3EnabledCueGroups />)
+    await screen.findByRole('button', { name: /RB3 Group 1/ })
+
+    getEnabledRb3CueGroups.mockResolvedValue(['rg1', 'rg2'])
+    await act(async () => emitIpc(RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED, undefined))
+
+    const enableCheckboxes = screen.getAllByRole('checkbox', { name: /Enable RB3 Group/ })
+    await waitFor(() => expect(enableCheckboxes[1]).toBeChecked())
   })
 })

@@ -1,10 +1,20 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { emitIpc } from '@renderer/tests/helpers/ipcListenerStub'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcApi from '../ipcApi'
 import YargEnabledCueGroups from './YargEnabledCueGroups'
+
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 jest.mock(
   '../ipcApi',
@@ -94,5 +104,17 @@ describe('YargEnabledCueGroups', () => {
     expect(alert.textContent).toContain('disabled save failed')
     await waitFor(() => expect(setEnabledCueGroups).toHaveBeenCalledTimes(2))
     expect(setEnabledCueGroups).toHaveBeenLastCalledWith(['yg1'])
+  })
+
+  it('shows a group enabled elsewhere', async () => {
+    seedHappyPath()
+    renderWithProviders(<YargEnabledCueGroups />)
+    await screen.findByRole('button', { name: /Yarg Group 1/ })
+
+    getEnabledCueGroups.mockResolvedValue(['yg1', 'yg2'])
+    await act(async () => emitIpc(RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED, undefined))
+
+    const enableCheckboxes = screen.getAllByRole('checkbox', { name: /Enable Yarg Group/ })
+    await waitFor(() => expect(enableCheckboxes[1]).toBeChecked())
   })
 })

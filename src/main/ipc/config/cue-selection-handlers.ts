@@ -9,13 +9,11 @@ import {
   type CueDomainRegistryBinding,
 } from '../../controllers/cueDomainBindings'
 import { ipcError } from '../ipcResult'
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { CONFIG } from '../../../shared/ipcChannels'
 import { validateOptionalStringArray, validateDisabledCuesMap } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
 import { handleInvoke } from '../handleInvoke'
 const log = createLogger('cue-selection-handlers')
-
-type ChangedEvent = (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
 
 interface CueGroupDomainSpec {
   /** Shared registry binding (registered-ids / setEnabled / setDisabled) for this domain. */
@@ -27,7 +25,6 @@ interface CueGroupDomainSpec {
     setDisabled: string
   }
   disabledLabel: string
-  changedEvent?: ChangedEvent
   /** SET-enabled side effect (activate groups / refresh selection); runs after disabled is applied. */
   afterSetEnabled?: (controllerManager: ControllerManager) => void
   /** SET-disabled side effect (refresh selection); runs after disabled is applied. */
@@ -81,8 +78,8 @@ function registerCueGroupDomain(
         binding.setEnabled(validation.value)
         binding.setDisabled(config.getPreference('cueDomains')[domain].disabledCues)
         spec.afterSetEnabled?.(controllerManager)
-        if (spec.changedEvent) {
-          sendToAllWindows(spec.changedEvent, undefined)
+        if (binding.changedEvent) {
+          sendToAllWindows(binding.changedEvent, undefined)
         }
         log.info(`Updated ${domain} enabled cue groups:`, validation.value)
         return { success: true }
@@ -114,8 +111,8 @@ function registerCueGroupDomain(
         await config.updateCueDomain(domain, { disabledCues: validation.value })
         binding.setDisabled(validation.value)
         spec.afterSetDisabled?.(controllerManager)
-        if (spec.changedEvent) {
-          sendToAllWindows(spec.changedEvent, undefined)
+        if (binding.changedEvent) {
+          sendToAllWindows(binding.changedEvent, undefined)
         }
         return { success: true }
       } catch (error) {
@@ -162,7 +159,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_AUDIO_CUES,
       },
       disabledLabel: 'disabledAudioCues',
-      changedEvent: RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED,
       afterSetEnabled: (cm) => cm.refreshAudioCueSelection(),
       afterSetDisabled: (cm) => cm.refreshAudioCueSelection(),
     },
@@ -175,7 +171,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_YARG_MOTION_CUES,
       },
       disabledLabel: 'disabledYargMotionCues',
-      changedEvent: RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED,
     },
     {
       binding: cueDomainBinding('audioMotion'),
@@ -186,7 +181,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_AUDIO_MOTION_CUES,
       },
       disabledLabel: 'disabledAudioMotionCues',
-      changedEvent: RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED,
     },
     {
       binding: cueDomainBinding('rb3'),
@@ -197,7 +191,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_RB3_CUES,
       },
       disabledLabel: 'disabledRb3Cues',
-      changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
       afterSetEnabled: (cm) => {
         activateRb3Groups()
         cm.refreshRb3CueSelection()
@@ -213,7 +206,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_RB3_MOTION_CUES,
       },
       disabledLabel: 'disabledRb3MotionCues',
-      changedEvent: RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED,
     },
   ]
 

@@ -4,6 +4,7 @@ import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistrie
 import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
 import { reconcileEnabledGroups, sameIds, type ReconciledCueGroups } from './cueGroupReconcile'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('cueDomainBindings')
@@ -30,6 +31,8 @@ export interface CueDomainRegistryBinding {
   setDisabled: (map: Record<string, string[]>) => void
   readStored: (config: ConfigurationManager) => StoredCueGroups
   persist: (config: ConfigurationManager, patch: Partial<CueDomainPrefs>) => Promise<void>
+  /** Broadcast to every window when the domain's enabled groups or disabled cues change. */
+  changedEvent?: (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
   /**
    * Registry-wide settings applied once at startup, before the node cue loader registers any
    * groups. Enabled and disabled state is not lasting here (it would apply to an empty registry);
@@ -85,6 +88,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => CueRegistry.getInstance().setEnabledGroups(ids),
     setDisabled: (map) => CueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('yarg'),
+    changedEvent: RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED,
     applyConsistencyWindow: applyYargConsistencyWindow,
     applyStartupSettings: (config) => {
       const registry = CueRegistry.getInstance()
@@ -109,6 +113,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => CueRegistry.getInstance().setEnabledMotionGroups(ids),
     setDisabled: (map) => CueRegistry.getInstance().setDisabledMotionCues(map),
     ...cueDomainStorage('yargMotion'),
+    changedEvent: RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = CueRegistry.getInstance()
       registry.setMotionSelectionMode(config.getMotionGroupSelectionMode())
@@ -121,6 +126,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => AudioCueRegistry.getInstance().setEnabledGroups(ids),
     setDisabled: (map) => AudioCueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('audio'),
+    changedEvent: RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = AudioCueRegistry.getInstance()
       // An empty selection is one the user chose, so it is applied as it is. First-run defaults
@@ -137,6 +143,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => AudioCueRegistry.getInstance().setEnabledMotionGroups(ids),
     setDisabled: (map) => AudioCueRegistry.getInstance().setDisabledMotionCues(map),
     ...cueDomainStorage('audioMotion'),
+    changedEvent: RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = AudioCueRegistry.getInstance()
       registry.setMotionSelectionMode(config.getAudioMotionGroupSelectionMode())
@@ -150,6 +157,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => getCueRegistry('rb3').setEnabledGroups(ids),
     setDisabled: (map) => getCueRegistry('rb3').setDisabledCues(map),
     ...cueDomainStorage('rb3'),
+    changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
     applyConsistencyWindow: applyRb3ConsistencyWindow,
     applyStartupSettings: (config) => {
       const registry = getCueRegistry('rb3')
@@ -168,6 +176,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => getCueRegistry('rb3').setEnabledMotionGroups(ids),
     setDisabled: (map) => getCueRegistry('rb3').setDisabledMotionCues(map),
     ...cueDomainStorage('rb3Motion'),
+    changedEvent: RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED,
     applyStartupSettings: (config) => {
       const registry = getCueRegistry('rb3')
       registry.setMotionSelectionMode(

@@ -284,6 +284,8 @@ export const RENDERER_RECEIVE = {
   LISTENER_ENABLED_CHANGED: 'listener:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
+  /** YARG enabled groups or per-cue disables changed (Preferences or a cue save, all windows). */
+  YARG_CUE_GROUPS_CHANGED: 'yarg:cue-groups-changed',
   /** Enabled audio cue groups or per-cue disables changed (Preferences → all windows). */
   AUDIO_CUE_GROUPS_CHANGED: 'audio:cue-groups-changed',
   /** YARG motion enabled groups or per-cue disables changed (Preferences → all windows). */

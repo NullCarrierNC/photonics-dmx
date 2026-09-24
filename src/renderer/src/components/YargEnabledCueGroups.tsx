@@ -7,6 +7,7 @@ import {
   getDisabledYargCues,
   setDisabledYargCues,
 } from '../ipcApi'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { CueGroupsPanel, type CueGroupsDomain } from './cue-groups/CueGroupsPanel'
 import {
   cueLabel,
@@ -28,6 +29,7 @@ const YARG_DOMAIN: CueGroupsDomain<CueGroup, LightingCueInfo> = {
   getDisabled: getDisabledYargCues,
   setDisabled: setDisabledYargCues,
   getCues: getAvailableCues,
+  changedEvent: RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED,
   renderCueLabel: (cue) => cueLabel(cue.id, cue.yargDescription),
   emptyLabel: NO_CUES_LABEL,
   cuesHeading: lightingCuesHeading,

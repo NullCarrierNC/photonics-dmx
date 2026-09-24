@@ -7,6 +7,14 @@ import * as ipcApi from '../ipcApi'
 import AudioEnabledCueGroups from './AudioEnabledCueGroups'
 
 jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
+
+jest.mock(
   '../ipcApi',
   () =>
     jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
