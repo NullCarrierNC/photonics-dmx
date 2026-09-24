@@ -1,4 +1,4 @@
-import { useAtom } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import { useCallback, useEffect, useId, useState } from 'react'
 import {
   yargListenerEnabledAtom,
@@ -7,13 +7,7 @@ import {
 } from '../atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import {
-  getAudioGameMode,
-  setAudioEnabled,
-  setAudioGameMode,
-  disableYarg,
-  disableRb3,
-} from '../ipcApi'
+import { getAudioGameMode, setAudioEnabled, setAudioGameMode } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('AudioToggle')
@@ -26,8 +20,8 @@ interface AudioToggleProps {
 
 const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
-  const [isYargEnabled, setIsYargEnabled] = useAtom(yargListenerEnabledAtom)
-  const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
+  const isYargEnabled = useAtomValue(yargListenerEnabledAtom)
+  const isRb3Enabled = useAtomValue(rb3eListenerEnabledAtom)
   const [isSaving, setIsSaving] = useState(false)
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
   const [gameModeSaving, setGameModeSaving] = useState(false)
@@ -68,18 +62,6 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
       if (!result.success) {
         log.error('Failed to save audio enabled state:', result.error)
         setIsAudioEnabled(!newState) // Revert on failure
-      } else {
-        // Disable YARG/RB3E when audio is enabled (mutual exclusion)
-        if (newState) {
-          if (isYargEnabled) {
-            setIsYargEnabled(false)
-            disableYarg()
-          }
-          if (isRb3Enabled) {
-            setIsRb3Enabled(false)
-            disableRb3()
-          }
-        }
       }
     } catch (error) {
       log.error('Failed to save audio enabled state:', error)

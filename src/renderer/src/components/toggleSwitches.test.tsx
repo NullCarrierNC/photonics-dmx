@@ -59,6 +59,30 @@ describe('toggle switches', () => {
     await waitFor(() => expect(switchNamed('Game mode')).toHaveAttribute('aria-checked', 'true'))
   })
 
+  it('turns audio on without touching the other listeners', async () => {
+    renderWithProviders(<AudioToggle />)
+
+    fireEvent.click(switchNamed('Enable Audio'))
+
+    await waitFor(() => expect(switchNamed('Enable Audio')).not.toBeDisabled())
+    expect(ipcApiMock.setAudioEnabled).toHaveBeenCalledWith(true)
+    expect(switchNamed('Enable Audio')).toHaveAttribute('aria-checked', 'true')
+    expect(ipcApiMock.disableYarg).not.toHaveBeenCalled()
+    expect(ipcApiMock.disableRb3).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['YARG', yargListenerEnabledAtom],
+    ['RB3E', rb3eListenerEnabledAtom],
+  ] as const)('holds the audio switch while the %s listener runs', (_name, other) => {
+    renderWithProviders(<AudioToggle />, { seed: (set) => set(other, true) })
+
+    fireEvent.click(switchNamed('Enable Audio'))
+
+    expect(switchNamed('Enable Audio')).toBeDisabled()
+    expect(ipcApiMock.setAudioEnabled).not.toHaveBeenCalled()
+  })
+
   it('names the smoothing switch and reports whether it is on', () => {
     renderWithProviders(<AudioSmoothingSettings />)
     expect(switchNamed('Enable Smoothing')).toHaveAttribute('aria-checked', 'true')
