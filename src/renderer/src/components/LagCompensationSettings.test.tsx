@@ -84,6 +84,11 @@ describe('LagCompensationSettings', () => {
     })
   })
 
+  it('says the master controls skip the delay and the lights then hold for it', () => {
+    renderWith()
+    expect(screen.getByText(/master dimmer and the strobe gate act at once/)).toBeInTheDocument()
+  })
+
   describe('what it shows', () => {
     it('is off when the preference has never been set', () => {
       renderWith()

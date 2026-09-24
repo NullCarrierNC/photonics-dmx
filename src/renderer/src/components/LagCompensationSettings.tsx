@@ -149,7 +149,8 @@ const LagCompensationSettings: React.FC = () => {
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         If your physical lights seem slightly out of sync with the lights on screen, set this to
-        match the calibration delay in game.
+        match the calibration delay in game. Blackout, the master dimmer and the strobe gate act at
+        once, so after using one the lights hold still for the delay while the show catches up.
       </p>
 
       <DelayField
