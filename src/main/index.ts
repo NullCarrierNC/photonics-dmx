@@ -6,6 +6,7 @@ import {
   installDefaultSessionPermissionHandlers,
 } from './rendererSessionSecurity'
 import { Application } from './application'
+import { refuseDebuggingSwitches } from './debuggingSwitches'
 import { createFileLogSink } from './logging/fileLogSink'
 import {
   consoleLogSink,
@@ -16,6 +17,8 @@ import {
 } from '../shared/logger'
 
 const log = createLogger('Main')
+
+refuseDebuggingSwitches()
 
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('disable-http-cache')

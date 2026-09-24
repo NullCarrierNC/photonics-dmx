@@ -17,6 +17,7 @@ const handleActivate = jest.fn()
 const applicationCtor = jest.fn()
 let mockIsPackaged = false
 let mockHasInstanceLock = true
+let mockSwitches: string[] = []
 const createFileLogSink = jest.fn()
 const installCsp = jest.fn()
 const installPermissionHandlers = jest.fn()
@@ -44,7 +45,10 @@ jest.mock('electron', () => ({
     get isPackaged() {
       return mockIsPackaged
     },
-    commandLine: { appendSwitch: jest.fn() },
+    commandLine: {
+      appendSwitch: jest.fn(),
+      hasSwitch: (name: string) => mockSwitches.includes(name),
+    },
     name: '',
   },
   BrowserWindow: { getAllWindows: jest.fn(() => [{}]) },
@@ -122,6 +126,7 @@ describe('main startup', () => {
     appExit.mockReset()
     appOn.mockReset()
     mockHasInstanceLock = true
+    mockSwitches = []
   })
 
   it('builds the application once Electron is ready', async () => {
@@ -168,6 +173,22 @@ describe('main startup', () => {
 
     expect(showErrorBox).toHaveBeenCalled()
     expect(appExit).toHaveBeenCalledWith(1)
+  })
+
+  it('stops a packaged launch with --remote-debugging-port before building anything', async () => {
+    mockIsPackaged = true
+    mockSwitches = ['remote-debugging-port']
+    const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    try {
+      await startUp()
+
+      expect(exit).toHaveBeenCalledWith(1)
+      expect(exit.mock.invocationCallOrder[0]).toBeLessThan(
+        whenReady.mock.invocationCallOrder[0] ?? Infinity,
+      )
+    } finally {
+      exit.mockRestore()
+    }
   })
 
   it('quits a second launch rather than running two copies', async () => {
