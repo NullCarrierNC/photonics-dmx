@@ -43,6 +43,36 @@ describe('readElectronFuses', () => {
   it('answers an empty set for a config with no electronFuses block', () => {
     expect(readElectronFuses('appId: com.example\n', KNOWN)).toEqual({})
   })
+
+  it('reads every boolean spelling electron-builder reads', () => {
+    const spelled = HARDENED.replace('runAsNode: false', 'runAsNode: False').replace(
+      'onlyLoadAppFromAsar: true',
+      'onlyLoadAppFromAsar: TRUE',
+    )
+
+    expect(readElectronFuses(spelled, KNOWN)).toMatchObject({
+      RunAsNode: false,
+      OnlyLoadAppFromAsar: true,
+    })
+  })
+
+  it('reads a flow mapping', () => {
+    const flow = `electronFuses: { runAsNode: false, onlyLoadAppFromAsar: true }\n`
+
+    expect(readElectronFuses(flow, KNOWN)).toEqual({ RunAsNode: false, OnlyLoadAppFromAsar: true })
+  })
+
+  it('reads a fuse only under the camel-case key electron-builder reads', () => {
+    const capitalised = HARDENED.replace('runAsNode: false', 'RunAsNode: false')
+
+    expect(readElectronFuses(capitalised, KNOWN)).not.toHaveProperty('RunAsNode')
+  })
+
+  it('reads a key with no value as unset', () => {
+    expect(
+      readElectronFuses(HARDENED.replace('runAsNode: false', 'runAsNode:'), KNOWN),
+    ).not.toHaveProperty('RunAsNode')
+  })
 })
 
 describe('fuseConfigProblems', () => {
@@ -71,6 +101,19 @@ describe('fuseConfigProblems', () => {
     expect(fuseConfigProblems(readElectronFuses(set, KNOWN))).toEqual([
       expect.stringContaining('GrantFileProtocolExtraPrivileges'),
       expect.stringContaining('EnableCookieEncryption'),
+    ])
+  })
+
+  it('names a fuse set to a quoted value, which electron-builder reads as on', () => {
+    const quoted = HARDENED.replace('runAsNode: false', "runAsNode: 'false'").replace(
+      '  resetAdHocDarwinSignature',
+      "  loadBrowserProcessSpecificV8Snapshot: 'false'\n  resetAdHocDarwinSignature",
+    )
+
+    expect(fuseConfigProblems(readElectronFuses(quoted, KNOWN))).toEqual([
+      'RunAsNode must be set off in electronFuses',
+      'RunAsNode must be true or false, and electron-builder reads "false" as on',
+      'LoadBrowserProcessSpecificV8Snapshot must be true or false, and electron-builder reads "false" as on',
     ])
   })
 

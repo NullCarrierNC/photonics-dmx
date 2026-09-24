@@ -3,6 +3,11 @@
  * to the hardened settings. The CLI in packaged-files-check.mjs reads the binary and owns the exit
  * code.
  */
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- the tests require this core
+const { createRequire } = require('node:module')
+
+/** js-yaml as electron-builder resolves it, so the file reads here the way a build reads it. */
+const yaml = createRequire(require.resolve('app-builder-lib'))('js-yaml')
 
 /**
  * Fuses every build sets. Off: running the binary as plain Node, NODE_OPTIONS and --inspect. On:
@@ -28,31 +33,27 @@ const HARDENED_WHEN_SET = {
 /**
  * @param {string} yamlText contents of electron-builder.yml
  * @param {string[]} knownFuses the fuse-wire names, such as RunAsNode
- * @returns {Record<string, boolean>} each fuse the electronFuses block sets, by fuse-wire name.
- *   Keys that are not fuses, such as resetAdHocDarwinSignature, are left out.
+ * @returns {Record<string, unknown>} each fuse the electronFuses block sets, by fuse-wire name,
+ *   read from the camel-case key electron-builder reads, such as runAsNode. A key with no value is
+ *   unset, as it is to electron-builder, and keys that are not fuses are left out.
  */
 function readElectronFuses(yamlText, knownFuses) {
-  /** @type {Record<string, boolean>} */
+  const block = yaml.load(yamlText)?.electronFuses
+  /** @type {Record<string, unknown>} */
   const fuses = {}
-  let inBlock = false
-  for (const line of yamlText.split(/\r?\n/)) {
-    if (/^electronFuses:\s*(#.*)?$/.test(line)) {
-      inBlock = true
-      continue
-    }
-    if (!inBlock || /^\s*(#.*)?$/.test(line)) continue
-    const entry = /^\s+([A-Za-z0-9]+):\s*(true|false)\s*(#.*)?$/.exec(line)
-    if (!/^\s/.test(line)) break
-    if (!entry) continue
-    const name = entry[1][0].toUpperCase() + entry[1].slice(1)
-    if (knownFuses.includes(name)) fuses[name] = entry[2] === 'true'
+  if (block === null || typeof block !== 'object') return fuses
+  for (const name of knownFuses) {
+    const value = block[name[0].toLowerCase() + name.slice(1)]
+    if (value !== null && value !== undefined) fuses[name] = value
   }
   return fuses
 }
 
 /**
- * @param {Record<string, boolean>} fuses what electron-builder.yml sets
- * @returns {string[]} one line per fuse the config leaves weaker than the hardened setting
+ * @param {Record<string, unknown>} fuses what electron-builder.yml sets
+ * @returns {string[]} one line per fuse the config leaves weaker than the hardened setting, and one
+ *   per fuse set to something other than true or false, which electron-builder turns on or off by
+ *   whether the value is truthy
  */
 function fuseConfigProblems(fuses) {
   const problems = []
@@ -64,6 +65,13 @@ function fuseConfigProblems(fuses) {
   for (const [name, wanted] of Object.entries(HARDENED_WHEN_SET)) {
     if (name in fuses && fuses[name] !== wanted) {
       problems.push(`${name} may only be set ${wanted ? 'on' : 'off'} in electronFuses`)
+    }
+  }
+  for (const [name, value] of Object.entries(fuses)) {
+    if (typeof value !== 'boolean') {
+      problems.push(
+        `${name} must be true or false, and electron-builder reads ${JSON.stringify(value)} as ${value ? 'on' : 'off'}`,
+      )
     }
   }
   return problems
