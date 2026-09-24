@@ -16,6 +16,7 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 const { tallyRuleReports } = require('./ruleReportsCore.cjs')
+const { budgetVerdict } = require('./countBudgetCore.cjs')
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -54,20 +55,6 @@ function countReports(ruleId) {
 }
 
 /**
- * The budget a file records, from its first line.
- *
- * @param {string} file
- * @returns {number | null} The recorded budget, or null when there is none to read.
- */
-function readBudget(file) {
-  if (!existsSync(file)) {
-    return null
-  }
-  const first = parseInt(readFileSync(file, 'utf8').trim().split('\n')[0], 10)
-  return Number.isNaN(first) || first < 0 ? null : first
-}
-
-/**
  * Run one rule's budget check, exiting the process with the result.
  *
  * @param {object} options
@@ -97,53 +84,35 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
 }
 
 /**
- * Hold a count to the budget a file records, exiting the process with the result.
+ * Hold a count, or several named counts, to the budget a file records, exiting the process with
+ * the result. countBudgetCore.cjs decides.
  *
  * @param {object} options
- * @param {number} options.count The count now.
+ * @param {number} [options.count] The count now, for a budget of one count.
+ * @param {Map<string, number>} [options.counts] The counts now by name, for a budget of several.
  * @param {string} options.budgetFile Path under metrics/, relative to the repository root.
  * @param {string} options.label What the count is called on screen, e.g. "Explicit any".
  * @param {string} options.counted What is counted, written into the budget file.
  * @param {string} options.note One line written into the budget file saying how to lower it.
  */
-export function runCountBudget({ count: current, budgetFile, label, counted, note }) {
+export function runCountBudget({ count, counts, budgetFile, label, counted, note }) {
   const file = join(root, budgetFile)
-
-  if (process.argv.includes('--write')) {
-    // A ratchet holds only while writing it can lower a count and never raise one.
-    const previous = readBudget(file)
-    if (previous !== null && current > previous) {
-      console.error(`${label} count ${current} is above the recorded ${previous} (file ${file})`)
-      console.error(
-        `Refusing to raise the budget. Fix the new reports, or edit line 1 of ${file} by hand if the increase is intended.`,
-      )
-      process.exit(1)
-    }
+  const verdict = budgetVerdict({
+    counts: counts ?? new Map([[label, count]]),
+    recordedText: existsSync(file) ? readFileSync(file, 'utf8') : null,
+    write: process.argv.includes('--write'),
+    label,
+    file,
+    counted,
+    note,
+  })
+  if (verdict.write !== undefined) {
     mkdirSync(dirname(file), { recursive: true })
-    const lines = [String(current), `Auto-generated: ${counted}`, note]
-    writeFileSync(file, `${lines.join('\n')}\n`, 'utf8')
-    console.log(`Wrote ${file} with count ${current}`)
-    process.exit(0)
+    writeFileSync(file, verdict.write, 'utf8')
   }
-
-  if (!existsSync(file)) {
-    console.error(`Missing ${file}. Run the same command with --write`)
-    process.exit(1)
+  for (const line of verdict.lines) {
+    if (verdict.ok) console.log(line)
+    else console.error(line)
   }
-
-  const budget = readBudget(file)
-  if (budget === null) {
-    console.error('Budget file must start with a non-negative integer on line 1')
-    process.exit(1)
-  }
-
-  if (current > budget) {
-    console.error(`${label} count ${current} exceeds budget ${budget} (file ${file})`)
-    console.error(
-      `Fix the new reports. --write will not raise the budget, so edit line 1 of ${file} by hand if the increase is intended.`,
-    )
-    process.exit(1)
-  }
-
-  console.log(`${label}: ${current} (budget ${budget}) - ok`)
+  process.exit(verdict.ok ? 0 : 1)
 }
