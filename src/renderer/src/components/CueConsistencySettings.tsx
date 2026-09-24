@@ -66,7 +66,18 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   const [rb3MotionDurationMin, setRb3MotionDurationMin] = useState(5)
   const [rb3MotionDurationMax, setRb3MotionDurationMax] = useState(20)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  // Writes run one at a time in the order they were asked for, so a change made while another
+  // field is saving still reaches main once that save lands.
+  const writes = useRef<Promise<unknown>>(Promise.resolve())
+  const [pendingWrites, setPendingWrites] = useState(0)
+  const isSaving = pendingWrites > 0
+
+  const queueWrite = useCallback((write: () => Promise<void>): Promise<void> => {
+    setPendingWrites((count) => count + 1)
+    const run = writes.current.then(write).finally(() => setPendingWrites((count) => count - 1))
+    writes.current = run.catch(() => undefined)
+    return run
+  }, [])
 
   const yargProbability = useProbabilitySaver(
     setMotionCueProbabilityPercent,
@@ -181,59 +192,55 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   }, [seedYargProbability, seedAudioProbability, seedRb3Probability])
 
   const handleConsistencyWindowChange = useCallback(
-    async (value: number) => {
-      if (isSaving) return
-
+    (value: number) => {
       const newValue = Math.max(0, Math.min(300000, value)) // Clamp to 0-300000
       setConsistencyWindow(newValue)
 
-      try {
-        setIsSaving(true)
-        const result = await setCueConsistencyWindow(newValue)
-        if (result.success) {
-          setConsistencyWindow(result.windowMs)
-          savedConsistencyWindow.current = result.windowMs
-        } else {
-          log.error('Failed to save consistency window:', result.error)
+      return queueWrite(async () => {
+        try {
+          const result = await setCueConsistencyWindow(newValue)
+          if (result.success) {
+            setConsistencyWindow(result.windowMs)
+            savedConsistencyWindow.current = result.windowMs
+          } else {
+            log.error('Failed to save consistency window:', result.error)
+            setConsistencyWindow(savedConsistencyWindow.current)
+          }
+        } catch (error) {
+          log.error('Failed to save consistency window:', error)
           setConsistencyWindow(savedConsistencyWindow.current)
         }
-      } catch (error) {
-        log.error('Failed to save consistency window:', error)
-        setConsistencyWindow(savedConsistencyWindow.current)
-      } finally {
-        setIsSaving(false)
-      }
+      })
     },
-    [isSaving],
+    [queueWrite],
   )
 
   /**
-   * Applies a chosen mode, saves it, and puts the previous one back when the save is refused. A
-   * save already in flight leaves the choice on screen without starting a second write.
+   * Applies a chosen mode, saves it once any write before it has landed, and puts the previous one
+   * back when the save is refused.
    */
-  async function saveMode<T extends string>(
+  function saveMode<T extends string>(
     next: T,
     previous: T,
     apply: (value: T) => void,
     save: (value: T) => Promise<{ success: boolean; error?: string }>,
     what: string,
   ): Promise<void> {
-    // Nothing is sent while another write is in flight, so do not show the choice either.
-    if (isSaving) return
     apply(next)
-    try {
-      setIsSaving(true)
-      const result = await save(next)
-      if (!result.success) {
-        log.error(`Failed to save ${what}:`, result.error)
+    return queueWrite(async () => {
+      try {
+        const result = await save(next)
+        if (result.success) {
+          apply(next)
+        } else {
+          log.error(`Failed to save ${what}:`, result.error)
+          apply(previous)
+        }
+      } catch (error) {
+        log.error(`Failed to save ${what}:`, error)
         apply(previous)
       }
-    } catch (error) {
-      log.error(`Failed to save ${what}:`, error)
-      apply(previous)
-    } finally {
-      setIsSaving(false)
-    }
+    })
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,88 +255,82 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   }
 
   const handleMotionMinHoldChange = useCallback(
-    async (value: number) => {
-      if (isSaving) return
+    (value: number) => {
       const newValue = Math.max(0, Math.min(600000, value))
       setMotionMinHoldMsState(newValue)
-      try {
-        setIsSaving(true)
-        const result = await setMotionCueMinHoldMs(newValue)
-        if (result.success && typeof result.minHoldMs === 'number') {
-          setMotionMinHoldMsState(result.minHoldMs)
-        } else if (!result.success) {
-          log.error('Failed to save motion min hold:', result.error)
-          const reload = await getMotionCueMinHoldMs()
-          if (reload.success && typeof reload.minHoldMs === 'number') {
-            setMotionMinHoldMsState(reload.minHoldMs)
-          }
-        }
-      } catch (error) {
-        log.error('Failed to save motion min hold:', error)
+      return queueWrite(async () => {
         try {
-          const reload = await getMotionCueMinHoldMs()
-          if (reload.success && typeof reload.minHoldMs === 'number') {
-            setMotionMinHoldMsState(reload.minHoldMs)
+          const result = await setMotionCueMinHoldMs(newValue)
+          if (result.success && typeof result.minHoldMs === 'number') {
+            setMotionMinHoldMsState(result.minHoldMs)
+          } else if (!result.success) {
+            log.error('Failed to save motion min hold:', result.error)
+            const reload = await getMotionCueMinHoldMs()
+            if (reload.success && typeof reload.minHoldMs === 'number') {
+              setMotionMinHoldMsState(reload.minHoldMs)
+            }
           }
-        } catch (reloadError) {
-          log.error('Failed to re-read motion min hold:', reloadError)
+        } catch (error) {
+          log.error('Failed to save motion min hold:', error)
+          try {
+            const reload = await getMotionCueMinHoldMs()
+            if (reload.success && typeof reload.minHoldMs === 'number') {
+              setMotionMinHoldMsState(reload.minHoldMs)
+            }
+          } catch (reloadError) {
+            log.error('Failed to re-read motion min hold:', reloadError)
+          }
         }
-      } finally {
-        setIsSaving(false)
-      }
+      })
     },
-    [isSaving],
+    [queueWrite],
   )
 
   const handleRb3MinHoldChange = useCallback(
-    async (value: number) => {
-      if (isSaving) return
+    (value: number) => {
       const newValue = Math.max(0, Math.min(600000, value))
       setRb3MotionMinHoldMsState(newValue)
-      try {
-        setIsSaving(true)
-        const result = await setRb3MotionCueMinHoldMs(newValue)
-        if (result.success && typeof result.minHoldMs === 'number') {
-          setRb3MotionMinHoldMsState(result.minHoldMs)
-        } else if (!result.success) {
-          const reload = await getRb3MotionCueMinHoldMs()
-          if (reload.success && typeof reload.minHoldMs === 'number') {
-            setRb3MotionMinHoldMsState(reload.minHoldMs)
+      return queueWrite(async () => {
+        try {
+          const result = await setRb3MotionCueMinHoldMs(newValue)
+          if (result.success && typeof result.minHoldMs === 'number') {
+            setRb3MotionMinHoldMsState(result.minHoldMs)
+          } else if (!result.success) {
+            const reload = await getRb3MotionCueMinHoldMs()
+            if (reload.success && typeof reload.minHoldMs === 'number') {
+              setRb3MotionMinHoldMsState(reload.minHoldMs)
+            }
           }
+        } catch (error) {
+          log.error('Failed to save RB3 motion min hold:', error)
         }
-      } catch (error) {
-        log.error('Failed to save RB3 motion min hold:', error)
-      } finally {
-        setIsSaving(false)
-      }
+      })
     },
-    [isSaving],
+    [queueWrite],
   )
 
   const handleRb3DurationChange = useCallback(
-    async (min: number, max: number) => {
-      if (isSaving) return
+    (min: number, max: number) => {
       const range = { min: Math.max(0, Math.min(600, min)), max: Math.max(0, Math.min(600, max)) }
-      try {
-        setIsSaving(true)
-        const result = await setRb3MotionCueDuration(range)
-        if (result.success && typeof result.min === 'number' && typeof result.max === 'number') {
-          setRb3MotionDurationMin(result.min)
-          setRb3MotionDurationMax(result.max)
-        } else if (!result.success) {
-          const reload = await getRb3MotionCueDuration()
-          if (reload.success) {
-            setRb3MotionDurationMin(reload.min)
-            setRb3MotionDurationMax(reload.max)
+      return queueWrite(async () => {
+        try {
+          const result = await setRb3MotionCueDuration(range)
+          if (result.success && typeof result.min === 'number' && typeof result.max === 'number') {
+            setRb3MotionDurationMin(result.min)
+            setRb3MotionDurationMax(result.max)
+          } else if (!result.success) {
+            const reload = await getRb3MotionCueDuration()
+            if (reload.success) {
+              setRb3MotionDurationMin(reload.min)
+              setRb3MotionDurationMax(reload.max)
+            }
           }
+        } catch (error) {
+          log.error('Failed to save RB3 motion duration:', error)
         }
-      } catch (error) {
-        log.error('Failed to save RB3 motion duration:', error)
-      } finally {
-        setIsSaving(false)
-      }
+      })
     },
-    [isSaving],
+    [queueWrite],
   )
 
   return (
