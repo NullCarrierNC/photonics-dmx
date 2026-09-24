@@ -138,7 +138,8 @@ export interface AppPreferences {
    * different amounts, and a loopback capture is early where a microphone is late. 0 is off.
    */
   audioLagCompensationMs?: number
-  audioConfig?: AudioConfig
+  /** Saves leave out `enabled`, and a file from an earlier build may hold only some fields. */
+  audioConfig?: Partial<Omit<AudioConfig, 'enabled'>>
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
   simulationSettings?: {
