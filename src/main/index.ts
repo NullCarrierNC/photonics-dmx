@@ -54,7 +54,9 @@ function reportStartupFailure(err: unknown): void {
   app.exit(1)
 }
 
-// Global error handling: delegate network sender errors to ControllerManager for unified handling
+// A network sender error stays with the senders. Anything else holds the lighting controllers
+// failed and dark until a restart (ControllerManager.handleUncaughtException), and the process
+// carries on so the blackout reaches the rig.
 process.on('uncaughtException', (error: unknown) => {
   const handled =
     applicationInstance?.getControllerManager()?.handleUncaughtException(error) ?? false
@@ -63,7 +65,8 @@ process.on('uncaughtException', (error: unknown) => {
   }
 })
 
-// Global unhandled promise rejection handling
+// Logged only, and the show carries on. A rejection nobody awaited is async work failing after
+// its caller moved on.
 process.on('unhandledRejection', (reason, _promise) => {
   log.error('Unhandled promise rejection:', reason)
 })

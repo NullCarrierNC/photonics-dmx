@@ -100,6 +100,7 @@ export function senderLifecycleStub() {
     getSenderManager: jest.fn(),
     ensureSenderManager: jest.fn(),
     setSenderErrorTrackingCallback: jest.fn(),
+    handleUncaughtException: jest.fn((_error: unknown, _isInitialized: () => boolean) => false),
   }
 }
 

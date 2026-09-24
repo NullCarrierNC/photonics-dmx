@@ -22,9 +22,9 @@ export class LifecycleAbortedError extends Error {
  */
 const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
   initializing: ['running', 'failed', 'shuttingDown'],
-  running: ['restarting', 'consoleMode', 'shuttingDown'],
+  running: ['restarting', 'consoleMode', 'failed', 'shuttingDown'],
   restarting: ['running', 'failed', 'shuttingDown'],
-  consoleMode: ['running', 'restarting', 'shuttingDown'],
+  consoleMode: ['running', 'restarting', 'failed', 'shuttingDown'],
   failed: ['running', 'restarting', 'shuttingDown'],
   shuttingDown: ['stopped'],
   stopped: [],
@@ -64,6 +64,8 @@ export class ControllerLifecycle {
   private initInFlight: Promise<void> | null = null
   /** The queued op or restart running now, past any wait on a shutdown. */
   private activeOp: Promise<unknown> | null = null
+  /** Set by an uncaught fault and cleared when the phase leaves `failed`. Refuses input enables. */
+  private faulted = false
 
   /**
    * @param broadcastPhase Called on every real phase transition so the renderer can disable
@@ -85,7 +87,20 @@ export class ControllerLifecycle {
       log.warn(`Unexpected lifecycle transition ${this.phaseValue} -> ${next}`)
     }
     this.phaseValue = next
+    if (next !== 'failed') this.faulted = false
     this.broadcastPhase(next)
+  }
+
+  /**
+   * Hold the graph `failed` after an uncaught fault, refusing input enables until a restart or
+   * init moves the phase on. Returns false, and changes nothing, once a shutdown has begun or while
+   * a fault is already held.
+   */
+  public markFaulted(): boolean {
+    if (this.isShuttingDown() || this.faulted) return false
+    this.setPhase('failed')
+    this.faulted = true
+    return true
   }
 
   /**
@@ -266,6 +281,16 @@ export class ControllerLifecycle {
     return this.runOp(async () => {
       await this.awaitShutdownWork()
       return this.runActive(op)
+    })
+  }
+
+  /** Run an input enable as a queued op, refused while an uncaught fault is held. */
+  public runQueuedEnable<T>(op: () => Promise<T>): Promise<T> {
+    return this.runQueuedOp(async () => {
+      if (this.faulted) {
+        throw new Error('The lighting controllers stopped after an error. Restart them first.')
+      }
+      return op()
     })
   }
 

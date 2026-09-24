@@ -26,6 +26,7 @@ import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycl
 import { ControllerGraph } from './ControllerGraph'
 import { runControllerRestart } from './controllerRestart'
 import { runControllerShutdown } from './controllerShutdown'
+import { holdFailedAfterFault } from './uncaughtFault'
 import {
   buildControllerCollaborators,
   type ControllerCollaborators,
@@ -272,7 +273,7 @@ export class ControllerManager {
    * additionally yields to any in-flight shutdown.
    */
   public async enableYarg(): Promise<void> {
-    await this.lifecycle.runQueuedOp(async () => {
+    await this.lifecycle.runQueuedEnable(async () => {
       await this.preemptSimulation()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
@@ -288,7 +289,7 @@ export class ControllerManager {
 
   /** Enable Rb3 listener. */
   public async enableRb3(): Promise<void> {
-    await this.lifecycle.runQueuedOp(async () => {
+    await this.lifecycle.runQueuedEnable(async () => {
       await this.preemptSimulation()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
@@ -367,12 +368,11 @@ export class ControllerManager {
     return domain === 'rb3' ? this.rb3TestEffectRunner : this.testEffectRunner
   }
 
-  /**
-   * Handles uncaught exceptions that are network sender errors.
-   * @returns true if the error was handled as a network sender error, false otherwise
-   */
+  /** True when the senders handled it. Any error but a network send holds the graph failed. */
   public handleUncaughtException(error: unknown): boolean {
-    return this.senderLifecycle.handleUncaughtException(error, () => this.getIsInitialized())
+    const handled = this.senderLifecycle.handleUncaughtException(error, () => this.isInitialized)
+    if (!handled) void holdFailedAfterFault(error, this.lifecycle, this)
+    return handled
   }
 
   /** Register a callback run during restart teardown. Returns an unregister function. */
@@ -500,7 +500,7 @@ export class ControllerManager {
 
   /** Enable audio listener and processor. */
   public async enableAudio(): Promise<void> {
-    await this.lifecycle.runQueuedOp(async () => {
+    await this.lifecycle.runQueuedEnable(async () => {
       await this.preemptSimulation()
       await this.listenerLifecycle.yargRb3.disableYarg()
       await this.listenerLifecycle.yargRb3.disableRb3()

@@ -34,6 +34,18 @@ function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
   return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
 }
 
+const NETWORK_SEND_ERROR_CODES = new Set(['EHOSTUNREACH', 'EHOSTDOWN', 'ENETUNREACH', 'ETIMEDOUT'])
+
+/** A UDP send that the network refused, which a wire sender's socket raises uncaught. */
+export function isNetworkSendError(err: unknown): err is NetworkErrorLike {
+  return (
+    isNetworkErrorLike(err) &&
+    err.code !== undefined &&
+    NETWORK_SEND_ERROR_CODES.has(err.code) &&
+    err.syscall === 'send'
+  )
+}
+
 export type OutputSenderStateSnapshot = {
   sacn: boolean
   artnet: boolean
@@ -248,30 +260,20 @@ export class SenderLifecycleController {
    * @returns true if the error was handled as a network sender error, false otherwise
    */
   public handleUncaughtException(error: unknown, getIsInitialized: () => boolean): boolean {
-    const isNetworkError =
-      isNetworkErrorLike(error) &&
-      (error.code === 'EHOSTUNREACH' ||
-        error.code === 'EHOSTDOWN' ||
-        error.code === 'ENETUNREACH' ||
-        error.code === 'ETIMEDOUT') &&
-      error.syscall === 'send'
-
-    if (!isNetworkError || !this.senderManager || !getIsInitialized()) {
+    if (!isNetworkSendError(error) || !this.senderManager || !getIsInitialized()) {
       return false
     }
 
     let senderId: string | null = null
-    if (isNetworkErrorLike(error)) {
-      const senderManager = this.senderManager
-      if (error.port != null) {
-        senderId = senderManager.getSenderIdByPort(error.port)
-      }
-      if (!senderId && error.port == null && error.address) {
-        if (senderManager.isSenderEnabled('artnet')) {
-          senderId = 'artnet'
-        } else if (senderManager.isSenderEnabled('sacn')) {
-          senderId = 'sacn'
-        }
+    const senderManager = this.senderManager
+    if (error.port != null) {
+      senderId = senderManager.getSenderIdByPort(error.port)
+    }
+    if (!senderId && error.port == null && error.address) {
+      if (senderManager.isSenderEnabled('artnet')) {
+        senderId = 'artnet'
+      } else if (senderManager.isSenderEnabled('sacn')) {
+        senderId = 'sacn'
       }
     }
 

@@ -7,8 +7,9 @@ const log = createLogger('LifecycleFailedBanner')
 
 /**
  * Shown while the controller graph is in the `failed` phase, which the main process reports when
- * initialization or a restart did not complete. The UI still runs in that state but nothing it
- * drives does, so this is the surface that says why and offers a way back without relaunching.
+ * initialization or a restart did not complete, or after an uncaught error. The UI still runs in
+ * that state but nothing it drives does, so this is the surface that says why and offers a way
+ * back without relaunching.
  */
 const LifecycleFailedBanner: React.FC = () => {
   const phase = useLifecyclePhase()
@@ -43,8 +44,8 @@ const LifecycleFailedBanner: React.FC = () => {
       role="alert"
       className="flex items-center gap-3 px-4 py-2 bg-red-600 text-white text-sm shadow-md">
       <span className="flex-grow">
-        Lighting controllers failed to start. DMX output, cues and listeners are unavailable. Check
-        the log for the cause, then retry.
+        Lighting controllers stopped after an error. DMX output, cues and listeners are unavailable.
+        Check the log for the cause, then retry.
         {retryError && <span className="block mt-1 opacity-90">Retry failed: {retryError}</span>}
       </span>
       <button
