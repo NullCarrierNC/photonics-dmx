@@ -75,6 +75,14 @@ export class FrameDriver implements SimDriver {
     const cueIsStrobe = isStrobeCueType(state.cue)
     const frame = this.buildFrame(state, transient, cueIsStrobe)
 
+    // A strobe cue rides the dedicated strobe slot; everything else is a primary/secondary
+    // look. Strobe_Off carries no implementation (handled internally by the handler). The
+    // frame's timing events follow the cue without waiting on it, matching the listener.
+    const cueDispatched =
+      !cueIsStrobe || state.cue !== CueType.Strobe_Off
+        ? this.handler.handleCue(state.cue, frame)
+        : Promise.resolve()
+
     if (transient.beat === 'Strong') {
       this.handler.handleBeat()
     } else if (transient.beat === 'Measure') {
@@ -92,14 +100,7 @@ export class FrameDriver implements SimDriver {
         this.handler.handleKeyframePrevious()
         break
     }
-
-    // A strobe cue rides the dedicated strobe slot; everything else is a primary/secondary
-    // look. Strobe_Off carries no implementation (handled internally by the handler).
-    if (!cueIsStrobe) {
-      await this.handler.handleCue(state.cue, frame)
-    } else if (state.cue !== CueType.Strobe_Off) {
-      await this.handler.handleCue(state.cue, frame)
-    }
+    await cueDispatched
 
     for (const note of frame.drumNotes) {
       if (note !== DrumNoteType.None) {

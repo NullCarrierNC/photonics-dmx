@@ -231,6 +231,25 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('timing events on a frame that carries a cue', () => {
+    it.each([
+      ['beat', { beat: 'Strong' }, 'handleBeat'],
+      ['measure', { beat: 'Measure' }, 'handleMeasure'],
+      ['keyframe', { keyframe: 'Next' }, 'handleKeyframeNext'],
+    ] as const)('dispatches the cue before the %s it arrives on', (_, timing, handlerName) => {
+      listener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Gameplay',
+        lightingCue: CueType.Verse,
+        ...timing,
+      })
+
+      const cueAt = cueHandler.handleCue.mock.invocationCallOrder[0]
+      const eventAt = cueHandler[handlerName].mock.invocationCallOrder[0]
+      expect(cueAt).toBeLessThan(eventAt)
+    })
+  })
+
   describe('menu cues once a song is on screen', () => {
     const dispatchedCues = (): unknown[] => cueHandler.handleCue.mock.calls.map((c) => c[0])
 

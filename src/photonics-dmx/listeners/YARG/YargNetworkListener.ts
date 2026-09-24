@@ -377,27 +377,6 @@ export class YargNetworkListener extends EventEmitter {
       YargCueData.currentScene === 'Gameplay' || YargCueData.currentScene === 'Practice'
     this.publishPostProcessing(showsVenue ? YargCueData.postProcessing : 'Default')
 
-    switch (YargCueData.beat) {
-      case 'Strong':
-        this.cueHandler.handleBeat()
-        break
-      case 'Measure':
-        this.cueHandler.handleMeasure()
-        break
-    }
-
-    switch (YargCueData.keyframe) {
-      case 'First':
-        this.cueHandler.handleKeyframeFirst()
-        break
-      case 'Next':
-        this.cueHandler.handleKeyframeNext()
-        break
-      case 'Previous':
-        this.cueHandler.handleKeyframePrevious()
-        break
-    }
-
     const cueType = YargCueData.lightingCue
     if (cueType && isCueType(cueType)) {
       // During gameplay a menu-side cue describes a screen the player has left, so it is
@@ -466,6 +445,29 @@ export class YargNetworkListener extends EventEmitter {
       void this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
     }
     this.strobeWatchdog.setStrobeRunning(currentHasActiveStrobe)
+
+    // After the cues, so a transition they submit to wait for this frame's beat, measure or
+    // keyframe starts on it.
+    switch (YargCueData.beat) {
+      case 'Strong':
+        this.cueHandler.handleBeat()
+        break
+      case 'Measure':
+        this.cueHandler.handleMeasure()
+        break
+    }
+
+    switch (YargCueData.keyframe) {
+      case 'First':
+        this.cueHandler.handleKeyframeFirst()
+        break
+      case 'Next':
+        this.cueHandler.handleKeyframeNext()
+        break
+      case 'Previous':
+        this.cueHandler.handleKeyframePrevious()
+        break
+    }
 
     const noteEdges = computeInstrumentRisingEdges(this.lastData, YargCueData)
     for (const note of noteEdges.drumNotes) {
