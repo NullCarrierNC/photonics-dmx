@@ -18,7 +18,7 @@ import type {
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
-import { createMockDmxLight, createMockLightingConfig } from '../../../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import type { RuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
@@ -33,7 +33,7 @@ function makeSequencerStub(): ILightingController {
 
 function fourFrontLightManager(): DmxLightManager {
   const frontLights = Array.from({ length: 4 }, (_, index) =>
-    createMockDmxLight({ id: `front-${index + 1}`, group: 'front', position: index + 1 }),
+    rgbLight({ id: `front-${index + 1}`, group: 'front', position: index + 1 }),
   )
   return new DmxLightManager(
     createMockLightingConfig({ numLights: 4, frontLights, backLights: [] }),

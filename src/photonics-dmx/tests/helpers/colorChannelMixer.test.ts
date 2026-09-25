@@ -15,29 +15,13 @@ import {
   EMITTER_PRIMARIES,
 } from '../../helpers/colorChannelMixer'
 import {
-  FixtureTypes,
   type DmxFixture,
   type ExtraChannel,
   type ExtraChannelType,
   type MixableChannelType,
+  type RgbFixture,
 } from '../../types'
-
-function makeFixture(
-  fixture: FixtureTypes,
-  channels: Record<string, number>,
-  extraChannels?: ExtraChannel[],
-): DmxFixture {
-  return {
-    id: 'tpl',
-    position: 0,
-    fixture,
-    label: 'L',
-    name: 'L',
-    isStrobeEnabled: false,
-    channels: channels as unknown as DmxFixture['channels'],
-    ...(extraChannels ? { extraChannels } : {}),
-  }
-}
+import { rgbFixture, rgbMovingHeadFixture, strobeFixture } from './testFixtures'
 
 function extra(type: ExtraChannelType, channel: number, value?: number): ExtraChannel {
   return value === undefined ? { type, channel } : { type, channel, value }
@@ -61,32 +45,36 @@ function mixAdditive(fixture: DmxFixture, r: number, g: number, b: number): Reco
 
 const RGB_CHANNELS = { masterDimmer: 1, red: 2, green: 3, blue: 4 }
 
+function withExtras(extraChannels: ExtraChannel[]): RgbFixture {
+  return rgbFixture({ channels: RGB_CHANNELS, extraChannels })
+}
+
 /**
  * What used to be the discrete RGBW archetype: RGB plus a white extra on the channel the named
  * white channel occupied. Every RGBW expectation below is unchanged from when the type existed,
  * which is the point — the mixer treats a white extra exactly as it treated the named channel.
  */
 function rgbwFixture(extras: ExtraChannel[] = []): DmxFixture {
-  return makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 5), ...extras])
+  return withExtras([extra('white', 5), ...extras])
 }
 
 describe('buildChannelMixPlan — when a plan is needed', () => {
   it('returns null for a plain RGB fixture (legacy path, bit-for-bit)', () => {
-    expect(buildChannelMixPlan(makeFixture(FixtureTypes.RGB, RGB_CHANNELS))).toBeNull()
+    expect(buildChannelMixPlan(rgbFixture({ channels: RGB_CHANNELS }))).toBeNull()
   })
 
   it('returns null for an RGB fixture that only has a hardware strobe channel', () => {
-    const f = makeFixture(FixtureTypes.RGB, { ...RGB_CHANNELS, strobeChannel: 5 })
+    const f = rgbFixture({ channels: { ...RGB_CHANNELS, strobeChannel: 5 } })
     expect(buildChannelMixPlan(f)).toBeNull()
   })
 
   it('returns null for an RGB moving head (pan/tilt are not colour channels)', () => {
-    const f = makeFixture(FixtureTypes.RGBMH, { ...RGB_CHANNELS, pan: 5, tilt: 6 })
+    const f = rgbMovingHeadFixture({ channels: { ...RGB_CHANNELS, pan: 5, tilt: 6 } })
     expect(buildChannelMixPlan(f)).toBeNull()
   })
 
   it('returns null for a dedicated strobe fixture with no extras', () => {
-    const f = makeFixture(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 2 })
+    const f = strobeFixture()
     expect(buildChannelMixPlan(f)).toBeNull()
   })
 
@@ -97,7 +85,7 @@ describe('buildChannelMixPlan — when a plan is needed', () => {
   })
 
   it('returns null when a template only has unassigned (channel 0) extras', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 0), extra('amber', 0)])
+    const f = withExtras([extra('white', 0), extra('amber', 0)])
     expect(buildChannelMixPlan(f)).toBeNull()
   })
 })
@@ -119,7 +107,7 @@ describe('applyChannelMixPlan — worked vectors', () => {
   })
 
   it('4: RGB+amber (255,191,0) → amber=255, rgb=0', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('amber', 5)])
+    const f = withExtras([extra('amber', 5)])
     expect(mix(f, 255, 191, 0)).toEqual({ 5: 255, 2: 0, 3: 0, 4: 0 })
   })
 
@@ -129,36 +117,32 @@ describe('applyChannelMixPlan — worked vectors', () => {
   })
 
   it('6: RGB+uv (128,0,128) → uv=128, red=64, green=0, blue=0', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('uv', 5)])
+    const f = withExtras([extra('uv', 5)])
     expect(mix(f, 128, 0, 128)).toEqual({ 5: 128, 2: 64, 3: 0, 4: 0 })
   })
 
   it('8a: RGB+uv (255,0,0) → uv stays dark, red=255', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('uv', 5)])
+    const f = withExtras([extra('uv', 5)])
     expect(mix(f, 255, 0, 0)).toEqual({ 5: 0, 2: 255, 3: 0, 4: 0 })
   })
 
   it('8b: RGB+uv (0,0,255) → uv stays dark, blue=255', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('uv', 5)])
+    const f = withExtras([extra('uv', 5)])
     expect(mix(f, 0, 0, 255)).toEqual({ 5: 0, 2: 0, 3: 0, 4: 255 })
   })
 
   it('9: RGB+orange (255,127,0) → orange=254, red=1', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('orange', 5)])
+    const f = withExtras([extra('orange', 5)])
     expect(mix(f, 255, 127, 0)).toEqual({ 5: 254, 2: 1, 3: 0, 4: 0 })
   })
 
   it('10: RGB+lime (127,255,0) → lime=254, green=1', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('lime', 5)])
+    const f = withExtras([extra('lime', 5)])
     expect(mix(f, 127, 255, 0)).toEqual({ 5: 254, 2: 0, 3: 1, 4: 0 })
   })
 
   it('11: RGB+amber+2×extra red (255,127,0) → amber=169, every red bank=86', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [
-      extra('amber', 5),
-      extra('red', 6),
-      extra('red', 7),
-    ])
+    const f = withExtras([extra('amber', 5), extra('red', 6), extra('red', 7)])
     // amber on ch5, named red ch2, extra reds ch6/ch7 all identical.
     expect(mix(f, 255, 127, 0)).toEqual({ 5: 169, 2: 86, 6: 86, 7: 86, 3: 0, 4: 0 })
   })
@@ -168,12 +152,12 @@ describe('applyChannelMixPlan — white precedence and duplicates', () => {
   it('white extracts before the narrower emitters, which take only what it leaves', () => {
     // Stage order is white first, so a neutral target is carried entirely by white and amber gets
     // nothing — the narrower emitter only ever colours the remainder.
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 5), extra('amber', 6)])
+    const f = withExtras([extra('white', 5), extra('amber', 6)])
     expect(mix(f, 255, 255, 255)).toEqual({ 5: 255, 6: 0, 2: 0, 3: 0, 4: 0 })
   })
 
   it('two amber banks receive the same value and the triple is subtracted once', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('amber', 5), extra('amber', 6)])
+    const f = withExtras([extra('amber', 5), extra('amber', 6)])
     const out = mix(f, 255, 191, 0)
     expect(out[5]).toBe(255)
     expect(out[6]).toBe(255)
@@ -206,9 +190,9 @@ describe('applyChannelMixPlan — additive white (strobe mode)', () => {
   })
 
   it('is inert on a fixture with no white emitter', () => {
-    const uv = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('uv', 5)])
+    const uv = withExtras([extra('uv', 5)])
     expect(mixAdditive(uv, 128, 0, 128)).toEqual(mix(uv, 128, 0, 128))
-    const amber = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('amber', 5)])
+    const amber = withExtras([extra('amber', 5)])
     expect(mixAdditive(amber, 255, 191, 0)).toEqual(mix(amber, 255, 191, 0))
   })
 
@@ -246,30 +230,26 @@ describe('applyChannelMixPlan — additive white (strobe mode)', () => {
 
 describe('fixed channels', () => {
   it('collects fixed channels into fixedWrites with a clamped value, not into stages', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('fixed', 5, 42)])
+    const f = withExtras([extra('fixed', 5, 42)])
     const plan = buildChannelMixPlan(f)!
     expect(plan.stages).toHaveLength(0)
     expect(plan.fixedWrites).toEqual([{ channel: 5, value: 42 }])
   })
 
   it('clamps an out-of-range fixed value into 0–255', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('fixed', 5, 999)])
+    const f = withExtras([extra('fixed', 5, 999)])
     expect(buildChannelMixPlan(f)!.fixedWrites).toEqual([{ channel: 5, value: 255 }])
   })
 
   it('a fixed value of 0 is valid and still emitted', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('fixed', 5, 0)])
+    const f = withExtras([extra('fixed', 5, 0)])
     expect(buildChannelMixPlan(f)!.fixedWrites).toEqual([{ channel: 5, value: 0 }])
   })
 })
 
 describe('invalid channels and strobe device class', () => {
   it('excludes out-of-range extra channel numbers and records them', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [
-      extra('amber', 600),
-      extra('white', 5),
-      extra('uv', 0),
-    ])
+    const f = withExtras([extra('amber', 600), extra('white', 5), extra('uv', 0)])
     const plan = buildChannelMixPlan(f)!
     expect(plan.invalidChannels).toHaveLength(2) // amber@600 and uv@0
     // Only the valid white extra produced a stage.
@@ -279,7 +259,7 @@ describe('invalid channels and strobe device class', () => {
   it('still returns a plan when every extra is excluded, so the caller can report it', () => {
     // Otherwise the exclusions are dropped with the plan and the user is never told why their
     // channel is dead. The plan has no stages, so it mixes to the legacy values.
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('amber', 600)])
+    const f = withExtras([extra('amber', 600)])
     const plan = buildChannelMixPlan(f)!
     expect(plan.invalidChannels).toHaveLength(1)
     expect(plan.stages).toHaveLength(0)
@@ -289,7 +269,7 @@ describe('invalid channels and strobe device class', () => {
   it('excludes an extra whose type it does not recognise instead of throwing', () => {
     // `extraChannels` reaches the mixer straight from persisted JSON, which the config schema only
     // validates loosely, so an unknown type is reachable and must degrade to a reported exclusion.
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [
+    const f = withExtras([
       { type: 'chartreuse' as ExtraChannelType, channel: 5 },
       extra('amber', 6),
     ])
@@ -301,10 +281,7 @@ describe('invalid channels and strobe device class', () => {
   })
 
   it('a dedicated strobe fixture honours fixed extras but never colour extras', () => {
-    const f = makeFixture(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 2 }, [
-      extra('fixed', 3, 200),
-      extra('red', 4),
-    ])
+    const f = strobeFixture({ extraChannels: [extra('fixed', 3, 200), extra('red', 4)] })
     const plan = buildChannelMixPlan(f)!
     expect(plan.fixedWrites).toEqual([{ channel: 3, value: 200 }])
     expect(plan.redChannels).toHaveLength(0)
@@ -333,7 +310,7 @@ describe('input sanitisation', () => {
 
 describe('white=0 matches legacy', () => {
   it('an unassigned white channel produces no plan (legacy RGB path)', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 0)])
+    const f = withExtras([extra('white', 0)])
     // No valid white channel → no stage, nothing else to mix → null plan → the publisher's legacy
     // path writes full RGB and never touches white, exactly as before this feature.
     expect(buildChannelMixPlan(f)).toBeNull()
@@ -357,7 +334,7 @@ describe('reconstruction and bounds invariants', () => {
 
   for (const set of EMITTER_SETS) {
     it(`${set.label}: outputs are ints in 0–255 and reconstruct the input within rounding slack`, () => {
-      const fixture = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, set.extras)
+      const fixture = withExtras(set.extras)
       const plan = buildChannelMixPlan(fixture)
       expect(plan).not.toBeNull()
 

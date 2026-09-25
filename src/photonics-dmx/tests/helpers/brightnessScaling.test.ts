@@ -15,14 +15,15 @@ import {
 import {
   ConfigStrobeType,
   FixtureTypes,
-  type DmxFixture,
   type DmxLight,
   type LightingConfiguration,
+  type RgbLight,
 } from '../../types'
 
-function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function fixture(overrides: Partial<RgbLight> = {}): RgbLight {
   return {
     id: 'f1',
+    fixtureId: 'f1',
     position: 1,
     fixture: FixtureTypes.RGB,
     label: 'RGB',
@@ -33,12 +34,12 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
   }
 }
 
-function config(lights: DmxFixture[]): LightingConfiguration {
+function config(lights: DmxLight[]): LightingConfiguration {
   return {
     numLights: lights.length,
     lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
     strobeType: ConfigStrobeType.AllCapable,
-    frontLights: lights as DmxLight[],
+    frontLights: lights,
     backLights: [],
     strobeLights: [],
   }

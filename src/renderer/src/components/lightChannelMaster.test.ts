@@ -5,13 +5,13 @@ import { describe, expect, it } from '@jest/globals'
 import {
   DMX_CHANNEL_MAX,
   FixtureTypes,
-  type DmxFixture,
   type ExtraChannel,
+  type RgbFixture,
 } from '../../../photonics-dmx/types'
 import { resolveMasterDimmer } from './lightChannelMaster'
 
 /** An RGB template whose colour channels sit at master + 1, 2, 3. */
-function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function template(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 't1',
     position: 0,
@@ -21,17 +21,20 @@ function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
     isStrobeEnabled: false,
     group: '',
     universe: 1,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }
 
 describe('resolveMasterDimmer', () => {
   it('moves every channel by the same offset', () => {
-    const { master, channels } = resolveMasterDimmer(template(), 100)
+    const { master, layout } = resolveMasterDimmer(template(), 100)
 
     expect(master).toBe(100)
-    expect(channels).toEqual({ masterDimmer: 100, red: 101, green: 102, blue: 103 })
+    expect(layout).toEqual({
+      fixture: FixtureTypes.RGB,
+      channels: { masterDimmer: 100, red: 101, green: 102, blue: 103 },
+    })
   })
 
   it('reports no cap for a master that fits', () => {

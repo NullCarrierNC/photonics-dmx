@@ -4,12 +4,7 @@ import { Billboard, Center, Grid, OrbitControls, SpotLight, Text3D } from '@reac
 import helvetikerFontUrl from 'three/examples/fonts/helvetiker_regular.typeface.json?url'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import {
-  LightingConfiguration,
-  DmxFixture,
-  RgbMovingHeadDmxChannels,
-  ConfigStrobeType,
-} from '../../../photonics-dmx/types'
+import { LightingConfiguration, DmxFixture, ConfigStrobeType } from '../../../photonics-dmx/types'
 import { getDmxPreviewLightColor } from './dmxPreviewLightColor'
 import {
   panTiltDmxToStageVector,
@@ -426,7 +421,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
         const dim = masterDimmer01(it.light, dmxValues)
         let dir: StageVector3
         if (isMovingHead(it.light)) {
-          const ch = it.light.channels as RgbMovingHeadDmxChannels
+          const ch = it.light.channels
           const pan = dmxValues[ch.pan] ?? 0
           const tilt = dmxValues[ch.tilt] ?? 0
           dir = panTiltDmxToStageVector(pan, tilt, it.light.config)

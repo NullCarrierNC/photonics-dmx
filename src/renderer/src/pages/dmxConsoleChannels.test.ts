@@ -7,10 +7,13 @@ import {
   ConfigStrobeType,
   FixtureTypes,
   type DmxFixture,
-  type DmxLight,
   type ExtraChannel,
   type LightingConfiguration,
+  type RgbDmxChannels,
+  type RgbFixture,
+  type RgbLight,
 } from '../../../photonics-dmx/types'
+import { strobeLight } from '../../../photonics-dmx/tests/helpers/testFixtures'
 import {
   buildConsoleFixedSeed,
   channelLabel,
@@ -25,7 +28,7 @@ import {
 } from './dmxConsoleChannels'
 
 /** An RGB template whose colour channels sit one, two and three above its master dimmer. */
-function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function template(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 't1',
     position: 0,
@@ -35,12 +38,12 @@ function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
     isStrobeEnabled: false,
     group: '',
     universe: 1,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }
 
-function light(overrides: Partial<DmxLight> = {}): DmxLight {
+function light(overrides: Partial<RgbLight> = {}): RgbLight {
   return {
     id: 'l1',
     fixtureId: 't1',
@@ -52,7 +55,7 @@ function light(overrides: Partial<DmxLight> = {}): DmxLight {
     group: 'front',
     universe: 1,
     mount: 'floor',
-    channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 } as DmxLight['channels'],
+    channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 },
     ...overrides,
   }
 }
@@ -78,7 +81,7 @@ describe('getTemplateAlignedChannels', () => {
         green: 3,
         blue: 4,
         strobeChannel: 5,
-      } as DmxFixture['channels'],
+      },
     })
 
     const channels = getTemplateAlignedChannels(light(), [withStrobe])
@@ -96,7 +99,7 @@ describe('getTemplateAlignedChannels', () => {
         green: 3,
         blue: 4,
         strobeChannel: 5,
-      } as DmxFixture['channels'],
+      },
     })
 
     const channels = getTemplateAlignedChannels(light(), [withStrobe])
@@ -108,7 +111,7 @@ describe('getTemplateAlignedChannels', () => {
   it('keeps a number the light already carries', () => {
     const channels = getTemplateAlignedChannels(
       light({
-        channels: { masterDimmer: 10, red: 99, green: 12, blue: 13 } as DmxLight['channels'],
+        channels: { masterDimmer: 10, red: 99, green: 12, blue: 13 },
       }),
       [template()],
     )
@@ -118,7 +121,8 @@ describe('getTemplateAlignedChannels', () => {
 
   it('reads the master dimmer from the light', () => {
     const channels = getTemplateAlignedChannels(
-      light({ channels: { masterDimmer: 200 } as DmxLight['channels'] }),
+      // A light with no red channel of its own, as when its template changed fixture type.
+      strobeLight({ fixtureId: 't1', channels: { masterDimmer: 200, strobeChannel: 240 } }),
       [template()],
     )
 
@@ -162,6 +166,12 @@ describe('buildConsoleFixedSeed', () => {
   const fixedAt = (channel: number, value?: number): ExtraChannel[] => [
     { type: 'fixed', channel, value },
   ]
+  const rgbAt = (masterDimmer: number): RgbDmxChannels => ({
+    masterDimmer,
+    red: masterDimmer + 1,
+    green: masterDimmer + 2,
+    blue: masterDimmer + 3,
+  })
 
   it('seeds a pinned channel from every group of the rig', () => {
     const templates = [
@@ -170,15 +180,9 @@ describe('buildConsoleFixedSeed', () => {
       template({ id: 'strobe', extraChannels: fixedAt(7, 50) }),
     ]
     const config = layout({
-      frontLights: [
-        light({ fixtureId: 'front', channels: { masterDimmer: 1 } as DmxLight['channels'] }),
-      ],
-      backLights: [
-        light({ fixtureId: 'back', channels: { masterDimmer: 1 } as DmxLight['channels'] }),
-      ],
-      strobeLights: [
-        light({ fixtureId: 'strobe', channels: { masterDimmer: 1 } as DmxLight['channels'] }),
-      ],
+      frontLights: [light({ fixtureId: 'front', channels: rgbAt(1) })],
+      backLights: [light({ fixtureId: 'back', channels: rgbAt(1) })],
+      strobeLights: [light({ fixtureId: 'strobe', channels: rgbAt(1) })],
     })
 
     expect(buildConsoleFixedSeed(config, templates)).toEqual({ 5: 200, 6: 100, 7: 50 })
@@ -187,7 +191,7 @@ describe('buildConsoleFixedSeed', () => {
   it('leaves colour extras out, since only a pinned channel holds a constant', () => {
     const templates = [template({ extraChannels: [{ type: 'white', channel: 5 }] })]
     const config = layout({
-      frontLights: [light({ channels: { masterDimmer: 1 } as DmxLight['channels'] })],
+      frontLights: [light({ channels: rgbAt(1) })],
     })
 
     expect(buildConsoleFixedSeed(config, templates)).toEqual({})
@@ -196,7 +200,7 @@ describe('buildConsoleFixedSeed', () => {
   it('treats a pinned channel with no value as zero', () => {
     const templates = [template({ extraChannels: fixedAt(5) })]
     const config = layout({
-      frontLights: [light({ channels: { masterDimmer: 1 } as DmxLight['channels'] })],
+      frontLights: [light({ channels: rgbAt(1) })],
     })
 
     expect(buildConsoleFixedSeed(config, templates)).toEqual({ 5: 0 })
@@ -209,8 +213,8 @@ describe('buildConsoleFixedSeed', () => {
     ]
     const config = layout({
       frontLights: [
-        light({ id: 'a', fixtureId: 'hi', channels: { masterDimmer: 1 } as DmxLight['channels'] }),
-        light({ id: 'b', fixtureId: 'lo', channels: { masterDimmer: 1 } as DmxLight['channels'] }),
+        light({ id: 'a', fixtureId: 'hi', channels: rgbAt(1) }),
+        light({ id: 'b', fixtureId: 'lo', channels: rgbAt(1) }),
       ],
     })
 
@@ -220,7 +224,7 @@ describe('buildConsoleFixedSeed', () => {
   it('skips a channel that lands outside the universe', () => {
     const templates = [template({ extraChannels: fixedAt(5, 200) })]
     const config = layout({
-      frontLights: [light({ channels: { masterDimmer: 600 } as DmxLight['channels'] })],
+      frontLights: [light({ channels: rgbAt(600) })],
     })
 
     expect(buildConsoleFixedSeed(config, templates)).toEqual({})
@@ -229,7 +233,8 @@ describe('buildConsoleFixedSeed', () => {
 
 describe('getEffectiveChannelEntries', () => {
   it('orders the channels the way the console lists them', () => {
-    const mh = template({
+    const mh: DmxFixture = {
+      ...template(),
       fixture: FixtureTypes.RGBMH,
       channels: {
         masterDimmer: 1,
@@ -238,8 +243,8 @@ describe('getEffectiveChannelEntries', () => {
         red: 2,
         green: 3,
         blue: 4,
-      } as DmxFixture['channels'],
-    })
+      },
+    }
 
     const names = getEffectiveChannelEntries(light(), [mh]).map(([name]) => name)
 
@@ -257,7 +262,7 @@ describe('lightOnChannel', () => {
   const second = light({
     id: 'l2',
     name: 'Second',
-    channels: { masterDimmer: 20, red: 21, green: 22, blue: 23 } as DmxLight['channels'],
+    channels: { masterDimmer: 20, red: 21, green: 22, blue: 23 },
   })
   const config = layout({ frontLights: [light()], backLights: [second] })
   const movingRed = { lightId: 'l1', channelName: 'red' }

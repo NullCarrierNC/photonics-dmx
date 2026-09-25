@@ -4,7 +4,7 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { getColor } from '../../helpers/dmxHelpers'
 import { Effect } from '../../types'
@@ -39,14 +39,14 @@ function createSequencerHarness(): SequencerHarness {
 
 function createStageKitLightManager() {
   const frontLights = Array.from({ length: 4 }, (_, index) =>
-    createMockDmxLight({
+    rgbLight({
       id: `front-${index + 1}`,
       position: index + 1,
     }),
   )
 
   const backLights = Array.from({ length: 4 }, (_, index) =>
-    createMockDmxLight({
+    rgbLight({
       id: `back-${index + 1}`,
       position: frontLights.length + index + 1,
     }),

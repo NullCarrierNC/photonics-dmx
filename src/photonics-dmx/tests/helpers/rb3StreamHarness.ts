@@ -13,7 +13,7 @@ import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectPr
 import type { DmxRig, RGBIO } from '../../types'
 import { ManualTestClock } from './sequencerHarness'
 import { createRecordingPublisher, type RecordingPublisher } from './recordingPublisher'
-import { createMockDmxLight, createMockLightingConfig } from './testFixtures'
+import { rgbLight, createMockLightingConfig } from './testFixtures'
 
 /** Light indices (0-based, front row) that are strobe-enabled. */
 const RB3_STREAM_STROBE_LIGHTS = [0, 4]
@@ -105,7 +105,7 @@ export function createRb3StreamHarness(options: Rb3StreamHarnessOptions = {}): R
   }
 
   const front = Array.from({ length: 8 }, (_, i) =>
-    createMockDmxLight({
+    rgbLight({
       id: `f${i + 1}`,
       fixtureId: `f${i + 1}`,
       position: i + 1,

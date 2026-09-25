@@ -9,13 +9,13 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import {
   DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
   FixtureTypes,
-  type DmxFixture,
+  type RgbFixture,
 } from '../../../photonics-dmx/types'
 import DmxChannels from './DmxChannels'
 
 afterEach(() => cleanup())
 
-function rgbFixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function rgbFixture(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 't',
     position: 0,
@@ -23,7 +23,7 @@ function rgbFixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
     label: 'PAR',
     name: 'PAR',
     isStrobeEnabled: false,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }

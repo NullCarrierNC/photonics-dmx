@@ -4,7 +4,6 @@ import {
   type DmxFixture,
   type DmxLight,
   type LightingConfiguration,
-  type RgbDmxChannels,
 } from '../types'
 
 /**
@@ -16,8 +15,7 @@ export function isRgbFamilyWithStrobeChannel(light: DmxFixture): boolean {
   if (light.fixture === FixtureTypes.STROBE) {
     return false
   }
-  const channels = light.channels as RgbDmxChannels
-  return typeof channels.strobeChannel === 'number'
+  return typeof light.channels.strobeChannel === 'number'
 }
 
 /**

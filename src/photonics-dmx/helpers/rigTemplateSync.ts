@@ -1,12 +1,15 @@
 import equal from 'fast-deep-equal'
-import { clampDerivedDmxChannel, DMX_CHANNEL_MAX } from '../types'
+import { clampDerivedDmxChannel, DMX_CHANNEL_MAX, FixtureTypes } from '../types'
 import type {
   DmxFixture,
   DmxLight,
   DmxRig,
   DmxRigsConfig,
   ExtraChannel,
+  FixtureChannelLayout,
   LightingConfiguration,
+  RgbDmxChannels,
+  RgbMovingHeadDmxChannels,
 } from '../types'
 
 /**
@@ -45,8 +48,6 @@ import type {
  *
  * Orphaned rig lights (whose `fixtureId` no longer resolves to a template) are returned unchanged.
  */
-
-type ChannelRecord = Record<string, number>
 
 /**
  * Derives a rig light's `extraChannels` from its template. `type`, `value` and `scale` are
@@ -112,24 +113,49 @@ export function maxMasterDimmerForTemplate(template: DmxFixture): number {
 }
 
 /**
- * Derives every base channel from a master dimmer using the template's own offsets — the offset
- * model this module documents. Results are normalised to the persisted 0/1–512 domain via
- * {@link clampDerivedDmxChannel}.
+ * The template's fixture type with every base channel derived from a master dimmer using the
+ * template's own offsets, the offset model this module documents. Results are normalised to the
+ * persisted 0/1-512 domain via {@link clampDerivedDmxChannel}.
  */
-export function deriveBaseChannelsForMaster(
+export function deriveChannelLayoutForMaster(
   template: DmxFixture,
   master: number,
-): Record<string, number> {
-  const templateChannels = template.channels
-  const templateMaster = templateChannels.masterDimmer ?? 0
-  const derived: Record<string, number> = {}
-  for (const [channelName, value] of Object.entries(templateChannels)) {
-    derived[channelName] =
-      channelName === 'masterDimmer'
-        ? clampDerivedDmxChannel(master)
-        : clampDerivedDmxChannel(master + (value - templateMaster))
+): FixtureChannelLayout {
+  const templateMaster = template.channels.masterDimmer
+  const at = (channel: number): number =>
+    clampDerivedDmxChannel(master + (channel - templateMaster))
+  const masterDimmer = clampDerivedDmxChannel(master)
+  switch (template.fixture) {
+    case FixtureTypes.STROBE:
+      return {
+        fixture: template.fixture,
+        channels: { masterDimmer, strobeChannel: at(template.channels.strobeChannel) },
+      }
+    case FixtureTypes.RGB: {
+      const { red, green, blue, strobeChannel } = template.channels
+      const channels: RgbDmxChannels = {
+        masterDimmer,
+        red: at(red),
+        green: at(green),
+        blue: at(blue),
+      }
+      if (strobeChannel !== undefined) channels.strobeChannel = at(strobeChannel)
+      return { fixture: template.fixture, channels }
+    }
+    case FixtureTypes.RGBMH: {
+      const { red, green, blue, pan, tilt, strobeChannel } = template.channels
+      const channels: RgbMovingHeadDmxChannels = {
+        masterDimmer,
+        red: at(red),
+        green: at(green),
+        blue: at(blue),
+        pan: at(pan),
+        tilt: at(tilt),
+      }
+      if (strobeChannel !== undefined) channels.strobeChannel = at(strobeChannel)
+      return { fixture: template.fixture, channels }
+    }
   }
-  return derived
 }
 
 /**
@@ -146,8 +172,8 @@ export function syncDmxLightWithTemplate(
 
   const rigChannels = light.channels
   const templateChannels = template.channels
-  const templateMaster = templateChannels.masterDimmer ?? 0
-  const rigMaster = rigChannels.masterDimmer ?? templateMaster
+  const templateMaster = templateChannels.masterDimmer
+  const rigMaster = rigChannels.masterDimmer
 
   // Channel layout is template-owned. Every channel except masterDimmer is derived from the
   // template's offset relative to its own master dimmer, applied to this rig light's master
@@ -157,7 +183,7 @@ export function syncDmxLightWithTemplate(
   // Results land in the persisted 0/1–512 domain, so a fixture addressed near the top of the
   // universe stays saveable; out-of-range channels read as unassigned rather than saturating onto
   // one address (see {@link clampDerivedDmxChannel}).
-  const nextChannels: ChannelRecord = deriveBaseChannelsForMaster(template, rigMaster)
+  const layout = deriveChannelLayoutForMaster(template, rigMaster)
 
   // Track whether `strobeChannel` was dropped, so we can clear `strobeValues` accordingly. The
   // template either has a strobeChannel (RGB+S model) or doesn't; the rig's previous state may have
@@ -201,10 +227,9 @@ export function syncDmxLightWithTemplate(
   // equality against the (potentially key-less) input doesn't trip on `{key: undefined}` vs absent.
   const synced: DmxLight = {
     ...light,
-    fixture: template.fixture,
+    ...layout,
     label: template.label,
     name: template.name,
-    channels: nextChannels as unknown as DmxLight['channels'],
   }
   if (nextStrobeValues !== undefined) {
     synced.strobeValues = nextStrobeValues

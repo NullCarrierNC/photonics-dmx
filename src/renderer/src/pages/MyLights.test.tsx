@@ -9,7 +9,7 @@ import { screen, fireEvent, cleanup, waitFor, act, within } from '@testing-libra
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
-import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
+import { FixtureTypes, type DmxFixture, type RgbFixture } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom } from './../atoms'
 import { randomUUID as nodeRandomUUID } from 'node:crypto'
 
@@ -35,7 +35,7 @@ import MyLights from './MyLights'
 import { ToastStack } from '../components/Toast'
 import ConfirmModalHost from '../components/ConfirmModalHost'
 
-function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function fixture(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 'light-1',
     position: 0,
@@ -43,7 +43,7 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
     label: 'PAR',
     name: 'Front PAR',
     isStrobeEnabled: false,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }

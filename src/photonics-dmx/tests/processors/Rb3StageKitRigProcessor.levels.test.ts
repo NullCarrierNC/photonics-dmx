@@ -5,7 +5,7 @@ import { LightTransitionController } from '../../controllers/sequencer/LightTran
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ManualTestClock } from '../helpers/sequencerHarness'
-import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
 
 const CLOCK_MS = 10
@@ -18,7 +18,7 @@ function buildRig() {
   const clockNow = jest.spyOn(performance, 'now').mockImplementation(() => now)
 
   const front = Array.from({ length: 8 }, (_, index) =>
-    createMockDmxLight({
+    rgbLight({
       id: `f${index + 1}`,
       group: 'front',
       position: index + 1,

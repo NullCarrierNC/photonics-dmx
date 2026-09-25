@@ -7,8 +7,8 @@ import {
   LightingConfiguration,
   DmxFixture,
   FixtureTypes,
-  RgbMovingHeadDmxChannels,
   ConfigStrobeType,
+  type RgbMovingHeadFixture,
 } from '../../../photonics-dmx/types'
 import { panTiltDmxToSphericalXY } from './lightsDmxPreviewMath'
 import {
@@ -129,7 +129,8 @@ const LightChannelSwatches: React.FC<{ entries: ChannelBreakdownEntry[] }> = ({ 
   </div>
 )
 
-const isMovingHead = (light: DmxFixture): boolean => light.fixture === FixtureTypes.RGBMH
+const isMovingHead = (light: DmxFixture): light is RgbMovingHeadFixture =>
+  light.fixture === FixtureTypes.RGBMH
 
 const baseCircleClasses =
   'w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md'
@@ -171,7 +172,7 @@ const LightCircle = React.memo(function LightCircle({ light, dmxValues }: LightC
     )
   }
 
-  const channels = light.channels as RgbMovingHeadDmxChannels
+  const channels = light.channels
   const pan = dmxValues[channels.pan] ?? 0
   const tilt = dmxValues[channels.tilt] ?? 0
   const { xPct, yPct } = panTiltDmxToSphericalXY(pan, tilt, light.config)

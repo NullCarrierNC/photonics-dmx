@@ -123,7 +123,7 @@ export type RgbMovingHeadDmxChannels = MovingHeadDmxChannels & RgbDmxChannels
  * outputs are master dimmer + strobe speed. Distinct from {@link RgbDmxChannels.strobeChannel},
  * which is the optional strobe-speed channel exposed by some RGB-family fixtures.
  */
-export type StrobeDmxChannels = BaseDmxFixture & {
+type StrobeDmxChannels = BaseDmxFixture & {
   strobeChannel: number
 }
 
@@ -174,16 +174,15 @@ export type TrackedLight = {
   bearingIsFlipped?: boolean
 }
 
-export interface DmxFixture {
+/** What every fixture carries, whatever its type. */
+type FixtureBase = {
   // The physical light
   id: string | null
   position: number
-  fixture: FixtureTypes
   label: string
   name: string
   isStrobeEnabled: boolean
   group?: string
-  channels: RgbDmxChannels | StrobeDmxChannels | RgbMovingHeadDmxChannels
   config?: FixtureConfig
   universe?: number
   /** Floor vs ceiling/truss placement for preview and static wash, default floor when omitted before migration. */
@@ -195,8 +194,8 @@ export interface DmxFixture {
    */
   strobeValues?: StrobeChannelValues
   /**
-   * User-added channels beyond the archetype's closed {@link channels} map. Ordered, and duplicates of a
-   * type are valid. Absent (never `[]`) when the fixture has no additions, so deep-equality and
+   * User-added channels beyond the fixture type's closed `channels` map. Ordered, and duplicates of
+   * a type are valid. Absent (never `[]`) when the fixture has no additions, so deep-equality and
    * template dedup treat "no extras" uniformly. On a rig snapshot ({@link DmxLight}) this field is
    * template-owned exactly like the channel layout: `type`/`value` are copied from the template and
    * `channel` is re-derived by the master-dimmer offset model on every sync.
@@ -209,13 +208,39 @@ export interface DmxFixture {
   brightnessScaling?: BrightnessScaling
 }
 
-export interface DmxLight extends DmxFixture {
-  fixtureId: string
+export type RgbFixture = FixtureBase & { fixture: FixtureTypes.RGB; channels: RgbDmxChannels }
+
+export type RgbMovingHeadFixture = FixtureBase & {
+  fixture: FixtureTypes.RGBMH
+  channels: RgbMovingHeadDmxChannels
 }
 
+export type StrobeFixture = FixtureBase & {
+  fixture: FixtureTypes.STROBE
+  channels: StrobeDmxChannels
+}
+
+/** A fixture type together with the channel map that goes with it. */
+export type FixtureChannelLayout =
+  | Pick<RgbFixture, 'fixture' | 'channels'>
+  | Pick<RgbMovingHeadFixture, 'fixture' | 'channels'>
+  | Pick<StrobeFixture, 'fixture' | 'channels'>
+
+/** A fixture template, its channel map tied to its fixture type. */
+export type DmxFixture = RgbFixture | RgbMovingHeadFixture | StrobeFixture
+
+/** A rig light: a fixture plus the id of the template it came from. */
+export type DmxLight = DmxFixture & { fixtureId: string }
+
+export type RgbLight = RgbFixture & { fixtureId: string }
+
+export type RgbMovingHeadLight = RgbMovingHeadFixture & { fixtureId: string }
+
+export type StrobeLight = StrobeFixture & { fixtureId: string }
+
 /**
- * A fixture's channels by name. Each archetype declares its own closed channel map, so code that
- * handles every archetype reads it through this view.
+ * A fixture's channels by name. Each fixture type declares its own closed channel map, so code
+ * that handles every fixture type reads it through this view.
  */
 export type ChannelView = Readonly<Record<string, number | undefined>>
 

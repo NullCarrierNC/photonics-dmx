@@ -5,12 +5,18 @@
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
-import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../../photonics-dmx/types'
+import {
+  FixtureTypes,
+  type DmxFixture,
+  type ExtraChannel,
+  type RgbFixture,
+} from '../../../photonics-dmx/types'
+import { strobeFixture } from '../../../photonics-dmx/tests/helpers/testFixtures'
 import LightSettings from './LightSettings'
 
 afterEach(() => cleanup())
 
-function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function fixture(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 't',
     position: 0,
@@ -18,7 +24,7 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
     label: 'L',
     name: 'L',
     isStrobeEnabled: false,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }
@@ -32,7 +38,10 @@ function scaleInput(channel: 'Red' | 'Green' | 'Blue'): HTMLInputElement {
 }
 
 /** Renders with state wired up, so a change and its follow-up render both apply. */
-function renderEditor(initial: DmxFixture): { latest: () => DmxFixture; setter: jest.Mock } {
+function renderEditor(initial: DmxFixture): {
+  latest: () => DmxFixture
+  setter: jest.Mock<(next: DmxFixture | null) => void>
+} {
   let current = initial
   const setter = jest.fn((next: DmxFixture | null) => {
     if (next === null) return
@@ -40,7 +49,7 @@ function renderEditor(initial: DmxFixture): { latest: () => DmxFixture; setter: 
     rerender(<LightSettings currentLight={current} setCurrentLight={setter} />)
   })
   const { rerender } = render(<LightSettings currentLight={current} setCurrentLight={setter} />)
-  return { latest: () => current, setter: setter as unknown as jest.Mock }
+  return { latest: () => current, setter }
 }
 
 describe('LightSettings brightness scaling', () => {
@@ -137,12 +146,7 @@ describe('LightSettings brightness scaling', () => {
   })
 
   it('offers no scaling at all for a colour-less strobe fixture', () => {
-    renderEditor(
-      fixture({
-        fixture: FixtureTypes.STROBE,
-        channels: { masterDimmer: 1, strobeChannel: 2 } as unknown as DmxFixture['channels'],
-      }),
-    )
+    renderEditor(strobeFixture())
     expect(screen.queryByLabelText('Use Brightness Scaling')).toBeNull()
   })
 

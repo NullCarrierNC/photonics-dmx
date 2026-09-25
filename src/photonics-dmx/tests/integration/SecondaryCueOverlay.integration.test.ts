@@ -27,7 +27,7 @@ import { CueType } from '../../cues/types/cueTypes'
 import type { NetNodeCueDefinition } from '../../cues/types/nodeCueTypes'
 import type { ActionNode, NetEventNode } from '../../cues/types/nodeCueTypes'
 import { ManualTestClock, createSequencerHarness } from '../helpers/sequencerHarness'
-import { createMockLightingConfig, createMockDmxLight } from '../helpers/testFixtures'
+import { createMockLightingConfig, rgbLight } from '../helpers/testFixtures'
 import { buildYargPacket } from '../helpers/yargPacket'
 import { loadCoreEffectRegistry } from '../helpers/effectRegistry'
 import { loadRb3CueFile, createRb3Cue, renderFrames } from '../helpers/rb3CueFile'
@@ -181,7 +181,7 @@ async function createYargRig(groupFile: string): Promise<YargRig> {
   const clock = new ManualTestClock(10)
   const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => clock.getCurrentTimeMs())
   const light = (group: 'front' | 'back' | 'strobe', position: number) =>
-    createMockDmxLight({
+    rgbLight({
       id: `${group}-${position}`,
       group,
       position,

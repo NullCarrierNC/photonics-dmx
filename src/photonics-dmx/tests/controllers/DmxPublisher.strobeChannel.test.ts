@@ -18,7 +18,13 @@ import { DmxPublisher } from '../../controllers/DmxPublisher'
 import { SenderManager } from '../../controllers/SenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
-import { ConfigStrobeType, FixtureTypes, type DmxRig, type RGBIO } from '../../types'
+import {
+  ConfigStrobeType,
+  FixtureTypes,
+  type DmxRig,
+  type RGBIO,
+  type RgbDmxChannels,
+} from '../../types'
 
 function makeBlackRgbio(): RGBIO {
   return { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace' }
@@ -80,7 +86,7 @@ function setupScenario(options: {
   const strobe = new StrobeStateManager()
   const publisher = new DmxPublisher(sender as unknown as SenderManager, lightStateManager, strobe)
 
-  const channels: Record<string, number> = {
+  const channels: RgbDmxChannels = {
     masterDimmer: 1,
     red: 2,
     green: 3,
@@ -110,7 +116,7 @@ function setupScenario(options: {
           group: 'front',
           universe: 1,
           mount: 'floor',
-          channels: channels as unknown as DmxRig['config']['frontLights'][number]['channels'],
+          channels,
           strobeValues: { slow: 30, medium: 90, fast: 180, fastest: 240 },
         },
       ],
@@ -321,7 +327,7 @@ describe('DmxPublisher dedicated STROBE fixtures', () => {
             channels: {
               masterDimmer: 10,
               strobeChannel: 11,
-            } as unknown as DmxRig['config']['strobeLights'][number]['channels'],
+            },
             // Crucially: NO strobeValues on a dedicated STROBE fixture. Asserts the publisher
             // gates on fixture type rather than just on `hasStrobeChannel`.
           },

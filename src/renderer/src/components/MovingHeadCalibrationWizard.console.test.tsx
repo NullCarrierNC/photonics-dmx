@@ -28,27 +28,23 @@ import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
 import {
-  FixtureTypes,
-  type DmxLight,
-  type LightingConfiguration,
-} from '../../../photonics-dmx/types'
+  createMockLightingConfig,
+  rgbMovingHeadLight,
+} from '../../../photonics-dmx/tests/helpers/testFixtures'
 
-const light = {
+const light = rgbMovingHeadLight({
   id: 'mh-1',
   name: 'Moving head',
   label: 'Moving head',
   position: 0,
-  fixture: FixtureTypes.RGBMH,
-  universe: 1,
-  channels: { masterDimmer: 1, pan: 2, tilt: 3 },
-  config: {},
-} as unknown as DmxLight
+  channels: { masterDimmer: 1, pan: 2, tilt: 3, red: 4, green: 5, blue: 6 },
+})
 
 const wizard = (
   <MovingHeadCalibrationWizard
     light={light}
     rigId="rig-1"
-    lightingConfig={{ frontLights: [], backLights: [] } as unknown as LightingConfiguration}
+    lightingConfig={createMockLightingConfig({ frontLights: [] })}
     onClose={() => {}}
     onComplete={() => {}}
   />

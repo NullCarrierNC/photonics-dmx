@@ -6,11 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { DmxPublisher } from '../../controllers/DmxPublisher'
 import { SenderManager } from '../../controllers/SenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
-import {
-  createMockDmxLight,
-  createMockRGBIP,
-  createMockLightingConfig,
-} from '../helpers/testFixtures'
+import { rgbLight, createMockRGBIP, createMockLightingConfig } from '../helpers/testFixtures'
 import { createRecordingPublisher, type RecordingPublisher } from '../helpers/recordingPublisher'
 import type { DmxRig, FixtureConfig, LightingConfiguration, RGBIO } from '../../types'
 import { ConfigStrobeType, DEFAULT_STROBE_CHANNEL_VALUES, FixtureTypes } from '../../types'
@@ -80,11 +76,11 @@ describe('DmxPublisher', () => {
   })
 
   it('skips out-of-range channel numbers instead of writing unbounded buffer keys', () => {
-    const { createMockDmxLight } =
+    const { rgbLight } =
       jest.requireActual<typeof import('../helpers/testFixtures')>('../helpers/testFixtures')
     // A bad config already on disk: red at DMX 5000, masterDimmer negative, green NaN. Blue is the
     // only valid channel and must still publish.
-    const badLight = createMockDmxLight({
+    const badLight = rgbLight({
       channels: { red: 5000, green: NaN, blue: 3, masterDimmer: -4 },
     })
     const config = createMockLightingConfig({ frontLights: [badLight] })
@@ -346,7 +342,7 @@ describe('DmxPublisher strobe slot before any light state', () => {
   })
 
   function setup(strobeEnabled: boolean): RecordingPublisher {
-    const light = createMockDmxLight({
+    const light = rgbLight({
       id: 'f1',
       fixtureId: 'f1',
       isStrobeEnabled: strobeEnabled,

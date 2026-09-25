@@ -10,7 +10,7 @@ import { LightTransitionController } from '../../controllers/sequencer/LightTran
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ManualTestClock } from '../helpers/sequencerHarness'
-import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
 import { Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
 import { createRb3StreamHarness, type Rb3StreamHarness } from '../helpers/rb3StreamHarness'
@@ -26,7 +26,7 @@ async function runStrobe(clockMs: number, type: 'fastest' | 'fast' | 'medium'): 
   const clockNow = jest.spyOn(performance, 'now').mockImplementation(() => now)
 
   const front = Array.from({ length: 8 }, (_, index) =>
-    createMockDmxLight({
+    rgbLight({
       id: `f${index + 1}`,
       group: 'front',
       position: index + 1,

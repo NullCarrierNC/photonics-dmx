@@ -18,6 +18,7 @@ import type {
   DmxLight,
   ExtraChannel,
   ExtraChannelType,
+  FixtureChannelLayout,
   FixtureConfig,
   LegacyFixtureConfigFields,
   RgbDmxChannels,
@@ -73,7 +74,7 @@ function parseChannels(
   raw: unknown,
   path: string,
   report: FixtureFaultReport,
-): DmxFixture['channels'] {
+): FixtureChannelLayout {
   if (!isPlainObject(raw)) {
     report(`${path}.channels is missing`)
   }
@@ -96,12 +97,15 @@ function parseChannels(
     return 0
   }
 
-  let channels: DmxFixture['channels']
+  let layout: FixtureChannelLayout
   switch (fixture) {
     case FixtureTypes.STROBE:
-      channels = {
-        masterDimmer: required('masterDimmer'),
-        strobeChannel: required('strobeChannel'),
+      layout = {
+        fixture,
+        channels: {
+          masterDimmer: required('masterDimmer'),
+          strobeChannel: required('strobeChannel'),
+        },
       }
       break
     case FixtureTypes.RGB: {
@@ -113,7 +117,7 @@ function parseChannels(
       }
       const strobeChannel = channel('strobeChannel')
       if (strobeChannel !== undefined) rgb.strobeChannel = strobeChannel
-      channels = rgb
+      layout = { fixture, channels: rgb }
       break
     }
     case FixtureTypes.RGBMH: {
@@ -127,7 +131,7 @@ function parseChannels(
       }
       const strobeChannel = channel('strobeChannel')
       if (strobeChannel !== undefined) movingHead.strobeChannel = strobeChannel
-      channels = movingHead
+      layout = { fixture, channels: movingHead }
       break
     }
   }
@@ -135,7 +139,7 @@ function parseChannels(
   for (const key of Object.keys(source)) {
     if (!read.has(key)) report(`${path}.channels.${key} is not a channel of a ${fixture} fixture`)
   }
-  return channels
+  return layout
 }
 
 function parseConfig(raw: unknown, path: string, report: FixtureFaultReport): FixtureConfig {
@@ -279,11 +283,10 @@ function parseFixtureFields(
   const fixture: DmxFixture = {
     id,
     position,
-    fixture: fixtureType,
     label: text('label'),
     name: text('name'),
     isStrobeEnabled,
-    channels: parseChannels(fixtureType, raw.channels, path, report),
+    ...parseChannels(fixtureType, raw.channels, path, report),
   }
 
   if (typeof raw.group === 'string') fixture.group = raw.group

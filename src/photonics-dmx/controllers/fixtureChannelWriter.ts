@@ -1,12 +1,5 @@
-import {
-  DEFAULT_STROBE_CHANNEL_VALUES,
-  type DmxFixture,
-  type MovingHeadDmxChannels,
-  type RgbDmxChannels,
-  type StrobeDmxChannels,
-} from '../types'
+import { DEFAULT_STROBE_CHANNEL_VALUES, type DmxFixture } from '../types'
 import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
-import { castToChannelType } from '../helpers/dmxHelpers'
 import {
   applyChannelMixPlan,
   buildChannelMixPlan,
@@ -52,8 +45,6 @@ export class FixtureChannelWriter {
   /** Light ids already reported for excluded extra channels. Separate from the range set, so a
    *  fixture with both faults reports both. */
   private _reportedInvalidExtraLights = new Set<string>()
-  /** Light ids already reported for a fixture type the channel cast does not know. */
-  private _reportedCastFailureLights = new Set<string>()
   /**
    * Colour-mixing plans keyed by fixture object identity. `syncDmxLightWithTemplate` replaces a
    * fixture object whenever its channels or extras change and returns the same reference
@@ -88,7 +79,6 @@ export class FixtureChannelWriter {
   public resetFaultReports(): void {
     this._reportedBadChannelLights.clear()
     this._reportedInvalidExtraLights.clear()
-    this._reportedCastFailureLights.clear()
   }
 
   /**
@@ -105,32 +95,9 @@ export class FixtureChannelWriter {
     this._lightId = lightId
     this._scaleMap = this._scaleMapFor(fixture)
 
-    const channelsInput: { [key: string]: number } = {
-      red: output.red,
-      green: output.green,
-      blue: output.blue,
-      masterDimmer: output.intensity,
-      pan: output.pan,
-      tilt: output.tilt,
-    }
-
-    let dmxChannelData
-    try {
-      dmxChannelData = castToChannelType(fixture.fixture, channelsInput)
-    } catch (error) {
-      // Once per light. This runs per light per frame, so a bad fixture reports on its first
-      // frame and stays quiet for as long as it is configured.
-      if (!this._reportedCastFailureLights.has(lightId)) {
-        this._reportedCastFailureLights.add(lightId)
-        log.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
-      }
-      return
-    }
-
     // With a plan, the mixer owns the colour channels (named red, green, blue and white, plus any
     // extras). It splits the rgb into the fixture's declared emitters and writes what is left back
-    // to the rgb channels. Without one, the switch below writes them. It runs after the cast so a
-    // cast failure still skips the whole light.
+    // to the rgb channels. Without one, the switch below writes them.
     const mixPlan = this._mixPlanFor(fixture)
     if (mixPlan) {
       this._warnInvalidExtras(lightId, mixPlan)
@@ -153,16 +120,16 @@ export class FixtureChannelWriter {
         case 'blue':
           // The mixer owns these when there is a plan.
           if (mixPlan) continue
-          value = (dmxChannelData as RgbDmxChannels)[channelName]
+          value = output[channelName]
           break
         case 'masterDimmer':
-          value = (dmxChannelData as RgbDmxChannels | StrobeDmxChannels).masterDimmer
+          value = output.intensity
           break
         case 'pan':
-          value = (dmxChannelData as MovingHeadDmxChannels).pan
+          value = output.pan
           break
         case 'tilt':
-          value = (dmxChannelData as MovingHeadDmxChannels).tilt
+          value = output.tilt
           break
         case 'strobeChannel':
           value = strobeSlot ? strobeChannelValue(fixture, strobeSlot) : 0
@@ -197,7 +164,7 @@ export class FixtureChannelWriter {
     for (const [lightId, fixture] of fixtures) {
       if (visited.has(lightId)) continue
       this._lightId = lightId
-      const strobeChannel = (fixture.channels as RgbDmxChannels).strobeChannel
+      const strobeChannel = fixture.channels.strobeChannel
       if (
         strobeSlot &&
         typeof strobeChannel === 'number' &&
@@ -226,7 +193,7 @@ export class FixtureChannelWriter {
       }
       return
     }
-    const clamped = Math.max(0, Math.min(255, value))
+    const clamped = Number.isFinite(value) ? Math.max(0, Math.min(255, value)) : 0
     // Scaling is a property of the fixture, so the wire gets it and the IPC buffer keeps cue
     // intent. The preview re-applies it on request, rounding through the same helper.
     const scalePercent = this._scaleMap?.get(channelNumber)

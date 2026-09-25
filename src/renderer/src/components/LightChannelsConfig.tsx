@@ -5,7 +5,6 @@ import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   ExtraChannel,
   FixtureTypes,
-  RgbDmxChannels,
   StrobeChannelValues,
   FIXTURE_CONFIG_FIELDS,
   FixtureConfig,
@@ -18,9 +17,8 @@ import {
 } from '../../../photonics-dmx/types'
 import { DraftNumberField } from './controls/DraftField'
 import { LightIcon } from './LightIcon'
-import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
 import {
-  deriveBaseChannelsForMaster,
+  deriveChannelLayoutForMaster,
   deriveExtraChannelsForMaster,
   maxMasterDimmerForTemplate,
 } from '../../../photonics-dmx/helpers/rigTemplateSync'
@@ -128,13 +126,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // Handle Main Channels
       const templateChannels = fixtureTemplate.channels
       const existingMasterDimmer = light.channels.masterDimmer
-      const recalculatedChannels = deriveBaseChannelsForMaster(
-        fixtureTemplate,
-        existingMasterDimmer,
-      )
-
-      const castChannels = castToChannelType(fixtureTemplate.fixture, recalculatedChannels)
-      setLocalChannels(castChannels)
+      setLocalChannels(deriveChannelLayoutForMaster(fixtureTemplate, existingMasterDimmer).channels)
       setLocalExtraChannels(
         deriveExtraChannelsForMaster(
           fixtureTemplate.extraChannels,
@@ -175,10 +167,10 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     setMasterDimmerNotice(
       resolved.cappedMessage ? { lightId: light.id, message: resolved.cappedMessage } : null,
     )
-    setLocalChannels({ ...resolved.channels })
+    setLocalChannels(resolved.layout.channels)
     setLocalExtraChannels(resolved.extraChannels)
 
-    const updatedLight: DmxLight = { ...light, channels: { ...resolved.channels } }
+    const updatedLight: DmxLight = { ...light, ...resolved.layout }
     // Set/delete (not omit-on-spread): the spread copies the rig light's existing extraChannels,
     // so we must explicitly drop them when the template now has none, or a stale key persists.
     if (resolved.extraChannels) updatedLight.extraChannels = resolved.extraChannels
@@ -240,10 +232,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       light.channels.masterDimmer,
       maxMasterDimmerForTemplate(selectedFixture),
     )
-    const recalculatedChannels = deriveBaseChannelsForMaster(selectedFixture, existingMasterDimmer)
-
-    const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
-    setLocalChannels({ ...castChannels })
+    const layout = deriveChannelLayoutForMaster(selectedFixture, existingMasterDimmer)
+    setLocalChannels(layout.channels)
 
     const extras = deriveExtraChannelsForMaster(
       selectedFixture.extraChannels,
@@ -254,12 +244,11 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
     const updatedLight: DmxLight = {
       ...light,
+      ...layout,
       fixtureId: selectedFixture.id!,
-      fixture: selectedFixture.fixture,
       label: selectedFixture.label,
       name: selectedFixture.name,
       isStrobeEnabled: selectedFixture.isStrobeEnabled,
-      channels: { ...castChannels },
     }
     // Set/delete so switching to a template with no extras drops the previous template's extras.
     if (extras) updatedLight.extraChannels = extras
@@ -308,7 +297,9 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
 
-  const showCalibrate = !!light && !!rigId && !!light.id && light.fixture === FixtureTypes.RGBMH
+  // A saved moving head in a rig is what the calibration wizard opens for.
+  const calibration =
+    light?.fixture === FixtureTypes.RGBMH && light.id && rigId ? { light, rigId } : null
 
   let dragHandleButton: React.ReactNode = null
   if (dragHandle) {
@@ -344,15 +335,15 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                       : 'bg-gray-300 dark:bg-[#303548] hover:bg-gray-200 dark:hover:bg-[#40465a]'
                   }`}>
       {dragHandleButton}
-      {calibrationOpen && showCalibrate && light && rigId && (
+      {calibrationOpen && calibration && (
         <MovingHeadCalibrationWizard
-          key={light.id}
-          light={light}
-          rigId={rigId}
+          key={calibration.light.id}
+          light={calibration.light}
+          rigId={calibration.rigId}
           lightingConfig={lightingConfig}
           onClose={() => setCalibrationOpen(false)}
           onComplete={(updatedConfig) => {
-            onChange({ ...light, config: updatedConfig })
+            onChange({ ...calibration.light, config: updatedConfig })
           }}
         />
       )}
@@ -497,7 +488,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         </div>
       )}
 
-      {showCalibrate && (
+      {calibration && (
         <div className="w-full mt-2">
           <button
             type="button"
@@ -533,7 +524,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light &&
         light.isStrobeEnabled &&
         light.fixture !== FixtureTypes.STROBE &&
-        typeof (light.channels as RgbDmxChannels).strobeChannel === 'number' && (
+        typeof light.channels.strobeChannel === 'number' && (
           <div className="w-full mt-2 space-y-1">
             <h4 className="text-sm font-semibold">Strobe Speed Values</h4>
             <p className="text-xs text-gray-600 dark:text-gray-400">

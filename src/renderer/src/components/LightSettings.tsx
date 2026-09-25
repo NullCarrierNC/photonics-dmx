@@ -11,13 +11,12 @@ import {
   ExtraChannel,
   FixtureConfig,
   FixtureTypes,
-  LightTypes,
-  RgbDmxChannels,
   StrobeChannelValues,
   normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
 import { isStorableBrightnessScale } from '../../../photonics-dmx/helpers/brightnessScaling'
 import { extraChannelDisplayLabel } from './lightChannelDisplay'
+import { withChannelNumber, withFixtureType, withStrobeChannelOption } from './fixtureTemplateEdits'
 
 function isFixtureConfigKey(name: string): name is keyof FixtureConfig {
   return name in DEFAULT_MOVING_HEAD_FIXTURE_CONFIG
@@ -61,8 +60,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     return null // Hide form if currentLight is null
   }
 
-  const channels = currentLight.channels as RgbDmxChannels
-  const hasStrobeChannel = typeof channels.strobeChannel === 'number'
+  const hasStrobeChannel = typeof currentLight.channels.strobeChannel === 'number'
   const isDedicatedStrobe = currentLight.fixture === FixtureTypes.STROBE
   // The "Strobe Channel?" toggle and the four per-speed DMX values belong to the RGB+S model only.
   // Dedicated STROBE fixtures are a separate device class (colour-less hardware strobe) — they
@@ -86,53 +84,9 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
   }
 
   const handleTypeChange = (newType: FixtureTypes) => {
-    const defaultType = LightTypes.find((type) => type.fixture === newType)
-    if (!defaultType) return
-
-    // Preserve the user's strobe-channel choice across RGB-family type changes. Dedicated STROBE
-    // fixtures are a separate device class — they intrinsically carry a strobe channel and don't
-    // consume `strobeValues`, so when switching into/out of STROBE we drop the RGB+S extras.
-    const nextChannels: Record<string, number | undefined> = { ...defaultType.channels }
-    const prevStrobe = channels.strobeChannel
-    const newIsStrobeFixture = newType === FixtureTypes.STROBE
-    if (newIsStrobeFixture) {
-      // Template already includes strobeChannel; nothing extra to carry over from prev RGB-family.
-    } else if (typeof prevStrobe === 'number' && currentLight.fixture !== FixtureTypes.STROBE) {
-      nextChannels.strobeChannel = prevStrobe
-    } else {
-      delete nextChannels.strobeChannel
-    }
-
-    // strobeValues only applies to RGB-family fixtures with hasStrobeChannel — clear on STROBE.
-    const nextStrobeValues = newIsStrobeFixture
-      ? undefined
-      : typeof nextChannels.strobeChannel === 'number'
-        ? currentLight.strobeValues ?? { ...DEFAULT_STROBE_CHANNEL_VALUES }
-        : undefined
-
-    // Extra channels survive RGB-family switches. A dedicated STROBE fixture is colour-less, so only
-    // fixed (mode) channels carry over; an empty result must become key-absent (never persist []).
-    const prevExtras = currentLight.extraChannels ?? []
-    const nextExtras: ExtraChannel[] | undefined = newIsStrobeFixture
-      ? prevExtras.filter((ec) => ec.type === 'fixed')
-      : prevExtras
-    const nextLight: DmxFixture = {
-      ...currentLight,
-      fixture: newType,
-      channels: nextChannels as unknown as DmxFixture['channels'],
-      config: defaultType.config ? normalizeFixtureConfig(defaultType.config) : undefined,
-      strobeValues: nextStrobeValues,
-    }
-    if (nextExtras && nextExtras.length > 0) nextLight.extraChannels = nextExtras
-    else delete nextLight.extraChannels
-
-    // A colour-less strobe has nothing to balance. Its colour extras were filtered out above.
-    if (newIsStrobeFixture) delete nextLight.brightnessScaling
-
-    setCurrentLight(nextLight)
+    setCurrentLight(withFixtureType(currentLight, newType))
   }
 
-  // Updated handleChannelChange to accept number | boolean
   const handleChannelChange = (channelName: string, value: number | boolean) => {
     if (currentLight.config && isFixtureConfigKey(channelName)) {
       setCurrentLight({
@@ -142,36 +96,13 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
           [channelName]: value,
         }),
       })
-    } else {
-      // Update regular channels
-      setCurrentLight({
-        ...currentLight,
-        channels: {
-          ...currentLight.channels,
-          [channelName]: value as number, // Type assertion since channels expect number
-        },
-      })
+    } else if (typeof value === 'number') {
+      setCurrentLight(withChannelNumber(currentLight, channelName, value))
     }
   }
 
   const handleStrobeChannelToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = e.target.checked
-    const nextChannels: Record<string, number | undefined> = { ...currentLight.channels }
-    if (checked) {
-      nextChannels.strobeChannel = nextChannels.strobeChannel ?? 0
-      setCurrentLight({
-        ...currentLight,
-        channels: nextChannels as unknown as DmxFixture['channels'],
-        strobeValues: currentLight.strobeValues ?? { ...DEFAULT_STROBE_CHANNEL_VALUES },
-      })
-    } else {
-      delete nextChannels.strobeChannel
-      setCurrentLight({
-        ...currentLight,
-        channels: nextChannels as unknown as DmxFixture['channels'],
-        strobeValues: undefined,
-      })
-    }
+    setCurrentLight(withStrobeChannelOption(currentLight, e.target.checked))
   }
 
   /** Clamps to 0-100; anything unreadable reads as unscaled. */
@@ -235,10 +166,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
       {/* Light Type Field */}
       <div className="flex items-center space-x-2 max-w-[360px]">
         <div className="flex-grow">
-          <LightType
-            selectedType={currentLight.fixture}
-            onTypeChange={(newType) => handleTypeChange(newType as FixtureTypes)}
-          />
+          <LightType selectedType={currentLight.fixture} onTypeChange={handleTypeChange} />
         </div>
       </div>
 

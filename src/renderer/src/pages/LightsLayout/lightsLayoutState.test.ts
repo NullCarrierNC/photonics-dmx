@@ -1,9 +1,9 @@
 import { describe, it, expect } from '@jest/globals'
 import { FixtureTypes } from '../../../../photonics-dmx/types'
-import type { DmxLight } from '../../../../photonics-dmx/types'
+import type { DmxLight, RgbLight } from '../../../../photonics-dmx/types'
 import { reassignNonStrobeGroups, mapDedicatedStrobeGroupRows } from './lightsLayoutState'
 
-function makeLight(overrides: Partial<DmxLight> & Pick<DmxLight, 'id' | 'position'>): DmxLight {
+function makeLight(overrides: Partial<RgbLight> & Pick<RgbLight, 'id' | 'position'>): RgbLight {
   return {
     fixtureId: 'f1',
     fixture: FixtureTypes.RGB,

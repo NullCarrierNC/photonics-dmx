@@ -2,7 +2,6 @@ import {
   DmxFixture,
   FixtureTypes,
   MIXABLE_CHANNEL_TYPES,
-  RgbDmxChannels,
   type MixableChannelType,
 } from '../../../photonics-dmx/types'
 import { EMITTER_PRIMARIES } from '../../../photonics-dmx/helpers/colorChannelMixer'
@@ -109,16 +108,14 @@ export function getDmxPreviewLightColor(
   dmxValues: Record<number, number>,
   use3dOffGrey = false,
 ): { r: number; g: number; b: number } {
-  const { channels, fixture } = light
-
-  if (fixture === FixtureTypes.STROBE) {
-    const dimmer = dmxValues[channels.masterDimmer] ?? 0
+  if (light.fixture === FixtureTypes.STROBE) {
+    const dimmer = dmxValues[light.channels.masterDimmer] ?? 0
     const v = Math.round(255 * (dimmer / 255))
     return finalizePreviewRgb({ r: v, g: v, b: v }, dimmer === 0, use3dOffGrey)
   }
 
-  if (fixture === FixtureTypes.RGB || fixture === FixtureTypes.RGBMH) {
-    const rgbChannels = channels as RgbDmxChannels
+  if (light.fixture === FixtureTypes.RGB || light.fixture === FixtureTypes.RGBMH) {
+    const rgbChannels = light.channels
     const red = dmxValues[rgbChannels.red] || 0
     const green = dmxValues[rgbChannels.green] || 0
     const blue = dmxValues[rgbChannels.blue] || 0
@@ -204,7 +201,7 @@ export function getLightColorChannelBreakdown(
   if (light.fixture === FixtureTypes.STROBE) return null
 
   const extras = light.extraChannels ?? []
-  const channels = light.channels as RgbDmxChannels
+  const channels = light.channels
   const entries: ChannelBreakdownEntry[] = []
   for (const base of ['red', 'green', 'blue'] as const) {
     const channel = channels[base]

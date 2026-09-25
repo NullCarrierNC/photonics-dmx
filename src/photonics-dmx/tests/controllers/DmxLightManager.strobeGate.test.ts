@@ -54,7 +54,7 @@ describe('DmxLightManager strobe group gating', () => {
   })
 
   it('still excludes null-id lights', () => {
-    const withNull = { ...strobeRow('x', true, 1), id: null } as unknown as DmxLight
+    const withNull: DmxLight = { ...strobeRow('x', true, 1), id: null }
     const mgr = new DmxLightManager(makeConfig([withNull, strobeRow('on-1', true, 2)]))
     expect(mgr.getLightsInGroup('strobe').map((l) => l.id)).toEqual(['on-1'])
   })

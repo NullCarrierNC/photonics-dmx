@@ -48,7 +48,6 @@ export type {
   FixtureConfigFlagField,
   FixtureConfigNumberField,
   LegacyFixtureConfigFields,
-  MovingHeadDmxChannels,
 } from './types/movingHead'
 
 export {
@@ -72,12 +71,18 @@ export type {
   DmxFixture,
   DmxLight,
   ExtraChannel,
+  FixtureChannelLayout,
   ExtraChannelType,
   MixableChannelType,
   RgbDmxChannels,
+  RgbFixture,
+  RgbLight,
   RgbMovingHeadDmxChannels,
+  RgbMovingHeadFixture,
+  RgbMovingHeadLight,
   StrobeChannelValues,
-  StrobeDmxChannels,
+  StrobeFixture,
+  StrobeLight,
   TrackedLight,
   WhiteChannelMixMode,
 } from './types/fixtures'

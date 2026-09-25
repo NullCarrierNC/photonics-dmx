@@ -14,7 +14,7 @@ import type { RigChain } from '../../controllers/RigChain'
 import { getColor } from '../../helpers/dmxHelpers'
 import { CueData } from '../../cues/types/cueTypes'
 import { Effect, RGBIO } from '../../types'
-import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { performance as perfHooks } from 'perf_hooks'
 import { fakeLightingController } from '../helpers/fakeLightingController'
 import { createRb3StreamHarness, type Rb3StreamHarness } from '../helpers/rb3StreamHarness'
@@ -49,10 +49,10 @@ function makeFourLightConfig() {
   return createMockLightingConfig({
     numLights: 4,
     frontLights: [
-      createMockDmxLight({ id: 'f0', position: 0, fixtureId: 'f0' }),
-      createMockDmxLight({ id: 'f1', position: 1, fixtureId: 'f1' }),
-      createMockDmxLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
-      createMockDmxLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
+      rgbLight({ id: 'f0', position: 0, fixtureId: 'f0' }),
+      rgbLight({ id: 'f1', position: 1, fixtureId: 'f1' }),
+      rgbLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
+      rgbLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
     ],
     backLights: [],
     strobeLights: [],
@@ -568,14 +568,14 @@ describe('StageKit strobe watchdog', () => {
     return createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
-        createMockDmxLight({ id: 's-f1', position: 1, fixtureId: 's-f1' }),
-        createMockDmxLight({ id: 's-f2', position: 2, fixtureId: 's-f2' }),
-        createMockDmxLight({ id: 's-f3', position: 3, fixtureId: 's-f3' }),
+        rgbLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 's-f1', position: 1, fixtureId: 's-f1' }),
+        rgbLight({ id: 's-f2', position: 2, fixtureId: 's-f2' }),
+        rgbLight({ id: 's-f3', position: 3, fixtureId: 's-f3' }),
       ],
       backLights: [],
       strobeLights: [
-        createMockDmxLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
       ],
     })
   }

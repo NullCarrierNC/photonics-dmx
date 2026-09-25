@@ -12,9 +12,11 @@ import {
   ConfigStrobeType,
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
+  type DmxLight,
   type DmxRig,
   type ExtraChannel,
   type RGBIO,
+  type RgbDmxChannels,
   type StrobeChannelValues,
 } from '../../types'
 
@@ -38,15 +40,15 @@ function makeMockSender(): {
 
 interface LightSpec {
   id: string
-  channels: Record<string, number>
+  channels: RgbDmxChannels
   extraChannels?: ExtraChannel[]
   isStrobeEnabled?: boolean
   group?: 'front' | 'strobe'
-  fixture?: FixtureTypes
+  fixture?: FixtureTypes.RGB
   strobeValues?: StrobeChannelValues
 }
 
-function makeLight(spec: LightSpec, group: 'front' | 'strobe'): unknown {
+function makeLight(spec: LightSpec, group: 'front' | 'strobe'): DmxLight {
   return {
     id: spec.id,
     fixtureId: `tpl-${spec.id}`,
@@ -57,7 +59,7 @@ function makeLight(spec: LightSpec, group: 'front' | 'strobe'): unknown {
     isStrobeEnabled: spec.isStrobeEnabled ?? false,
     group,
     universe: 1,
-    mount: 'floor' as const,
+    mount: 'floor',
     channels: spec.channels,
     ...(spec.extraChannels ? { extraChannels: spec.extraChannels } : {}),
     ...(spec.strobeValues ? { strobeValues: spec.strobeValues } : {}),
@@ -82,9 +84,9 @@ function makeRig(lights: LightSpec[], strobeType = ConfigStrobeType.AllCapable):
       numLights: front.length,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType,
-      frontLights: front as unknown as DmxRig['config']['frontLights'],
+      frontLights: front,
       backLights: [],
-      strobeLights: strobe as unknown as DmxRig['config']['strobeLights'],
+      strobeLights: strobe,
     },
   }
 }

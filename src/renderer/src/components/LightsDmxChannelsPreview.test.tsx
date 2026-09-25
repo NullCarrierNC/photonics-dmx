@@ -11,12 +11,14 @@ import {
   type DmxLight,
   type ExtraChannel,
   type LightingConfiguration,
+  type RgbDmxChannels,
 } from '../../../photonics-dmx/types'
+import { rgbMovingHeadLight } from '../../../photonics-dmx/tests/helpers/testFixtures'
 import LightsDmxChannelsPreview from './LightsDmxChannelsPreview'
 
 afterEach(() => cleanup())
 
-function light(channels: Record<string, number>, extraChannels?: ExtraChannel[]): DmxLight {
+function light(channels: RgbDmxChannels, extraChannels?: ExtraChannel[]): DmxLight {
   return {
     id: 'l1',
     fixtureId: 't1',
@@ -28,7 +30,7 @@ function light(channels: Record<string, number>, extraChannels?: ExtraChannel[])
     group: 'front',
     universe: 1,
     mount: 'floor',
-    channels: channels as unknown as DmxLight['channels'],
+    channels,
     ...(extraChannels ? { extraChannels } : {}),
   }
 }
@@ -72,13 +74,16 @@ describe('LightsDmxChannelsPreview extra channels', () => {
   })
 
   it('lists Master Dimmer before the other base channels', () => {
-    const rgbmh = light({
-      masterDimmer: 124,
-      red: 126,
-      green: 127,
-      blue: 128,
-      pan: 121,
-      tilt: 122,
+    const rgbmh = rgbMovingHeadLight({
+      name: 'PAR',
+      channels: {
+        masterDimmer: 124,
+        red: 126,
+        green: 127,
+        blue: 128,
+        pan: 121,
+        tilt: 122,
+      },
     })
     render(<LightsDmxChannelsPreview lightingConfig={config(rgbmh)} dmxValues={{}} />)
     const card = screen.getByText(/PAR/).closest('div') as HTMLElement

@@ -10,9 +10,9 @@ import {
   setMinLogLevel,
   type LogEntry,
 } from '../../../shared/logger'
-import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../types'
+import { FixtureTypes, type DmxFixture, type ExtraChannel, type RgbFixture } from '../../types'
 
-function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function fixture(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 'fixture-1',
     position: 1,
@@ -20,7 +20,7 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
     label: 'PAR',
     name: 'PAR',
     isStrobeEnabled: false,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }
@@ -120,7 +120,7 @@ describe('FixtureChannelWriter', () => {
     const wire: Record<number, number> = {}
     const writer = writerFor(wire)
     const unassigned = fixture({
-      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 },
     })
 
     writer.writeLight('l1', unassigned, output(), null, false)
@@ -137,7 +137,7 @@ describe('FixtureChannelWriter', () => {
   it('reports a fault again after resetFaultReports', () => {
     const writer = writerFor({})
     const unassigned = fixture({
-      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 },
     })
 
     writer.writeLight('l1', unassigned, output(), null, false)
@@ -147,18 +147,6 @@ describe('FixtureChannelWriter', () => {
     writer.resetFaultReports()
     writer.writeLight('l1', unassigned, output(), null, false)
     expect(reported('warn')).toHaveLength(2)
-  })
-
-  it('writes nothing for a fixture type the cast does not know and reports it once', () => {
-    const wire: Record<number, number> = {}
-    const writer = writerFor(wire)
-    const unknownType = fixture({ fixture: 'bogus' as unknown as FixtureTypes })
-
-    writer.writeLight('l1', unknownType, output({ red: 10 }), null, false)
-    writer.writeLight('l1', unknownType, output({ red: 10 }), null, false)
-
-    expect(wire).toEqual({})
-    expect(reported('error')).toHaveLength(1)
   })
 
   it('writes fixed channels for planned fixtures no light state reached', () => {

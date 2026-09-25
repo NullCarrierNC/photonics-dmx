@@ -1,11 +1,5 @@
-import {
-  ConfigStrobeType,
-  DmxLight,
-  DmxRig,
-  FixtureTypes,
-  LightingConfiguration,
-} from '../../types'
-import { createMockDmxLight } from './testFixtures'
+import { ConfigStrobeType, DmxLight, DmxRig, LightingConfiguration } from '../../types'
+import { rgbLight } from './testFixtures'
 
 /**
  * Helpers for building multi-rig test fixtures so tests covering symmetric and asymmetric
@@ -24,7 +18,6 @@ export interface RigSpec {
   frontCount?: number
   backCount?: number
   strobeCount?: number
-  fixtureType?: FixtureTypes
   /** Per-rig `outputs` whitelist (see DmxRig.outputs). Defaults to undefined (all wire senders). */
   outputs?: DmxRig['outputs']
 }
@@ -34,14 +27,12 @@ const buildLights = (
   group: 'front' | 'back' | 'strobe',
   count: number,
   startPosition: number,
-  fixtureType: FixtureTypes,
 ): DmxLight[] => {
   return Array.from({ length: count }, (_, idx) =>
-    createMockDmxLight({
+    rgbLight({
       id: `${rigId}-${group}-${startPosition + idx}`,
       group,
       position: startPosition + idx,
-      fixture: fixtureType,
       isStrobeEnabled: group === 'strobe',
     }),
   )
@@ -51,10 +42,9 @@ export function makeRig(spec: RigSpec): DmxRig {
   const frontCount = spec.frontCount ?? 0
   const backCount = spec.backCount ?? 0
   const strobeCount = spec.strobeCount ?? 0
-  const fixtureType = spec.fixtureType ?? FixtureTypes.RGB
-  const frontLights = buildLights(spec.id, 'front', frontCount, 1, fixtureType)
-  const backLights = buildLights(spec.id, 'back', backCount, 1, fixtureType)
-  const strobeLights = buildLights(spec.id, 'strobe', strobeCount, 1, fixtureType)
+  const frontLights = buildLights(spec.id, 'front', frontCount, 1)
+  const backLights = buildLights(spec.id, 'back', backCount, 1)
+  const strobeLights = buildLights(spec.id, 'strobe', strobeCount, 1)
   const config: LightingConfiguration = {
     numLights: frontCount + backCount + strobeCount,
     lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
@@ -78,27 +68,23 @@ export function makeTwoRigs(
     frontPerRig?: number
     backPerRig?: number
     strobePerRig?: number
-    fixtureType?: FixtureTypes
   } = {},
 ): [DmxRig, DmxRig] {
   const frontPerRig = options.frontPerRig ?? 4
   const backPerRig = options.backPerRig ?? 0
   const strobePerRig = options.strobePerRig ?? 0
-  const fixtureType = options.fixtureType ?? FixtureTypes.RGB
   return [
     makeRig({
       id: 'rig-a',
       frontCount: frontPerRig,
       backCount: backPerRig,
       strobeCount: strobePerRig,
-      fixtureType,
     }),
     makeRig({
       id: 'rig-b',
       frontCount: frontPerRig,
       backCount: backPerRig,
       strobeCount: strobePerRig,
-      fixtureType,
     }),
   ]
 }
@@ -112,14 +98,12 @@ export function makeAsymmetricTwoRigs(
   options: {
     smallFrontCount?: number
     largeFrontCount?: number
-    fixtureType?: FixtureTypes
   } = {},
 ): [DmxRig, DmxRig] {
   const smallFrontCount = options.smallFrontCount ?? 4
   const largeFrontCount = options.largeFrontCount ?? 8
-  const fixtureType = options.fixtureType ?? FixtureTypes.RGB
   return [
-    makeRig({ id: 'rig-small', frontCount: smallFrontCount, fixtureType }),
-    makeRig({ id: 'rig-large', frontCount: largeFrontCount, fixtureType }),
+    makeRig({ id: 'rig-small', frontCount: smallFrontCount }),
+    makeRig({ id: 'rig-large', frontCount: largeFrontCount }),
   ]
 }

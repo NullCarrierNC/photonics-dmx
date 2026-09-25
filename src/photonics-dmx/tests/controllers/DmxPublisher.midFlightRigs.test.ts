@@ -66,7 +66,7 @@ function makeRig(id: string, lightId: string, channelBase: number): DmxRig {
           red: channelBase + 1,
           green: channelBase + 2,
           blue: channelBase + 3,
-        } as unknown as DmxRig['config']['frontLights'][number]['channels'],
+        },
       },
     ],
     backLights: [],

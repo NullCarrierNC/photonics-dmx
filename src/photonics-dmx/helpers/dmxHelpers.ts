@@ -1,14 +1,4 @@
-import {
-  BlendMode,
-  Brightness,
-  Color,
-  FixtureTypes,
-  isColor,
-  RgbDmxChannels,
-  RGBIO,
-  RgbMovingHeadDmxChannels,
-  StrobeDmxChannels,
-} from '../types'
+import { BlendMode, Brightness, Color, isColor, RGBIO } from '../types'
 
 /**
  * A universe buffer holding only addresses that exist, at values a fixture can take.
@@ -282,49 +272,5 @@ export const getColor = (
 
     opacity: 1.0,
     blendMode: blendMode,
-  }
-}
-
-/**
- * Casts a channel configuration to the appropriate fixture type
- *
- * @param fixtureType - The type of fixture to cast to
- * @param channels - Channel configuration object
- * @returns A strongly-typed channel object for the specified fixture type
- */
-export const castToChannelType = (
-  fixtureType: FixtureTypes,
-  channels: { [key: string]: number },
-): RgbDmxChannels | StrobeDmxChannels | RgbMovingHeadDmxChannels => {
-  switch (fixtureType) {
-    case FixtureTypes.RGB: {
-      const out: RgbDmxChannels = {
-        red: channels.red || 0,
-        green: channels.green || 0,
-        blue: channels.blue || 0,
-        masterDimmer: channels.masterDimmer || 0,
-      }
-      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
-      return out
-    }
-    case FixtureTypes.STROBE:
-      return {
-        masterDimmer: channels.masterDimmer || 0,
-        strobeChannel: channels.strobeChannel || 0,
-      } as StrobeDmxChannels
-    case FixtureTypes.RGBMH: {
-      const out: RgbMovingHeadDmxChannels = {
-        red: channels.red || 0,
-        green: channels.green || 0,
-        blue: channels.blue || 0,
-        masterDimmer: channels.masterDimmer || 0,
-        pan: channels.pan || 0,
-        tilt: channels.tilt || 0,
-      }
-      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
-      return out
-    }
-    default:
-      throw new Error(`Unknown fixture type: ${fixtureType}`)
   }
 }

@@ -25,10 +25,12 @@ import {
 } from './../atoms'
 import {
   ConfigStrobeType,
+  DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
   type DmxFixture,
   type DmxLight,
   type DmxRig,
+  type RgbLight,
 } from '../../../photonics-dmx/types'
 
 // jsdom may not expose crypto.randomUUID; mapLightsToNewIdsForSave needs it on the save path.
@@ -77,7 +79,7 @@ jest.mock('./LightsLayout/components/ImportRigModal', () => ({
 import LightsLayout from './LightsLayout'
 import { parseDmxLight } from '../../../photonics-dmx/helpers/fixtureParsing'
 
-const fixture = {
+const fixture: DmxFixture = {
   id: 'f1',
   position: 0,
   fixture: FixtureTypes.RGB,
@@ -87,11 +89,11 @@ const fixture = {
   group: '',
   channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
   universe: 0,
-} as unknown as DmxFixture
+}
 
 // The settled editor shape for a single-light, front-only, strobe-None layout: group 'front',
 // position 1, and NO strobeValues.
-const initialFront = {
+const initialFront: RgbLight = {
   id: 'l1',
   fixtureId: 'f1',
   position: 1,
@@ -103,7 +105,7 @@ const initialFront = {
   channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
   universe: 0,
   mount: 'floor',
-} as unknown as DmxLight
+}
 
 const initialRig: DmxRig = {
   id: 'r1',
@@ -123,7 +125,7 @@ const initialRig: DmxRig = {
 // editor's raw config lacks this key, so raw-vs-normalized compares unequal.
 function normalizeForTest(rig: DmxRig): DmxRig {
   const addStrobeValues = (lights: DmxLight[]): DmxLight[] =>
-    lights.map((l) => ({ ...l, strobeValues: { value: 128 } }) as unknown as DmxLight)
+    lights.map((l) => ({ ...l, strobeValues: { ...DEFAULT_STROBE_CHANNEL_VALUES } }))
   return {
     ...rig,
     config: {
@@ -238,15 +240,12 @@ describe('LightsLayout save that answers after a rig switch', () => {
       numLights: 3,
       lightLayout: { id: 'front', label: 'Front only' },
       strobeType: ConfigStrobeType.None,
-      frontLights: [1, 2, 3].map(
-        (position) =>
-          ({
-            ...initialFront,
-            id: `b${position}`,
-            position,
-            channels: { masterDimmer: 100 + position * 4, red: 0, green: 0, blue: 0 },
-          }) as unknown as DmxLight,
-      ),
+      frontLights: [1, 2, 3].map((position) => ({
+        ...initialFront,
+        id: `b${position}`,
+        position,
+        channels: { masterDimmer: 100 + position * 4, red: 0, green: 0, blue: 0 },
+      })),
       backLights: [],
       strobeLights: [],
     },
@@ -302,20 +301,6 @@ describe('LightsLayout import dialog', () => {
 })
 
 describe('LightsLayout saves lights the save check accepts', () => {
-  const frontLight: DmxLight = {
-    id: 'l1',
-    fixtureId: 'f1',
-    position: 1,
-    fixture: FixtureTypes.RGB,
-    label: 'PAR',
-    name: 'PAR',
-    isStrobeEnabled: false,
-    group: 'front',
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
-    universe: 0,
-    mount: 'floor',
-  }
-
   const faultsInSavedLights = (): string[] => {
     if (!lastSavedRig) throw new Error('nothing was saved')
     const { frontLights, backLights, strobeLights } = lastSavedRig.config
@@ -346,14 +331,14 @@ describe('LightsLayout saves lights the save check accepts', () => {
   }
 
   it('saves a layout with strobe off', async () => {
-    await saveRig({ ...initialRig, config: { ...initialRig.config, frontLights: [frontLight] } })
+    await saveRig(initialRig)
 
     expect(faultsInSavedLights()).toEqual([])
   })
 
   it('saves a dedicated strobe row built from an RGB template as an RGB light', async () => {
     const strobeRow: DmxLight = {
-      ...frontLight,
+      ...initialFront,
       id: 's1',
       position: 2,
       group: 'strobe',
@@ -365,7 +350,6 @@ describe('LightsLayout saves lights the save check accepts', () => {
       config: {
         ...initialRig.config,
         strobeType: ConfigStrobeType.Dedicated,
-        frontLights: [frontLight],
         strobeLights: [strobeRow],
       },
     })

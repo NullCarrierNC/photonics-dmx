@@ -1,13 +1,18 @@
 import { describe, expect, it } from '@jest/globals'
 import { createStore } from 'jotai'
 import { myDmxLightsAtom, myValidDmxLightsAtom } from './atoms'
-import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../photonics-dmx/types'
+import {
+  FixtureTypes,
+  type ExtraChannel,
+  type RgbDmxChannels,
+  type RgbFixture,
+} from '../../photonics-dmx/types'
 
 function fixture(
   name: string,
-  channels: Record<string, number>,
+  channels: RgbDmxChannels,
   extraChannels?: ExtraChannel[],
-): DmxFixture {
+): RgbFixture {
   return {
     id: name,
     position: 0,
@@ -15,7 +20,7 @@ function fixture(
     label: name,
     name,
     isStrobeEnabled: false,
-    channels: channels as unknown as DmxFixture['channels'],
+    channels,
     ...(extraChannels ? { extraChannels } : {}),
   }
 }

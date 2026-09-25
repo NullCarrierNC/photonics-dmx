@@ -1,7 +1,12 @@
 import { describe, it, expect } from '@jest/globals'
-import { ConfigStrobeType, FixtureTypes } from '../../../../photonics-dmx/types'
+import {
+  ConfigStrobeType,
+  DEFAULT_STROBE_CHANNEL_VALUES,
+  FixtureTypes,
+} from '../../../../photonics-dmx/types'
 import type { DmxFixture, DmxLight, LightingConfiguration } from '../../../../photonics-dmx/types'
 import { findSharedChannelNumbers } from '../../components/lightChannelDisplay'
+import { rgbLight } from '../../../../photonics-dmx/tests/helpers/testFixtures'
 import {
   LIGHT_LAYOUTS,
   createDmxLightInstance,
@@ -64,7 +69,7 @@ describe('lightingConfigsEqual', () => {
     }
     const materialized: LightingConfiguration = {
       ...base,
-      frontLights: [{ ...minimalStrobe, strobeValues: { value: 1 } } as unknown as DmxLight],
+      frontLights: [{ ...minimalStrobe, strobeValues: { ...DEFAULT_STROBE_CHANNEL_VALUES } }],
     }
     expect(lightingConfigsEqual(base, materialized)).toBe(false)
   })
@@ -90,9 +95,7 @@ describe('buildMergedPrimaryLightsFromConfig', () => {
       backLights: [],
       strobeLights: [minimalStrobe],
     })
-    expect(dedicated.some((l) => (l as DmxLight & { group?: string }).group === 'strobe')).toBe(
-      true,
-    )
+    expect(dedicated.some((l) => l.group === 'strobe')).toBe(true)
 
     const allCap = buildMergedPrimaryLightsFromConfig({
       strobeType: ConfigStrobeType.AllCapable,
@@ -128,8 +131,7 @@ describe('createDmxLightInstance', () => {
     return light
   }
 
-  const masterOf = (light: DmxLight): number =>
-    (light.channels as unknown as Record<string, number>).masterDimmer
+  const masterOf = (light: DmxLight): number => light.channels.masterDimmer
 
   it('addresses the first light at 1', () => {
     expect(masterOf(place([], rgbTemplate))).toBe(1)
@@ -150,23 +152,19 @@ describe('createDmxLightInstance', () => {
   })
 
   it('packs after a hand-edited address rather than under it', () => {
-    const moved = place([], rgbTemplate)
-    ;(moved.channels as unknown as Record<string, number>).masterDimmer = 100
-    ;(moved.channels as unknown as Record<string, number>).blue = 103
+    const moved = rgbLight({ channels: { masterDimmer: 100, red: 2, green: 3, blue: 103 } })
     expect(masterOf(place([moved], rgbTemplate))).toBe(111)
   })
 
   it('reports the address as capped when the universe has no room left', () => {
-    const full = place([], rgbTemplate)
-    ;(full.channels as unknown as Record<string, number>).blue = 512
+    const full = rgbLight({ channels: { masterDimmer: 1, red: 2, green: 3, blue: 512 } })
     const { light, addressCapped } = createDmxLightInstance('front', [full], [rgbTemplate])
     expect(addressCapped).toBe(true)
     expect(masterOf(light)).toBe(509)
   })
 
   it('leaves room for added channels when capping', () => {
-    const full = place([], rgbTemplate)
-    ;(full.channels as unknown as Record<string, number>).blue = 512
+    const full = rgbLight({ channels: { masterDimmer: 1, red: 2, green: 3, blue: 512 } })
     const { light, addressCapped } = createDmxLightInstance('front', [full], [wideTemplate])
     expect(addressCapped).toBe(true)
     // Widest offset is +13, so the master must sit at 512 - 13.

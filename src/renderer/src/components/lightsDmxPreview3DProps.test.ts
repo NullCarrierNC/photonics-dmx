@@ -3,7 +3,11 @@
  */
 import { describe, expect, it } from '@jest/globals'
 import type { Texture } from 'three'
-import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
+import { FixtureTypes, type RgbFixture } from '../../../photonics-dmx/types'
+import {
+  rgbMovingHeadFixture,
+  strobeFixture,
+} from '../../../photonics-dmx/tests/helpers/testFixtures'
 import {
   beamPropsEqual,
   bodyPropsEqual,
@@ -14,7 +18,7 @@ import {
   type FixtureBodyProps,
 } from './lightsDmxPreview3DProps'
 
-function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function fixture(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 'f1',
     position: 1,
@@ -24,7 +28,7 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
     isStrobeEnabled: false,
     group: '',
     universe: 1,
-    channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 } as DmxFixture['channels'],
+    channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 },
     ...overrides,
   }
 }
@@ -55,12 +59,12 @@ function bodyProps(overrides: Partial<FixtureBodyProps> = {}): FixtureBodyProps 
 
 describe('isMovingHead', () => {
   it('recognises a moving head', () => {
-    expect(isMovingHead(fixture({ fixture: FixtureTypes.RGBMH }))).toBe(true)
+    expect(isMovingHead(rgbMovingHeadFixture())).toBe(true)
   })
 
   it('treats every other archetype as static', () => {
-    for (const type of [FixtureTypes.RGB, FixtureTypes.STROBE]) {
-      expect(isMovingHead(fixture({ fixture: type }))).toBe(false)
+    for (const light of [fixture(), strobeFixture()]) {
+      expect(isMovingHead(light)).toBe(false)
     }
   })
 })
@@ -85,7 +89,7 @@ describe('masterDimmer01', () => {
 
   it('reads its own master dimmer channel, not another light on the same value', () => {
     expect(
-      masterDimmer01(fixture({ channels: { masterDimmer: 20 } as DmxFixture['channels'] }), {
+      masterDimmer01(fixture({ channels: { ...fixture().channels, masterDimmer: 20 } }), {
         10: 255,
         20: 0,
       }),

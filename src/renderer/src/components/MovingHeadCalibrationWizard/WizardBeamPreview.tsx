@@ -5,11 +5,7 @@
  * uninverted console values. After that it can place the beam on the stage.
  */
 import { FixtureTypes } from '../../../../photonics-dmx/types'
-import type {
-  DmxLight,
-  FixtureConfig,
-  RgbMovingHeadDmxChannels,
-} from '../../../../photonics-dmx/types'
+import type { FixtureConfig, RgbMovingHeadLight } from '../../../../photonics-dmx/types'
 import { getDmxPreviewLightColorCss } from '../dmxPreviewLightColor'
 import { panTiltDmxToSphericalXY, panTiltDmxToWizardMotorSpaceXY } from '../LightsDmxPreview'
 
@@ -25,12 +21,12 @@ export function WizardBeamPreview({
   config,
   step,
 }: {
-  light: DmxLight
+  light: RgbMovingHeadLight
   buffer: Record<number, number>
   config: FixtureConfig
   step: number
 }) {
-  const ch = light.channels as RgbMovingHeadDmxChannels
+  const ch = light.channels
   const pan = buffer[ch.pan] ?? 0
   const tilt = buffer[ch.tilt] ?? 0
 

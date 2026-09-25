@@ -16,9 +16,12 @@ import {
 import {
   ConfigStrobeType,
   FixtureTypes,
+  type DmxLight,
   type DmxRig,
   type ExtraChannel,
   type RGBIO,
+  type RgbDmxChannels,
+  type RgbMovingHeadDmxChannels,
 } from '../../types'
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 
@@ -26,38 +29,36 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
   return { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace', ...overrides }
 }
 
-interface LightSpec {
+type LightSpec = {
   id: string
-  channels: Record<string, number>
   extraChannels?: ExtraChannel[]
   isStrobeEnabled?: boolean
   group?: 'front' | 'back' | 'strobe'
-}
+} & (
+  | { fixture?: FixtureTypes.RGB; channels: RgbDmxChannels }
+  | { fixture: FixtureTypes.RGBMH; channels: RgbMovingHeadDmxChannels }
+)
 
 /** Positions run across both rows rather than restarting per row, as the layout editor assigns. */
-function makeLight(spec: LightSpec, group: 'front' | 'back' | 'strobe', position: number): unknown {
+function makeLight(spec: LightSpec, position: number): DmxLight {
   return {
-    id: spec.id,
+    fixture: FixtureTypes.RGB,
     fixtureId: `tpl-${spec.id}`,
     position,
     name: spec.id,
     label: spec.id,
-    fixture: FixtureTypes.RGB,
-    isStrobeEnabled: spec.isStrobeEnabled ?? false,
-    group,
+    isStrobeEnabled: false,
+    group: 'front',
     universe: 1,
-    mount: 'floor' as const,
-    channels: spec.channels,
-    ...(spec.extraChannels ? { extraChannels: spec.extraChannels } : {}),
+    mount: 'floor',
+    ...spec,
   }
 }
 
 function makeRig(lights: LightSpec[]): DmxRig {
   let nextPosition = 1
-  const inGroup = (group: 'front' | 'back' | 'strobe'): unknown[] =>
-    lights
-      .filter((l) => (l.group ?? 'front') === group)
-      .map((l) => makeLight(l, group, nextPosition++))
+  const inGroup = (group: 'front' | 'back' | 'strobe'): DmxLight[] =>
+    lights.filter((l) => (l.group ?? 'front') === group).map((l) => makeLight(l, nextPosition++))
 
   const front = inGroup('front')
   const back = inGroup('back')
@@ -70,9 +71,9 @@ function makeRig(lights: LightSpec[]): DmxRig {
       numLights: front.length + back.length,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType: ConfigStrobeType.AllCapable,
-      frontLights: front as unknown as DmxRig['config']['frontLights'],
-      backLights: back as unknown as DmxRig['config']['backLights'],
-      strobeLights: strobe as unknown as DmxRig['config']['strobeLights'],
+      frontLights: front,
+      backLights: back,
+      strobeLights: strobe,
     },
   }
 }
@@ -156,11 +157,15 @@ describe('DmxPublisher venue post-processing', () => {
   })
 
   it('leaves master dimmer, pan and tilt alone', () => {
-    const ctx = setup([{ id: 'f1', channels: { ...RGB, pan: 5, tilt: 6 } }])
+    const ctx = setup([
+      { id: 'f1', fixture: FixtureTypes.RGBMH, channels: { ...RGB, pan: 5, tilt: 6 } },
+    ])
     ctx.venue.setVenuePostProcessing('BlackAndWhite')
     const buf = ctx.publish({ f1: rgbio({ red: 255, intensity: 200, pan: 50, tilt: 25 }) })
     expect(buf[1]).toBe(200)
-    const plain = setup([{ id: 'f1', channels: { ...RGB, pan: 5, tilt: 6 } }]).publish({
+    const plain = setup([
+      { id: 'f1', fixture: FixtureTypes.RGBMH, channels: { ...RGB, pan: 5, tilt: 6 } },
+    ]).publish({
       f1: rgbio({ red: 255, intensity: 200, pan: 50, tilt: 25 }),
     })
     expect(buf[5]).toBe(plain[5])

@@ -11,10 +11,10 @@ import * as ipcApi from '../../ipcApi'
 import {
   ConfigStrobeType,
   FixtureTypes,
-  type DmxFixture,
   type DmxLight,
   type DmxRig,
   type LightingConfiguration,
+  type RgbFixture,
 } from '../../../../photonics-dmx/types'
 import {
   countOrphanLights,
@@ -32,22 +32,22 @@ jest.mock(
     ).ipcApiMock,
 )
 
-const TEMPLATE: DmxFixture = {
+const TEMPLATE: RgbFixture = {
   id: 't1',
   position: 0,
   fixture: FixtureTypes.RGB,
   label: 'PAR',
   name: 'PAR',
   isStrobeEnabled: false,
-  channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+  channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
 }
 
-const NEW_TEMPLATE: DmxFixture = {
+const NEW_TEMPLATE: RgbFixture = {
   ...TEMPLATE,
   id: 't2',
   name: 'Wash',
   label: 'Wash',
-  channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 } as unknown as DmxFixture['channels'],
+  channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 },
 }
 
 function light(id: string, fixtureId: string): DmxLight {

@@ -6,12 +6,12 @@
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
-import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
+import { FixtureTypes, type RgbFixture } from '../../../photonics-dmx/types'
 import LightSettingsModal from './LightSettingsModal'
 
 afterEach(() => cleanup())
 
-function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function fixture(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 't1',
     position: 0,
@@ -19,7 +19,7 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
     label: 'PAR',
     name: 'Front PAR',
     isStrobeEnabled: false,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }

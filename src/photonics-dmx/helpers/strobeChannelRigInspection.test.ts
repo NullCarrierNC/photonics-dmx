@@ -1,12 +1,12 @@
 import { describe, expect, it } from '@jest/globals'
 import { ConfigStrobeType, FixtureTypes } from '../types'
-import type { DmxLight, LightingConfiguration } from '../types'
+import type { DmxLight, LightingConfiguration, RgbLight, StrobeLight } from '../types'
 import {
   getStrobeChannelLightsInConfig,
   isRgbFamilyWithStrobeChannel,
 } from './strobeChannelRigInspection'
 
-function makeRgbLight(overrides: Partial<DmxLight> = {}): DmxLight {
+function makeRgbLight(overrides: Partial<RgbLight> = {}): RgbLight {
   return {
     id: 'l-1',
     fixtureId: 't-1',
@@ -17,10 +17,10 @@ function makeRgbLight(overrides: Partial<DmxLight> = {}): DmxLight {
     isStrobeEnabled: false,
     channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
-  } as DmxLight
+  }
 }
 
-function makeRgbWithStrobeChannel(overrides: Partial<DmxLight> = {}): DmxLight {
+function makeRgbWithStrobeChannel(overrides: Partial<RgbLight> = {}): DmxLight {
   return makeRgbLight({
     channels: {
       masterDimmer: 1,
@@ -28,12 +28,12 @@ function makeRgbWithStrobeChannel(overrides: Partial<DmxLight> = {}): DmxLight {
       green: 3,
       blue: 4,
       strobeChannel: 5,
-    } as DmxLight['channels'],
+    },
     ...overrides,
   })
 }
 
-function makeDedicatedStrobe(overrides: Partial<DmxLight> = {}): DmxLight {
+function makeDedicatedStrobe(overrides: Partial<StrobeLight> = {}): StrobeLight {
   return {
     id: 's-1',
     fixtureId: 't-strobe',
@@ -42,9 +42,9 @@ function makeDedicatedStrobe(overrides: Partial<DmxLight> = {}): DmxLight {
     label: 'Strobe',
     name: 'Strobe',
     isStrobeEnabled: true,
-    channels: { masterDimmer: 10, strobeChannel: 11 } as DmxLight['channels'],
+    channels: { masterDimmer: 10, strobeChannel: 11 },
     ...overrides,
-  } as DmxLight
+  }
 }
 
 function makeConfig(overrides: Partial<LightingConfiguration> = {}): LightingConfiguration {
