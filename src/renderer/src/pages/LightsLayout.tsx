@@ -6,7 +6,6 @@ import { useAtom, useSetAtom, useStore } from 'jotai'
 import {
   ConfigStrobeType,
   DmxLight,
-  FixtureTypes,
   DmxRig,
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
@@ -224,17 +223,6 @@ const LightsLayout = () => {
     })
   }, [assignedToBack, selectedLayout, selectedCount])
 
-  // Strobe Logic for non-Dedicated lights
-  useEffect(() => {
-    // If strobe is disabled => turn off strobeMode for non-strobe fixtures
-    if (selectedStrobe === ConfigStrobeType.None) {
-      setAllPrimaryLights((prev) =>
-        prev.map((l) => (l.fixture === FixtureTypes.STROBE ? l : { ...l, strobeMode: 'disabled' })),
-      )
-    }
-    // For AllCapable, we don’t create a separate strobe group,
-  }, [selectedStrobe])
-
   // Handle Dedicated Strobe (using dedicatedStrobeCount)
   useEffect(() => {
     if (selectedStrobe !== ConfigStrobeType.Dedicated) {
@@ -245,9 +233,7 @@ const LightsLayout = () => {
       let updated = [...prev]
 
       // Count current dedicated strobe lights
-      const currentStrobes = updated.filter(
-        (l) => l.group === 'strobe' && l.fixture === FixtureTypes.STROBE,
-      )
+      const currentStrobes = updated.filter((l) => l.group === 'strobe')
       const currentCount = currentStrobes.length
 
       if (currentCount < dedicatedStrobeCount) {
@@ -256,7 +242,6 @@ const LightsLayout = () => {
         for (let i = 0; i < numToAdd; i++) {
           const { light: newStrobe, addressCapped } = createLightInstance('strobe', updated)
           if (addressCapped) universeFullRef.current = true
-          newStrobe.fixture = FixtureTypes.STROBE
           newStrobe.isStrobeEnabled = true
           newStrobe.group = 'strobe'
           newStrobe.position = updated.length + 1
@@ -266,7 +251,7 @@ const LightsLayout = () => {
         // Remove extra strobe lights
         let toRemove = currentCount - dedicatedStrobeCount
         updated = updated.filter((light) => {
-          if (light.group === 'strobe' && light.fixture === FixtureTypes.STROBE && toRemove > 0) {
+          if (light.group === 'strobe' && toRemove > 0) {
             toRemove--
             return false
           }

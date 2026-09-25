@@ -1,4 +1,3 @@
-import { FixtureTypes } from '../../../../photonics-dmx/types'
 import type { DmxLight } from '../../../../photonics-dmx/types'
 
 /**
@@ -27,13 +26,11 @@ export function reassignNonStrobeGroups(
 }
 
 /**
- * In dedicated strobe mode, strobe group rows get STROBE fixture and flags, without mutating.
+ * In dedicated strobe mode, strobe group rows are strobe-enabled, without mutating. Each keeps its
+ * template's fixture type.
  */
 export function mapDedicatedStrobeGroupRows(lights: DmxLight[]): DmxLight[] {
-  return lights.map((light) => {
-    const g = (light as DmxLight & { group?: string }).group
-    return g === 'strobe'
-      ? { ...light, fixture: FixtureTypes.STROBE, isStrobeEnabled: true }
-      : light
-  })
+  return lights.map((light) =>
+    light.group === 'strobe' ? { ...light, isStrobeEnabled: true } : light,
+  )
 }
