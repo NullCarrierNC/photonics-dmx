@@ -14,6 +14,11 @@ import {
   DmxRig,
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
+import {
+  loadDmxRigsFixtures,
+  loadLightingLayoutFixtures,
+  loadUserLightsFixtures,
+} from './fixtureLoading'
 import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
 
@@ -91,11 +96,13 @@ export class ConfigurationManager {
     this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1, {
       onCorruptRecovery: onCorrupt,
       validate: validateUserLightsData,
+      normalizeLoaded: loadUserLightsFixtures,
       coerceUnversioned: (raw) => (Array.isArray(raw) ? { lights: raw } : raw) as UserLightsConfig,
     })
     this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1, {
       onCorruptRecovery: onCorrupt,
       validate: validateLightingLayoutData,
+      normalizeLoaded: loadLightingLayoutFixtures,
     })
     // The ConfigFile envelope version stays at 1, and rig migrations run at load through a separate
     // internal schemaVersion (migrateDmxRigsConfig) because they need the userLights library to
@@ -103,6 +110,7 @@ export class ConfigurationManager {
     this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1, {
       onCorruptRecovery: onCorrupt,
       validate: validateDmxRigsData,
+      normalizeLoaded: loadDmxRigsFixtures,
     })
 
     runStartupMigrations({

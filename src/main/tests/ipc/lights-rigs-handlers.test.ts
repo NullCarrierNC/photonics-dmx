@@ -171,9 +171,6 @@ function getHandler(
 
 describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
   const validateRig = validateDmxRigPayload as jest.MockedFunction<typeof validateDmxRigPayload>
-  const validateTemplates = validateDmxFixturesArray as jest.MockedFunction<
-    typeof validateDmxFixturesArray
-  >
 
   const exampleRig = {
     id: 'r1',
@@ -237,16 +234,24 @@ describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
 
   it('import-pick: returns the parsed rig + templates without committing', async () => {
     registerLightsRigsConfigHandlers(mockIpcMain as never, mockControllerManager as never)
+    const template = {
+      id: 't1',
+      position: 0,
+      fixture: 'rgb',
+      label: 'RGB',
+      name: 'RGB',
+      isStrobeEnabled: false,
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+    }
     const file = {
       formatVersion: 1,
       type: 'photonics-rig',
       rig: exampleRig,
-      templates: [{ id: 't1' }],
+      templates: [template],
     }
     mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/in/rig.json'] })
     mockReadFile.mockResolvedValue(JSON.stringify(file))
     validateRig.mockReturnValue({ ok: true, value: exampleRig as never })
-    validateTemplates.mockReturnValue({ ok: true, value: file.templates as never })
 
     const r = await getHandler(RIGS.IMPORT_PICK)(null, undefined)
 
@@ -254,7 +259,8 @@ describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
       success: true,
       sourceBasename: 'rig.json',
       rig: exampleRig,
-      templates: file.templates,
+      templates: [template],
+      repairs: [],
     })
     expect(saveUserLights).not.toHaveBeenCalled()
   })

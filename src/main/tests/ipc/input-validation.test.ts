@@ -695,7 +695,7 @@ describe('inputValidation', () => {
         label: 'L1',
         isStrobeEnabled: false,
         universe: 1,
-        fixture: 'RGB',
+        fixture: 'rgb',
         group: 'front',
         position: 1,
         channels,
@@ -704,7 +704,7 @@ describe('inputValidation', () => {
         numLights: 1,
         lightLayout: { id: 'two-rows', label: 'Two Rows' },
         strobeType: 'None',
-        frontLights: [lightWith(channels)],
+        frontLights: [{ ...lightWith(channels), fixtureId: 'tpl-1' }],
         backLights: [],
         strobeLights: [],
       })
@@ -743,6 +743,60 @@ describe('inputValidation', () => {
       )
     })
 
+    describe('fixture type channels', () => {
+      const fixtureWith = (fields: Record<string, unknown>): Record<string, unknown> => ({
+        id: 'l1',
+        name: 'L1',
+        label: 'L1',
+        isStrobeEnabled: false,
+        universe: 1,
+        fixture: 'rgb',
+        position: 1,
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+        ...fields,
+      })
+      const layoutWith = (light: Record<string, unknown>) => ({
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows' },
+        strobeType: 'None',
+        frontLights: [{ ...light, fixtureId: 'tpl-1', group: 'front' }],
+        backLights: [],
+        strobeLights: [],
+      })
+
+      it.each([
+        ['an RGB fixture missing blue', { channels: { masterDimmer: 1, red: 2, green: 3 } }],
+        [
+          'a moving head missing tilt',
+          { fixture: 'rgb/mh', channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, pan: 5 } },
+        ],
+        [
+          'a strobe missing its strobe channel',
+          { fixture: 'strobe', channels: { masterDimmer: 1 } },
+        ],
+        [
+          'a channel the fixture type does not have',
+          { channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, tilt: 5 } },
+        ],
+      ])('rejects %s', (_label, fields) => {
+        expect(validateDmxFixturesArray([fixtureWith(fields)]).ok).toBe(false)
+        expect(validateLightingConfiguration(layoutWith(fixtureWith(fields))).ok).toBe(false)
+      })
+
+      it('accepts an RGB fixture with an optional strobe channel', () => {
+        const fields = {
+          channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 5 },
+        }
+        expect(validateDmxFixturesArray([fixtureWith(fields)]).ok).toBe(true)
+      })
+
+      it('rejects a layout light whose fixture type is unknown', () => {
+        expect(
+          validateLightingConfiguration(layoutWith(fixtureWith({ fixture: 'laser' }))).ok,
+        ).toBe(false)
+      })
+    })
+
     describe('extra channels', () => {
       const fixtureWith = (extraChannels: unknown): Record<string, unknown> => ({
         id: 'l1',
@@ -777,10 +831,9 @@ describe('inputValidation', () => {
       })
 
       it.each([null, []])('normalises %p extraChannels to a missing key', (empty) => {
-        const el = fixtureWith(empty)
-        const result = validateDmxFixturesArray([el])
-        expect(result.ok).toBe(true)
-        expect('extraChannels' in el).toBe(false)
+        const result = validateDmxFixturesArray([fixtureWith(empty)])
+        if (!result.ok) throw new Error(result.error)
+        expect('extraChannels' in result.value[0]!).toBe(false)
       })
 
       it.each([
@@ -873,25 +926,24 @@ describe('inputValidation', () => {
       })
 
       it('normalises 100% away so an unscaled fixture stays key-less', () => {
-        const el = fixtureWith({
-          brightnessScaling: { red: 100, green: 80 },
-          extraChannels: [{ type: 'amber', channel: 5, scale: 100 }],
-        })
-        expect(validateDmxFixturesArray([el]).ok).toBe(true)
-        expect(el.brightnessScaling).toEqual({ green: 80 })
-        expect((el.extraChannels as Array<Record<string, unknown>>)[0]).toEqual({
-          type: 'amber',
-          channel: 5,
-        })
+        const result = validateDmxFixturesArray([
+          fixtureWith({
+            brightnessScaling: { red: 100, green: 80 },
+            extraChannels: [{ type: 'amber', channel: 5, scale: 100 }],
+          }),
+        ])
+        if (!result.ok) throw new Error(result.error)
+        expect(result.value[0]!.brightnessScaling).toEqual({ green: 80 })
+        expect(result.value[0]!.extraChannels).toEqual([{ type: 'amber', channel: 5 }])
       })
 
       it.each([
         ['an all-default scaling object', { red: 100, green: 100 }],
         ['a null scaling', null],
       ])('drops %s entirely', (_label, scaling) => {
-        const el = fixtureWith({ brightnessScaling: scaling })
-        expect(validateDmxFixturesArray([el]).ok).toBe(true)
-        expect('brightnessScaling' in el).toBe(false)
+        const result = validateDmxFixturesArray([fixtureWith({ brightnessScaling: scaling })])
+        if (!result.ok) throw new Error(result.error)
+        expect('brightnessScaling' in result.value[0]!).toBe(false)
       })
 
       it('validates and normalises scaling on rig-snapshot lights via the layout path', () => {
@@ -916,8 +968,9 @@ describe('inputValidation', () => {
           backLights: [],
           strobeLights: [],
         }
-        expect(validateLightingConfiguration(config).ok).toBe(true)
-        expect(rigLight.brightnessScaling).toEqual({ green: 80 })
+        const result = validateLightingConfiguration(config)
+        if (!result.ok) throw new Error(result.error)
+        expect(result.value.frontLights[0]!.brightnessScaling).toEqual({ green: 80 })
 
         const badRigLight = { ...rigLight, brightnessScaling: { green: 200 } }
         expect(validateLightingConfiguration({ ...config, frontLights: [badRigLight] }).ok).toBe(

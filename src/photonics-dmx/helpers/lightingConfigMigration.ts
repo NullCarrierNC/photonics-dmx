@@ -1,10 +1,4 @@
-import type {
-  ChannelView,
-  DmxFixture,
-  DmxLight,
-  DmxRigsConfig,
-  LightingConfiguration,
-} from '../types'
+import type { DmxFixture, DmxLight, DmxRigsConfig, LightingConfiguration } from '../types'
 import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
@@ -47,32 +41,44 @@ const TWO_ROWS_LAYOUT = { id: 'two-rows', label: 'Two Rows (one in front of the 
 export const CURRENT_RIGS_SCHEMA_VERSION = 8
 
 /**
- * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures are
- * promoted onto the new `hasStrobeChannel + strobeValues` model — dedicated {@link FixtureTypes.STROBE}
- * fixtures are a different device class (colour-less hardware strobe) and don't consume
- * `strobeValues`; for those we only correct the legacy channel-key name.
+ * A fixture as any build may have stored it, before the migrations below and the parser in
+ * `fixtureParsing` have run. Its type and channel keys are whatever that build wrote.
+ */
+export type LegacyDmxFixture = { fixture: string; [field: string]: unknown }
+
+function channelsOf(fixture: LegacyDmxFixture): Record<string, unknown> {
+  const channels = fixture.channels
+  // A fixture read from an older or hand-edited file may carry no channel map at all.
+  return typeof channels === 'object' && channels !== null && !Array.isArray(channels)
+    ? { ...channels }
+    : {}
+}
+
+/**
+ * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures move onto
+ * `channels.strobeChannel` plus `strobeValues`. Dedicated {@link FixtureTypes.STROBE} fixtures are
+ * a different device class (colour-less hardware strobe) and don't consume `strobeValues`, so for
+ * those only the legacy channel-key name is corrected.
  *
  * Specifically:
- *   - `fixture: 'rgb/s'` → `'rgb'` with `channels.strobeChannel` preserved from the legacy
+ *   - `fixture: 'rgb/s'` becomes `'rgb'` with `channels.strobeChannel` preserved from the legacy
  *     `channels.strobeSpeed` (default 0 if missing) and `strobeValues` seeded with defaults.
- *   - `fixture: 'rgbw/s'` → same for `'rgbw'`.
- *   - `fixture: 'strobe'` keeps its type; the channel key is renamed `strobeSpeed`→`strobeChannel`.
- *     `strobeValues` is **not** seeded for these fixtures (it isn't part of the dedicated-strobe
- *     model).
+ *   - `fixture: 'rgbw/s'` becomes `'rgbw'` the same way.
+ *   - `fixture: 'strobe'` keeps its type, and the channel key `strobeSpeed` is renamed
+ *     `strobeChannel`. `strobeValues` is **not** seeded for these fixtures (it isn't part of the
+ *     dedicated-strobe model).
  *
- * Returns the input unchanged when no migration is needed. Operates on a generic shape so it can
- * be reused for both rig fixtures (`DmxLight`) and the fixture library (`DmxFixture`).
+ * Returns the input unchanged when no migration is needed.
  */
-export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
-  fixture: T,
-): { fixture: T; changed: boolean } {
-  const legacyFixtureKey = String(fixture.fixture)
-  const isLegacyRgbStrobe = legacyFixtureKey === LEGACY_FIXTURE_RGB_STROBE
-  const isLegacyRgbwStrobe = legacyFixtureKey === LEGACY_FIXTURE_RGBW_STROBE
-  // A fixture read from an older or hand-edited file may carry no channel map at all.
-  const channels: ChannelView = fixture.channels ?? {}
-  const hasLegacyStrobeSpeed = Object.prototype.hasOwnProperty.call(channels, 'strobeSpeed')
-  const hasStrobeChannel = Object.prototype.hasOwnProperty.call(channels, 'strobeChannel')
+export function migrateFixtureToStrobeChannelSchema(fixture: LegacyDmxFixture): {
+  fixture: LegacyDmxFixture
+  changed: boolean
+} {
+  const isLegacyRgbStrobe = fixture.fixture === LEGACY_FIXTURE_RGB_STROBE
+  const isLegacyRgbwStrobe = fixture.fixture === LEGACY_FIXTURE_RGBW_STROBE
+  const nextChannels = channelsOf(fixture)
+  const hasLegacyStrobeSpeed = Object.prototype.hasOwnProperty.call(nextChannels, 'strobeSpeed')
+  const hasStrobeChannel = Object.prototype.hasOwnProperty.call(nextChannels, 'strobeChannel')
   const needsStrobeValuesSeed =
     (isLegacyRgbStrobe || isLegacyRgbwStrobe) && fixture.strobeValues == null
 
@@ -85,7 +91,6 @@ export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
     return { fixture, changed: false }
   }
 
-  const nextChannels: Record<string, number | undefined> = { ...channels }
   if (hasLegacyStrobeSpeed) {
     const legacyValue = nextChannels.strobeSpeed
     delete nextChannels.strobeSpeed
@@ -97,16 +102,13 @@ export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
     nextChannels.strobeChannel = 0
   }
 
-  const next: T = {
-    ...fixture,
-    channels: nextChannels as unknown as T['channels'],
-  }
+  const next: LegacyDmxFixture = { ...fixture, channels: nextChannels }
   if (isLegacyRgbStrobe) {
     next.fixture = FixtureTypes.RGB
   } else if (isLegacyRgbwStrobe) {
     // Lands on the (now legacy) `rgbw` identifier, which the white-channel migration below then
     // collapses to `rgb` + a white extra. Two hops so each migration owns one concern.
-    next.fixture = LEGACY_FIXTURE_RGBW as FixtureTypes
+    next.fixture = LEGACY_FIXTURE_RGBW
   }
   if (needsStrobeValuesSeed) {
     next.strobeValues = { ...DEFAULT_STROBE_CHANNEL_VALUES }
@@ -116,8 +118,8 @@ export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
 
 /**
  * Collapses the discrete RGBW archetypes onto RGB(+MH) carrying a `white` {@link ExtraChannel}:
- *   - `fixture: 'rgbw'`    → `'rgb'`
- *   - `fixture: 'rgbw/mh'` → `'rgb/mh'`
+ *   - `fixture: 'rgbw'` becomes `'rgb'`
+ *   - `fixture: 'rgbw/mh'` becomes `'rgb/mh'`
  * with `channels.white` removed and re-expressed as `{ type: 'white', channel: <the old number> }`
  * prepended to `extraChannels`, so it still renders directly after the base channels and ahead of
  * anything the user added. The publisher's substitution mixer feeds a white extra into the same
@@ -127,34 +129,30 @@ export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
  * flag exactly as the unassigned base channel did. Returns the input unchanged when no migration
  * is needed, so this is idempotent and cheap to run on every load.
  */
-export function migrateFixtureWhiteToExtraChannel<T extends DmxFixture>(
-  fixture: T,
-): { fixture: T; changed: boolean } {
-  const legacyFixtureKey = String(fixture.fixture)
-  const isLegacyRgbw = legacyFixtureKey === LEGACY_FIXTURE_RGBW
-  const isLegacyRgbwMh = legacyFixtureKey === LEGACY_FIXTURE_RGBW_MH
+export function migrateFixtureWhiteToExtraChannel(fixture: LegacyDmxFixture): {
+  fixture: LegacyDmxFixture
+  changed: boolean
+} {
+  const isLegacyRgbw = fixture.fixture === LEGACY_FIXTURE_RGBW
+  const isLegacyRgbwMh = fixture.fixture === LEGACY_FIXTURE_RGBW_MH
   if (!isLegacyRgbw && !isLegacyRgbwMh) {
     return { fixture, changed: false }
   }
 
-  // A fixture read from an older or hand-edited file may carry no channel map at all.
-  const channels: ChannelView = fixture.channels ?? {}
-  const nextChannels: Record<string, number | undefined> = { ...channels }
+  const nextChannels = channelsOf(fixture)
   const whiteChannel = nextChannels.white
   delete nextChannels.white
 
-  const next: T = {
+  const next: LegacyDmxFixture = {
     ...fixture,
     fixture: isLegacyRgbw ? FixtureTypes.RGB : FixtureTypes.RGBMH,
-    channels: nextChannels as unknown as T['channels'],
+    channels: nextChannels,
   }
-  // A template that somehow lacked the white key keeps its extras untouched — there is no channel
-  // number to carry over, and inventing an unassigned row would fail the fixture's validity check.
+  // A template without a white key keeps its extras untouched. There is no channel number to
+  // carry over, and inventing an unassigned row would fail the fixture's validity check.
   if (typeof whiteChannel === 'number') {
-    next.extraChannels = [
-      { type: 'white', channel: whiteChannel },
-      ...(fixture.extraChannels ?? []),
-    ]
+    const extras = Array.isArray(fixture.extraChannels) ? fixture.extraChannels : []
+    next.extraChannels = [{ type: 'white', channel: whiteChannel }, ...extras]
   }
   return { fixture: next, changed: true }
 }
@@ -162,34 +160,15 @@ export function migrateFixtureWhiteToExtraChannel<T extends DmxFixture>(
 /**
  * Every one-time fixture-shape migration, in order: the strobe-channel schema first (which can land
  * a `rgbw/s` template on the legacy `rgbw` identifier), then the RGBW white-channel collapse.
- * Shared by the rig lights and the MyLights template library so both stay on the same rules.
+ * Loading a template or a rig light runs these before parsing it (see `fixtureParsing`).
  */
-export function migrateFixtureSchema<T extends DmxFixture>(
-  fixture: T,
-): { fixture: T; changed: boolean } {
+export function migrateFixtureSchema(fixture: LegacyDmxFixture): {
+  fixture: LegacyDmxFixture
+  changed: boolean
+} {
   const strobe = migrateFixtureToStrobeChannelSchema(fixture)
   const white = migrateFixtureWhiteToExtraChannel(strobe.fixture)
   return { fixture: white.fixture, changed: strobe.changed || white.changed }
-}
-
-/**
- * Migrates a list of user-defined fixture templates (the `MyLights` library) through
- * {@link migrateFixtureSchema}. Returns the original array reference unchanged when no entry needed
- * migration so callers can do a cheap identity check.
- */
-export function migrateUserLightsSchema(lights: DmxFixture[]): {
-  lights: DmxFixture[]
-  changed: boolean
-} {
-  let changed = false
-  const next = lights.map((light) => {
-    const result = migrateFixtureSchema(light)
-    if (result.changed) {
-      changed = true
-    }
-    return result.fixture
-  })
-  return changed ? { lights: next, changed: true } : { lights, changed: false }
 }
 
 function isMovingHeadFixture(light: DmxFixture): boolean {
@@ -207,17 +186,11 @@ function deriveMountFromConfig(light: DmxFixture): 'floor' | 'ceiling' {
 function migrateLights(lights: DmxLight[]): { lights: DmxLight[]; changed: boolean } {
   let changed = false
   const next = lights.map((light) => {
-    let current: DmxLight = light
-    const schemaResult = migrateFixtureSchema(current)
-    if (schemaResult.changed) {
-      changed = true
-      current = schemaResult.fixture
+    if (light.mount === 'floor' || light.mount === 'ceiling') {
+      return light
     }
-    if (current.mount !== 'floor' && current.mount !== 'ceiling') {
-      changed = true
-      current = { ...current, mount: deriveMountFromConfig(current) }
-    }
-    return current
+    changed = true
+    return { ...light, mount: deriveMountFromConfig(light) }
   })
   return { lights: next, changed }
 }

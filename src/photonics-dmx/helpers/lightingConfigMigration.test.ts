@@ -5,7 +5,7 @@ import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
 } from '../types'
-import type { DmxFixture, DmxLight, DmxRig } from '../types'
+import type { DmxLight, DmxRig } from '../types'
 import {
   CURRENT_RIGS_SCHEMA_VERSION,
   migrateDmxRigsConfig,
@@ -13,7 +13,7 @@ import {
   migrateLightingConfiguration,
   migrateFixtureSchema,
   migrateFixtureWhiteToExtraChannel,
-  migrateUserLightsSchema,
+  type LegacyDmxFixture,
 } from './lightingConfigMigration'
 
 function rgbLight(id: string, group: 'front' | 'back'): DmxLight {
@@ -362,92 +362,47 @@ describe('migrateDmxRigsConfig', () => {
     expect(config.rigs[0]!.config.lightLayout.id).toBe('front-back')
     expect(config.schemaVersion).toBe(CURRENT_RIGS_SCHEMA_VERSION)
   })
-
-  it('migrates legacy rgb/s rig lights to rgb + strobeChannel and seeds strobeValues', () => {
-    const legacyLight = {
-      id: 'rgbs-1',
-      fixtureId: 'tpl-rgbs',
-      position: 1,
-      fixture: 'rgb/s',
-      label: 'L',
-      name: 'L',
-      isStrobeEnabled: true,
-      group: 'front',
-      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeSpeed: 6 },
-    } as unknown as DmxLight
-    const legacyRig: DmxRig = {
-      id: 'rig-legacy',
-      name: 'Legacy',
-      active: true,
-      config: {
-        numLights: 1,
-        lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
-        strobeType: ConfigStrobeType.AllCapable,
-        frontLights: [legacyLight],
-        backLights: [],
-        strobeLights: [],
-      },
-    }
-    const { config, changed } = migrateDmxRigsConfig({ rigs: [legacyRig] })
-    expect(changed).toBe(true)
-    const migratedLight = config.rigs[0]!.config.frontLights[0]!
-    expect(migratedLight.fixture).toBe(FixtureTypes.RGB)
-    expect((migratedLight.channels as { strobeChannel?: number }).strobeChannel).toBe(6)
-    expect((migratedLight.channels as { strobeSpeed?: number }).strobeSpeed).toBeUndefined()
-    expect(migratedLight.strobeValues).toEqual(DEFAULT_STROBE_CHANNEL_VALUES)
-    expect(config.schemaVersion).toBe(CURRENT_RIGS_SCHEMA_VERSION)
-  })
 })
 
 describe('migrateFixtureToStrobeChannelSchema', () => {
   it('converts rgbw/s template to rgbw with strobeChannel + default strobeValues', () => {
-    const legacy = {
+    const legacy: LegacyDmxFixture = {
       id: 'tpl-rgbws',
-      position: 0,
       fixture: 'rgbw/s',
-      label: 'RGBW/S',
-      name: 'RGBW/S',
-      isStrobeEnabled: false,
       channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, white: 4, strobeSpeed: 5 },
-    } as unknown as DmxFixture
+    }
     const { fixture, changed } = migrateFixtureToStrobeChannelSchema(legacy)
     expect(changed).toBe(true)
-    // Lands on the legacy `rgbw` identifier — the white-collapse migration takes it from there.
-    expect(String(fixture.fixture)).toBe('rgbw')
-    expect((fixture.channels as { strobeChannel?: number }).strobeChannel).toBe(5)
-    expect((fixture.channels as { strobeSpeed?: number }).strobeSpeed).toBeUndefined()
+    // Lands on the legacy `rgbw` identifier, which the white-collapse migration takes from there.
+    expect(fixture.fixture).toBe('rgbw')
+    expect(fixture.channels).toEqual({
+      masterDimmer: 0,
+      red: 1,
+      green: 2,
+      blue: 3,
+      white: 4,
+      strobeChannel: 5,
+    })
     expect(fixture.strobeValues).toEqual(DEFAULT_STROBE_CHANNEL_VALUES)
   })
 
   it('renames strobeSpeed to strobeChannel on a dedicated strobe fixture but does NOT seed strobeValues', () => {
-    // Dedicated STROBE fixtures are a separate device class from the RGB+S "Strobe Channel?"
-    // feature — they intrinsically carry a strobe channel and don't consume `strobeValues`. The
-    // migration only corrects the legacy channel key name.
-    const legacy = {
+    const legacy: LegacyDmxFixture = {
       id: 'tpl-strobe',
-      position: 0,
       fixture: FixtureTypes.STROBE,
-      label: 'S',
-      name: 'S',
-      isStrobeEnabled: false,
-      channels: { masterDimmer: 1, strobeSpeed: 2 } as unknown as DmxFixture['channels'],
-    } as DmxFixture
+      channels: { masterDimmer: 1, strobeSpeed: 2 },
+    }
     const { fixture, changed } = migrateFixtureToStrobeChannelSchema(legacy)
     expect(changed).toBe(true)
-    expect((fixture.channels as { strobeChannel: number }).strobeChannel).toBe(2)
-    expect((fixture.channels as { strobeSpeed?: number }).strobeSpeed).toBeUndefined()
+    expect(fixture.channels).toEqual({ masterDimmer: 1, strobeChannel: 2 })
     expect(fixture.strobeValues).toBeUndefined()
   })
 
   it('leaves a clean dedicated strobe fixture unchanged', () => {
-    const strobe: DmxFixture = {
+    const strobe: LegacyDmxFixture = {
       id: 'tpl-strobe',
-      position: 0,
       fixture: FixtureTypes.STROBE,
-      label: 'S',
-      name: 'S',
-      isStrobeEnabled: false,
-      channels: { masterDimmer: 1, strobeChannel: 2 } as unknown as DmxFixture['channels'],
+      channels: { masterDimmer: 1, strobeChannel: 2 },
     }
     const { fixture, changed } = migrateFixtureToStrobeChannelSchema(strobe)
     expect(changed).toBe(false)
@@ -455,13 +410,9 @@ describe('migrateFixtureToStrobeChannelSchema', () => {
   })
 
   it('leaves a plain rgb fixture unchanged', () => {
-    const rgb: DmxFixture = {
+    const rgb: LegacyDmxFixture = {
       id: 'tpl-rgb',
-      position: 0,
       fixture: FixtureTypes.RGB,
-      label: 'R',
-      name: 'R',
-      isStrobeEnabled: false,
       channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     }
     const { fixture, changed } = migrateFixtureToStrobeChannelSchema(rgb)
@@ -471,38 +422,25 @@ describe('migrateFixtureToStrobeChannelSchema', () => {
 })
 
 describe('migrateFixtureWhiteToExtraChannel', () => {
-  const rgbwTemplate = (overrides: Partial<DmxFixture> = {}): DmxFixture =>
-    ({
-      id: 'tpl-rgbw',
-      position: 0,
-      fixture: 'rgbw',
-      label: 'RGBW',
-      name: 'RGBW',
-      isStrobeEnabled: false,
-      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 },
-      ...overrides,
-    }) as unknown as DmxFixture
+  const rgbwTemplate = (overrides: Partial<LegacyDmxFixture> = {}): LegacyDmxFixture => ({
+    id: 'tpl-rgbw',
+    fixture: 'rgbw',
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 },
+    ...overrides,
+  })
 
   it('moves the white channel onto an extra channel and retypes to rgb', () => {
     const { fixture, changed } = migrateFixtureWhiteToExtraChannel(rgbwTemplate())
     expect(changed).toBe(true)
     expect(fixture.fixture).toBe(FixtureTypes.RGB)
-    expect((fixture.channels as { white?: number }).white).toBeUndefined()
+    expect(fixture.channels).toEqual({ masterDimmer: 1, red: 2, green: 3, blue: 4 })
     expect(fixture.extraChannels).toEqual([{ type: 'white', channel: 5 }])
   })
 
   it('retypes rgbw/mh to rgb/mh and keeps pan/tilt', () => {
     const legacy = rgbwTemplate({
-      fixture: 'rgbw/mh' as unknown as FixtureTypes,
-      channels: {
-        masterDimmer: 1,
-        red: 2,
-        green: 3,
-        blue: 4,
-        white: 5,
-        pan: 6,
-        tilt: 7,
-      } as unknown as DmxFixture['channels'],
+      fixture: 'rgbw/mh',
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5, pan: 6, tilt: 7 },
     })
     const { fixture } = migrateFixtureWhiteToExtraChannel(legacy)
     expect(fixture.fixture).toBe(FixtureTypes.RGBMH)
@@ -529,20 +467,16 @@ describe('migrateFixtureWhiteToExtraChannel', () => {
   it('carries an unassigned white channel through as an unassigned extra', () => {
     // Such a template was already invalid (base channels must all be > 0) and stays flagged.
     const legacy = rgbwTemplate({
-      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 0 } as DmxFixture['channels'],
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 0 },
     })
     const { fixture } = migrateFixtureWhiteToExtraChannel(legacy)
     expect(fixture.extraChannels).toEqual([{ type: 'white', channel: 0 }])
   })
 
   it('is a no-op for fixtures already on the current schema', () => {
-    const rgb: DmxFixture = {
+    const rgb: LegacyDmxFixture = {
       id: 'tpl-rgb',
-      position: 0,
       fixture: FixtureTypes.RGB,
-      label: 'R',
-      name: 'R',
-      isStrobeEnabled: false,
       channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
       extraChannels: [{ type: 'white', channel: 5 }],
     }
@@ -554,15 +488,11 @@ describe('migrateFixtureWhiteToExtraChannel', () => {
 
 describe('migrateFixtureSchema', () => {
   it('takes an rgbw/s template all the way to rgb + a white extra', () => {
-    const legacy = {
+    const legacy: LegacyDmxFixture = {
       id: 'tpl-rgbws',
-      position: 0,
       fixture: 'rgbw/s',
-      label: 'RGBW/S',
-      name: 'RGBW/S',
-      isStrobeEnabled: false,
       channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5, strobeSpeed: 6 },
-    } as unknown as DmxFixture
+    }
     const { fixture, changed } = migrateFixtureSchema(legacy)
     expect(changed).toBe(true)
     expect(fixture.fixture).toBe(FixtureTypes.RGB)
@@ -578,63 +508,14 @@ describe('migrateFixtureSchema', () => {
   })
 
   it('is idempotent', () => {
-    const legacy = {
+    const legacy: LegacyDmxFixture = {
       id: 'tpl-rgbw',
-      position: 0,
       fixture: 'rgbw',
-      label: 'RGBW',
-      name: 'RGBW',
-      isStrobeEnabled: false,
       channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 },
-    } as unknown as DmxFixture
+    }
     const once = migrateFixtureSchema(legacy)
     const twice = migrateFixtureSchema(once.fixture)
     expect(twice.changed).toBe(false)
     expect(twice.fixture).toBe(once.fixture)
-  })
-})
-
-describe('migrateUserLightsSchema', () => {
-  it('returns the same array reference when no migration is needed', () => {
-    const lights: DmxFixture[] = [
-      {
-        id: 'tpl-rgb',
-        position: 0,
-        fixture: FixtureTypes.RGB,
-        label: 'R',
-        name: 'R',
-        isStrobeEnabled: false,
-        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
-      },
-    ]
-    const { lights: next, changed } = migrateUserLightsSchema(lights)
-    expect(changed).toBe(false)
-    expect(next).toBe(lights)
-  })
-
-  it('migrates only the legacy entries and preserves untouched ones by reference', () => {
-    const rgb: DmxFixture = {
-      id: 'tpl-rgb',
-      position: 0,
-      fixture: FixtureTypes.RGB,
-      label: 'R',
-      name: 'R',
-      isStrobeEnabled: false,
-      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
-    }
-    const legacy = {
-      id: 'tpl-rgbs',
-      position: 0,
-      fixture: 'rgb/s',
-      label: 'RGB/S',
-      name: 'RGB/S',
-      isStrobeEnabled: true,
-      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeSpeed: 5 },
-    } as unknown as DmxFixture
-    const { lights, changed } = migrateUserLightsSchema([rgb, legacy])
-    expect(changed).toBe(true)
-    expect(lights[0]).toBe(rgb)
-    expect(lights[1]!.fixture).toBe(FixtureTypes.RGB)
-    expect((lights[1]!.channels as { strobeChannel?: number }).strobeChannel).toBe(5)
   })
 })

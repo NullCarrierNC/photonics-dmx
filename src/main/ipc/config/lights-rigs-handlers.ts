@@ -13,9 +13,10 @@ import {
 } from '../inputValidation'
 import {
   buildRigExportFile,
-  migrateRigExportFixtures,
+  loadRigExportFixtures,
   validateRigExportFile,
 } from '../../../photonics-dmx/helpers/rigImportExport'
+import { migrateLightingConfiguration } from '../../../photonics-dmx/helpers/lightingConfigMigration'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('Ipc.LightsRigs')
@@ -201,23 +202,26 @@ export function registerLightsRigsConfigHandlers(
     if (!envelope.ok) {
       return { success: false, error: envelope.error }
     }
-    // A rig file exported by an older build can name fixture types this build has since collapsed
-    // (`rgbw`, `rgb/s`). Migrate before validation, which checks against the current type list.
-    const migrated = migrateRigExportFixtures(envelope.value)
-    const rigValidation = validateDmxRigPayload(migrated.rig)
+    // A file from an older build can name retired fixture types (`rgbw`, `rgb/s`), which loading
+    // migrates.
+    const repairs: string[] = []
+    const loaded = loadRigExportFixtures(envelope.value, repairs)
+    if (!loaded.ok) {
+      return { success: false, error: loaded.error }
+    }
+    const rigValidation = validateDmxRigPayload(loaded.rig)
     if (!rigValidation.ok) {
       return { success: false, error: `Rig: ${rigValidation.error}` }
     }
-    const templatesValidation = validateDmxFixturesArray(migrated.templates, 'templates')
-    if (!templatesValidation.ok) {
-      return { success: false, error: `Templates: ${templatesValidation.error}` }
-    }
+    const rig = rigValidation.value
+    const { config } = migrateLightingConfiguration(rig.config, { skipLegacyRename: true })
 
     return {
       success: true,
       sourceBasename: path.basename(sourcePath),
-      rig: rigValidation.value,
-      templates: templatesValidation.value,
+      rig: { ...rig, config },
+      templates: loaded.templates,
+      repairs,
     }
   })
 }
