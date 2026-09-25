@@ -5,6 +5,7 @@ import {
   DmxFixture,
   LightingConfiguration,
   DmxRig,
+  isSavedFixture,
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
@@ -38,8 +39,8 @@ export const myValidDmxLightsAtom = atom((get) => {
   // Get the list of DmxLights from myDmxLightsAtom
   const myDmxLights = get(myDmxLightsAtom)
 
-  // Filter DmxLights that have all channel values greater than 0
-  const validDmxLights = myDmxLights.filter((DmxLight: DmxFixture) => {
+  // Saved templates whose channel values are all greater than 0
+  const validDmxLights = myDmxLights.filter(isSavedFixture).filter((DmxLight: DmxFixture) => {
     const { channels } = DmxLight
 
     // Check if all channel values in the channels object are greater than 0

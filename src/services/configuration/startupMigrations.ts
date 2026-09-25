@@ -31,25 +31,6 @@ export interface UserLightsConfig {
 }
 
 /**
- * Migrates legacy lights format (array) to new format ({lights: [...]})
- */
-export function migrateLegacyLightsFormat(userLights: ConfigFile<UserLightsConfig>): void {
-  const currentData = userLights.get()
-
-  // If already in new format, do nothing
-  if (currentData && Array.isArray(currentData.lights)) {
-    return
-  }
-
-  // If legacy format (just an array), migrate
-  if (Array.isArray(currentData)) {
-    const migratedData: UserLightsConfig = { lights: currentData }
-    userLights.applyLoadMigration(migratedData)
-    log.info(`[Photonics Config] Migrated legacy lights format to new format`)
-  }
-}
-
-/**
  * The rig-config migrations (mount backfill, light count) for the standalone lighting layout, which
  * is still served to the renderer and seeds the default rig on first run. The legacy `front-back`
  * rename is skipped, since that was the rigs' v1 migration and a layout naming `front-back` means
@@ -137,7 +118,6 @@ export function migrateToDmxRigs(
 /** Every config file the startup migrations touch. */
 export interface MigratableConfigFiles {
   preferences: PreferencesConfigFile
-  userLights: ConfigFile<UserLightsConfig>
   lightingLayout: ConfigFile<LightingConfiguration>
   dmxRigs: ConfigFile<DmxRigsConfig>
 }
@@ -147,7 +127,6 @@ export interface MigratableConfigFiles {
  * migration has run.
  */
 export function runStartupMigrations(files: MigratableConfigFiles): void {
-  migrateLegacyLightsFormat(files.userLights)
   migrateLightingLayoutFixtureSchema(files.lightingLayout)
   normalizeStraySenderFlatKeys(files.preferences)
   migrateToDmxRigs(files.lightingLayout, files.dmxRigs)

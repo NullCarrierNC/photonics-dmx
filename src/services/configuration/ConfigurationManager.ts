@@ -97,7 +97,6 @@ export class ConfigurationManager {
       onCorruptRecovery: onCorrupt,
       validate: validateUserLightsData,
       normalizeLoaded: loadUserLightsFixtures,
-      coerceUnversioned: (raw) => (Array.isArray(raw) ? { lights: raw } : raw) as UserLightsConfig,
     })
     this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1, {
       onCorruptRecovery: onCorrupt,
@@ -115,7 +114,6 @@ export class ConfigurationManager {
 
     runStartupMigrations({
       preferences: this.preferences,
-      userLights: this.userLights,
       lightingLayout: this.lightingLayout,
       dmxRigs: this.dmxRigs,
     })

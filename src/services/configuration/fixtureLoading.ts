@@ -61,12 +61,20 @@ export function loadUserLightsFixtures(
   data: UserLightsConfig,
   reportRepair: ReportRepair,
 ): UserLightsConfig {
-  if (!Array.isArray(data?.lights)) {
+  // A bare array in the file is the template list itself.
+  const stored: unknown = data
+  const config = Array.isArray(stored) ? { lights: stored } : data
+  if (!Array.isArray(config?.lights)) {
     return data
   }
   const faults: string[] = []
-  const lights = loadList(data.lights, 'lights', loadDmxFixture, faults)
-  return settle(data, { ...data, lights }, faults, reportRepair)
+  // Rig lights reference their template by id, so a template without one gets a new id.
+  const lights = loadList(config.lights, 'lights', loadDmxFixture, faults).map((fixture, i) => {
+    if (fixture.id !== null) return fixture
+    faults.push(`lights[${i}].id is missing`)
+    return { ...fixture, id: globalThis.crypto.randomUUID() }
+  })
+  return settle(data, { ...config, lights }, faults, reportRepair)
 }
 
 export function loadLightingLayoutFixtures(

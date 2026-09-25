@@ -14,6 +14,7 @@ import {
   isFixtureConfigFlagField,
   normalizeFixtureConfig,
   LightingConfiguration,
+  SavedFixture,
 } from '../../../photonics-dmx/types'
 import { DraftNumberField } from './controls/DraftField'
 import { LightIcon } from './LightIcon'
@@ -35,7 +36,7 @@ interface LightChannelsConfigProps {
   onChange: (updatedLight: DmxLight) => void
   onClick: () => void
   isHighlighted: boolean
-  myLights: DmxFixture[] // Light templates
+  myLights: SavedFixture[] // Light templates
   /** When set, moving-head fixtures can open the live calibration wizard. */
   rigId?: string | null
   /** Current rig lighting config (for 3D preview in the calibration wizard). */
@@ -245,7 +246,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     const updatedLight: DmxLight = {
       ...light,
       ...layout,
-      fixtureId: selectedFixture.id!,
+      fixtureId: selectedFixtureId,
       label: selectedFixture.label,
       name: selectedFixture.name,
       isStrobeEnabled: selectedFixture.isStrobeEnabled,
@@ -353,7 +354,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         onChange={handleLightTypeChange}
         className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
         {myLights.map((availableFixture) => (
-          <option key={availableFixture.id!} value={availableFixture.id!}>
+          <option key={availableFixture.id} value={availableFixture.id}>
             {availableFixture.name}
           </option>
         ))}

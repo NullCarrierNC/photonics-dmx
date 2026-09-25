@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { rectSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import LightChannelsConfig from '../../components/LightChannelsConfig'
-import type { DmxLight, DmxFixture, LightingConfiguration } from '../../../../photonics-dmx/types'
+import type { DmxLight, LightingConfiguration, SavedFixture } from '../../../../photonics-dmx/types'
 
 const MountToggle: React.FC<{
   value: 'floor' | 'ceiling'
@@ -36,7 +36,7 @@ const MountToggle: React.FC<{
 interface LightCardSharedProps {
   light: DmxLight
   index: number
-  myLights: DmxFixture[]
+  myLights: SavedFixture[]
   rigId: string | null
   lightingConfig: LightingConfiguration
   onLightChange: (light: DmxLight) => void
@@ -157,7 +157,7 @@ const SortableLightCard: React.FC<SortableLightCardProps> = ({
 interface LightChannelAssignmentSectionProps {
   title: string
   lights: DmxLight[]
-  myLights: DmxFixture[]
+  myLights: SavedFixture[]
   rigId: string | null
   lightingConfig: LightingConfiguration
   onLightChange: (light: DmxLight) => void

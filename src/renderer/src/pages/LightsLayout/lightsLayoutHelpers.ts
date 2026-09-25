@@ -6,6 +6,7 @@ import {
   DmxLight,
   DmxRig,
   LightingConfiguration,
+  SavedFixture,
 } from '../../../../photonics-dmx/types'
 import {
   deriveChannelLayoutForMaster,
@@ -89,7 +90,7 @@ export function nextMasterDimmerForNewLight(
 export function createDmxLightInstance(
   group: 'front' | 'back' | 'strobe',
   existingLights: DmxLight[],
-  myFixtures: DmxFixture[],
+  myFixtures: SavedFixture[],
 ): { light: DmxLight & { group: 'front' | 'back' | 'strobe' }; addressCapped: boolean } {
   if (myFixtures.length === 0) {
     throw new Error('myFixtures must be non-empty to create a light instance')
@@ -111,7 +112,7 @@ export function createDmxLightInstance(
   return {
     light: {
       id: crypto.randomUUID(),
-      fixtureId: selectedFixture.id!,
+      fixtureId: selectedFixture.id,
       position: totalExisting + 1,
       ...deriveChannelLayoutForMaster(selectedFixture, newMasterDimmer),
       label: selectedFixture.label,

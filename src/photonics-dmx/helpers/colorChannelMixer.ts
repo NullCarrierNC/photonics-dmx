@@ -160,15 +160,7 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
       blueChannels.push(ec.channel)
       hasRgbExtra = true
     } else {
-      // Extras arrive from persisted JSON, which the config schema validates only loosely, so the
-      // type is not guaranteed to be one this build knows. Report and skip rather than driving the
-      // channel with a guessed primary or indexing a bucket that isn't there.
-      const bucket = mixableChannels[ec.type as MixableChannelType]
-      if (!bucket) {
-        exclude(label, true)
-        return
-      }
-      bucket.push(ec.channel)
+      mixableChannels[ec.type].push(ec.channel)
     }
   })
 

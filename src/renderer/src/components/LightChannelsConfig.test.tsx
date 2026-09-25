@@ -14,12 +14,12 @@ import {
   DMX_CHANNEL_MAX,
   FixtureTypes,
   normalizeFixtureConfig,
-  type DmxFixture,
   type DmxLight,
   type ExtraChannel,
   type LightingConfiguration,
   type RgbFixture,
   type RgbLight,
+  type SavedFixture,
 } from '../../../photonics-dmx/types'
 import {
   rgbMovingHeadFixture,
@@ -34,7 +34,7 @@ jest.mock('./MovingHeadCalibrationWizard', () => ({
 import LightChannelsConfig from './LightChannelsConfig'
 
 /** An RGB template whose channels sit at master + 1, 2, 3. */
-function template(overrides: Partial<RgbFixture> = {}): RgbFixture {
+function template(overrides: Omit<Partial<RgbFixture>, 'id'> = {}): SavedFixture {
   return {
     id: 't1',
     position: 0,
@@ -77,7 +77,7 @@ const lightingConfig: LightingConfiguration = {
 
 type OnLightChange = (updatedLight: DmxLight) => void
 
-function renderCard(opts: { light?: DmxLight; templates?: DmxFixture[] } = {}) {
+function renderCard(opts: { light?: DmxLight; templates?: SavedFixture[] } = {}) {
   const onChange = jest.fn<OnLightChange>()
   const view = render(
     <LightChannelsConfig
@@ -286,7 +286,7 @@ describe('LightChannelsConfig fixture config fields', () => {
   const movingHead = (): DmxLight =>
     rgbMovingHeadLight({ config: normalizeFixtureConfig({ panRangeDeg: 540 }) })
 
-  const templates = (): DmxFixture[] => [rgbMovingHeadFixture()]
+  const templates = (): SavedFixture[] => [{ ...rgbMovingHeadFixture(), id: 'test-fixture-1' }]
 
   const panField = (): HTMLInputElement => screen.getByLabelText('panRangeDeg') as HTMLInputElement
 
