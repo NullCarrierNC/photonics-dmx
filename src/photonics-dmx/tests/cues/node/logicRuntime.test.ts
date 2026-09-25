@@ -423,9 +423,8 @@ describe('Node cue logic runtime', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       const out = cueLevelVarStore.get('out')
-      expect(out).toBeDefined()
-      expect(out?.type).toBe('light-array')
-      const arr = out?.value as TrackedLight[]
+      if (out?.type !== 'light-array') throw new Error('out is not a light array')
+      const arr = out.value
       expect(arr).toHaveLength(3)
       const ids = new Set(arr.map((l) => l.id))
       expect(ids).toEqual(new Set(['l1', 'l2', 'l3']))
@@ -592,12 +591,9 @@ describe('Node cue logic runtime', () => {
 
       const ring = cueLevelVarStore.get('ring')
       const groupSize = cueLevelVarStore.get('ringGroupSize')
-      expect(ring?.type).toBe('light-array')
-      expect(groupSize?.type).toBe('number')
-      return {
-        ringIds: (ring?.value as TrackedLight[]).map((l) => l.id),
-        groupSize: groupSize?.value as number,
-      }
+      if (ring?.type !== 'light-array') throw new Error('ring is not a light array')
+      if (groupSize?.type !== 'number') throw new Error('ringGroupSize is not a number')
+      return { ringIds: ring.value.map((l) => l.id), groupSize: groupSize.value }
     }
 
     it('4 lights: ring is the array doubled with group size 1', () => {
@@ -992,8 +988,8 @@ describe('Node cue logic runtime', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       const picked = cueLevelVarStore.get('picked')
-      expect(picked?.type).toBe('light-array')
-      const arr = picked?.value as TrackedLight[]
+      if (picked?.type !== 'light-array') throw new Error('picked is not a light array')
+      const arr = picked.value
       expect(arr).toHaveLength(1)
       expect(['front1', 'front2']).toContain(arr[0].id)
     })

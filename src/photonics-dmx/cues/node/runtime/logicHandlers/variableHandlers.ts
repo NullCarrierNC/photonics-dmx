@@ -58,9 +58,9 @@ export const indexedVariableHandler: LogicHandler<'indexed-variable'> = (logicNo
     const slot = varStore.get(slotKey)
     const targetStore = getVarStore(logicNode.assignTo)
     if (slot !== undefined) {
-      targetStore.set(logicNode.assignTo, { type: slot.type, value: slot.value })
+      targetStore.set(logicNode.assignTo, { ...slot })
     } else {
-      targetStore.set(logicNode.assignTo, { type: valueType, value: zeroForType(valueType) })
+      targetStore.set(logicNode.assignTo, zeroForType(valueType))
     }
   }
   return ctx.next()

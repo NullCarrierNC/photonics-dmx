@@ -34,7 +34,7 @@ import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
 import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
-import type { Effect, TrackedLight } from '../../../types'
+import type { Effect } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { delayPlaceholderAction, indexEventListeners } from './engineUtils'
 import { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
@@ -519,7 +519,7 @@ export abstract class BaseNodeExecutionEngine {
       return
     }
 
-    const lightsArray = sourceVar.value as TrackedLight[]
+    const lightsArray = sourceVar.value
     const rawLength = lightsArray.length
 
     const groupSize = this.resolveForEachGroupSize(logicNode, context)

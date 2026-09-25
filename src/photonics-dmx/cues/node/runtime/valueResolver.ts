@@ -109,7 +109,7 @@ function resolveLightArray(
     return Array.isArray(source.value) ? (source.value as TrackedLight[]) : []
   }
   const existing = lookupVariable(source.name, context, variableDefinitions)
-  return existing.type === 'light-array' ? (existing.value as TrackedLight[]) : []
+  return existing.type === 'light-array' ? existing.value : []
 }
 
 export function resolveColorArray(
@@ -122,7 +122,7 @@ export function resolveColorArray(
     return Array.isArray(source.value) ? (source.value as Color[]) : []
   }
   const existing = lookupVariable(source.name, context, variableDefinitions)
-  return existing.type === 'color-array' ? (existing.value as Color[]) : []
+  return existing.type === 'color-array' ? existing.value : []
 }
 
 /** A variable of `type` holding what `source` resolves to as that type. */
@@ -146,13 +146,11 @@ export function resolveVariableValue(
   }
 }
 
-/**
- * Infer variable type from value.
- */
-export function inferType(value: number | string | boolean): VariableType {
-  if (typeof value === 'boolean') return 'boolean'
-  if (typeof value === 'number') return 'number'
-  return 'string'
+/** A variable holding `value`, typed by what it holds. */
+export function inferVariableValue(value: number | string | boolean): VariableValue {
+  if (typeof value === 'boolean') return { type: 'boolean', value }
+  if (typeof value === 'number') return { type: 'number', value }
+  return { type: 'string', value }
 }
 
 /**

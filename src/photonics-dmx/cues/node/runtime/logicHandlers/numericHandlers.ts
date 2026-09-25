@@ -1,7 +1,6 @@
 /** Handlers for the numeric logic nodes: arithmetic, formulas, clamping, wall-clock pulses, rolls. */
 
 import type { RandomRoll } from '../../../types/nodeCueTypes'
-import type { TrackedLight } from '../../../../types'
 import { randomBetween, shuffle } from '../../../../helpers/utils'
 import { resolveNumber } from '../valueResolver'
 import { compileExpression } from '../expressionEvaluator'
@@ -149,7 +148,7 @@ export const randomHandler: LogicHandler<'random'> = (logicNode, ctx) => {
         )
         return
       }
-      const lightsArray = sourceVar.value as TrackedLight[]
+      const lightsArray = sourceVar.value
       const countVal = Number(
         resolveNumber(roll.count ?? { source: 'literal', value: 1 }, context, variableDefinitions),
       )

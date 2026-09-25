@@ -2,20 +2,14 @@ import { TrackedLight, Color, isColor } from '../../../types'
 import type { VariableType } from '../../types/nodeCueTypes'
 
 /**
- * Variable value stored in variable stores.
+ * Variable value stored in variable stores, holding the value its type names.
  */
-export interface VariableValue {
-  type:
-    | 'number'
-    | 'boolean'
-    | 'string'
-    | 'color'
-    | 'light-array'
-    | 'color-array'
-    | 'cue-type'
-    | 'event'
-  value: number | boolean | string | TrackedLight[] | Color[]
-}
+export type VariableValue =
+  | { type: 'number'; value: number }
+  | { type: 'boolean'; value: boolean }
+  | { type: 'string' | 'cue-type' | 'event' | 'color'; value: string }
+  | { type: 'light-array'; value: TrackedLight[] }
+  | { type: 'color-array'; value: Color[] }
 
 /** A number from an authored or stored value, with 0 for anything unreadable. */
 function toNumber(raw: unknown): number {

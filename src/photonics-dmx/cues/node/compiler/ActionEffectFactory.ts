@@ -89,7 +89,7 @@ export class ActionEffectFactory {
 
       // If it's a light-array variable, use those exact lights (ignore filter)
       if (varValue?.type === 'light-array') {
-        return varValue.value as TrackedLight[]
+        return varValue.value
       }
 
       // If it's a string variable, treat as group name(s) and resolve with filter

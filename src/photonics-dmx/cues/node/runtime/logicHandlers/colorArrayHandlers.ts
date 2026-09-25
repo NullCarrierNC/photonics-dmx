@@ -44,7 +44,7 @@ export const reverseColorsHandler: LogicHandler<'reverse-colors'> = (logicNode, 
     return ctx.next()
   }
 
-  const colorsArray = sourceVar.value as Color[]
+  const colorsArray = sourceVar.value
   const reversed = [...colorsArray].reverse()
 
   const targetVarStore = getVarStore(logicNode.assignTo)
@@ -62,7 +62,7 @@ export const concatColorsHandler: LogicHandler<'concat-colors'> = (logicNode, ct
     const sourceVar = sourceVarStore.get(varName)
 
     if (sourceVar && sourceVar.type === 'color-array') {
-      concatResult.push(...(sourceVar.value as Color[]))
+      concatResult.push(...sourceVar.value)
     } else {
       log.warn(`concat-colors node ${nodeId}: variable "${varName}" is not a color-array, skipping`)
     }
@@ -86,7 +86,7 @@ export const shuffleColorsHandler: LogicHandler<'shuffle-colors'> = (logicNode, 
     return ctx.next()
   }
 
-  const colorsArray = sourceVar.value as Color[]
+  const colorsArray = sourceVar.value
   const shuffled = shuffle(colorsArray)
 
   const targetVarStore = getVarStore(logicNode.assignTo)
@@ -103,7 +103,7 @@ export const arrayLengthHandler: LogicHandler<'array-length'> = (logicNode, ctx)
 
   let length = 0
   if (sourceVar && (sourceVar.type === 'light-array' || sourceVar.type === 'color-array')) {
-    length = (sourceVar.value as unknown[]).length
+    length = sourceVar.value.length
   } else {
     log.warn(
       `array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not an array`,
