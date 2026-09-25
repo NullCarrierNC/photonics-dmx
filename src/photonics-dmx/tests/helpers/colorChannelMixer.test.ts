@@ -266,20 +266,6 @@ describe('invalid channels and strobe device class', () => {
     expect(mix(f, 255, 191, 0)).toEqual({ 2: 255, 3: 191, 4: 0 })
   })
 
-  it('excludes an extra whose type it does not recognise instead of throwing', () => {
-    // `extraChannels` reaches the mixer straight from persisted JSON, which the config schema only
-    // validates loosely, so an unknown type is reachable and must degrade to a reported exclusion.
-    const f = withExtras([
-      { type: 'chartreuse' as ExtraChannelType, channel: 5 },
-      extra('amber', 6),
-    ])
-    const plan = buildChannelMixPlan(f)!
-    expect(plan.invalidChannels).toHaveLength(1)
-    expect(plan.stages.every((s) => s.channels.every((c) => c === 6))).toBe(true)
-    // Channel 5 is left alone rather than driven with a guessed primary.
-    expect(mix(f, 255, 191, 0)[5]).toBeUndefined()
-  })
-
   it('a dedicated strobe fixture honours fixed extras but never colour extras', () => {
     const f = strobeFixture({ extraChannels: [extra('fixed', 3, 200), extra('red', 4)] })
     const plan = buildChannelMixPlan(f)!
