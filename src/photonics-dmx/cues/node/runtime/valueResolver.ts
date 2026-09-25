@@ -34,84 +34,116 @@ export class UninitializedVariableError extends Error {
 }
 
 /**
- * Resolve a value source to an actual value at runtime.
- * When variableDefinitions is provided, variable sources are resolved from the scope-correct
- * store (cue vs cue-group) to match scope-aware writes. When not provided, falls back to
- * cue-level then group-level.
+ * The variable a variable source names. With variableDefinitions it is read from the store its
+ * declared scope puts it in (cue vs cue-group), and without them from cue-level then group-level.
  */
-export function resolveValue(
-  expectedType: VariableType,
+function lookupVariable(
+  name: string,
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope,
+): VariableValue {
+  const existing = variableDefinitions
+    ? (variableDefinitions.some((v) => v.name === name && v.scope === 'cue')
+        ? context.cueLevelVarStore
+        : context.groupLevelVarStore
+      ).get(name)
+    : context.cueLevelVarStore.get(name) ?? context.groupLevelVarStore.get(name)
+  if (!existing) throw new UninitializedVariableError(name)
+  return existing
+}
+
+export function resolveNumber(
   source: ValueSource | undefined,
   context: ExecutionContext,
   variableDefinitions?: VariableDefinitionsForScope,
-): number | boolean | string | TrackedLight[] | Color[] {
-  if (!source) {
-    if (expectedType === 'light-array' || expectedType === 'color-array') return []
-    return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : ''
-  }
-
+): number {
+  if (!source) return 0
   if (source.source === 'literal') {
-    if (expectedType === 'light-array') {
-      return Array.isArray(source.value) ? (source.value as TrackedLight[]) : []
+    const value = source.value
+    if (typeof value === 'boolean') return value ? 1 : 0
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value)
+      return isNaN(parsed) ? 0 : parsed
     }
-    if (expectedType === 'color-array') {
-      return Array.isArray(source.value) ? (source.value as Color[]) : []
-    }
-    if (
-      expectedType === 'string' ||
-      expectedType === 'cue-type' ||
-      expectedType === 'color' ||
-      expectedType === 'event'
-    ) {
-      return String(source.value)
-    }
-    if (expectedType === 'number') {
-      if (typeof source.value === 'boolean') {
-        return source.value ? 1 : 0
-      }
-      if (typeof source.value === 'string') {
-        const parsed = parseFloat(source.value)
-        return isNaN(parsed) ? 0 : parsed
-      }
-      return typeof source.value === 'number' ? source.value : 0
-    }
-    return source.value === true || source.value === 'true'
+    return typeof value === 'number' ? value : 0
   }
-
-  // Variable source: use scope-aware store when definitions provided, else cue then group
-  const existing = variableDefinitions
-    ? (variableDefinitions.some((v) => v.name === source.name && v.scope === 'cue')
-        ? context.cueLevelVarStore
-        : context.groupLevelVarStore
-      ).get(source.name)
-    : context.cueLevelVarStore.get(source.name) ?? context.groupLevelVarStore.get(source.name)
-
-  if (existing) {
-    if (expectedType === 'light-array') {
-      return existing.type === 'light-array' ? (existing.value as TrackedLight[]) : []
-    }
-    if (expectedType === 'color-array') {
-      return existing.type === 'color-array' ? (existing.value as Color[]) : []
-    }
-    if (
-      expectedType === 'string' ||
-      expectedType === 'cue-type' ||
-      expectedType === 'color' ||
-      expectedType === 'event'
-    ) {
-      return String(existing.value)
-    }
-    if (expectedType === 'number') {
-      if (typeof existing.value === 'string') {
-        const parsed = parseFloat(existing.value)
-        return isNaN(parsed) ? 0 : parsed
-      }
-      return typeof existing.value === 'number' ? existing.value : existing.value ? 1 : 0
-    }
-    return existing.value === true || existing.value === 'true'
+  const value = lookupVariable(source.name, context, variableDefinitions).value
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value)
+    return isNaN(parsed) ? 0 : parsed
   }
+  return typeof value === 'number' ? value : value ? 1 : 0
+}
 
-  throw new UninitializedVariableError(source.name)
+export function resolveBoolean(
+  source: ValueSource | undefined,
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope,
+): boolean {
+  if (!source) return false
+  const value =
+    source.source === 'literal'
+      ? source.value
+      : lookupVariable(source.name, context, variableDefinitions).value
+  return value === true || value === 'true'
+}
+
+/** A string, cue-type, colour or event value as text. */
+export function resolveString(
+  source: ValueSource | undefined,
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope,
+): string {
+  if (!source) return ''
+  if (source.source === 'literal') return String(source.value)
+  return String(lookupVariable(source.name, context, variableDefinitions).value)
+}
+
+function resolveLightArray(
+  source: ValueSource | undefined,
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope,
+): TrackedLight[] {
+  if (!source) return []
+  if (source.source === 'literal') {
+    return Array.isArray(source.value) ? (source.value as TrackedLight[]) : []
+  }
+  const existing = lookupVariable(source.name, context, variableDefinitions)
+  return existing.type === 'light-array' ? (existing.value as TrackedLight[]) : []
+}
+
+export function resolveColorArray(
+  source: ValueSource | undefined,
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope,
+): Color[] {
+  if (!source) return []
+  if (source.source === 'literal') {
+    return Array.isArray(source.value) ? (source.value as Color[]) : []
+  }
+  const existing = lookupVariable(source.name, context, variableDefinitions)
+  return existing.type === 'color-array' ? (existing.value as Color[]) : []
+}
+
+/** A variable of `type` holding what `source` resolves to as that type. */
+export function resolveVariableValue(
+  type: VariableType,
+  source: ValueSource | undefined,
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope,
+): VariableValue {
+  switch (type) {
+    case 'number':
+      return { type, value: resolveNumber(source, context, variableDefinitions) }
+    case 'boolean':
+      return { type, value: resolveBoolean(source, context, variableDefinitions) }
+    case 'light-array':
+      return { type, value: resolveLightArray(source, context, variableDefinitions) }
+    case 'color-array':
+      return { type, value: resolveColorArray(source, context, variableDefinitions) }
+    default:
+      return { type, value: resolveString(source, context, variableDefinitions) }
+  }
 }
 
 /**
@@ -120,19 +152,6 @@ export function resolveValue(
 export function inferType(value: number | string | boolean): VariableType {
   if (typeof value === 'boolean') return 'boolean'
   if (typeof value === 'number') return 'number'
-  return 'string'
-}
-
-/**
- * Infer variable type from a value source, for an effect parameter the effect does not declare.
- * Falling back to a numeric type instead would turn "delay" or "yellow" into 0.
- */
-export function inferSourceType(source: ValueSource | undefined): VariableType {
-  if (!source || source.source !== 'literal') return 'string'
-  const value = source.value
-  if (typeof value === 'number') return 'number'
-  if (typeof value === 'boolean') return 'boolean'
-  if (Array.isArray(value)) return 'light-array'
   return 'string'
 }
 
@@ -175,19 +194,19 @@ export function resolveLocationGroups(
   source: ValueSource,
   context: ExecutionContext,
 ): LocationGroup[] {
-  return parseLocationGroups(resolveValue('string', source, context))
+  return parseLocationGroups(resolveString(source, context))
 }
 
 export function resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
-  return parseLightTarget(resolveValue('string', source, context))
+  return parseLightTarget(resolveString(source, context))
 }
 
 export function resolveColor(source: ValueSource, context: ExecutionContext): Color {
-  return parseColor(resolveValue('string', source, context))
+  return parseColor(resolveString(source, context))
 }
 
 export function resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
-  return parseBrightness(resolveValue('string', source, context))
+  return parseBrightness(resolveString(source, context))
 }
 
 export function resolveBlendMode(
@@ -195,7 +214,7 @@ export function resolveBlendMode(
   context: ExecutionContext,
 ): BlendMode | undefined {
   if (!source) return undefined
-  return parseBlendMode(resolveValue('string', source, context))
+  return parseBlendMode(resolveString(source, context))
 }
 
 /**

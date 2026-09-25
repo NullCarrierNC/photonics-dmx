@@ -1,6 +1,6 @@
 /** Handlers for the variable-store logic nodes: whole-variable reads/writes and indexed families. */
 
-import { resolveValue } from '../valueResolver'
+import { resolveNumber, resolveVariableValue } from '../valueResolver'
 import { zeroForType, type LogicHandler } from './handlerContext'
 
 export const variableHandler: LogicHandler<'variable'> = (logicNode, ctx) => {
@@ -18,7 +18,7 @@ export const variableHandler: LogicHandler<'variable'> = (logicNode, ctx) => {
             },
           ]
     for (const assignment of assignments) {
-      const value = resolveValue(
+      const value = resolveVariableValue(
         assignment.valueType,
         assignment.value,
         context,
@@ -27,10 +27,10 @@ export const variableHandler: LogicHandler<'variable'> = (logicNode, ctx) => {
       const varStore = getVarStore(assignment.varName)
       if (logicNode.mode === 'init') {
         if (!varStore.has(assignment.varName)) {
-          varStore.set(assignment.varName, { type: assignment.valueType, value })
+          varStore.set(assignment.varName, value)
         }
       } else {
-        varStore.set(assignment.varName, { type: assignment.valueType, value })
+        varStore.set(assignment.varName, value)
       }
     }
   }
@@ -41,17 +41,19 @@ export const indexedVariableHandler: LogicHandler<'indexed-variable'> = (logicNo
   const { context, variableDefinitions, getVarStore } = ctx
   // Read or write one slot of a `${varName}#${index}` family. The slot lives in the same store the
   // base `varName` is declared in (cue vs cue-group), so a family of latches clears on activation.
-  const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+  const rawIndex = resolveNumber(logicNode.index, context, variableDefinitions)
   const index = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
   const slotKey = `${logicNode.varName}#${index}`
   const varStore = getVarStore(logicNode.varName)
   const valueType = logicNode.valueType
   if (logicNode.mode === 'set') {
-    const value = resolveValue(valueType, logicNode.value, context, variableDefinitions)
-    varStore.set(slotKey, { type: valueType, value })
+    varStore.set(
+      slotKey,
+      resolveVariableValue(valueType, logicNode.value, context, variableDefinitions),
+    )
   } else if (logicNode.assignTo) {
     // get: always write the target so it can't read a stale value from a previous iteration. An empty
-    // slot yields the family type's zero (matching resolveValue's no-source defaults, plus
+    // slot yields the family type's zero (matching the readers' no-source defaults, plus
     // 'transparent' for a colour so an unwritten cell shows through rather than paints black).
     const slot = varStore.get(slotKey)
     const targetStore = getVarStore(logicNode.assignTo)

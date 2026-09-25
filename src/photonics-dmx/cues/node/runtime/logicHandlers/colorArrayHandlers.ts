@@ -5,7 +5,7 @@
 
 import type { Color } from '../../../../types'
 import { shuffle } from '../../../../helpers/utils'
-import { resolveValue } from '../valueResolver'
+import { resolveNumber, resolveColorArray } from '../valueResolver'
 import { log, warnOncePerNode, type LogicHandler } from './handlerContext'
 
 export const colorFromIndexHandler: LogicHandler<'color-from-index'> = (logicNode, ctx) => {
@@ -13,12 +13,7 @@ export const colorFromIndexHandler: LogicHandler<'color-from-index'> = (logicNod
   // Pick a colour from a palette by index, with wraparound. The colour analogue of
   // lights-from-index. The palette is a ValueSource resolving to a color-array: an inline
   // literal Color[] (enum-validated at load) or a color-array variable.
-  const colors = resolveValue(
-    'color-array',
-    logicNode.colors,
-    context,
-    variableDefinitions,
-  ) as Color[]
+  const colors = resolveColorArray(logicNode.colors, context, variableDefinitions)
   if (!colors || colors.length === 0) {
     warnOncePerNode(
       degenerateKey('palette-empty'),
@@ -27,7 +22,7 @@ export const colorFromIndexHandler: LogicHandler<'color-from-index'> = (logicNod
     return ctx.next()
   }
 
-  const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+  const rawIndex = resolveNumber(logicNode.index, context, variableDefinitions)
   const idx = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
   const wrapped = ((idx % colors.length) + colors.length) % colors.length
 

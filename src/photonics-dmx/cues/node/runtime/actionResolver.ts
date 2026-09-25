@@ -6,7 +6,9 @@
 import { ExecutionContext } from './ExecutionContext'
 import {
   parseWaitCondition,
-  resolveValue,
+  resolveNumber,
+  resolveBoolean,
+  resolveString,
   resolveColor,
   resolveBrightness,
   resolveBlendMode,
@@ -48,10 +50,8 @@ export function resolveActionTiming(
   timing: ActionTimingConfig,
   context: ExecutionContext,
 ): ResolvedActionTiming {
-  let waitUntilCondition = parseWaitCondition(
-    resolveValue('string', timing.waitUntilCondition, context),
-  )
-  let waitUntilTime = Number(resolveValue('number', timing.waitUntilTime, context))
+  let waitUntilCondition = parseWaitCondition(resolveString(timing.waitUntilCondition, context))
+  let waitUntilTime = resolveNumber(timing.waitUntilTime, context)
 
   // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait so the effect
   // var store and any direct use of timing stay consistent.
@@ -65,19 +65,19 @@ export function resolveActionTiming(
 
   return {
     ...timing,
-    waitForCondition: parseWaitCondition(resolveValue('string', timing.waitForCondition, context)),
+    waitForCondition: parseWaitCondition(resolveString(timing.waitForCondition, context)),
     waitUntilCondition,
-    waitForTime: Number(resolveValue('number', timing.waitForTime, context)),
+    waitForTime: resolveNumber(timing.waitForTime, context),
     waitForConditionCount: timing.waitForConditionCount
-      ? Number(resolveValue('number', timing.waitForConditionCount, context))
+      ? resolveNumber(timing.waitForConditionCount, context)
       : undefined,
-    duration: Number(resolveValue('number', timing.duration, context)),
+    duration: resolveNumber(timing.duration, context),
     waitUntilTime,
     waitUntilConditionCount: timing.waitUntilConditionCount
-      ? Number(resolveValue('number', timing.waitUntilConditionCount, context))
+      ? resolveNumber(timing.waitUntilConditionCount, context)
       : undefined,
-    easing: timing.easing ? String(resolveValue('string', timing.easing, context)) : undefined,
-    level: timing.level ? Number(resolveValue('number', timing.level, context)) : 1,
+    easing: timing.easing ? resolveString(timing.easing, context) : undefined,
+    level: timing.level ? resolveNumber(timing.level, context) : 1,
   }
 }
 
@@ -89,7 +89,7 @@ export function resolveActionColor(
     name: resolveColor(color.name, context),
     brightness: resolveBrightness(color.brightness, context),
     blendMode: resolveBlendMode(color.blendMode, context),
-    opacity: color.opacity ? Number(resolveValue('number', color.opacity, context)) : undefined,
+    opacity: color.opacity ? resolveNumber(color.opacity, context) : undefined,
   }
 }
 
@@ -99,7 +99,7 @@ export function resolveActionLayer(
   context: ExecutionContext,
 ): number {
   if (!layer) return 0
-  const n = Number(resolveValue('number', layer, context))
+  const n = resolveNumber(layer, context)
   return Number.isFinite(n) ? Math.min(MAX_NODE_LAYER, Math.max(0, n)) : 0
 }
 
@@ -116,7 +116,7 @@ function resolveBearingValue(source: ValueSource, context: ExecutionContext): nu
       return normalizeBearingDegrees(v ? 1 : 0)
     }
   }
-  const str = String(resolveValue('string', source, context))
+  const str = resolveString(source, context)
   return parseBearingFromResolvedValue(str)
 }
 
@@ -133,7 +133,7 @@ export function resolveActionPosition(
     return {
       mode: 'direction',
       bearingDeg: resolveBearingValue(position.bearing, context),
-      angleFromVerticalDeg: Number(resolveValue('number', position.angle, context)),
+      angleFromVerticalDeg: resolveNumber(position.angle, context),
     }
   }
 
@@ -143,8 +143,8 @@ export function resolveActionPosition(
     }
     return {
       mode: 'offset',
-      panOffsetDeg: Number(resolveValue('number', position.pan, context)),
-      tiltOffsetDeg: Number(resolveValue('number', position.tilt, context)),
+      panOffsetDeg: resolveNumber(position.pan, context),
+      tiltOffsetDeg: resolveNumber(position.tilt, context),
     }
   }
 
@@ -153,8 +153,8 @@ export function resolveActionPosition(
   }
   return {
     mode: 'absolute',
-    pan: Number(resolveValue('number', position.pan, context)),
-    tilt: Number(resolveValue('number', position.tilt, context)),
+    pan: resolveNumber(position.pan, context),
+    tilt: resolveNumber(position.tilt, context),
   }
 }
 
@@ -196,20 +196,18 @@ export function resolveMotionPattern(
   setting: NodeMotionPatternSetting,
   context: ExecutionContext,
 ): ResolvedMotionPatternSetting {
-  const pattern = parseMotionPatternType(String(resolveValue('string', setting.pattern, context)))
+  const pattern = parseMotionPatternType(resolveString(setting.pattern, context))
 
-  const speedHz = Number(resolveValue('number', setting.speed, context))
-  const sizeDeg = Number(resolveValue('number', setting.size, context))
-  const fanSpreadDeg = setting.fanSpread
-    ? Number(resolveValue('number', setting.fanSpread, context))
-    : 0
+  const speedHz = resolveNumber(setting.speed, context)
+  const sizeDeg = resolveNumber(setting.size, context)
+  const fanSpreadDeg = setting.fanSpread ? resolveNumber(setting.fanSpread, context) : 0
 
   let panWaveform: WaveformType = 'sine'
   let tiltWaveform: WaveformType = 'cosine'
   let panAmplitudeDeg = sizeDeg
   let tiltAmplitudeDeg = sizeDeg
   const panPhaseOffsetDeg = setting.panPhaseOffset
-    ? Number(resolveValue('number', setting.panPhaseOffset, context))
+    ? resolveNumber(setting.panPhaseOffset, context)
     : 0
   const panFreqMultiplier = 1
   let tiltFreqMultiplier = 1
@@ -242,7 +240,7 @@ export function resolveMotionPattern(
       log.warn('linear-sweep motion pattern has no linearSweepAxis, sweeping horizontally (pan)')
     }
     linearSweepAxis = setting.linearSweepAxis
-      ? parseLinearSweepAxis(String(resolveValue('string', setting.linearSweepAxis, context)))
+      ? parseLinearSweepAxis(resolveString(setting.linearSweepAxis, context))
       : 'horizontal'
     if (linearSweepAxis === 'horizontal') {
       panWaveform = 'sine'
@@ -258,22 +256,18 @@ export function resolveMotionPattern(
   } else {
     // custom
     panWaveform = setting.panWaveform
-      ? parseWaveformType(String(resolveValue('string', setting.panWaveform, context)))
+      ? parseWaveformType(resolveString(setting.panWaveform, context))
       : 'sine'
     tiltWaveform = setting.tiltWaveform
-      ? parseWaveformType(String(resolveValue('string', setting.tiltWaveform, context)))
+      ? parseWaveformType(resolveString(setting.tiltWaveform, context))
       : 'cosine'
-    panAmplitudeDeg = setting.panAmplitude
-      ? Number(resolveValue('number', setting.panAmplitude, context))
-      : sizeDeg
+    panAmplitudeDeg = setting.panAmplitude ? resolveNumber(setting.panAmplitude, context) : sizeDeg
     tiltAmplitudeDeg = setting.tiltAmplitude
-      ? Number(resolveValue('number', setting.tiltAmplitude, context))
+      ? resolveNumber(setting.tiltAmplitude, context)
       : sizeDeg
   }
 
-  const reverse = setting.reverse
-    ? Boolean(resolveValue('boolean', setting.reverse, context))
-    : false
+  const reverse = setting.reverse ? resolveBoolean(setting.reverse, context) : false
 
   return {
     pattern,

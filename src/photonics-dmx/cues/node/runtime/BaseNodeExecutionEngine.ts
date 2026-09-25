@@ -48,7 +48,7 @@ import {
 } from '../compiler/ActionEffectFactory'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import {
-  resolveValue,
+  resolveNumber,
   getVariableStore,
   resolveLocationGroups,
   resolveLightTarget,
@@ -422,7 +422,7 @@ export abstract class BaseNodeExecutionEngine {
   ): void {
     const nodeId = delayNode.id
     try {
-      const delayMs = Number(resolveValue('number', delayNode.delayTime, context))
+      const delayMs = resolveNumber(delayNode.delayTime, context)
       this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs })
 
       // Registered as active so the delay blocks the nodes after it until it fires.

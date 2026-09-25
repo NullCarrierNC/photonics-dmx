@@ -23,9 +23,9 @@ import { createLogger } from '../../../../../shared/logger'
 /** Shared by every handler, so log lines carry one prefix whichever module they come from. */
 export const log = createLogger('logicNodeEvaluator')
 
-/** The empty-slot / uninitialised value for a variable type, matching resolveValue's no-source defaults
- *  (arrays -> [], number -> 0, boolean -> false, others -> ''), with 'transparent' for a colour so an
- *  unwritten colour cell shows through rather than resolving to black. */
+/** The empty-slot / uninitialised value for a variable type, matching the readers' no-source
+ *  defaults (arrays -> [], number -> 0, boolean -> false, others -> ''), with 'transparent' for a
+ *  colour so an unwritten colour cell shows through. */
 export function zeroForType(t: VariableType): number | boolean | string | TrackedLight[] | Color[] {
   if (t === 'light-array' || t === 'color-array') return []
   if (t === 'number') return 0

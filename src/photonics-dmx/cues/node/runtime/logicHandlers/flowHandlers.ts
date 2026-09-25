@@ -11,7 +11,7 @@ import {
   type ValueSource,
   type VariableType,
 } from '../../../types/nodeCueTypes'
-import { resolveValue } from '../valueResolver'
+import { resolveNumber, resolveBoolean, resolveString } from '../valueResolver'
 import { extractCueDataValue } from '../dataExtractors'
 import { log, type HandlerCtx, type LogicHandler } from './handlerContext'
 
@@ -24,7 +24,7 @@ export const selectFromListHandler: LogicHandler<'select-from-list'> = (logicNod
     log.warn(`select-from-list node ${nodeId}: list is empty`)
     return ctx.next()
   }
-  const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+  const rawIndex = resolveNumber(logicNode.index, context, variableDefinitions)
   const idx = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
   const wrapped = ((idx % list.length) + list.length) % list.length
   const targetVarStore = getVarStore(logicNode.assignTo)
@@ -76,21 +76,21 @@ export const conditionalHandler: LogicHandler<'conditional'> = (logicNode, ctx) 
 
   if (logicNode.comparator === '==' || logicNode.comparator === '!=') {
     if (useBooleanCompare) {
-      const left = resolveValue('boolean', logicNode.left, context, variableDefinitions)
-      const right = resolveValue('boolean', logicNode.right, context, variableDefinitions)
+      const left = resolveBoolean(logicNode.left, context, variableDefinitions)
+      const right = resolveBoolean(logicNode.right, context, variableDefinitions)
       outcome = logicNode.comparator === '==' ? left === right : left !== right
     } else if (useStringCompare) {
-      const left = resolveValue('string', logicNode.left, context, variableDefinitions)
-      const right = resolveValue('string', logicNode.right, context, variableDefinitions)
+      const left = resolveString(logicNode.left, context, variableDefinitions)
+      const right = resolveString(logicNode.right, context, variableDefinitions)
       outcome = logicNode.comparator === '==' ? left === right : left !== right
     } else {
-      const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions))
-      const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions))
+      const left = resolveNumber(logicNode.left, context, variableDefinitions)
+      const right = resolveNumber(logicNode.right, context, variableDefinitions)
       outcome = logicNode.comparator === '==' ? left === right : left !== right
     }
   } else {
-    const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions))
-    const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions))
+    const left = resolveNumber(logicNode.left, context, variableDefinitions)
+    const right = resolveNumber(logicNode.right, context, variableDefinitions)
     switch (logicNode.comparator) {
       case '>':
         outcome = left > right
@@ -123,7 +123,7 @@ export const frameGateHandler: LogicHandler<'frame-gate'> = (logicNode, ctx) => 
   cueLevelVarStore.set(key, { type: 'number', value: count })
   // A non-finite divisor (e.g. an expression that produced NaN) would make `count % divisor` never 0
   // and stick the gate on the false port, so it falls back to 1 (fire every frame).
-  const rawDivisor = Number(resolveValue('number', logicNode.divisor, context, variableDefinitions))
+  const rawDivisor = resolveNumber(logicNode.divisor, context, variableDefinitions)
   const divisor = Number.isFinite(rawDivisor) ? Math.max(1, Math.round(rawDivisor)) : 1
   const branch = count % divisor === 0 ? 'true' : 'false'
   return edges.filter((edge) => edge.fromPort === branch).map((edge) => edge.to)
@@ -138,7 +138,7 @@ export const tempoHandler: LogicHandler<'tempo'> = (logicNode, ctx) => {
   // the whole derivation with NaN.
   const numOr = (vs: ValueSource | undefined, dflt: number): number => {
     if (vs == null) return dflt
-    const n = Number(resolveValue('number', vs, context, variableDefinitions))
+    const n = resolveNumber(vs, context, variableDefinitions)
     return Number.isFinite(n) ? n : dflt
   }
 
@@ -198,7 +198,7 @@ export const delayHandler: LogicHandler<'delay'> = (_logicNode, ctx) => {
 export const debuggerHandler: LogicHandler<'debugger'> = (logicNode, ctx) => {
   const { context, variableDefinitions, getVarStore, debugOutput } = ctx
   // Log the message
-  const message = String(resolveValue('string', logicNode.message, context, variableDefinitions))
+  const message = resolveString(logicNode.message, context, variableDefinitions)
   log.info(`[DebuggerNode] ${message}`)
 
   // Log checked variables with their current values
