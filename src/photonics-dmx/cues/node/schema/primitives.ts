@@ -217,11 +217,26 @@ export const variableDefinitionSchema = {
     isParameter: { type: 'boolean', nullable: true },
     validValues: { type: 'array', items: { type: 'string' }, nullable: true },
   },
-  // A colour-array variable starts as a list of known colours.
-  if: { properties: { type: { const: 'color-array' } } },
-  then: {
-    properties: { initialValue: { type: 'array', items: { type: 'string', enum: COLOR_OPTIONS } } },
-  },
+  // Only an array variable starts as an array. A colour array starts as known colours, and a light
+  // array starts empty.
+  allOf: [
+    {
+      if: { properties: { type: { const: 'color-array' } } },
+      then: {
+        properties: {
+          initialValue: { type: 'array', items: { type: 'string', enum: COLOR_OPTIONS } },
+        },
+      },
+    },
+    {
+      if: { properties: { type: { const: 'light-array' } } },
+      then: { properties: { initialValue: { type: 'array', maxItems: 0 } } },
+    },
+    {
+      if: { properties: { type: { enum: ['color-array', 'light-array'] } } },
+      else: { properties: { initialValue: { type: ['number', 'boolean', 'string'] } } },
+    },
+  ],
 } as unknown as JSONSchemaType<VariableDefinition>
 
 export const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
