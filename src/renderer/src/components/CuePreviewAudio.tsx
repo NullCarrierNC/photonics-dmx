@@ -65,7 +65,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({
         name: band.name,
         minHz: band.minHz,
         maxHz: band.maxHz,
-        color: (EQ_BAND_COLORS[index] || 'white') as Color,
+        color: EQ_BAND_COLORS[index] || 'white',
       }))
     }
     return audioConfig.bands.map((band, index) => ({
@@ -73,7 +73,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({
       name: band.name,
       minHz: band.minHz,
       maxHz: band.maxHz,
-      color: (EQ_BAND_COLORS[index] || 'white') as Color,
+      color: EQ_BAND_COLORS[index] || 'white',
     }))
   }, [audioConfig])
 
@@ -178,7 +178,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({
       <div className={showAudioQuickControls ? 'space-y-2' : 'space-y-2 mb-4'}>
         {displayRanges.map((range) => {
           const bandValue = bandValuesById[range.id] || 0
-          const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white
+          const colorRgb = COLOR_TO_RGB[range.color] || COLOR_TO_RGB.white
           const frequencyLabel = `${range.minHz}-${range.maxHz >= 1000 ? `${(range.maxHz / 1000).toFixed(1)}k` : range.maxHz}Hz`
 
           return (
