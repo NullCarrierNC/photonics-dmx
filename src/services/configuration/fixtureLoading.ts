@@ -65,7 +65,12 @@ export function loadUserLightsFixtures(
     return data
   }
   const faults: string[] = []
-  const lights = loadList(data.lights, 'lights', loadDmxFixture, faults)
+  // Rig lights reference their template by id, so a template without one gets a new id.
+  const lights = loadList(data.lights, 'lights', loadDmxFixture, faults).map((fixture, i) => {
+    if (fixture.id !== null) return fixture
+    faults.push(`lights[${i}].id is missing`)
+    return { ...fixture, id: globalThis.crypto.randomUUID() }
+  })
   return settle(data, { ...data, lights }, faults, reportRepair)
 }
 

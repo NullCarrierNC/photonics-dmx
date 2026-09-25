@@ -105,6 +105,24 @@ describe('ConfigurationManager fixture loading', () => {
     expect(reportsFor(cm, 'lights.json')).toEqual([])
   })
 
+  it('gives a template stored with a null id a new id, and reports it', () => {
+    const cm = boot({ lights: [template({ id: null })] })
+
+    expect(cm.getUserLights()[0].id).toEqual(expect.any(String))
+    expect(cm.getUserLights()[0].id).not.toBe('')
+    expect(reportsFor(cm, 'lights.json')).toEqual([
+      expect.objectContaining({ reason: 'repaired', message: expect.stringContaining('[0].id') }),
+    ])
+  })
+
+  it('gives a template stored without an id a new id', () => {
+    const { id: _id, ...stored } = template({})
+    const cm = boot({ lights: [stored] })
+
+    expect(cm.getUserLights()[0].id).toEqual(expect.any(String))
+    expect(reportsFor(cm, 'lights.json')[0]?.message).toContain('[0].id')
+  })
+
   it('moves a lights file aside when it names a fixture type no build wrote', () => {
     const cm = boot({ lights: [template({ fixture: 'laser' })] })
 
