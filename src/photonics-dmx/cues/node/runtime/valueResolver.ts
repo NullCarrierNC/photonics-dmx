@@ -10,9 +10,13 @@ import {
   LocationGroup,
   LightTarget,
   TrackedLight,
+  isBlendMode,
+  isBrightness,
+  isColor,
+  isLightTarget,
+  isLocationGroup,
 } from '../../../types'
 import { ValueSource, VariableType } from '../../types/nodeCueTypes'
-import { BLEND_MODE_OPTIONS, COLOR_OPTIONS, LIGHT_TARGET_OPTIONS } from '../../../constants/options'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
 
@@ -141,11 +145,10 @@ export function resolveLocationGroups(
   if (typeof value !== 'string') return ['front']
 
   // Parse comma-separated groups: "front,back" → ['front', 'back']
-  const validGroups: LocationGroup[] = ['front', 'back', 'strobe']
   return value
     .split(',')
     .map((g) => g.trim())
-    .filter((g) => validGroups.includes(g as LocationGroup)) as LocationGroup[]
+    .filter(isLocationGroup)
 }
 
 /**
@@ -153,8 +156,7 @@ export function resolveLocationGroups(
  */
 export function resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
   const value = resolveValue('string', source, context)
-  const valid: LightTarget[] = LIGHT_TARGET_OPTIONS
-  return valid.includes(value as LightTarget) ? (value as LightTarget) : 'all'
+  return isLightTarget(value) ? value : 'all'
 }
 
 /**
@@ -162,8 +164,7 @@ export function resolveLightTarget(source: ValueSource, context: ExecutionContex
  */
 export function resolveColor(source: ValueSource, context: ExecutionContext): Color {
   const value = resolveValue('string', source, context)
-  const validColors: Color[] = COLOR_OPTIONS
-  return validColors.includes(value as Color) ? (value as Color) : 'blue'
+  return isColor(value) ? value : 'blue'
 }
 
 /**
@@ -171,8 +172,7 @@ export function resolveColor(source: ValueSource, context: ExecutionContext): Co
  */
 export function resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
   const value = resolveValue('string', source, context)
-  const valid: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
-  return valid.includes(value as Brightness) ? (value as Brightness) : 'medium'
+  return isBrightness(value) ? value : 'medium'
 }
 
 /**
@@ -184,7 +184,7 @@ export function resolveBlendMode(
 ): BlendMode | undefined {
   if (!source) return undefined
   const value = resolveValue('string', source, context)
-  return BLEND_MODE_OPTIONS.includes(value as BlendMode) ? (value as BlendMode) : 'replace'
+  return isBlendMode(value) ? value : 'replace'
 }
 
 /**

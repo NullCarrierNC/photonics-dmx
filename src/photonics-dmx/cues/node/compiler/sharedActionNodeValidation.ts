@@ -1,5 +1,5 @@
 import type { ActionNode, ValueSource } from '../../types/nodeCueTypes'
-import { WAIT_CONDITIONS, type LightTarget } from '../../../types'
+import { isLightTarget, isWaitCondition } from '../../../types'
 import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
 
 /**
@@ -67,31 +67,6 @@ function validateTargetGroups(
   }
 }
 
-const KNOWN_LIGHT_TARGETS = new Set<LightTarget>([
-  'all',
-  'even',
-  'odd',
-  'half-1',
-  'half-2',
-  'outter-half-major',
-  'outter-half-minor',
-  'inner-half-major',
-  'inner-half-minor',
-  'third-1',
-  'third-2',
-  'third-3',
-  'quarter-1',
-  'quarter-2',
-  'quarter-3',
-  'quarter-4',
-  'linear',
-  'inverse-linear',
-  'random-1',
-  'random-2',
-  'random-3',
-  'random-4',
-])
-
 function validateTargetFilter(
   action: ActionNode,
   label: string,
@@ -109,7 +84,7 @@ function validateTargetFilter(
     if (typeof value !== 'string' || value.length === 0) {
       throw createError(`Action '${label}' target.filter literal must be a non-empty string.`)
     }
-    if (!KNOWN_LIGHT_TARGETS.has(value as LightTarget)) {
+    if (!isLightTarget(value)) {
       throw createError(`Action '${label}' target.filter '${value}' is not a known LightTarget.`)
     }
   }
@@ -145,8 +120,6 @@ function validateSetPosition(
     }
   }
 }
-
-const KNOWN_WAIT_CONDITIONS = new Set<string>(WAIT_CONDITIONS)
 
 function validateTiming(
   action: ActionNode,
@@ -254,7 +227,7 @@ function validateConditionLiteral(
 ): void {
   if (value.source !== 'literal') return
   const v = value.value
-  if (typeof v !== 'string' || !KNOWN_WAIT_CONDITIONS.has(v)) {
+  if (!isWaitCondition(v)) {
     throw createError(
       `Action '${label}' timing.${field} literal '${String(v)}' is not a known wait condition.`,
     )

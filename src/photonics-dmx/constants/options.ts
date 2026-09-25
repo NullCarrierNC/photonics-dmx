@@ -1,65 +1,8 @@
-import {
-  Color,
-  Brightness,
-  BlendMode,
-  LightTarget,
-  LocationGroup,
-  WaitCondition,
-  WAIT_CONDITIONS,
-} from '../types'
+import { WaitCondition, WAIT_CONDITIONS } from '../types'
 import { AudioEventType } from '../cues/types/nodeCueTypes'
 
-export const COLOR_OPTIONS: Color[] = [
-  'amber',
-  'black',
-  'blue',
-  'chartreuse',
-  'cyan',
-  'green',
-  'magenta',
-  'orange',
-  'purple',
-  'red',
-  'teal',
-  'transparent',
-  'vermilion',
-  'violet',
-  'white',
-  'yellow',
-]
-
-export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
-
-// The supported layer blend modes. A cue blendMode outside this set is coerced to 'replace'
-// at runtime (valueResolver / LightTransitionController).
-export const BLEND_MODE_OPTIONS: BlendMode[] = ['mix', 'add', 'replace']
-
-export const LOCATION_OPTIONS: LocationGroup[] = ['front', 'back', 'strobe']
-
-export const LIGHT_TARGET_OPTIONS: LightTarget[] = [
-  'all',
-  'even',
-  'odd',
-  'half-1',
-  'half-2',
-  'outter-half-major',
-  'outter-half-minor',
-  'inner-half-major',
-  'inner-half-minor',
-  'third-1',
-  'third-2',
-  'third-3',
-  'quarter-1',
-  'quarter-2',
-  'quarter-3',
-  'quarter-4',
-  'linear',
-  'inverse-linear',
-  'random-1',
-  'random-2',
-  'random-3',
-  'random-4',
-]
+export { BLEND_MODE_OPTIONS, BRIGHTNESS_OPTIONS, COLOR_OPTIONS } from '../types/lighting'
+export { LIGHT_TARGET_OPTIONS, LOCATION_OPTIONS } from '../types/rigs'
 
 /**
  * Wait conditions for ACTION TIMING - song-based conditions only (no system events).

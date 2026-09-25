@@ -31,6 +31,12 @@ export enum EasingType {
   CUBIC_IN_OUT = 'cubicInOut',
 }
 
+const EASING_TYPES: readonly string[] = Object.values(EasingType)
+
+export function isEasingType(value: unknown): value is EasingType {
+  return typeof value === 'string' && EASING_TYPES.includes(value)
+}
+
 /**
  * Sin easing-in function.
  * @param t Normalized time (0 to 1).

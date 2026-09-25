@@ -32,7 +32,7 @@ interface ValueSourceEditorProps {
     | 'color-array'
     | 'event'
     | 'either'
-  validLiterals?: string[]
+  validLiterals?: readonly string[]
   /** When set, constrained literal dropdown uses these labels instead of repeating the stored value as the label (takes precedence over {@link validLiterals}). */
   validLiteralOptions?: ReadonlyArray<{ value: string; label: string }>
   availableVariables: {
