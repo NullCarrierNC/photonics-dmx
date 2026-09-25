@@ -1,7 +1,7 @@
 /**
  * Variable and event declarations a cue graph carries.
  */
-import type { Color, TrackedLight } from '../../../types'
+import type { Color } from '../../../types'
 
 /** Every variable/value type, the single source both the schema enums and the editor dropdowns derive
  *  from so they cannot drift from the VariableType union. */
@@ -26,7 +26,7 @@ export interface VariableDefinition {
   name: string
   type: VariableType
   scope: 'cue' | 'cue-group'
-  initialValue: number | boolean | string | TrackedLight[] | Color[]
+  initialValue: number | boolean | string | Color[]
   description?: string
   isParameter?: boolean
   /** Constrained set of allowed literal values, driving a selector in the effect-raiser parameter UI */

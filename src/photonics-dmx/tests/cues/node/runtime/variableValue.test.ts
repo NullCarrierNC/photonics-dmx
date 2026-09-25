@@ -57,7 +57,7 @@ describe('CueSession variable initialisation', () => {
 
   it('starts a light-array variable empty whatever it declares', () => {
     const session = new CueSession()
-    session.initializeVariables([variable('light-array', [createMockTrackedLight()])], [])
+    session.initializeVariables([variable('light-array', ['red'])], [])
     expect(session.getCueLevelVarStore().get('v')).toEqual({ type: 'light-array', value: [] })
   })
 
