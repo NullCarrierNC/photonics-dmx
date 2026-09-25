@@ -31,8 +31,6 @@ export type ConfigDataValidCheck<T> = (
 export type ConfigFileHooks<T> = {
   validate?: ConfigDataValidCheck<T>
   onCorruptRecovery?: (info: ConfigCorruptInfo) => void
-  /** If the file is legacy unversioned JSON, reshape before `migrateData` (e.g. lights array → `{ lights }`). */
-  coerceUnversioned?: (raw: unknown) => T
   /**
    * Runs on every load after migration and before validation. Returns the data unchanged (same
    * reference) when nothing needs fixing, or a repaired copy otherwise; a changed reference is
@@ -69,7 +67,6 @@ export class ConfigFile<T> {
   private readonly defaultData: T
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
-  private readonly coerceUnversioned: ((raw: unknown) => T) | undefined
   private readonly normalizeLoaded:
     | ((data: T, reportRepair: (message: string) => void) => T)
     | undefined
@@ -106,7 +103,6 @@ export class ConfigFile<T> {
     this.defaultData = defaultData
     this.validate = hooks.validate
     this.onCorruptRecovery = hooks.onCorruptRecovery
-    this.coerceUnversioned = hooks.coerceUnversioned
     this.normalizeLoaded = hooks.normalizeLoaded
     this.ensureConfigDirectory(configDir)
     this.data = this.load()
@@ -294,8 +290,7 @@ export class ConfigFile<T> {
       if (envelope.versioned) {
         data = envelope.data
       } else {
-        const { raw } = envelope
-        data = this.coerceUnversioned ? this.coerceUnversioned(raw) : (raw as T)
+        data = envelope.raw as T
       }
       if (version < this.currentVersion) {
         data = this.migrateData(data, version, this.currentVersion)
