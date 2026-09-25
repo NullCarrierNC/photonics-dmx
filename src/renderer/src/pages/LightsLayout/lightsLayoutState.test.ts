@@ -33,14 +33,14 @@ describe('reassignNonStrobeGroups', () => {
 })
 
 describe('mapDedicatedStrobeGroupRows', () => {
-  it('sets strobe properties only for group strobe', () => {
+  it('strobe-enables only the strobe group, keeping each fixture type', () => {
     const input: DmxLight[] = [
-      { ...makeLight({ id: '1', position: 1 }) },
-      { ...(makeLight({ id: '2', position: 2 }) as DmxLight & { group: string }), group: 'strobe' },
+      makeLight({ id: '1', position: 1 }),
+      makeLight({ id: '2', position: 2, group: 'strobe' }),
     ]
     const out = mapDedicatedStrobeGroupRows(input)
-    expect(out[0]!.fixture).toBe(FixtureTypes.RGB)
-    expect(out[1]!.fixture).toBe(FixtureTypes.STROBE)
+    expect(out[0]!.isStrobeEnabled).toBe(false)
+    expect(out[1]!.fixture).toBe(FixtureTypes.RGB)
     expect(out[1]!.isStrobeEnabled).toBe(true)
   })
 })

@@ -75,6 +75,7 @@ jest.mock('./LightsLayout/components/ImportRigModal', () => ({
 }))
 
 import LightsLayout from './LightsLayout'
+import { parseDmxLight } from '../../../photonics-dmx/helpers/fixtureParsing'
 
 const fixture = {
   id: 'f1',
@@ -89,7 +90,7 @@ const fixture = {
 } as unknown as DmxFixture
 
 // The settled editor shape for a single-light, front-only, strobe-None layout: group 'front',
-// position 1, strobeMode 'disabled' (added by the None-strobe effect), and NO strobeValues.
+// position 1, and NO strobeValues.
 const initialFront = {
   id: 'l1',
   fixtureId: 'f1',
@@ -102,7 +103,6 @@ const initialFront = {
   channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
   universe: 0,
   mount: 'floor',
-  strobeMode: 'disabled',
 } as unknown as DmxLight
 
 const initialRig: DmxRig = {
@@ -298,5 +298,81 @@ describe('LightsLayout import dialog', () => {
     await act(async () => {})
 
     expect(importRigModalRenders).toHaveLength(0)
+  })
+})
+
+describe('LightsLayout saves lights the save check accepts', () => {
+  const frontLight: DmxLight = {
+    id: 'l1',
+    fixtureId: 'f1',
+    position: 1,
+    fixture: FixtureTypes.RGB,
+    label: 'PAR',
+    name: 'PAR',
+    isStrobeEnabled: false,
+    group: 'front',
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+    universe: 0,
+    mount: 'floor',
+  }
+
+  const faultsInSavedLights = (): string[] => {
+    if (!lastSavedRig) throw new Error('nothing was saved')
+    const { frontLights, backLights, strobeLights } = lastSavedRig.config
+    return [...frontLights, ...backLights, ...strobeLights].flatMap((light, i) => {
+      const faults: string[] = []
+      parseDmxLight(light, `lights[${i}]`, (message) => faults.push(message))
+      return faults
+    })
+  }
+
+  async function saveRig(rig: DmxRig): Promise<void> {
+    getDmxRigsMock.mockImplementation(async () => [lastSavedRig ?? rig])
+    getDmxRigMock.mockImplementation(async () => lastSavedRig ?? rig)
+    renderWithProviders(<LightsLayout />, {
+      seed: (set) => {
+        set(activeRigIdAtom, rig.id)
+        set(dmxRigsAtom, [rig])
+        set(activeDmxLightsConfigAtom, rig.config)
+        set(myDmxLightsAtom, [fixture])
+        set(lightingPrefsAtom, {})
+      },
+    })
+    await waitFor(() => expect(screen.getByText('Save Changes')).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save Changes'))
+    })
+    await waitFor(() => expect(saveDmxRigMock).toHaveBeenCalled())
+  }
+
+  it('saves a layout with strobe off', async () => {
+    await saveRig({ ...initialRig, config: { ...initialRig.config, frontLights: [frontLight] } })
+
+    expect(faultsInSavedLights()).toEqual([])
+  })
+
+  it('saves a dedicated strobe row built from an RGB template as an RGB light', async () => {
+    const strobeRow: DmxLight = {
+      ...frontLight,
+      id: 's1',
+      position: 2,
+      group: 'strobe',
+      isStrobeEnabled: true,
+      channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 },
+    }
+    await saveRig({
+      ...initialRig,
+      config: {
+        ...initialRig.config,
+        strobeType: ConfigStrobeType.Dedicated,
+        frontLights: [frontLight],
+        strobeLights: [strobeRow],
+      },
+    })
+
+    expect(lastSavedRig?.config.strobeLights).toEqual([
+      expect.objectContaining({ fixture: FixtureTypes.RGB, isStrobeEnabled: true }),
+    ])
+    expect(faultsInSavedLights()).toEqual([])
   })
 })
