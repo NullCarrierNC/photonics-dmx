@@ -406,7 +406,7 @@ const updateDocumentFromFlow = (
   // The flow canvas is mode-agnostic, so `payload.events` is the net-or-audio union rather than one
   // family's array, and the rebuilt cue matches neither branch. A canvas only holds the events of
   // the cue loaded into it, so the family is whatever `currentCueDefinition` already was.
-  return replaceCueInFile(editorDoc.file as NodeCueFile, updatedCue.id, updatedCue as CueDefinition)
+  return replaceCueInFile(editorDoc.file, updatedCue.id, updatedCue as CueDefinition)
 }
 
 export { cueToFlow, flowToNodesAndConnections, updateDocumentFromFlow }
@@ -468,11 +468,7 @@ const updateEffectDocumentFromFlow = (
   }
   // Same mode-agnostic canvas payload as updateDocumentFromFlow, so the family is whatever
   // `currentEffectDefinition` already was.
-  return replaceEffectInFile(
-    editorDoc.file as EffectFile,
-    updatedEffect.id,
-    updatedEffect as EffectDefinition,
-  )
+  return replaceEffectInFile(editorDoc.file, updatedEffect.id, updatedEffect as EffectDefinition)
 }
 
 export { effectToFlow, updateEffectDocumentFromFlow }

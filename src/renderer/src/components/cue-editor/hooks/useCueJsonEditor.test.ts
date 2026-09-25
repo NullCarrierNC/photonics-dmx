@@ -122,7 +122,7 @@ describe('useCueJsonEditor', () => {
       updateDocumentFromFlow.mockReturnValue(merged)
       const { rendered } = setup()
 
-      expect(rendered.result.current.getUpdatedDocument()).toBe(merged)
+      expect(rendered.result.current.getUpdatedDocument()).toEqual({ ...cueDoc(), file: merged })
       expect(updateDocumentFromFlow).toHaveBeenCalledTimes(1)
       expect(updateEffectDocumentFromFlow).not.toHaveBeenCalled()
     })
@@ -137,7 +137,10 @@ describe('useCueJsonEditor', () => {
         currentEffectDefinition: effectDefinition,
       })
 
-      expect(rendered.result.current.getUpdatedDocument()).toBe(merged)
+      expect(rendered.result.current.getUpdatedDocument()).toEqual({
+        ...effectDoc(),
+        file: merged,
+      })
       expect(updateEffectDocumentFromFlow).toHaveBeenCalledTimes(1)
       expect(updateDocumentFromFlow).not.toHaveBeenCalled()
     })

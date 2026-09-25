@@ -256,7 +256,7 @@ const CueEditorWorkspace: React.FC<CueEditorWorkspaceProps> = ({
           {showJsonEditor &&
           editorMode === 'effect' &&
           selectedCueId &&
-          editorDoc &&
+          editorDoc?.mode === 'effect' &&
           currentEffectDefinition ? (
             <EffectJsonEditor
               effectDefinition={currentEffectDefinition}
@@ -272,7 +272,7 @@ const CueEditorWorkspace: React.FC<CueEditorWorkspaceProps> = ({
           ) : showJsonEditor &&
             editorMode === 'cue' &&
             selectedCueId &&
-            editorDoc &&
+            editorDoc?.mode === 'cue' &&
             currentCueDefinition ? (
             <CueJsonEditor
               cueDefinition={currentCueDefinition}

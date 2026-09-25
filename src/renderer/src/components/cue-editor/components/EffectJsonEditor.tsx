@@ -4,7 +4,7 @@ import type {
   EffectFile,
   YargEffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { EditorDocument } from '../lib/types'
+import type { EffectDocument } from '../lib/types'
 import { validateEffect } from '../../../ipcApi'
 import { replaceEffectInFile } from '../lib/cueUtils'
 import NodeJsonEditor from './NodeJsonEditor'
@@ -15,7 +15,7 @@ const validateEffectContent = (file: EffectFile) => validateEffect({ content: fi
 
 type EffectJsonEditorProps = {
   effectDefinition: EffectDefinition
-  editorDoc: EditorDocument
+  editorDoc: EffectDocument
   selectedEffectId: string
   onSave: (updatedEffect: EffectDefinition) => void
   onCancel: () => void
@@ -33,7 +33,7 @@ const EffectJsonEditor: React.FC<EffectJsonEditorProps> = ({
 }) => {
   const buildFile = useCallback(
     (effect: EffectDefinition): EffectFile =>
-      replaceEffectInFile(editorDoc.file as EffectFile, selectedEffectId, effect),
+      replaceEffectInFile(editorDoc.file, selectedEffectId, effect),
     [editorDoc.file, selectedEffectId],
   )
 

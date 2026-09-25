@@ -2,11 +2,9 @@ import { useCallback } from 'react'
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
-  NodeCueFile,
   NodeCueGroupMeta,
   NetNodeCueDefinition,
   YargEffectDefinition,
-  EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { updateCueInFile, updateEffectInFile } from '../lib/cueUtils'
@@ -27,14 +25,17 @@ export function useCueMetadata({
   const updateGroupMeta = useCallback(
     (updates: Partial<NodeCueGroupMeta>) => {
       if (!editorDoc) return
-      const updated = {
-        ...editorDoc,
-        file: {
-          ...editorDoc.file,
-          group: { ...editorDoc.file.group, ...updates },
-        },
-      }
-      setEditorDoc(updated)
+      setEditorDoc(
+        editorDoc.mode === 'cue'
+          ? {
+              ...editorDoc,
+              file: { ...editorDoc.file, group: { ...editorDoc.file.group, ...updates } },
+            }
+          : {
+              ...editorDoc,
+              file: { ...editorDoc.file, group: { ...editorDoc.file.group, ...updates } },
+            },
+      )
       setIsDirty(true)
     },
     [editorDoc, setEditorDoc, setIsDirty],
@@ -43,7 +44,7 @@ export function useCueMetadata({
   const updateCueMetadata = useCallback(
     (updates: Partial<NetNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return
-      const cueFile = editorDoc.file as NodeCueFile
+      const cueFile = editorDoc.file
       // `updates` is a partial of either family, so spreading it over a cue widens the result past
       // both branches. The form only ever edits the cue that is open, so the family is the one the
       // cue already had.
@@ -61,7 +62,7 @@ export function useCueMetadata({
   const updateEffectMetadata = useCallback(
     (updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'effect') return
-      const effectFile = editorDoc.file as EffectFile
+      const effectFile = editorDoc.file
       const updatedFile = updateEffectInFile(effectFile, selectedCueId, (effect) => ({
         ...effect,
         ...updates,

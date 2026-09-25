@@ -1,8 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { Node, Edge, ReactFlowInstance } from 'reactflow'
 import type {
-  NodeCueFile,
-  EffectFile,
   NetNodeCueDefinition,
   AudioNodeCueDefinition,
   NodeCueKind,
@@ -66,17 +64,26 @@ export function useCueJsonEditor({
     setJsonEditorDirty(false)
   }, [])
 
-  const getUpdatedDocument = useCallback((): NodeCueFile | EffectFile | null => {
-    if (editorDoc?.mode === 'effect') {
-      return updateEffectDocumentFromFlow(
+  const getUpdatedDocument = useCallback((): EditorDocument | null => {
+    if (!editorDoc) return null
+    if (editorDoc.mode === 'effect') {
+      const file = updateEffectDocumentFromFlow(
         editorDoc,
         currentEffectDefinition,
         nodes,
         edges,
         reactFlowInstance,
       )
+      return file && { ...editorDoc, file }
     }
-    return updateDocumentFromFlow(editorDoc, currentCueDefinition, nodes, edges, reactFlowInstance)
+    const file = updateDocumentFromFlow(
+      editorDoc,
+      currentCueDefinition,
+      nodes,
+      edges,
+      reactFlowInstance,
+    )
+    return file && { ...editorDoc, file }
   }, [editorDoc, currentCueDefinition, currentEffectDefinition, nodes, edges, reactFlowInstance])
 
   const handleJsonEditorSave = useCallback(
@@ -85,7 +92,7 @@ export function useCueJsonEditor({
       if (updatedCue.kind === 'lighting' || updatedCue.kind === 'motion') {
         setCueKind(updatedCue.kind)
       }
-      const file = editorDoc.file as NodeCueFile
+      const file = editorDoc.file
       const updatedFile = replaceCueInFile(file, selectedCueId, updatedCue)
       setEditorDoc({ mode: 'cue', file: updatedFile, path: editorDoc.path })
       // Collision resolution may have regenerated the cue's id; follow it so the editor
@@ -110,7 +117,7 @@ export function useCueJsonEditor({
   const handleJsonEffectSave = useCallback(
     (updatedEffect: YargEffectDefinition | AudioEffectDefinition) => {
       if (!editorDoc || editorDoc.mode !== 'effect' || !selectedCueId) return
-      const file = editorDoc.file as EffectFile
+      const file = editorDoc.file
       const updatedFile = replaceEffectInFile(file, selectedCueId, updatedEffect)
       setEditorDoc({ mode: 'effect', file: updatedFile, path: editorDoc.path })
       setSelectedCueId(updatedEffect.id)

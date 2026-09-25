@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { EditorDocument } from '../lib/types'
+import type { CueDocument, EditorDocument } from '../lib/types'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type {
   EffectDefinition,
   EffectFile,
-  NodeCueFile,
   NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { readEffectFile } from '../../../ipcApi'
@@ -23,12 +22,12 @@ type LoadedEffectDefinitions = {
 }
 
 function buildEffectRequestKey(
-  editorDoc: EditorDocument,
+  editorDoc: CueDocument,
   selectedCueId: string,
   mode: NodeCueMode,
   groupedEffectFiles: GroupedEffectFiles,
 ): string {
-  const cueFile = editorDoc.file as NodeCueFile
+  const cueFile = editorDoc.file
   const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
   const effectRefs = currentCue?.effects ?? []
   const effectFileList = mode === 'audio' ? groupedEffectFiles.audio : groupedEffectFiles.yarg
@@ -79,7 +78,7 @@ export function useEffectDefinitions(
     } = inputsRef.current
     if (!requestKey || !doc || doc.mode !== 'cue' || !cueId) return
 
-    const cueFile = doc.file as NodeCueFile
+    const cueFile = doc.file
     const currentCue = cueFile.cues.find((c) => c.id === cueId)
     const effectRefs = currentCue?.effects ?? []
 

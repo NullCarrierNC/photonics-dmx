@@ -26,9 +26,8 @@ import { useEffectDefinitions } from '../components/cue-editor/hooks/useEffectDe
 import { useCueEditorNavigation } from '../components/cue-editor/hooks/useCueEditorNavigation'
 import { useCueRegistryPanel } from '../components/cue-editor/hooks/useCueRegistryPanel'
 import { useCueJsonEditor } from '../components/cue-editor/hooks/useCueJsonEditor'
+import type { EditorDocument } from '../components/cue-editor/lib/types'
 import type {
-  NodeCueFile,
-  EffectFile,
   YargEffectDefinition,
   AudioEffectDefinition,
   NetNodeCueDefinition,
@@ -57,7 +56,7 @@ const CueEditor: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const { showToast } = useToast()
   const loadCueIntoFlowRef = useRef<(cue: EditorCueOrEffect) => void>(() => {})
-  const getUpdatedDocumentRef = useRef<() => NodeCueFile | EffectFile | null>(() => null)
+  const getUpdatedDocumentRef = useRef<() => EditorDocument | null>(() => null)
   const flowWrapperRef = useRef<HTMLDivElement | null>(null)
 
   const loadCueIntoFlowProxy = useCallback(
@@ -187,8 +186,8 @@ const CueEditor: React.FC = () => {
   const currentGraphId =
     editorDoc?.mode === 'effect'
       ? (currentEffectDefinition as { id?: string } | null)?.id ?? null
-      : editorDoc?.file && selectedCueId && 'group' in editorDoc.file
-        ? `${(editorDoc.file as NodeCueFile).group.id}:${selectedCueId}`
+      : editorDoc && selectedCueId
+        ? `${editorDoc.file.group.id}:${selectedCueId}`
         : selectedCueId ?? null
   const activeNodeIds = useActiveNodes(currentGraphId)
   const errorNodeIds = useErrorNodes(currentGraphId)
@@ -196,7 +195,7 @@ const CueEditor: React.FC = () => {
 
   const usedCueTypes = useMemo((): Set<string> => {
     if (!editorDoc || editorDoc.mode !== 'cue' || cueKind !== 'lighting') return new Set()
-    const cueFile = editorDoc.file as NodeCueFile
+    const cueFile = editorDoc.file
     return new Set(
       cueFile.cues
         .filter((cue) => cue.id !== selectedCueId && cue.kind === 'lighting')

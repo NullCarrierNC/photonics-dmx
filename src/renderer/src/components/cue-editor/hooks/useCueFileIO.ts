@@ -12,7 +12,7 @@ import type {
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
-import { firstByName } from '../lib/cueUtils'
+import { firstByName, savedAsUserFile } from '../lib/cueUtils'
 import {
   clearLastFilePathForMode,
   modeKeyFor,
@@ -58,7 +58,7 @@ export type UseCueFileIOParams = {
       | AudioEffectDefinition
       | null,
   ) => void
-  getUpdatedDocument: () => NodeCueFile | EffectFile | null
+  getUpdatedDocument: () => EditorDocument | null
   rememberLastFilePath: (path: string | null) => void
   clearLastFilePath: () => void
   refreshFiles: () => Promise<void>
@@ -228,14 +228,14 @@ export function useCueFileIO({
    * opened meanwhile is left as it is.
    */
   const installSaved = useCallback(
-    (saved: EditorDocument, snapshot: NodeCueFile | EffectFile, path: string): void => {
+    (saved: EditorDocument, snapshot: EditorDocument, path: string): void => {
       const open = openDocRef.current
       if (!open || open.mode !== saved.mode || open.path !== saved.path) return
-      const current = getUpdatedDocument() ?? open.file
-      setEditorDoc({ mode: open.mode, file: { ...current, bundled: false }, path })
+      const current = getUpdatedDocument() ?? open
+      setEditorDoc(savedAsUserFile(current, path))
       rememberLastFilePath(path)
       setValidationErrors([])
-      setIsDirty(!equal(current, snapshot))
+      setIsDirty(!equal(current.file, snapshot.file))
     },
     [getUpdatedDocument, rememberLastFilePath, setEditorDoc, setValidationErrors, setIsDirty],
   )
@@ -250,11 +250,10 @@ export function useCueFileIO({
       )
       return false
     }
-    // A saved file is the user's, so a newer shipped version never replaces it.
-    const updatedFile = { ...snapshot, bundled: false }
 
-    if (editorDoc.mode === 'effect') {
-      const effectContent = updatedFile as EffectFile
+    // A saved file is the user's, so a newer shipped version never replaces it.
+    if (snapshot.mode === 'effect') {
+      const effectContent = { ...snapshot.file, bundled: false }
       try {
         const validation = await validateEffect({ content: effectContent })
         if (!validation.valid) {
@@ -280,7 +279,7 @@ export function useCueFileIO({
         return false
       }
     } else {
-      const cueContent = updatedFile as NodeCueFile
+      const cueContent = { ...snapshot.file, bundled: false }
       try {
         const validation = await validateNodeCue({ content: cueContent })
         if (!validation.valid) {
@@ -345,7 +344,7 @@ export function useCueFileIO({
     const isEffectDoc = editorDoc.mode === 'effect'
     const deletedKind = isEffectDoc
       ? undefined
-      : (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)?.kind
+      : editorDoc.file.cues.find((c) => c.id === selectedCueId)?.kind
     const modeKey = modeKeyFor(
       editorDoc.file.mode,
       deletedKind === 'motion' ? 'motion' : 'lighting',

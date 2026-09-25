@@ -43,11 +43,13 @@ export type EditorNodeData = {
 
 export type EditorNode = Node<EditorNodeData>
 
-export type EditorDocument = {
-  mode: EditorMode
-  file: NodeCueFile | EffectFile
-  path: string | null
-}
+/** An open file, its type tied to the editor mode it opened in. */
+export type EditorDocument =
+  | { mode: 'cue'; file: NodeCueFile; path: string | null }
+  | { mode: 'effect'; file: EffectFile; path: string | null }
+
+export type CueDocument = Extract<EditorDocument, { mode: 'cue' }>
+export type EffectDocument = Extract<EditorDocument, { mode: 'effect' }>
 
 export type EventOption<T extends string> = {
   value: T
