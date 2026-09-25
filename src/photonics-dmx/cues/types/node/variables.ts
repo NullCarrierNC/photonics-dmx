@@ -19,7 +19,7 @@ export const VARIABLE_TYPES = [
 export type VariableType = (typeof VARIABLE_TYPES)[number]
 
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean | string | TrackedLight[] | Color[] }
+  | { source: 'literal'; value: number | boolean | string | Color[] }
   | { source: 'variable'; name: string }
 
 export interface VariableDefinition {

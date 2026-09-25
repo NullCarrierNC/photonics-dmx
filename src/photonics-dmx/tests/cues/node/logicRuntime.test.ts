@@ -347,7 +347,9 @@ describe('Node cue logic runtime', () => {
         { id: 'l2', position: 1, config: {} as any },
         { id: 'l3', position: 2, config: {} as any },
       ]
-      const cueLevelVarStore = new Map<string, VariableValue>()
+      const cueLevelVarStore = new Map<string, VariableValue>([
+        ['arr', { type: 'light-array', value: mockLights }],
+      ])
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = fakeLightingController({
         addEffectUnblockedNameWithCallback: (
@@ -370,15 +372,6 @@ describe('Node cue logic runtime', () => {
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
-      const initNode: LogicNode = {
-        id: 'init1',
-        type: 'logic',
-        logicType: 'variable',
-        mode: 'init',
-        varName: 'arr',
-        valueType: 'light-array',
-        value: { source: 'literal', value: mockLights },
-      }
       const shuffleNode: LogicNode = {
         id: 'shuffle1',
         type: 'logic',
@@ -396,11 +389,10 @@ describe('Node cue logic runtime', () => {
         nodes: {
           events: [eventNode],
           actions: [action],
-          logic: [initNode, shuffleNode],
+          logic: [shuffleNode],
         },
         connections: [
-          { from: 'e1', to: 'init1' },
-          { from: 'init1', to: 'shuffle1' },
+          { from: 'e1', to: 'shuffle1' },
           { from: 'shuffle1', to: 'action1' },
         ],
         variables: [

@@ -104,10 +104,7 @@ function resolveLightArray(
   context: ExecutionContext,
   variableDefinitions?: VariableDefinitionsForScope,
 ): TrackedLight[] {
-  if (!source) return []
-  if (source.source === 'literal') {
-    return Array.isArray(source.value) ? (source.value as TrackedLight[]) : []
-  }
+  if (!source || source.source === 'literal') return []
   const existing = lookupVariable(source.name, context, variableDefinitions)
   return existing.type === 'light-array' ? existing.value : []
 }
@@ -119,7 +116,7 @@ export function resolveColorArray(
 ): Color[] {
   if (!source) return []
   if (source.source === 'literal') {
-    return Array.isArray(source.value) ? (source.value as Color[]) : []
+    return Array.isArray(source.value) ? source.value : []
   }
   const existing = lookupVariable(source.name, context, variableDefinitions)
   return existing.type === 'color-array' ? existing.value : []

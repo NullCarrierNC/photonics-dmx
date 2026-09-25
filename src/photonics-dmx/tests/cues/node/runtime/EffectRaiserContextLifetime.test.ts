@@ -23,7 +23,10 @@ import type {
 import { CueType, type CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
-import type { NodeRuntimeCallbacks } from '../../../../cues/node/runtime/executionTypes'
+import type {
+  NodeRuntimeCallbacks,
+  VariableValue,
+} from '../../../../cues/node/runtime/executionTypes'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
@@ -197,7 +200,10 @@ describe('the context that raised an effect', () => {
     } as unknown as DmxLightManager
   })
 
-  const makeEngine = (compiled: ReturnType<typeof buildCue>): NodeExecutionEngine =>
+  const makeEngine = (
+    compiled: ReturnType<typeof buildCue>,
+    groupLevelVarStore = new Map<string, VariableValue>(),
+  ): NodeExecutionEngine =>
     new NodeExecutionEngine(
       compiled,
       CUE_ID,
@@ -205,7 +211,7 @@ describe('the context that raised an effect', () => {
       lightManager,
       noopRuntimeBroadcaster(),
       new Map(),
-      new Map(),
+      groupLevelVarStore,
       registry(),
     )
 
@@ -498,21 +504,18 @@ describe('the context that raised an effect', () => {
   describe('inside a for-each-light loop', () => {
     it('continues per iteration rather than holding the loop open', async () => {
       const event: NetEventNode = { id: 'ev', type: 'event', eventType: 'beat' }
-      const seed = {
-        id: 'seed',
-        type: 'logic',
-        logicType: 'variable',
-        mode: 'set',
-        varName: 'lights',
-        valueType: 'light-array',
-        value: {
-          source: 'literal',
-          value: [
-            { id: 'front-1', position: 1, group: 'front', config: {} },
-            { id: 'back-1', position: 1, group: 'back', config: {} },
-          ],
-        },
-      } as unknown as LogicNode
+      const lights = new Map<string, VariableValue>([
+        [
+          'lights',
+          {
+            type: 'light-array',
+            value: [
+              { id: 'front-1', position: 1 },
+              { id: 'back-1', position: 1 },
+            ],
+          },
+        ],
+      ])
       const loop = {
         id: 'loop',
         type: 'logic',
@@ -527,16 +530,16 @@ describe('the context that raised an effect', () => {
           [event],
           {
             actions: [colorAction('tail')],
-            logic: [seed, loop],
+            logic: [loop],
             effectRaisers: [raiser()],
           },
           [
-            { from: 'ev', to: 'seed' },
-            { from: 'seed', to: 'loop' },
+            { from: 'ev', to: 'loop' },
             { from: 'loop', to: RAISER_ID, fromPort: 'each' },
             { from: RAISER_ID, to: 'tail' },
           ],
         ),
+        lights,
       )
 
       engine.startExecution(event, cueData())
