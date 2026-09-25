@@ -16,7 +16,12 @@ import type {
 } from '../../../../cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
-import { createMockLightingConfig, createMockTrackedLight } from '../../../helpers/testFixtures'
+import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
+import {
+  createMockDmxLight,
+  createMockLightingConfig,
+  createMockTrackedLight,
+} from '../../../helpers/testFixtures'
 
 describe('ActionEffectFactory', () => {
   let lightManager: DmxLightManager
@@ -605,5 +610,91 @@ describe('ActionEffectFactory resolving an authored action', () => {
     expect(fallbackTiming.waitForTime).toBe(0)
     expect(literalTiming.transform.easing).toBe('linear')
     expect(fallbackTiming.transform.easing).toBe('sinInOut')
+  })
+
+  describe('with values outside their lists', () => {
+    const rig = () =>
+      new DmxLightManager(
+        createMockLightingConfig({
+          frontLights: [
+            createMockDmxLight({ id: 'f1', position: 0 }),
+            createMockDmxLight({ id: 'f2', position: 1 }),
+          ],
+          backLights: [createMockDmxLight({ id: 'b1', position: 2, group: 'back' })],
+        }),
+      )
+    const ids = (resolved: { id: string }[]) => resolved.map((light) => light.id)
+    const stringVariables =
+      (values: Record<string, string>) =>
+      (name: string): VariableValue => ({ type: 'string', value: values[name] })
+
+    it('falls back to the front lights for a literal group it does not know', () => {
+      const resolved = ActionEffectFactory.resolveLights(rig(), {
+        groups: literal('frnt'),
+        filter: literal('all'),
+      })
+
+      expect(ids(resolved)).toEqual(['f1', 'f2'])
+    })
+
+    it('keeps the known groups of a list and drops the unknown one', () => {
+      const resolved = ActionEffectFactory.resolveLights(rig(), {
+        groups: literal('back, bak'),
+        filter: literal('all'),
+      })
+
+      expect(ids(resolved)).toEqual(['b1'])
+    })
+
+    it('targets all of the lights for a literal filter it does not know', () => {
+      const resolved = ActionEffectFactory.resolveLights(rig(), {
+        groups: literal('front'),
+        filter: literal('evens'),
+      })
+
+      expect(ids(resolved)).toEqual(['f1', 'f2'])
+    })
+
+    it('applies the same fallbacks to groups and a filter held in string variables', () => {
+      const resolved = ActionEffectFactory.resolveLights(
+        rig(),
+        { groups: variable('groupVar'), filter: variable('filterVar') },
+        stringVariables({ groupVar: 'frnt', filterVar: 'evens' }),
+      )
+
+      expect(ids(resolved)).toEqual(['f1', 'f2'])
+    })
+
+    it('uses blue at medium, replacing, for colour literals it does not know', () => {
+      const unknown = firstTransition(
+        setColor({
+          name: literal('bleu'),
+          brightness: literal('bright'),
+          blendMode: literal('multiply'),
+        }),
+      )
+      const defaults = firstTransition(
+        setColor({
+          name: literal('blue'),
+          brightness: literal('medium'),
+          blendMode: literal('replace'),
+        }),
+      )
+
+      expect(unknown.transform.color).toEqual(defaults.transform.color)
+    })
+
+    it('waits for nothing on a wait condition literal it does not know', () => {
+      const transition = firstTransition(
+        setColor(color(), {
+          ...createDefaultActionTiming(),
+          waitForCondition: literal('beet'),
+          waitUntilCondition: literal('dealy'),
+        }),
+      )
+
+      expect(transition.waitForCondition).toBe('none')
+      expect(transition.waitUntilCondition).toBe('none')
+    })
   })
 })

@@ -7,7 +7,7 @@ import type { LocationGroup } from '../../../types'
 import {
   CONFIG_LIGHT_GROUPS,
   ConfigLightGroup,
-  PATTERN_TARGETS,
+  isPatternTarget,
   PatternTarget,
 } from '../../../constants/nodeConstants'
 
@@ -27,8 +27,8 @@ export function parsePatternPropertyId(
   for (const group of CONFIG_LIGHT_GROUPS) {
     const prefix = `${group}-lights-`
     if (propertyId.startsWith(prefix)) {
-      const target = propertyId.slice(prefix.length) as PatternTarget
-      if (PATTERN_TARGETS.includes(target)) {
+      const target = propertyId.slice(prefix.length)
+      if (isPatternTarget(target)) {
         return { group, target }
       }
     }

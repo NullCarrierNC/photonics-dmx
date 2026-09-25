@@ -15,6 +15,8 @@ import {
   isColor,
   isLightTarget,
   isLocationGroup,
+  isWaitCondition,
+  WaitCondition,
 } from '../../../types'
 import { ValueSource, VariableType } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
@@ -135,56 +137,65 @@ export function inferSourceType(source: ValueSource | undefined): VariableType {
 }
 
 /**
- * Resolve location groups from ValueSource (comma-separated string to array).
+ * Comma-separated group names ("front,back"), keeping the known ones, or the front group when
+ * none is known.
  */
+export function parseLocationGroups(value: unknown): LocationGroup[] {
+  const groups =
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((g) => g.trim())
+          .filter(isLocationGroup)
+      : []
+  return groups.length > 0 ? groups : ['front']
+}
+
+export function parseLightTarget(value: unknown): LightTarget {
+  return isLightTarget(value) ? value : 'all'
+}
+
+export function parseColor(value: unknown): Color {
+  return isColor(value) ? value : 'blue'
+}
+
+export function parseBrightness(value: unknown): Brightness {
+  return isBrightness(value) ? value : 'medium'
+}
+
+export function parseBlendMode(value: unknown): BlendMode {
+  return isBlendMode(value) ? value : 'replace'
+}
+
+export function parseWaitCondition(value: unknown): WaitCondition {
+  return isWaitCondition(value) ? value : 'none'
+}
+
 export function resolveLocationGroups(
   source: ValueSource,
   context: ExecutionContext,
 ): LocationGroup[] {
-  const value = resolveValue('string', source, context)
-  if (typeof value !== 'string') return ['front']
-
-  // Parse comma-separated groups: "front,back" → ['front', 'back']
-  return value
-    .split(',')
-    .map((g) => g.trim())
-    .filter(isLocationGroup)
+  return parseLocationGroups(resolveValue('string', source, context))
 }
 
-/**
- * Resolve light target filter from ValueSource.
- */
 export function resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
-  const value = resolveValue('string', source, context)
-  return isLightTarget(value) ? value : 'all'
+  return parseLightTarget(resolveValue('string', source, context))
 }
 
-/**
- * Resolve color name from ValueSource.
- */
 export function resolveColor(source: ValueSource, context: ExecutionContext): Color {
-  const value = resolveValue('string', source, context)
-  return isColor(value) ? value : 'blue'
+  return parseColor(resolveValue('string', source, context))
 }
 
-/**
- * Resolve brightness level from ValueSource.
- */
 export function resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
-  const value = resolveValue('string', source, context)
-  return isBrightness(value) ? value : 'medium'
+  return parseBrightness(resolveValue('string', source, context))
 }
 
-/**
- * Resolve blend mode from ValueSource.
- */
 export function resolveBlendMode(
   source: ValueSource | undefined,
   context: ExecutionContext,
 ): BlendMode | undefined {
   if (!source) return undefined
-  const value = resolveValue('string', source, context)
-  return isBlendMode(value) ? value : 'replace'
+  return parseBlendMode(resolveValue('string', source, context))
 }
 
 /**

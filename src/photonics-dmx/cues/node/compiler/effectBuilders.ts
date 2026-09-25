@@ -9,7 +9,7 @@ import type {
   ResolvedPositionSetting,
 } from './resolvedAction'
 import { ActionNode } from '../../types/nodeCueTypes'
-import { EasingType } from '../../../easing'
+import { EasingType, isEasingType } from '../../../easing'
 import { Effect, EffectTransition, RGBIO, TrackedLight, WaitCondition } from '../../../types'
 import { getColor } from '../../../helpers/dmxHelpers'
 
@@ -68,11 +68,7 @@ export const resolveEasing = (
   value?: string,
   fallback: EasingType = EasingType.SIN_IN_OUT,
 ): EasingType => {
-  if (!value) {
-    return fallback
-  }
-  const valid = Object.values(EasingType).includes(value as EasingType)
-  return valid ? (value as EasingType) : fallback
+  return isEasingType(value) ? value : fallback
 }
 
 export const normalizeWaitFor = (
