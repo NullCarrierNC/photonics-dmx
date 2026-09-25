@@ -1,5 +1,12 @@
-import type { ActionNode, ValueSource } from '../../types/nodeCueTypes'
-import { isLightTarget, isWaitCondition } from '../../../types'
+import type { ActionNode, NodeColorSetting, ValueSource } from '../../types/nodeCueTypes'
+import {
+  isBlendMode,
+  isBrightness,
+  isColor,
+  isLightTarget,
+  isLocationGroup,
+  isWaitCondition,
+} from '../../../types'
 import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
 
 /**
@@ -23,6 +30,9 @@ export function validateSharedActionNodePayload(
   }
   if (action.effectType === 'set-color' && !action.color) {
     throw createError(`Action '${label}' (set-color) must include color.`)
+  }
+  if (action.color) {
+    validateColorLiterals(action.color, label, createError)
   }
   if (action.effectType === 'motion-pattern' && !action.motionPattern) {
     throw createError(`Action '${label}' (motion-pattern) must include motionPattern.`)
@@ -63,6 +73,31 @@ function validateTargetGroups(
       (!Array.isArray(v) && !v)
     ) {
       throw createError(`Action '${label}' must target at least one group.`)
+    }
+    for (const group of String(v).split(',')) {
+      const name = group.trim()
+      if (!isLocationGroup(name)) {
+        throw createError(`Action '${label}' target.groups '${name}' is not a known LocationGroup.`)
+      }
+    }
+  }
+}
+
+function validateColorLiterals(
+  color: NodeColorSetting,
+  label: string,
+  createError: (message: string) => Error,
+): void {
+  const fields: [string, ValueSource | undefined, (value: unknown) => boolean, string][] = [
+    ['name', color.name, isColor, 'Color'],
+    ['brightness', color.brightness, isBrightness, 'Brightness'],
+    ['blendMode', color.blendMode, isBlendMode, 'BlendMode'],
+  ]
+  for (const [field, source, isKnown, typeName] of fields) {
+    if (source?.source === 'literal' && !isKnown(source.value)) {
+      throw createError(
+        `Action '${label}' color.${field} '${String(source.value)}' is not a known ${typeName}.`,
+      )
     }
   }
 }
