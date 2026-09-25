@@ -28,9 +28,15 @@ describe('variableValue', () => {
     expect(variableValue('boolean', raw)).toEqual({ type: 'boolean', value: expected })
   })
 
-  it.each(['string', 'color', 'cue-type', 'event'] as const)('reads %s values as text', (type) => {
+  it.each(['string', 'cue-type', 'event'] as const)('reads %s values as text', (type) => {
     expect(variableValue(type, 5)).toEqual({ type, value: '5' })
     expect(variableValue(type, 'beat')).toEqual({ type, value: 'beat' })
+  })
+
+  it('reads a colour as that colour, and anything else as blue', () => {
+    expect(variableValue('color', 'red')).toEqual({ type: 'color', value: 'red' })
+    expect(variableValue('color', 'mauve')).toEqual({ type: 'color', value: 'blue' })
+    expect(variableValue('color', 5)).toEqual({ type: 'color', value: 'blue' })
   })
 
   it('keeps only the known colours of a colour array', () => {

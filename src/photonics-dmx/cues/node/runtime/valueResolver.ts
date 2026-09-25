@@ -19,8 +19,8 @@ import {
   WaitCondition,
 } from '../../../types'
 import { ValueSource, VariableType } from '../../types/nodeCueTypes'
-import { ExecutionContext } from './ExecutionContext'
-import { VariableValue } from './executionTypes'
+import type { ExecutionContext } from './ExecutionContext'
+import type { VariableValue } from './executionTypes'
 
 /** Optional; when provided, variable lookups use scope-aware store (cue vs cue-group). */
 type VariableDefinitionsForScope = { name: string; scope: 'cue' | 'cue-group' }[]
@@ -136,6 +136,8 @@ export function resolveVariableValue(
       return { type, value: resolveBoolean(source, context, variableDefinitions) }
     case 'light-array':
       return { type, value: resolveLightArray(source, context, variableDefinitions) }
+    case 'color':
+      return { type, value: parseColor(resolveString(source, context, variableDefinitions)) }
     case 'color-array':
       return { type, value: resolveColorArray(source, context, variableDefinitions) }
     default:
