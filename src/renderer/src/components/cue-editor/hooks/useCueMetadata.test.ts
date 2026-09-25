@@ -52,14 +52,18 @@ describe('useCueMetadata', () => {
   it('changes only the selected cue', () => {
     const { result } = renderMetadata(CUE_DOC, 'c1')
     act(() => result.current.updateCueMetadata({ name: 'First' }))
-    const cues = (result.current.editorDoc!.file as NodeCueFile).cues
+    const doc = result.current.editorDoc
+    if (doc?.mode !== 'cue') throw new Error('expected the cue document')
+    const cues = doc.file.cues
     expect(cues.map((cue) => cue.name)).toEqual(['First', 'Two'])
   })
 
   it('changes only the selected effect', () => {
     const { result } = renderMetadata(EFFECT_DOC, 'e2')
     act(() => result.current.updateEffectMetadata({ name: 'Wipe' }))
-    const effects = (result.current.editorDoc!.file as EffectFile).effects
+    const doc = result.current.editorDoc
+    if (doc?.mode !== 'effect') throw new Error('expected the effect document')
+    const effects = doc.file.effects
     expect(effects.map((effect) => effect.name)).toEqual(['Sweep', 'Wipe'])
   })
 

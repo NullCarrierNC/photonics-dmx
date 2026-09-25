@@ -38,6 +38,13 @@ const mixedFile = () => ({
   ],
 })
 
+/** A document open at the saved path, in the given mode, holding `file`. */
+const openAt = (mode: 'cue' | 'effect', file: unknown) => ({
+  mode,
+  path: '/cues/motion-cues.json',
+  file,
+})
+
 const setup = (overrides: Partial<UseCueFileIOParams> = {}) => {
   const mocks = {
     setEditorDoc: jest.fn(),
@@ -253,7 +260,7 @@ describe('useCueFileIO handleSave', () => {
       filename: 'motion-cues.json',
       selectedCueId: 'cue-light',
       cueKind: 'lighting',
-      getUpdatedDocument: jest.fn(() => mixedFile()),
+      getUpdatedDocument: jest.fn(() => openAt('cue', mixedFile())),
       lastStoredFilePathRef: { current: '/cues/motion-cues.json' as string | null },
     }) as unknown as Partial<UseCueFileIOParams>
 
@@ -263,8 +270,10 @@ describe('useCueFileIO handleSave', () => {
       .mocked(ipcApi.saveNodeCueFile)
       .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
     const edited = { ...mixedFile(), cues: [] }
-    const getUpdatedDocument = jest.fn(() => mixedFile() as unknown)
-    getUpdatedDocument.mockReturnValueOnce(mixedFile()).mockReturnValue(edited)
+    const getUpdatedDocument = jest.fn(() => openAt('cue', mixedFile()))
+    getUpdatedDocument
+      .mockReturnValueOnce(openAt('cue', mixedFile()))
+      .mockReturnValue(openAt('cue', edited))
     const { rendered, setIsDirty } = setup({
       ...openCueDoc(),
       getUpdatedDocument: getUpdatedDocument as never,
@@ -288,8 +297,10 @@ describe('useCueFileIO handleSave', () => {
         .mocked(ipcApi[save])
         .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
       const added = { ...mixedFile(), cues: [...mixedFile().cues, { id: 'cue-new', name: 'New' }] }
-      const getUpdatedDocument = jest.fn(() => mixedFile() as unknown)
-      getUpdatedDocument.mockReturnValueOnce(mixedFile()).mockReturnValue(added)
+      const getUpdatedDocument = jest.fn(() => openAt(docMode, mixedFile()))
+      getUpdatedDocument
+        .mockReturnValueOnce(openAt(docMode, mixedFile()))
+        .mockReturnValue(openAt(docMode, added))
       const { rendered, setEditorDoc, setIsDirty } = setup({
         ...openCueDoc(),
         editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: mixedFile() },
@@ -344,7 +355,7 @@ describe('useCueFileIO handleSave', () => {
     rerender({
       ...saving,
       editorDoc: other,
-      getUpdatedDocument: () => other.file,
+      getUpdatedDocument: () => other,
     } as unknown as UseCueFileIOParams)
     await act(async () => {
       answerSave({ success: true, path: '/cues/motion-cues.json' })
@@ -424,7 +435,7 @@ describe('useCueFileIO handleSave', () => {
       const { rendered, setEditorDoc, setIsDirty } = setup({
         ...openCueDoc(),
         editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: shipped },
-        getUpdatedDocument: jest.fn(() => shipped) as never,
+        getUpdatedDocument: jest.fn(() => openAt(docMode, shipped)) as never,
       } as unknown as Partial<UseCueFileIOParams>)
 
       await act(async () => {

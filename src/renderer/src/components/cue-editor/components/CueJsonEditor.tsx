@@ -4,7 +4,7 @@ import type {
   NodeCueFile,
   NetNodeCueDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { EditorDocument } from '../lib/types'
+import type { CueDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
 import { replaceCueInFile, resolveCueCollisions } from '../lib/cueUtils'
 import NodeJsonEditor from './NodeJsonEditor'
@@ -15,7 +15,7 @@ const validateCueContent = (file: NodeCueFile) => validateNodeCue({ content: fil
 
 type CueJsonEditorProps = {
   cueDefinition: CueDefinition
-  editorDoc: EditorDocument
+  editorDoc: CueDocument
   selectedCueId: string
   availableCueTypes: string[]
   onSave: (updatedCue: CueDefinition) => void
@@ -37,14 +37,13 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   onDirtyChange,
 }) => {
   const buildFile = useCallback(
-    (cue: CueDefinition): NodeCueFile =>
-      replaceCueInFile(editorDoc.file as NodeCueFile, selectedCueId, cue),
+    (cue: CueDefinition): NodeCueFile => replaceCueInFile(editorDoc.file, selectedCueId, cue),
     [editorDoc.file, selectedCueId],
   )
 
   const reconcile = useCallback(
     (cue: CueDefinition) => {
-      const siblings = (editorDoc.file as NodeCueFile).cues.filter((c) => c.id !== selectedCueId)
+      const siblings = editorDoc.file.cues.filter((c) => c.id !== selectedCueId)
       const { cue: definition, notices } = resolveCueCollisions(cue, siblings, availableCueTypes)
       return { definition, notices }
     },

@@ -31,7 +31,6 @@ import {
   VariableType,
   NodeCueMode,
 } from '../../types/nodeCueTypes'
-import { TrackedLight, Color } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import {
   ExecutionState,
@@ -308,7 +307,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
    * Start executing a node graph from an event node.
    * Creates a new ExecutionContext and begins execution.
    */
-  public startExecution(eventNode: BaseEventNode, parameters: CueData): void {
+  public startExecution(eventNode: BaseEventNode, parameters: CueData | AudioCueData): void {
     this.startExecutionWithCallback(eventNode, parameters)
   }
 
@@ -322,7 +321,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
    */
   public startExecutionWithCallback(
     eventNode: BaseEventNode,
-    parameters: CueData,
+    parameters: CueData | AudioCueData,
     onComplete?: () => void,
     options?: { fromPort?: string },
   ): void {
@@ -505,7 +504,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
       // Resolve parameter values using the effect's declared parameter types so string/color/event
       // params are not coerced through a numeric fallback.
-      const paramValues: Record<string, string | number | boolean | TrackedLight[] | Color[]> = {}
+      const paramValues: Record<string, VariableValue['value']> = {}
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
         const paramDef = compiledEffect.parameters.get(paramName)
         const expectedType: VariableType =
@@ -602,9 +601,8 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     cueData: CueData | AudioCueData,
   ): void {
     try {
-      // Create new context for listener chain (listener has id; ExecutionContext only needs event-like shape)
       const context = new ExecutionContext(
-        listenerNode as unknown as BaseEventNode,
+        listenerNode,
         cueData,
         this.cueLevelVarStore,
         this.groupLevelVarStore,

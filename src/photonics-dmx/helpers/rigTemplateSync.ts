@@ -48,10 +48,6 @@ import type {
 
 type ChannelRecord = Record<string, number>
 
-function channelsAsRecord(channels: DmxFixture['channels']): ChannelRecord {
-  return channels as unknown as ChannelRecord
-}
-
 /**
  * Derives a rig light's `extraChannels` from its template. `type`, `value` and `scale` are
  * template-owned and copied verbatim; `channel` follows the same offset model as the base
@@ -78,7 +74,7 @@ export function deriveExtraChannelsForMaster(
  * channels alike. An unassigned (0) extra occupies nothing.
  */
 export function templateChannelSpan(template: DmxFixture): number {
-  const templateChannels = channelsAsRecord(template.channels)
+  const templateChannels = template.channels
   const templateMaster = templateChannels.masterDimmer ?? 0
   let span = 0
   for (const [channelName, value] of Object.entries(templateChannels)) {
@@ -97,7 +93,7 @@ export function templateChannelSpan(template: DmxFixture): number {
  * Unassigned (0) channels occupy nothing, so a fixture with none returns 0.
  */
 export function highestChannelUsed(fixture: DmxFixture): number {
-  const channels = channelsAsRecord(fixture.channels)
+  const channels = fixture.channels
   let highest = 0
   for (const value of Object.values(channels)) highest = Math.max(highest, value)
   for (const extra of fixture.extraChannels ?? []) highest = Math.max(highest, extra.channel)
@@ -124,7 +120,7 @@ export function deriveBaseChannelsForMaster(
   template: DmxFixture,
   master: number,
 ): Record<string, number> {
-  const templateChannels = channelsAsRecord(template.channels)
+  const templateChannels = template.channels
   const templateMaster = templateChannels.masterDimmer ?? 0
   const derived: Record<string, number> = {}
   for (const [channelName, value] of Object.entries(templateChannels)) {
@@ -148,8 +144,8 @@ export function syncDmxLightWithTemplate(
     return { light, changed: false }
   }
 
-  const rigChannels = channelsAsRecord(light.channels)
-  const templateChannels = channelsAsRecord(template.channels)
+  const rigChannels = light.channels
+  const templateChannels = template.channels
   const templateMaster = templateChannels.masterDimmer ?? 0
   const rigMaster = rigChannels.masterDimmer ?? templateMaster
 

@@ -13,9 +13,8 @@ export type StoredEnvelope<T> =
   | { ok: true; versioned: false; version: 0; raw: unknown }
   | { ok: false; schemaText: string }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON parse result before validation
-function isVersionedFormat<T>(parsed: any): parsed is ConfigWithVersion<T> {
-  return parsed && typeof parsed === 'object' && 'version' in parsed && 'data' in parsed
+function isVersionedFormat(parsed: unknown): parsed is { version: unknown; data: unknown } {
+  return typeof parsed === 'object' && parsed !== null && 'version' in parsed && 'data' in parsed
 }
 
 /** A version a build could have stamped: a whole number from 0 up. */
@@ -24,7 +23,7 @@ function isStoredVersion(version: unknown): version is number {
 }
 
 export function readEnvelope<T>(parsed: unknown): StoredEnvelope<T> {
-  if (!isVersionedFormat<T>(parsed)) {
+  if (!isVersionedFormat(parsed)) {
     return { ok: true, versioned: false, version: 0, raw: parsed }
   }
   // Migration walks up one whole version at a time, so it needs a whole number to start from.
@@ -34,7 +33,8 @@ export function readEnvelope<T>(parsed: unknown): StoredEnvelope<T> {
       schemaText: `version must be a whole number of 0 or more, got ${JSON.stringify(parsed.version)}`,
     }
   }
-  return { ok: true, versioned: true, version: parsed.version, data: parsed.data }
+  // The data is unchecked here. ConfigFile migrates, repairs and validates it before it is used.
+  return { ok: true, versioned: true, version: parsed.version, data: parsed.data as T }
 }
 
 /** Walks `data` up from one version to another, one whole version per step. */

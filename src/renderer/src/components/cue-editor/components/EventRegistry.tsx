@@ -1,9 +1,6 @@
 import React, { useId, useState } from 'react'
 import Modal from '../../Modal'
-import type {
-  EventDefinition,
-  NodeCueFile,
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EventDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { useConfirm } from '../../../hooks/useConfirm'
 import { useToast } from '../../../hooks/useToast'
@@ -32,9 +29,7 @@ const EventRegistry: React.FC<Props> = ({
   const dialogTitleId = useId()
 
   const currentCue =
-    editorDoc?.mode === 'cue'
-      ? (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)
-      : null
+    editorDoc?.mode === 'cue' ? editorDoc.file.cues.find((c) => c.id === selectedCueId) : null
   const cueEvents = currentCue?.events ?? []
 
   const openDialog = (existing?: EventDefinition) => {

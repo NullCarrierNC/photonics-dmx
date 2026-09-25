@@ -45,7 +45,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
    * @param allowZero - Flag to determine if zero is allowed as a valid value.
    */
   const renderChannels = (
-    channels: Record<string, number | boolean>,
+    channels: Readonly<Record<string, number | boolean | undefined>>,
     title?: string,
     allowZero: boolean = false,
   ) => {
@@ -110,11 +110,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
   return (
     <div className="space-y-6">
       {/* Regular Channels - Do not allow zero */}
-      {renderChannels(
-        light.channels as unknown as Record<string, number | boolean>,
-        'Channels',
-        false,
-      )}
+      {renderChannels(light.channels, 'Channels', false)}
 
       {/* Config Channels - Allow zero if they exist */}
       {light.config &&

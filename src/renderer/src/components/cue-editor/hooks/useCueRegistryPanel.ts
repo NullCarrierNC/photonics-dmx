@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react'
 import type { Node } from 'reactflow'
 import type {
   NodeCueMode,
-  NodeCueFile,
   VariableDefinition,
   EventDefinition,
   EffectReference,
@@ -78,7 +77,7 @@ export function useCueRegistryPanel({
         )
         updateEffectMetadata({ variables: vars })
       } else {
-        const cueFile = editorDoc.file as NodeCueFile
+        const cueFile = editorDoc.file
         if (scope === 'cue-group') {
           const groupVars = (cueFile.group.variables ?? []).map((v) =>
             v.name === varName ? { ...v, validValues: [...validValues] } : v,
@@ -148,7 +147,7 @@ export function useCueRegistryPanel({
     }
 
     // Cue mode: combine group and cue variables
-    const cueFile = editorDoc.file as NodeCueFile
+    const cueFile = editorDoc.file
     const currentCue = selectedCueId ? cueFile.cues.find((c) => c.id === selectedCueId) : undefined
     const groupVars = (cueFile.group.variables ?? []).map((v) => ({
       name: v.name,
@@ -170,7 +169,7 @@ export function useCueRegistryPanel({
   const availableEvents = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return []
 
-    const cueFile = editorDoc.file as NodeCueFile
+    const cueFile = editorDoc.file
     const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
     return (currentCue?.events ?? []).map((e) => e.name)
   }, [editorDoc, selectedCueId])
@@ -178,7 +177,7 @@ export function useCueRegistryPanel({
   const availableEffects = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return []
 
-    const cueFile = editorDoc.file as NodeCueFile
+    const cueFile = editorDoc.file
     const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
     return (currentCue?.effects ?? []).map((e) => ({
       id: e.effectId,

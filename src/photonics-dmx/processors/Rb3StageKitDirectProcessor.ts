@@ -8,7 +8,6 @@
  * Game state, menu animation timing, and renderer-bound `cueHandled` event emission stay
  * on this coordinator. The per-rig render machinery lives in `Rb3StageKitRigProcessor`.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- RB3E game-state events and blended colours arrive untyped */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
@@ -20,11 +19,12 @@ import {
   RB3_SONG_SELECT_SCREEN,
   Rb3RightChannel,
 } from '../listeners/RB3/rb3eTypes'
-import type { StageKitData } from '../listeners/RB3/rb3eTypes'
+import type { Rb3GameStateEvent, StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { isActiveGameplayPacket } from './rb3GameplayEvidence'
 import { StrobeWatchdog } from './strobeWatchdog'
 import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
+import type { RGBIO } from '../types'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
 import {
@@ -43,7 +43,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   // Bound event handler for proper cleanup
   private boundHandleStageKitEvent: ((event: StageKitData) => void) | null = null
-  private boundHandleGameStateEvent: ((event: any) => void) | null = null
+  private boundHandleGameStateEvent: ((event: Rb3GameStateEvent) => void) | null = null
   private boundHandleScreenNameEvent:
     | ((event: { screenName: string; timestamp: number }) => void)
     | null = null
@@ -155,7 +155,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       'stagekit:data',
       this.boundHandleStageKitEvent as (event: StageKitData) => void,
     )
-    networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent as (event: unknown) => void)
+    networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent)
 
     this.boundHandleScreenNameEvent = this.handleScreenNameEvent.bind(this)
     networkListener.on(
@@ -312,12 +312,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   /**
    * Handle game state events
    */
-  private handleGameStateEvent(event: {
-    gameState: 'Menus' | 'InGame'
-    platform: string
-    timestamp: number
-    cueData: CueData | null
-  }): void {
+  private handleGameStateEvent(event: Rb3GameStateEvent): void {
     try {
       log.info('StageKitDirectProcessor: Received game state event:', event)
       const { gameState, cueData: realCueData } = event
@@ -489,7 +484,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   public getColorBlendingInfo(color: string): {
     color: string
-    blendedColor: any
+    blendedColor: RGBIO | null
     description: string
   } {
     const rig = this.rigs.values().next().value as Rb3StageKitRigProcessor | undefined

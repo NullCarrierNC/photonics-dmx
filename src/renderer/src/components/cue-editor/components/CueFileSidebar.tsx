@@ -10,8 +10,6 @@ import type {
   AudioNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
-  NodeCueFile,
-  EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 
@@ -69,11 +67,11 @@ const CueFileSidebar: React.FC<Props> = ({
   const items = useMemo(() => {
     if (!editorDoc) return []
     if (editorDoc.mode === 'effect') {
-      return [...(editorDoc.file as EffectFile).effects].sort((a, b) =>
+      return [...editorDoc.file.effects].sort((a, b) =>
         (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
       )
     }
-    const cues = (editorDoc.file as NodeCueFile).cues
+    const cues = editorDoc.file.cues
     const rawItems = cues.filter((c) => c.kind === cueKind)
     return [...rawItems].sort((a, b) =>
       (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),

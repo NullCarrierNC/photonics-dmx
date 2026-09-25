@@ -2,11 +2,8 @@ import React, { useState } from 'react'
 import type {
   VariableDefinition,
   VariableType,
-  NodeCueFile,
-  NodeCueGroupMeta,
   YargEffectDefinition,
   AudioEffectDefinition,
-  EffectFile,
   NodeCueKind,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -49,18 +46,13 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
     isParameter: false,
   })
 
-  const groupVariables =
-    editorDoc?.mode === 'cue' ? (editorDoc.file.group as NodeCueGroupMeta).variables ?? [] : []
+  const groupVariables = editorDoc?.mode === 'cue' ? editorDoc.file.group.variables ?? [] : []
   const currentCue =
-    editorDoc?.mode === 'cue'
-      ? (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)
-      : null
+    editorDoc?.mode === 'cue' ? editorDoc.file.cues.find((c) => c.id === selectedCueId) : null
   const cueVariables = currentCue?.variables ?? []
 
   const isEffectMode = editorDoc?.mode === 'effect'
-  const activeMode: NodeCueMode = editorDoc?.file
-    ? (editorDoc.file as NodeCueFile | EffectFile).mode
-    : 'yarg'
+  const activeMode: NodeCueMode = editorDoc ? editorDoc.file.mode : 'yarg'
 
   const cueKind: NodeCueKind =
     !isEffectMode && currentCue && 'kind' in currentCue ? currentCue.kind : 'lighting'

@@ -410,7 +410,7 @@ export class ConfigurationManager {
    * Gets audio configuration
    */
   getAudioConfig(): AudioConfig {
-    const savedConfig = this.getPreference('audioConfig') as Partial<AudioConfig> | undefined
+    const savedConfig = this.getPreference('audioConfig')
     const merged = { ...DEFAULT_AUDIO_CONFIG, ...savedConfig }
     const idleDetection = {
       ...DEFAULT_AUDIO_CONFIG.idleDetection,
@@ -423,11 +423,10 @@ export class ConfigurationManager {
    * Updates audio configuration (partial update)
    * Note: The 'enabled' field is never persisted (runtime-only state)
    */
-  async updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): Promise<void> {
+  async updateAudioConfig(updates: Partial<AudioConfig>): Promise<void> {
     await this.preferences.mutate((current) => {
-      const { enabled: _enabled, ...configToSave } = { ...(current.audioConfig ?? {}), ...updates }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
-      return { ...current, audioConfig: configToSave as any }
+      const { enabled: _enabled, ...configToSave } = { ...current.audioConfig, ...updates }
+      return { ...current, audioConfig: configToSave }
     })
   }
 

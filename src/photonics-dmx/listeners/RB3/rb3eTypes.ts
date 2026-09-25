@@ -1,4 +1,14 @@
+import type { CueData } from '../../cues/types/cueTypes'
+
 export type Rb3GameState = 'InGame' | 'Menus'
+
+/** What the listener emits as `rb3e:gameState`. */
+export interface Rb3GameStateEvent {
+  gameState: Rb3GameState
+  platform: string
+  timestamp: number
+  cueData: CueData | null
+}
 
 export type Rb3TrackType = 'Guitar' | 'Bass' | 'Drums' | 'Vocals' | 'Keys' | 'Harmony' | 'Unknown'
 

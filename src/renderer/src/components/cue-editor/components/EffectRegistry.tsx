@@ -97,13 +97,10 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
 
   // Effects are only available in cue mode (cues can reference effects)
   const currentCue =
-    editorDoc?.mode === 'cue' && editorDoc.file
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cue file shape
-        (editorDoc.file as any).cues?.find((c: any) => c.id === selectedCueId)
-      : null
-  // `currentCue` comes off the untyped cue-file shape above, so without the annotation this list
-  // and everything mapped over it is `any`.
-  const cueEffects: EffectReference[] = currentCue?.effects ?? []
+    editorDoc?.mode === 'cue'
+      ? editorDoc.file.cues.find((cue) => cue.id === selectedCueId)
+      : undefined
+  const cueEffects = currentCue?.effects ?? []
 
   const openDialog = (existing?: EffectReference) => {
     if (existing) {

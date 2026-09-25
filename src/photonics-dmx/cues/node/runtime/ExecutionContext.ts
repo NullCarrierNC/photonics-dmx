@@ -3,7 +3,13 @@
  * Tracks progress through the node graph for one event execution.
  */
 
-import { ActionNode, BaseEventNode, EffectRaiserNode } from '../../types/nodeCueTypes'
+import {
+  ActionNode,
+  BaseEventNode,
+  EffectEventListenerNode,
+  EffectRaiserNode,
+  EventListenerNode,
+} from '../../types/nodeCueTypes'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { VariableValue, NodeCompletionCallback, ContextCompletionCallback } from './executionTypes'
@@ -16,9 +22,12 @@ import { clampTimerDelayMs } from './engineUtils'
  */
 export type BlockingNode = ActionNode | EffectRaiserNode
 
+/** The node a chain starts from: an event, or a listener run by a raised event. */
+export type ContextStartNode = BaseEventNode | EventListenerNode | EffectEventListenerNode
+
 export class ExecutionContext {
   public readonly id: string
-  public readonly eventNode: BaseEventNode
+  public readonly eventNode: ContextStartNode
   public readonly startTime: number
 
   private visitedNodes: Map<string, number> = new Map() // nodeId -> phase when last visited
@@ -49,7 +58,7 @@ export class ExecutionContext {
   private onContextCompleteCallback?: ContextCompletionCallback
 
   constructor(
-    eventNode: BaseEventNode,
+    eventNode: ContextStartNode,
     cueData: CueData | AudioCueData,
     cueLevelVarStore: Map<string, VariableValue>,
     groupLevelVarStore: Map<string, VariableValue>,

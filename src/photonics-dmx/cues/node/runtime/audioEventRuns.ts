@@ -1,4 +1,5 @@
 import type { CueData } from '../../types/cueTypes'
+import type { AudioCueData } from '../../types/audioCueTypes'
 import type { AudioEventExecutionPolicy, BaseEventNode } from '../../types/nodeCueTypes'
 import type { NodeExecutionEngine } from './NodeExecutionEngine'
 
@@ -13,13 +14,13 @@ import type { NodeExecutionEngine } from './NodeExecutionEngine'
 export class AudioEventRuns {
   private readonly running = new Map<string, object>()
   /** The newest frame waiting behind a `latest-pending` run, per event id. */
-  private readonly pending = new Map<string, CueData>()
+  private readonly pending = new Map<string, CueData | AudioCueData>()
 
   start(
     engine: NodeExecutionEngine,
     event: BaseEventNode,
     policy: AudioEventExecutionPolicy = 'continuous',
-    data: CueData,
+    data: CueData | AudioCueData,
   ): void {
     if (policy === 'continuous') {
       engine.startExecution(event, data)
@@ -42,7 +43,11 @@ export class AudioEventRuns {
     this.pending.clear()
   }
 
-  private run(engine: NodeExecutionEngine, event: BaseEventNode, data: CueData): void {
+  private run(
+    engine: NodeExecutionEngine,
+    event: BaseEventNode,
+    data: CueData | AudioCueData,
+  ): void {
     const token = {}
     this.running.set(event.id, token)
     engine.startExecutionWithCallback(event, data, () => {

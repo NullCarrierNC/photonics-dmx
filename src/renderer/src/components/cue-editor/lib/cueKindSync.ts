@@ -1,7 +1,6 @@
 import type {
   AudioNodeCueDefinition,
   NetNodeCueDefinition,
-  NodeCueFile,
   NodeCueKind,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { firstByName } from './cueUtils'
@@ -28,7 +27,7 @@ export function resolveCueKindSelection(
     return { action: 'none' }
   }
 
-  const cueFile = editorDoc.file as NodeCueFile
+  const cueFile = editorDoc.file
   const matchingCues = cueFile.cues.filter((c) => c.kind === cueKind)
   if (matchingCues.length === 0) {
     return { action: 'clear' }

@@ -74,7 +74,7 @@ type UseCueFilesParams = {
       | AudioEffectDefinition
       | null,
   ) => void
-  getUpdatedDocument: () => NodeCueFile | EffectFile | null
+  getUpdatedDocument: () => EditorDocument | null
   onSaveSuccess?: (message: string) => void
   onError?: (message: string) => void
 }
@@ -362,13 +362,13 @@ const useCueFiles = ({
 
   const currentCueDefinition = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return null
-    const cueFile = editorDoc.file as NodeCueFile
+    const cueFile = editorDoc.file
     return cueFile.cues.find((cue) => cue.id === selectedCueId) ?? null
   }, [editorDoc, selectedCueId])
 
   const currentEffectDefinition = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'effect') return null
-    const effectFile = editorDoc.file as EffectFile
+    const effectFile = editorDoc.file
     return effectFile.effects.find((effect) => effect.id === selectedCueId) ?? null
   }, [editorDoc, selectedCueId])
 
@@ -505,7 +505,7 @@ const useCueFiles = ({
     const cueMode = editorDoc.file.mode
     const selectedKind = isEffect
       ? undefined
-      : (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)?.kind
+      : editorDoc.file.cues.find((c) => c.id === selectedCueId)?.kind
     const modeKey = modeKeyFor(cueMode, selectedKind === 'motion' ? 'motion' : 'lighting', isEffect)
     setLastItemIdForMode(modeKey, selectedCueId)
   }, [selectedCueId, editorDoc])

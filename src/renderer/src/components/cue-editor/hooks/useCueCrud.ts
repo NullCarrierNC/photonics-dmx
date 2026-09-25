@@ -4,7 +4,6 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
-  NodeCueFile,
   NodeCueKind,
   NodeCueMode,
   NetNodeCueDefinition,
@@ -13,7 +12,6 @@ import type {
   AudioNodeCueFile,
   YargEffectFile,
   AudioEffectFile,
-  EffectFile,
   EffectMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
@@ -221,7 +219,7 @@ export function useCueCrud({
     }
 
     const newCue = createBlankCue(mode, cueKind)
-    const baseCueFile = baseDoc.file as NodeCueFile
+    const baseCueFile = baseDoc.file
     const updatedCues = [...baseCueFile.cues, newCue]
     const updatedFile =
       mode === 'yarg'
@@ -257,7 +255,7 @@ export function useCueCrud({
     }
 
     const newEffect = createDefaultEffect(mode as EffectMode)
-    const baseEffectFile = baseDoc.file as EffectFile
+    const baseEffectFile = baseDoc.file
     const updatedEffects = [...baseEffectFile.effects, newEffect]
     const updatedFile =
       mode === 'yarg'
@@ -279,7 +277,7 @@ export function useCueCrud({
   const removeCue = useCallback(
     (cueId: string) => {
       if (!editorDoc || editorDoc.mode !== 'cue') return
-      const cueFile = editorDoc.file as NodeCueFile
+      const cueFile = editorDoc.file
       if (cueFile.cues.length <= 1) return
 
       const updatedCues = cueFile.cues.filter((cue) => cue.id !== cueId)
@@ -325,7 +323,7 @@ export function useCueCrud({
   const removeEffect = useCallback(
     (effectId: string) => {
       if (!editorDoc || editorDoc.mode !== 'effect') return
-      const effectFile = editorDoc.file as EffectFile
+      const effectFile = editorDoc.file
       if (effectFile.effects.length <= 1) return
 
       const updatedEffects = effectFile.effects.filter((effect) => effect.id !== effectId)
