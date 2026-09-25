@@ -124,6 +124,7 @@ describe('effect validation parity (cycles + conditional valid values)', () => {
           {
             name: 'mood',
             type: 'string',
+            scope: 'cue',
             initialValue: 'happy',
             validValues: ['happy', 'sad'],
           },

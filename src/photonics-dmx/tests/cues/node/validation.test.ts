@@ -1514,6 +1514,27 @@ describe('Node cue validation', () => {
       expect(result.data?.effects).toHaveLength(1)
     })
 
+    it('rejects an effect whose colour-array variable starts with an unknown colour', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'effect-group', name: 'Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: { events: [{ id: 'e1', type: 'event', eventType: 'beat' }], actions: [] },
+            connections: [],
+            variables: [
+              { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['bleu'] },
+            ],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
+    })
+
     it("migrates a removed 'half-beat' event to 'beat' in an effect file and warns once", () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
       const result = validateYargEffectFile({
