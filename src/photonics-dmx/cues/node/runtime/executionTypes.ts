@@ -1,5 +1,6 @@
 import { TrackedLight, Color, isColor } from '../../../types'
 import type { VariableType } from '../../types/nodeCueTypes'
+import { toNumber } from './valueResolver'
 
 /**
  * Variable value stored in variable stores, holding the value its type names.
@@ -10,13 +11,6 @@ export type VariableValue =
   | { type: 'string' | 'cue-type' | 'event' | 'color'; value: string }
   | { type: 'light-array'; value: TrackedLight[] }
   | { type: 'color-array'; value: Color[] }
-
-/** A number from an authored or stored value, with 0 for anything unreadable. */
-function toNumber(raw: unknown): number {
-  if (typeof raw === 'boolean') return raw ? 1 : 0
-  const n = typeof raw === 'string' ? parseFloat(raw) : raw
-  return typeof n === 'number' && !Number.isNaN(n) ? n : 0
-}
 
 /**
  * A variable of `type` holding `raw`, read as that type. Light arrays come only from the rig at
