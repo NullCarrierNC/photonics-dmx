@@ -1,9 +1,6 @@
 import { WaitCondition, WAIT_CONDITIONS } from '../types'
 import { AudioEventType } from '../cues/types/nodeCueTypes'
 
-export { BLEND_MODE_OPTIONS, BRIGHTNESS_OPTIONS, COLOR_OPTIONS } from '../types/lighting'
-export { LIGHT_TARGET_OPTIONS, LOCATION_OPTIONS } from '../types/rigs'
-
 /**
  * Wait conditions for ACTION TIMING - song-based conditions only (no system events).
  * Includes 'none' and 'delay' for action waitFor/waitUntil configuration.

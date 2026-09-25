@@ -7,7 +7,7 @@ import {
   BLEND_MODE_OPTIONS,
   BRIGHTNESS_OPTIONS,
   COLOR_OPTIONS,
-} from '../../../../../../../photonics-dmx/constants/options'
+} from '../../../../../../../photonics-dmx/types'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
 const EFFECT_TYPES_WITH_COLOR: NodeEffectType[] = ['set-color']

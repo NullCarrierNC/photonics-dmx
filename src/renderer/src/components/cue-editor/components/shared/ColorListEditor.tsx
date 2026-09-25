@@ -1,7 +1,5 @@
 import React from 'react'
-import { isColor } from '../../../../../../photonics-dmx/types'
-import type { Color } from '../../../../../../photonics-dmx/types'
-import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
+import { COLOR_OPTIONS, isColor, type Color } from '../../../../../../photonics-dmx/types'
 
 export interface ColorListEditorProps {
   colors: Color[]

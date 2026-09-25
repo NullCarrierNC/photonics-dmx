@@ -4,11 +4,8 @@ import type {
   EffectDefinition,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import {
-  WAIT_CONDITIONS_WITH_NONE_DELAY,
-  BRIGHTNESS_OPTIONS,
-  BLEND_MODE_OPTIONS,
-} from '../../../../../../photonics-dmx/constants/options'
+import { WAIT_CONDITIONS_WITH_NONE_DELAY } from '../../../../../../photonics-dmx/constants/options'
+import { BRIGHTNESS_OPTIONS, BLEND_MODE_OPTIONS } from '../../../../../../photonics-dmx/types'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
 
 const WELL_KNOWN_PARAM_OPTIONS: Record<string, readonly string[]> = {
