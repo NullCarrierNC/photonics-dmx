@@ -9,6 +9,7 @@ import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import {
   parseDmxFixture,
   parseDmxLight,
+  parseFixtureList,
   type FixtureFaultReport,
 } from '../../../photonics-dmx/helpers/fixtureParsing'
 import { isNonEmptyString, isPlainObject } from './primitives'
@@ -24,21 +25,14 @@ const VALID_STROBE_TYPES = new Set<string>([
  * Parses every entry of a fixture list from an IPC payload, refusing the payload on the first
  * fault. A save carries what the editors built, so a fault here is never repaired.
  */
-function parseFixtureList<T>(
+function parseSavedList<T>(
   list: readonly unknown[],
   path: string,
   parse: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
 ): ValidationResult<T[]> {
-  const fixtures: T[] = []
-  for (let i = 0; i < list.length; i++) {
-    const faults: string[] = []
-    const fixture = parse(list[i], `${path}[${i}]`, (message) => faults.push(message))
-    if (!fixture || faults.length > 0) {
-      return { ok: false, error: faults[0] ?? `${path}[${i}] is not a fixture` }
-    }
-    fixtures.push(fixture)
-  }
-  return { ok: true, value: fixtures }
+  const faults: string[] = []
+  const parsed = parseFixtureList(list, path, parse, faults)
+  return parsed.ok && faults.length > 0 ? { ok: false, error: faults[0] } : parsed
 }
 
 export function validateLightingConfiguration(
@@ -78,19 +72,19 @@ export function validateLightingConfiguration(
     return { ok: false, error: 'LightingConfiguration.strobeLights must be an array' }
   }
 
-  const frontLights = parseFixtureList(
+  const frontLights = parseSavedList(
     data.frontLights,
     'LightingConfiguration.frontLights',
     parseDmxLight,
   )
   if (!frontLights.ok) return frontLights
-  const backLights = parseFixtureList(
+  const backLights = parseSavedList(
     data.backLights,
     'LightingConfiguration.backLights',
     parseDmxLight,
   )
   if (!backLights.ok) return backLights
-  const strobeLights = parseFixtureList(
+  const strobeLights = parseSavedList(
     data.strobeLights,
     'LightingConfiguration.strobeLights',
     parseDmxLight,
@@ -173,5 +167,5 @@ export function validateDmxFixturesArray(
   if (!Array.isArray(value)) {
     return { ok: false, error: `${fieldName} must be an array` }
   }
-  return parseFixtureList(value, fieldName, parseDmxFixture)
+  return parseSavedList(value, fieldName, parseDmxFixture)
 }

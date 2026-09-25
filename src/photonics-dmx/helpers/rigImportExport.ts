@@ -1,7 +1,7 @@
 import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
 import { isStorableBrightnessScale } from './brightnessScaling'
-import { loadDmxFixture, loadDmxLight, loadFixtureList } from './fixtureParsing'
+import { loadDmxFixture, loadDmxLight, parseFixtureList } from './fixtureParsing'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -204,25 +204,25 @@ export function loadRigExportFixtures(
 ):
   | { ok: true; rig: Record<string, unknown>; templates: DmxFixture[] }
   | { ok: false; error: string } {
-  const templates = loadFixtureList(file.templates, 'templates', loadDmxFixture, faults)
+  const templates = parseFixtureList(file.templates, 'templates', loadDmxFixture, faults)
   if (!templates.ok) {
     return templates
   }
   const config = file.rig.config
   if (!isPlainObject(config)) {
-    return { ok: true, rig: file.rig, templates: templates.fixtures }
+    return { ok: true, rig: file.rig, templates: templates.value }
   }
   const loadedConfig: Record<string, unknown> = { ...config }
   for (const list of ['frontLights', 'backLights', 'strobeLights'] as const) {
     const lights = config[list]
     if (!Array.isArray(lights)) continue
-    const loaded = loadFixtureList(lights, `rig.config.${list}`, loadDmxLight, faults)
+    const loaded = parseFixtureList(lights, `rig.config.${list}`, loadDmxLight, faults)
     if (!loaded.ok) {
       return loaded
     }
-    loadedConfig[list] = loaded.fixtures
+    loadedConfig[list] = loaded.value
   }
-  return { ok: true, rig: { ...file.rig, config: loadedConfig }, templates: templates.fixtures }
+  return { ok: true, rig: { ...file.rig, config: loadedConfig }, templates: templates.value }
 }
 
 /**

@@ -241,11 +241,11 @@ function parseBrightnessScaling(
   return Object.keys(scaling).length > 0 ? scaling : undefined
 }
 
-function parseFixtureFields(
+/** A fixture template on the current schema. */
+export function parseDmxFixture(
   raw: unknown,
   path: string,
   report: FixtureFaultReport,
-  otherFields: ReadonlySet<string>,
 ): DmxFixture | null {
   if (!isPlainObject(raw)) {
     report(`${path} must be an object`)
@@ -322,23 +322,11 @@ function parseFixtureFields(
   }
 
   for (const key of Object.keys(raw)) {
-    if (!FIXTURE_FIELDS.has(key) && !otherFields.has(key)) {
+    if (!FIXTURE_FIELDS.has(key)) {
       report(`${path}.${key} is not a fixture field`)
     }
   }
   return fixture
-}
-
-const NO_OTHER_FIELDS: ReadonlySet<string> = new Set()
-const LIGHT_FIELDS: ReadonlySet<string> = new Set(['fixtureId'])
-
-/** A fixture template on the current schema. */
-export function parseDmxFixture(
-  raw: unknown,
-  path: string,
-  report: FixtureFaultReport,
-): DmxFixture | null {
-  return parseFixtureFields(raw, path, report, NO_OTHER_FIELDS)
 }
 
 /** A rig light: a fixture plus the id of the template it came from. */
@@ -347,12 +335,16 @@ export function parseDmxLight(
   path: string,
   report: FixtureFaultReport,
 ): DmxLight | null {
-  const fixture = parseFixtureFields(raw, path, report, LIGHT_FIELDS)
-  if (!fixture || !isPlainObject(raw)) return null
-  let fixtureId = ''
-  if (typeof raw.fixtureId === 'string') fixtureId = raw.fixtureId
-  else report(`${path}.fixtureId must be a string`)
-  return { ...fixture, fixtureId }
+  if (!isPlainObject(raw)) {
+    report(`${path} must be an object`)
+    return null
+  }
+  const { fixtureId, ...fields } = raw
+  const fixture = parseDmxFixture(fields, path, report)
+  if (!fixture) return null
+  if (typeof fixtureId === 'string') return { ...fixture, fixtureId }
+  report(`${path}.fixtureId must be a string`)
+  return { ...fixture, fixtureId: '' }
 }
 
 /** Brings a fixture any build may have written onto the current schema before it is parsed. */
@@ -380,24 +372,24 @@ export function loadDmxLight(
 }
 
 /**
- * Loads every entry of a stored fixture list with `load`, collecting the repairs in `faults`. A
- * list holding a fixture that cannot be loaded fails with that fixture's faults.
+ * Parses every entry of a fixture list with `parse`, collecting the faults in `faults`. A list
+ * holding a fixture that cannot be parsed fails with that fixture's faults.
  */
-export function loadFixtureList<T>(
+export function parseFixtureList<T>(
   raw: readonly unknown[],
   path: string,
-  load: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
+  parse: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
   faults: string[],
-): { ok: true; fixtures: T[] } | { ok: false; error: string } {
-  const fixtures: T[] = []
+): { ok: true; value: T[] } | { ok: false; error: string } {
+  const value: T[] = []
   for (let i = 0; i < raw.length; i++) {
     const entryFaults: string[] = []
-    const fixture = load(raw[i], `${path}[${i}]`, (message) => entryFaults.push(message))
+    const fixture = parse(raw[i], `${path}[${i}]`, (message) => entryFaults.push(message))
     if (!fixture) {
       return { ok: false, error: entryFaults.join('; ') }
     }
     faults.push(...entryFaults)
-    fixtures.push(fixture)
+    value.push(fixture)
   }
-  return { ok: true, fixtures }
+  return { ok: true, value }
 }
