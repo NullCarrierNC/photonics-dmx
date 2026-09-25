@@ -2,7 +2,6 @@
  * Execution engine for effect node graphs.
  * Similar to NodeExecutionEngine but for effects triggered by cues.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- author-typed parameter values */
 
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
@@ -17,8 +16,8 @@ import {
   EventListenerNode,
   LogicNode,
 } from '../../types/nodeCueTypes'
-import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
+import { effectParameterValue } from './effectParameters'
 import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
@@ -48,7 +47,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
 
   private compiledEffect: CompiledEffect<BaseEventNode>
   private effectVarStore: Map<string, VariableValue> // Effect-local variables
-  private parameterValues: Record<string, any>
+  private parameterValues: Record<string, VariableValue['value']>
   private callerCueData: CueData | AudioCueData // Cue data from caller
   private onIdleCallback?: () => void // Called when all contexts complete
   /** Prevents re-entrant onIdleCallback when triggerEffect completes synchronously (e.g. persistent raiser re-trigger). */
@@ -81,7 +80,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     sequencer: ILightingController,
     lightManager: DmxLightManager,
     broadcaster: RuntimeBroadcaster,
-    parameterValues: Record<string, any>,
+    parameterValues: Record<string, VariableValue['value']>,
     callerCueData: CueData | AudioCueData,
     options: EffectExecutionEngineOptions,
   ) {
@@ -267,45 +266,6 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   }
 
   /**
-   * Resolve a literal ValueSource to a primitive for storage in the effect var store.
-   * Parameter values from the cue are often ValueSource objects; storing them raw
-   * causes resolution to return 0/1 instead of the actual number (e.g. waitUntilTime 500).
-   */
-  private resolveParameterValue(
-    raw: unknown,
-    paramType: string,
-  ): number | string | boolean | TrackedLight[] {
-    if (raw == null) return paramType === 'number' ? 0 : paramType === 'boolean' ? false : ''
-    const vs = raw as { source?: string; value?: unknown }
-    if (vs && typeof vs === 'object' && vs.source === 'literal' && 'value' in vs) {
-      const v = vs.value
-      if (paramType === 'number') {
-        if (typeof v === 'number' && !Number.isNaN(v)) return v
-        if (typeof v === 'string') {
-          const n = parseFloat(v)
-          return Number.isNaN(n) ? 0 : n
-        }
-        return typeof v === 'boolean' ? (v ? 1 : 0) : 0
-      }
-      if (paramType === 'string' || paramType === 'color' || paramType === 'event')
-        return String(v ?? '')
-      if (paramType === 'boolean') return v === true || v === 'true'
-      if (paramType === 'light-array') return Array.isArray(v) ? (v as TrackedLight[]) : []
-    }
-    // Already-resolved values (e.g. from NodeExecutionEngine): coerce so delay timing is reliable
-    if (paramType === 'number') {
-      if (typeof raw === 'number' && !Number.isNaN(raw)) return raw
-      if (typeof raw === 'string') {
-        const n = parseFloat(raw)
-        return Number.isNaN(n) ? 0 : n
-      }
-    }
-    if (paramType === 'string' || paramType === 'color' || paramType === 'event')
-      return String(raw ?? '')
-    return raw as number | string | boolean | TrackedLight[]
-  }
-
-  /**
    * Apply parameter values to effect variables.
    * Parameters are variables with isParameter: true in the effect definition.
    * Caller (NodeExecutionEngine) passes resolved primitives with correct types (e.g. waitUntilCondition
@@ -316,9 +276,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     const parameterVars = this.variableDefinitions.filter((v) => v.isParameter)
 
     for (const paramVar of parameterVars) {
-      // Check if a value was provided, otherwise use the default
-      const raw = this.parameterValues[paramVar.name] ?? paramVar.initialValue
-      const value = this.resolveParameterValue(raw, paramVar.type)
+      const value = effectParameterValue(this.parameterValues[paramVar.name], paramVar)
 
       this.effectVarStore.set(paramVar.name, {
         type: paramVar.type,

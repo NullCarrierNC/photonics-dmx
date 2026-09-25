@@ -31,7 +31,6 @@ import {
   VariableType,
   NodeCueMode,
 } from '../../types/nodeCueTypes'
-import { TrackedLight, Color } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import {
   ExecutionState,
@@ -505,7 +504,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
       // Resolve parameter values using the effect's declared parameter types so string/color/event
       // params are not coerced through a numeric fallback.
-      const paramValues: Record<string, string | number | boolean | TrackedLight[] | Color[]> = {}
+      const paramValues: Record<string, VariableValue['value']> = {}
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
         const paramDef = compiledEffect.parameters.get(paramName)
         const expectedType: VariableType =
