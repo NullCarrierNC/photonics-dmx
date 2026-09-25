@@ -7,7 +7,13 @@ import {
   resolvePositionToAbsolutePercent,
 } from '../../../../cues/node/compiler/ActionEffectFactory'
 import { DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../../types'
-import type { ActionNode } from '../../../../cues/types/nodeCueTypes'
+import type {
+  ActionNode,
+  ActionTimingConfig,
+  NodeActionTarget,
+  NodeColorSetting,
+  ValueSource,
+} from '../../../../cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig, createMockTrackedLight } from '../../../helpers/testFixtures'
@@ -130,7 +136,7 @@ describe('ActionEffectFactory', () => {
   })
 
   it('reads literal wait conditions off an action it was given unresolved', () => {
-    const action = {
+    const action: ActionNode = {
       id: 'a1',
       type: 'action',
       effectType: 'set-color',
@@ -150,7 +156,7 @@ describe('ActionEffectFactory', () => {
         waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
-    } as unknown as ActionNode
+    }
 
     const transition = ActionEffectFactory.buildEffect({ action, lights })!.transitions[0]
 
@@ -253,7 +259,7 @@ describe('ActionEffectFactory', () => {
   })
 
   it('resolveLights maps target groups to TrackedLight array', () => {
-    const target = {
+    const target: NodeActionTarget = {
       groups: { source: 'literal', value: 'front' },
       filter: { source: 'literal', value: 'all' },
     }
@@ -264,7 +270,7 @@ describe('ActionEffectFactory', () => {
 
   it('resolveLights uses light-array variable when variableResolver provides one', () => {
     const customLights = [createMockTrackedLight({ id: 'v1', position: 0 })]
-    const target = {
+    const target: NodeActionTarget = {
       groups: { source: 'variable', name: 'myLights' },
       filter: { source: 'literal', value: 'all' },
     }
@@ -472,5 +478,132 @@ describe('resolvePositionToAbsolutePercent', () => {
     )
     expect(of.pan).toBeCloseTo(o.pan!, 5)
     expect(of.tilt).toBeCloseTo(o.tilt!, 5)
+  })
+})
+
+describe('ActionEffectFactory resolving an authored action', () => {
+  const lights = [createMockTrackedLight({ id: 'l1', position: 0 })]
+  const literal = (value: string | number): ValueSource => ({ source: 'literal', value })
+  const variable = (name: string): ValueSource => ({ source: 'variable', name })
+
+  const target: NodeActionTarget = { groups: literal('front'), filter: literal('all') }
+  const color = (overrides: Partial<NodeColorSetting> = {}): NodeColorSetting => ({
+    name: literal('red'),
+    brightness: literal('high'),
+    blendMode: literal('replace'),
+    ...overrides,
+  })
+  const setColor = (
+    colorSetting: NodeColorSetting,
+    timing: ActionTimingConfig = createDefaultActionTiming(),
+  ): ActionNode => ({
+    id: 'a1',
+    type: 'action',
+    effectType: 'set-color',
+    target,
+    color: colorSetting,
+    timing,
+  })
+  const firstTransition = (action: ActionNode) =>
+    ActionEffectFactory.buildEffect({ action, lights })!.transitions[0]
+
+  it('resolves groups and filter literals, splitting a group list', () => {
+    const lightManager = new DmxLightManager(createMockLightingConfig())
+    const getLights = jest.spyOn(lightManager, 'getLights')
+
+    ActionEffectFactory.resolveLights(lightManager, {
+      groups: literal('front, back'),
+      filter: literal('even'),
+    })
+
+    expect(getLights).toHaveBeenCalledWith(['front', 'back'], 'even')
+  })
+
+  it('reads the group name and the filter from string variables', () => {
+    const lightManager = new DmxLightManager(createMockLightingConfig())
+    const getLights = jest.spyOn(lightManager, 'getLights')
+    const values: Record<string, string> = { groupVar: 'back', filterVar: 'odd' }
+
+    ActionEffectFactory.resolveLights(
+      lightManager,
+      { groups: variable('groupVar'), filter: variable('filterVar') },
+      (name) => ({ type: 'string', value: values[name] }),
+    )
+
+    expect(getLights).toHaveBeenCalledWith(['back'], 'odd')
+  })
+
+  it('falls back to the front lights, all of them, for variables it cannot read', () => {
+    const lightManager = new DmxLightManager(createMockLightingConfig())
+    const getLights = jest.spyOn(lightManager, 'getLights')
+
+    ActionEffectFactory.resolveLights(lightManager, {
+      groups: variable('groupVar'),
+      filter: variable('filterVar'),
+    })
+
+    expect(getLights).toHaveBeenCalledWith(['front'], 'all')
+  })
+
+  it('reads a colour off its literals', () => {
+    const red = firstTransition(setColor(color()))
+    const blue = firstTransition(setColor(color({ name: literal('blue') })))
+
+    expect(red.transform.color).not.toEqual(blue.transform.color)
+    expect(red.transform.color.red).toBeGreaterThan(0)
+  })
+
+  it('uses blue at medium, replacing, for colour fields held in variables', () => {
+    const fromVariables = firstTransition(
+      setColor({
+        name: variable('c'),
+        brightness: variable('b'),
+        blendMode: variable('m'),
+      }),
+    )
+    const defaults = firstTransition(
+      setColor({
+        name: literal('blue'),
+        brightness: literal('medium'),
+        blendMode: literal('replace'),
+      }),
+    )
+
+    expect(fromVariables.transform.color).toEqual(defaults.transform.color)
+  })
+
+  it('clamps a literal opacity into 0 to 1', () => {
+    const over = firstTransition(setColor(color({ opacity: literal(2) })))
+    const one = firstTransition(setColor(color({ opacity: literal(1) })))
+
+    expect(over.transform.color).toEqual(one.transform.color)
+  })
+
+  it('reads timing literals, and falls back for variables and non-numeric values', () => {
+    const literalTiming = firstTransition(
+      setColor(color(), {
+        ...createDefaultActionTiming(),
+        duration: literal(350),
+        waitForCondition: literal('beat'),
+        easing: literal('linear'),
+      }),
+    )
+    const fallbackTiming = firstTransition(
+      setColor(color(), {
+        ...createDefaultActionTiming(),
+        duration: variable('d'),
+        waitForCondition: variable('w'),
+        waitForTime: literal('soon'),
+        easing: variable('e'),
+      }),
+    )
+
+    expect(literalTiming.transform.duration).toBe(350)
+    expect(literalTiming.waitForCondition).toBe('beat')
+    expect(fallbackTiming.transform.duration).toBe(200)
+    expect(fallbackTiming.waitForCondition).toBe('none')
+    expect(fallbackTiming.waitForTime).toBe(0)
+    expect(literalTiming.transform.easing).toBe('linear')
+    expect(fallbackTiming.transform.easing).toBe('sinInOut')
   })
 })

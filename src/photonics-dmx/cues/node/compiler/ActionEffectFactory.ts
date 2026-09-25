@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- the resolvers take an action field raw or already resolved */
 import {
   WaitCondition,
   TrackedLight,
@@ -13,6 +12,12 @@ import {
 } from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { VariableValue } from '../runtime/executionTypes'
+import type {
+  ActionTimingConfig,
+  NodeActionTarget,
+  NodeColorSetting,
+  ValueSource,
+} from '../../types/nodeCueTypes'
 import {
   ResolvedActionTarget,
   ResolvedActionTiming,
@@ -34,15 +39,9 @@ import {
 } from './effectBuilders'
 
 export class ActionEffectFactory {
-  // Helper to resolve target if needed
-  private static resolveTarget(target: any): ResolvedActionTarget {
-    // Check if already resolved (has array for groups)
-    if (Array.isArray(target.groups)) {
-      return target as ResolvedActionTarget
-    }
-    // Otherwise treat as ValueSource - use literal value or default
-    const groupsValue = target.groups?.source === 'literal' ? String(target.groups.value) : 'front'
-    const filterValue = target.filter?.source === 'literal' ? String(target.filter.value) : 'all'
+  private static resolveTarget(target: NodeActionTarget): ResolvedActionTarget {
+    const groupsValue = target.groups.source === 'literal' ? String(target.groups.value) : 'front'
+    const filterValue = target.filter.source === 'literal' ? String(target.filter.value) : 'all'
 
     return {
       groups: groupsValue.split(',').map((g) => g.trim()) as LocationGroup[],
@@ -50,16 +49,10 @@ export class ActionEffectFactory {
     }
   }
 
-  // Helper to resolve color if needed
-  private static resolveColorSetting(color: any): ResolvedColorSetting {
-    // Check if already resolved
-    if (typeof color.name === 'string' && typeof color.brightness === 'string') {
-      return color as ResolvedColorSetting
-    }
-    // Otherwise treat as ValueSource
-    const name = color.name?.source === 'literal' ? String(color.name.value) : 'blue'
+  private static resolveColorSetting(color: NodeColorSetting): ResolvedColorSetting {
+    const name = color.name.source === 'literal' ? String(color.name.value) : 'blue'
     const brightness =
-      color.brightness?.source === 'literal' ? String(color.brightness.value) : 'medium'
+      color.brightness.source === 'literal' ? String(color.brightness.value) : 'medium'
     const blendMode =
       color.blendMode?.source === 'literal' ? String(color.blendMode.value) : 'replace'
     const opacity = color.opacity?.source === 'literal' ? Number(color.opacity.value) : undefined
@@ -72,52 +65,41 @@ export class ActionEffectFactory {
     }
   }
 
-  // Helper to resolve timing if needed
-  private static resolveTiming(timing: any): ResolvedActionTiming {
-    // Check if already resolved
-    if (typeof timing.waitForTime === 'number') {
-      return timing as ResolvedActionTiming
+  /** An action's timing from its literals, with the fallbacks for anything else. */
+  private static resolveTiming(timing: ActionTimingConfig): ResolvedActionTiming {
+    const literal = (
+      source: ValueSource | undefined,
+    ): Extract<ValueSource, { source: 'literal' }>['value'] | undefined =>
+      source?.source === 'literal' ? source.value : undefined
+    const condition = (source: ValueSource): WaitCondition => {
+      const value = literal(source)
+      return value === undefined ? 'none' : (String(value) as WaitCondition)
     }
-    // Otherwise treat as ValueSource. A condition from anything but a literal reads as 'none'.
-    const condition = (source: unknown): WaitCondition => {
-      if (typeof source === 'string') return source as WaitCondition
-      const literal = source as { source?: string; value?: unknown } | undefined
-      return literal?.source === 'literal' ? (String(literal.value) as WaitCondition) : 'none'
+    const count = (source: ValueSource | undefined): number | undefined => {
+      const value = literal(source)
+      return value === undefined ? undefined : finiteOr(value, undefined)
     }
+    const easing = literal(timing.easing)
     return {
       waitForCondition: condition(timing.waitForCondition),
-      waitForTime:
-        timing.waitForTime?.source === 'literal' ? finiteOr(timing.waitForTime.value, 0) : 0,
-      waitForConditionCount:
-        timing.waitForConditionCount?.source === 'literal'
-          ? finiteOr(timing.waitForConditionCount.value, undefined)
-          : undefined,
-      duration: timing.duration?.source === 'literal' ? finiteOr(timing.duration.value, 200) : 200,
+      waitForTime: finiteOr(literal(timing.waitForTime), 0),
+      waitForConditionCount: count(timing.waitForConditionCount),
+      duration: finiteOr(literal(timing.duration), 200),
       waitUntilCondition: condition(timing.waitUntilCondition),
-      waitUntilTime:
-        timing.waitUntilTime?.source === 'literal' ? finiteOr(timing.waitUntilTime.value, 0) : 0,
-      waitUntilConditionCount:
-        timing.waitUntilConditionCount?.source === 'literal'
-          ? finiteOr(timing.waitUntilConditionCount.value, undefined)
-          : undefined,
-      easing: (() => {
-        const e = timing.easing as string | { source?: string; value?: unknown } | undefined
-        if (e === undefined) return undefined
-        if (typeof e === 'string') return e
-        if (e && typeof e === 'object' && e.source === 'literal') return String(e.value)
-        return undefined
-      })(),
-      level: timing.level?.source === 'literal' ? finiteOr(timing.level.value, 1) : 1,
+      waitUntilTime: finiteOr(literal(timing.waitUntilTime), 0),
+      waitUntilConditionCount: count(timing.waitUntilConditionCount),
+      easing: easing === undefined ? undefined : String(easing),
+      level: finiteOr(literal(timing.level), 1),
     }
   }
 
   public static resolveLights(
     lightManager: DmxLightManager,
-    target: any,
+    target: NodeActionTarget,
     variableResolver?: (name: string) => VariableValue | undefined,
   ): TrackedLight[] {
     // Check if groups is a variable reference
-    if (target.groups?.source === 'variable' && variableResolver) {
+    if (target.groups.source === 'variable' && variableResolver) {
       const varValue = variableResolver(target.groups.name)
 
       // If it's a light-array variable, use those exact lights (ignore filter)
@@ -130,10 +112,10 @@ export class ActionEffectFactory {
         const groupsStr = varValue.value || 'front'
         const groups = groupsStr.split(',').map((g) => g.trim()) as LocationGroup[]
         let filter: LightTarget = 'all'
-        if (target.filter?.source === 'variable' && variableResolver) {
+        if (target.filter.source === 'variable') {
           const filterVar = variableResolver(target.filter.name)
           if (filterVar?.value) filter = String(filterVar.value) as LightTarget
-        } else if (target.filter?.source === 'literal') {
+        } else {
           filter = String(target.filter.value) as LightTarget
         }
         return lightManager.getLights(groups, filter)
