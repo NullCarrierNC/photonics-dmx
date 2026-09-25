@@ -10,7 +10,7 @@ export function buildSimRig(
   strobeCount: number,
 ): LightingConfiguration {
   const makeLights = (count: number, group: 'front' | 'back' | 'strobe', start: number) =>
-    Array.from({ length: count }, (_, index) => {
+    Array.from({ length: count }, (_, index): DmxLight => {
       const position = start + index + 1
       const base = position * 4 - 3
       return {
@@ -29,7 +29,7 @@ export function buildSimRig(
           masterDimmer: base + 3,
         },
         fixtureId: `${group}-${position}`,
-      } as DmxLight
+      }
     })
 
   const frontLights = makeLights(frontCount, 'front', 0)

@@ -18,7 +18,7 @@ import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
 import {
-  createMockDmxLight,
+  rgbLight,
   createMockLightingConfig,
   createMockTrackedLight,
 } from '../../../helpers/testFixtures'
@@ -616,11 +616,8 @@ describe('ActionEffectFactory resolving an authored action', () => {
     const rig = () =>
       new DmxLightManager(
         createMockLightingConfig({
-          frontLights: [
-            createMockDmxLight({ id: 'f1', position: 0 }),
-            createMockDmxLight({ id: 'f2', position: 1 }),
-          ],
-          backLights: [createMockDmxLight({ id: 'b1', position: 2, group: 'back' })],
+          frontLights: [rgbLight({ id: 'f1', position: 0 }), rgbLight({ id: 'f2', position: 1 })],
+          backLights: [rgbLight({ id: 'b1', position: 2, group: 'back' })],
         }),
       )
     const ids = (resolved: { id: string }[]) => resolved.map((light) => light.id)

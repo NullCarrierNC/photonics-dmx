@@ -5,11 +5,11 @@ import StrobeChannelPreviewNotice from './StrobeChannelPreviewNotice'
 import {
   ConfigStrobeType,
   FixtureTypes,
-  type DmxLight,
   type LightingConfiguration,
+  type RgbLight,
 } from '../../../photonics-dmx/types'
 
-function makeRgbLight(overrides: Partial<DmxLight> = {}): DmxLight {
+function makeRgbLight(overrides: Partial<RgbLight> = {}): RgbLight {
   return {
     id: 'l-1',
     fixtureId: 't-1',
@@ -20,10 +20,10 @@ function makeRgbLight(overrides: Partial<DmxLight> = {}): DmxLight {
     isStrobeEnabled: false,
     channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
-  } as DmxLight
+  }
 }
 
-function makeRgbWithStrobeChannel(overrides: Partial<DmxLight> = {}): DmxLight {
+function makeRgbWithStrobeChannel(overrides: Partial<RgbLight> = {}): RgbLight {
   return makeRgbLight({
     channels: {
       masterDimmer: 1,
@@ -31,7 +31,7 @@ function makeRgbWithStrobeChannel(overrides: Partial<DmxLight> = {}): DmxLight {
       green: 3,
       blue: 4,
       strobeChannel: 5,
-    } as DmxLight['channels'],
+    },
     ...overrides,
   })
 }

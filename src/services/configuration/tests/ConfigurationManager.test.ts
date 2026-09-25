@@ -1,5 +1,5 @@
 import { ConfigurationManager } from '../ConfigurationManager'
-import { ConfigStrobeType, FixtureTypes } from '../../../photonics-dmx/types'
+import { ConfigStrobeType, FixtureTypes, type RgbFixture } from '../../../photonics-dmx/types'
 
 // Mock electron app
 jest.mock('electron', () => ({
@@ -132,7 +132,7 @@ describe('ConfigurationManager', () => {
     })
 
     test('should update user lights', async () => {
-      const mockLights = [
+      const mockLights: RgbFixture[] = [
         {
           id: '1',
           fixture: FixtureTypes.RGB,
@@ -148,7 +148,7 @@ describe('ConfigurationManager', () => {
     })
 
     test('changes one template from the stored list, keeping a save that landed meanwhile', async () => {
-      const light = (id: string, name: string) => ({
+      const light = (id: string, name: string): RgbFixture => ({
         id,
         fixture: FixtureTypes.RGB,
         name,
@@ -239,7 +239,7 @@ describe('ConfigurationManager', () => {
       const lights = bootWithLegacyRgbw().getUserLights()
       expect(lights[0].fixture).toBe(FixtureTypes.RGB)
       expect(lights[0].extraChannels).toEqual([{ type: 'white', channel: 5 }])
-      expect((lights[0].channels as unknown as Record<string, number>).white).toBeUndefined()
+      expect(lights[0].channels).not.toHaveProperty('white')
     })
 
     test('collapses rgbw lights in the stored lighting layout too', () => {
@@ -583,7 +583,7 @@ describe('ConfigurationManager', () => {
       const rigs = cm.getDmxRigs()
       const synced = rigs[0]!.config.frontLights[0]!
       // strobe channel filled from template offset (5 - 1 = 4, applied to master 11 → 15)
-      expect((synced.channels as unknown as Record<string, number>).strobeChannel).toBe(15)
+      expect(synced.channels).toHaveProperty('strobeChannel', 15)
       // strobeValues materialised from the template
       expect(synced.strobeValues).toEqual({ slow: 10, medium: 100, fast: 200, fastest: 250 })
       // rig-owned fields preserved

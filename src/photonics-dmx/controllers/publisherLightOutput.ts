@@ -10,7 +10,7 @@ import {
   percentToDmx,
 } from '../helpers/dmxHelpers'
 
-/** Pan and tilt as DMX values, ready for the channel cast. */
+/** A moving head's pan and tilt as DMX values. */
 export type MovingHeadAxes = { panOut: number; tiltOut: number }
 
 /**

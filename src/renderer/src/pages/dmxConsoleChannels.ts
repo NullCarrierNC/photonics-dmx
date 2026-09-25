@@ -101,7 +101,7 @@ export function buildConsoleFixedSeed(
   const seed: Record<number, number> = {}
   const allLights = [...config.frontLights, ...config.backLights, ...config.strobeLights]
   for (const light of allLights) {
-    for (const extra of getTemplateAlignedExtraChannels(light as DmxLight, templates)) {
+    for (const extra of getTemplateAlignedExtraChannels(light, templates)) {
       if (extra.type === 'fixed' && extra.channel >= 1 && extra.channel <= 512) {
         seed[extra.channel] = Math.max(0, Math.min(255, extra.value ?? 0))
       }
@@ -135,7 +135,7 @@ export function lightOnChannel(
   moving: { lightId: string; channelName: string },
 ): DmxLight | null {
   const allLights = [...config.frontLights, ...config.backLights, ...config.strobeLights]
-  for (const light of allLights as DmxLight[]) {
+  for (const light of allLights) {
     const lightOverrides = light.id ? overrides[light.id] : undefined
     const onChannel = getEffectiveChannelEntries(light, templates, lightOverrides).some(
       ([name, number]) =>

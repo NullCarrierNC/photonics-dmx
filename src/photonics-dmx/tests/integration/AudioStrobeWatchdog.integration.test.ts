@@ -57,7 +57,7 @@ const RIG: DmxRig = {
           blue: 3,
           masterDimmer: 4,
           strobeChannel: STROBE_CHANNEL,
-        } as unknown as DmxRig['config']['frontLights'][number]['channels'],
+        },
       },
     ],
     backLights: [],

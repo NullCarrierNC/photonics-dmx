@@ -5,9 +5,9 @@ import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
 } from '../types'
-import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig } from '../types'
+import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, RgbFixture, RgbLight } from '../types'
 import {
-  deriveBaseChannelsForMaster,
+  deriveChannelLayoutForMaster,
   maxMasterDimmerForTemplate,
   syncDmxLightWithTemplate,
   syncLightingConfigurationWithUserLights,
@@ -15,7 +15,7 @@ import {
   templateChannelSpan,
 } from './rigTemplateSync'
 
-const baseRgbLight: DmxLight = {
+const baseRgbLight: RgbLight = {
   id: 'l-1',
   fixtureId: 'tpl-rgb',
   position: 1,
@@ -29,7 +29,7 @@ const baseRgbLight: DmxLight = {
   channels: { masterDimmer: 11, red: 12, green: 13, blue: 14 },
 }
 
-const baseRgbTemplate: DmxFixture = {
+const baseRgbTemplate: RgbFixture = {
   id: 'tpl-rgb',
   position: 0,
   fixture: FixtureTypes.RGB,
@@ -61,12 +61,11 @@ describe('syncDmxLightWithTemplate', () => {
     const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, template)
     expect(changed).toBe(true)
     // master dimmer was 11; template strobe offset = 5 − 1 = 4; expected = 11 + 4 = 15
-    expect((light.channels as unknown as Record<string, number>).strobeChannel).toBe(15)
+    expect(light.channels).toHaveProperty('strobeChannel', 15)
     // strobeValues materialized from template defaults
     expect(light.strobeValues).toEqual({ slow: 10, medium: 100, fast: 200, fastest: 250 })
     // per-light values preserved
-    expect((light.channels as unknown as Record<string, number>).masterDimmer).toBe(11)
-    expect((light.channels as unknown as Record<string, number>).red).toBe(12)
+    expect(light.channels).toMatchObject({ masterDimmer: 11, red: 12 })
   })
 
   it('propagates a template channel-offset re-layout to existing rig lights (Fix 4)', () => {
@@ -82,13 +81,9 @@ describe('syncDmxLightWithTemplate', () => {
     }
     const { light, changed } = syncDmxLightWithTemplate(rigLight, reLaidOutTemplate)
     expect(changed).toBe(true)
-    const ch = light.channels as unknown as Record<string, number>
     // masterDimmer is rig-owned (DMX start address), unchanged.
-    expect(ch.masterDimmer).toBe(11)
     // Every other channel re-derived from the template's new offsets: 11 + (templateCh - 1).
-    expect(ch.red).toBe(14) // 11 + (4 - 1)
-    expect(ch.green).toBe(15) // 11 + (5 - 1)
-    expect(ch.blue).toBe(16) // 11 + (6 - 1)
+    expect(light.channels).toMatchObject({ masterDimmer: 11, red: 14, green: 15, blue: 16 })
   })
 
   it('removes a strobe channel and clears strobeValues when the template drops the channel', () => {
@@ -100,12 +95,12 @@ describe('syncDmxLightWithTemplate', () => {
         green: 13,
         blue: 14,
         strobeChannel: 15,
-      } as DmxLight['channels'],
+      },
       strobeValues: { slow: 30, medium: 90, fast: 180, fastest: 240 },
     }
     const { light, changed } = syncDmxLightWithTemplate(lightWithStrobe, baseRgbTemplate)
     expect(changed).toBe(true)
-    expect((light.channels as unknown as Record<string, number>).strobeChannel).toBeUndefined()
+    expect(light.channels).not.toHaveProperty('strobeChannel')
     expect(light.strobeValues).toBeUndefined()
   })
 
@@ -123,7 +118,7 @@ describe('syncDmxLightWithTemplate', () => {
         green: 13,
         blue: 14,
         strobeChannel: 15,
-      } as DmxLight['channels'],
+      },
       strobeValues: { slow: 1, medium: 2, fast: 3, fastest: 4 },
     }
     const { light } = syncDmxLightWithTemplate(lightWithOverride, template)
@@ -144,9 +139,7 @@ describe('syncDmxLightWithTemplate', () => {
     expect(light.fixture).toBe(FixtureTypes.RGBMH)
     expect(light.label).toBe('MH PAR')
     expect(light.name).toBe('MH PAR')
-    const channels = light.channels as unknown as Record<string, number>
-    expect(channels.pan).toBe(15) // 11 + (5 - 1)
-    expect(channels.tilt).toBe(16)
+    expect(light.channels).toMatchObject({ pan: 15, tilt: 16 }) // 11 + (5 - 1)
   })
 
   it('preserves rig-owned fields: id, fixtureId, position, group, universe, mount, isStrobeEnabled, masterDimmer', () => {
@@ -168,7 +161,7 @@ describe('syncDmxLightWithTemplate', () => {
     expect(light.universe).toBe(rigLight.universe)
     expect(light.mount).toBe(rigLight.mount)
     expect(light.isStrobeEnabled).toBe(true) // rig-owned post-creation
-    expect((light.channels as unknown as Record<string, number>).masterDimmer).toBe(11)
+    expect(light.channels).toHaveProperty('masterDimmer', 11)
   })
 
   it('preserves rig-side moving-head calibration when both have a config', () => {
@@ -182,7 +175,7 @@ describe('syncDmxLightWithTemplate', () => {
         blue: 14,
         pan: 15,
         tilt: 16,
-      } as DmxLight['channels'],
+      },
       config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG, panHome: 75, tiltHome: 25 },
     }
     const template: DmxFixture = {
@@ -318,12 +311,8 @@ describe('syncDmxLightWithTemplate', () => {
       channels: { masterDimmer: 510, red: 511, green: 512, blue: 513 },
     }
     const { light } = syncDmxLightWithTemplate(highMasterLight, baseRgbTemplate)
-    const channels = light.channels as unknown as Record<string, number>
-    expect(channels.masterDimmer).toBe(510)
-    expect(channels.red).toBe(511)
-    expect(channels.green).toBe(512)
     // 510 + (4 - 1) = 513 → unassigned, so the fixture reads as invalid rather than doubling up
-    expect(channels.blue).toBe(0)
+    expect(light.channels).toMatchObject({ masterDimmer: 510, red: 511, green: 512, blue: 0 })
   })
 
   it('removes rig extraChannels when the template drops them', () => {
@@ -396,7 +385,7 @@ describe('syncLightingConfigurationWithUserLights', () => {
         green: 13,
         blue: 14,
         strobeChannel: 15,
-      } as DmxLight['channels'],
+      },
       strobeValues: { slow: 10, medium: 100, fast: 200, fastest: 250 },
     }
     const config = {
@@ -425,7 +414,7 @@ describe('syncLightingConfigurationWithUserLights', () => {
     const { config: next, changed } = syncLightingConfigurationWithUserLights(config, [template])
     expect(changed).toBe(true)
     for (const arr of [next.frontLights, next.backLights, next.strobeLights]) {
-      expect((arr[0]!.channels as unknown as Record<string, number>).strobeChannel).toBe(15)
+      expect(arr[0]!.channels).toHaveProperty('strobeChannel', 15)
       expect(arr[0]!.strobeValues).toEqual({ slow: 10, medium: 100, fast: 200, fastest: 250 })
     }
   })
@@ -470,10 +459,7 @@ describe('syncRigsConfigWithUserLights', () => {
     expect(changed).toBe(true)
     expect(config.rigs[0]).toBe(cleanRig)
     expect(config.rigs[1]).not.toBe(dirtyRig)
-    expect(
-      (config.rigs[1]!.config.frontLights[0]!.channels as unknown as Record<string, number>)
-        .strobeChannel,
-    ).toBe(15)
+    expect(config.rigs[1]!.config.frontLights[0]!.channels).toHaveProperty('strobeChannel', 15)
   })
 
   it('returns same reference when no rigs needed syncing', () => {
@@ -517,18 +503,24 @@ describe('templateChannelSpan / maxMasterDimmerForTemplate', () => {
   })
 })
 
-describe('deriveBaseChannelsForMaster', () => {
+describe('deriveChannelLayoutForMaster', () => {
   it('applies the template offsets to the given master dimmer', () => {
-    expect(deriveBaseChannelsForMaster(baseRgbTemplate, 11)).toEqual({
-      masterDimmer: 11,
-      red: 12,
-      green: 13,
-      blue: 14,
+    expect(deriveChannelLayoutForMaster(baseRgbTemplate, 11)).toEqual({
+      fixture: FixtureTypes.RGB,
+      channels: {
+        masterDimmer: 11,
+        red: 12,
+        green: 13,
+        blue: 14,
+      },
     })
   })
 
   it('collapses channels past the universe to 0 rather than piling them onto 512', () => {
-    const derived = deriveBaseChannelsForMaster(baseRgbTemplate, 510)
-    expect(derived).toEqual({ masterDimmer: 510, red: 511, green: 512, blue: 0 })
+    const derived = deriveChannelLayoutForMaster(baseRgbTemplate, 510)
+    expect(derived).toEqual({
+      fixture: FixtureTypes.RGB,
+      channels: { masterDimmer: 510, red: 511, green: 512, blue: 0 },
+    })
   })
 })

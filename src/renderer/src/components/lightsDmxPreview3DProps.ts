@@ -6,13 +6,15 @@
  * rendered output. Each comparator reads every field of its shape.
  */
 import type { Texture } from 'three'
-import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
+import {
+  FixtureTypes,
+  type DmxFixture,
+  type RgbMovingHeadFixture,
+} from '../../../photonics-dmx/types'
 import type { StageVector3 } from './lightsDmxPreview3DMath'
 
-const MH_TYPES = new Set([FixtureTypes.RGBMH])
-
-export function isMovingHead(light: DmxFixture): boolean {
-  return MH_TYPES.has(light.fixture)
+export function isMovingHead(light: DmxFixture): light is RgbMovingHeadFixture {
+  return light.fixture === FixtureTypes.RGBMH
 }
 
 export function masterDimmer01(light: DmxFixture, dmxValues: Record<number, number>): number {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FixtureTypes, LightTypes } from '../../../photonics-dmx/types'
+import { FixtureTypes, isFixtureType, LightTypes } from '../../../photonics-dmx/types'
 
 interface LightTypeProps {
   selectedType: FixtureTypes // Currently selected light type
@@ -15,7 +15,8 @@ const LightType: React.FC<LightTypeProps> = ({ selectedType, onTypeChange }) => 
   }, [selectedType])
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newType = e.target.value as FixtureTypes
+    const newType = e.target.value
+    if (!isFixtureType(newType)) return
     setCurrentType(newType)
     onTypeChange(newType)
   }

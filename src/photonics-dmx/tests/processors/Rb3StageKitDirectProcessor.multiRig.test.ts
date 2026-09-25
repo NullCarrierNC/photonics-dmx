@@ -13,7 +13,7 @@ import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectPr
 import type { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
-import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { fakeLightingController } from '../helpers/fakeLightingController'
 import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
 
@@ -21,10 +21,10 @@ function makeFourLightConfig() {
   return createMockLightingConfig({
     numLights: 4,
     frontLights: [
-      createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0' }),
-      createMockDmxLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
-      createMockDmxLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
-      createMockDmxLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
+      rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0' }),
+      rgbLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
+      rgbLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
+      rgbLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
     ],
     backLights: [],
     strobeLights: [],
@@ -35,7 +35,7 @@ function makeEightLightConfig(prefix = 'b') {
   return createMockLightingConfig({
     numLights: 8,
     frontLights: Array.from({ length: 8 }, (_, i) =>
-      createMockDmxLight({ id: `${prefix}-f${i}`, position: i, fixtureId: `${prefix}-f${i}` }),
+      rgbLight({ id: `${prefix}-f${i}`, position: i, fixtureId: `${prefix}-f${i}` }),
     ),
     backLights: [],
     strobeLights: [],
@@ -45,7 +45,7 @@ function makeEightLightConfig(prefix = 'b') {
 /** Four lights with the first one strobe-capable, named by `prefix`. */
 function makeStrobeConfig(prefix: string) {
   const lights = Array.from({ length: 4 }, (_, i) =>
-    createMockDmxLight({
+    rgbLight({
       id: `${prefix}-f${i}`,
       position: i,
       fixtureId: `${prefix}-f${i}`,
@@ -137,10 +137,10 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       createMockLightingConfig({
         numLights: 4,
         frontLights: [
-          createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
-          createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-          createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-          createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+          rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
+          rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+          rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+          rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
         ],
         backLights: [],
         strobeLights: [],
@@ -238,8 +238,8 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       createMockLightingConfig({
         numLights: 2,
         frontLights: [
-          createMockDmxLight({ id: 'tiny-f0', position: 0, fixtureId: 'tiny-f0' }),
-          createMockDmxLight({ id: 'tiny-f1', position: 1, fixtureId: 'tiny-f1' }),
+          rgbLight({ id: 'tiny-f0', position: 0, fixtureId: 'tiny-f0' }),
+          rgbLight({ id: 'tiny-f1', position: 1, fixtureId: 'tiny-f1' }),
         ],
         backLights: [],
         strobeLights: [],
@@ -269,27 +269,27 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     const aConfig = createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
-        createMockDmxLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
-        createMockDmxLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
-        createMockDmxLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
+        rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
+        rgbLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
+        rgbLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
       ],
       backLights: [],
       strobeLights: [
-        createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
       ],
     })
     const bConfig = createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
-        createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-        createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-        createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+        rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+        rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+        rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
       ],
       backLights: [],
       strobeLights: [
-        createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
       ],
     })
     const a = makeChain('a', true, aConfig)
@@ -334,7 +334,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
         createMockLightingConfig({
           numLights: 4,
           frontLights: [0, 1, 2, 3].map((position) =>
-            createMockDmxLight({
+            rgbLight({
               id: `${rigId}-f${position}`,
               position,
               fixtureId: `${rigId}-f${position}`,
@@ -343,7 +343,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
           ),
           backLights: [],
           strobeLights: [
-            createMockDmxLight({
+            rgbLight({
               id: `${rigId}-f0`,
               position: 0,
               fixtureId: `${rigId}-f0`,
@@ -383,23 +383,23 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     const aConfig = createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
-        createMockDmxLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
-        createMockDmxLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
-        createMockDmxLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
+        rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
+        rgbLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
+        rgbLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
       ],
       backLights: [],
       strobeLights: [
-        createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
       ],
     })
     const bConfig = createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
-        createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-        createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-        createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+        rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
+        rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+        rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+        rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
       ],
       backLights: [],
       strobeLights: [],
@@ -427,27 +427,27 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     const aConfig = createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
-        createMockDmxLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
-        createMockDmxLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
-        createMockDmxLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
+        rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'a-f1', position: 1, fixtureId: 'a-f1' }),
+        rgbLight({ id: 'a-f2', position: 2, fixtureId: 'a-f2' }),
+        rgbLight({ id: 'a-f3', position: 3, fixtureId: 'a-f3' }),
       ],
       backLights: [],
       strobeLights: [
-        createMockDmxLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'a-f0', position: 0, fixtureId: 'a-f0', isStrobeEnabled: true }),
       ],
     })
     const bConfig = createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
-        createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-        createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-        createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+        rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+        rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+        rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
       ],
       backLights: [],
       strobeLights: [
-        createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
+        rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0', isStrobeEnabled: true }),
       ],
     })
     const a = makeChain('a', true, aConfig)
@@ -491,10 +491,10 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       createMockLightingConfig({
         numLights: 4,
         frontLights: [
-          createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
-          createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-          createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-          createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+          rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
+          rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+          rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+          rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
         ],
         backLights: [],
         strobeLights: [],
@@ -518,10 +518,10 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       createMockLightingConfig({
         numLights: 4,
         frontLights: [
-          createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
-          createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-          createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-          createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+          rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
+          rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+          rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+          rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
         ],
         backLights: [],
         strobeLights: [],
@@ -585,10 +585,10 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       createMockLightingConfig({
         numLights: 4,
         frontLights: [
-          createMockDmxLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
-          createMockDmxLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-          createMockDmxLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-          createMockDmxLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
+          rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
+          rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
+          rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
+          rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
         ],
         backLights: [],
         strobeLights: [],

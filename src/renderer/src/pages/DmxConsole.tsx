@@ -562,12 +562,12 @@ const DmxConsole: React.FC = () => {
 
           <div className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg py-3">
             {rigConfig.frontLights.length > 0 &&
-              renderLightsGroup(rigConfig.frontLights as DmxLight[], 'Front Lights')}
+              renderLightsGroup(rigConfig.frontLights, 'Front Lights')}
             {rigConfig.backLights.length > 0 &&
-              renderLightsGroup([...rigConfig.backLights].reverse() as DmxLight[], 'Back Lights')}
+              renderLightsGroup([...rigConfig.backLights].reverse(), 'Back Lights')}
             {rigConfig.strobeType === ConfigStrobeType.Dedicated &&
               rigConfig.strobeLights.length > 0 &&
-              renderLightsGroup(rigConfig.strobeLights as DmxLight[], 'Strobe Lights')}
+              renderLightsGroup(rigConfig.strobeLights, 'Strobe Lights')}
           </div>
         </>
       )}

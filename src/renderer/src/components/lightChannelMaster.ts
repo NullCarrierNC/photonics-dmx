@@ -6,9 +6,8 @@
  * past the end of the universe is held at the highest one that still fits, and the caller is given
  * the reason to show rather than the value changing without explanation.
  */
-import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
 import {
-  deriveBaseChannelsForMaster,
+  deriveChannelLayoutForMaster,
   deriveExtraChannelsForMaster,
   maxMasterDimmerForTemplate,
   templateChannelSpan,
@@ -16,8 +15,8 @@ import {
 import {
   DMX_CHANNEL_MAX,
   type DmxFixture,
-  type DmxLight,
   type ExtraChannel,
+  type FixtureChannelLayout,
 } from '../../../photonics-dmx/types'
 
 export interface MasterDimmerResolution {
@@ -25,7 +24,8 @@ export interface MasterDimmerResolution {
   master: number
   /** Why the master differs from the one asked for, or null when it does not. */
   cappedMessage: string | null
-  channels: DmxLight['channels']
+  /** The template's fixture type with every channel derived from `master`. */
+  layout: FixtureChannelLayout
   /** Null when the template carries no extra channels, so the light drops the key. */
   extraChannels: ExtraChannel[] | null
 }
@@ -43,15 +43,10 @@ export function resolveMasterDimmer(template: DmxFixture, asked: number): Master
     cappedMessage = `Capped at ${maxMaster} so all ${templateChannelSpan(template) + 1} channels fit within the ${DMX_CHANNEL_MAX}-channel universe.`
   }
 
-  const channels = castToChannelType(
-    template.fixture,
-    deriveBaseChannelsForMaster(template, master),
-  ) as DmxLight['channels']
-
   return {
     master,
     cappedMessage,
-    channels,
+    layout: deriveChannelLayoutForMaster(template, master),
     extraChannels:
       deriveExtraChannelsForMaster(
         template.extraChannels,

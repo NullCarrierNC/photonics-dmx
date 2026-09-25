@@ -11,7 +11,7 @@ import { CueHandler } from '../../../../cueHandlers/CueHandler'
 import { CueType, defaultCueData } from '../../../../cues/types/cueTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
-import { createMockDmxLight, createMockLightingConfig } from '../../../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../../../helpers/testFixtures'
 import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 const BUNDLED = path.join(__dirname, '../../../../../../resources/defaults/node-data')
@@ -64,7 +64,7 @@ describe('NodeCueLoader reload', () => {
     yarg.setCueConsistencyWindow(10000)
 
     const front = Array.from({ length: 8 }, (_, i) =>
-      createMockDmxLight({ id: `f${i + 1}`, position: i + 1, fixtureId: `f${i + 1}` }),
+      rgbLight({ id: `f${i + 1}`, position: i + 1, fixtureId: `f${i + 1}` }),
     )
     handler = new CueHandler(
       new DmxLightManager(createMockLightingConfig({ numLights: 8, frontLights: front })),

@@ -6,28 +6,15 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { afterEach } from '@jest/globals'
-import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../../photonics-dmx/types'
+import { rgbFixture, strobeFixture } from '../../../photonics-dmx/tests/helpers/testFixtures'
 import ExtraChannelsEditor from './ExtraChannelsEditor'
 
 afterEach(() => cleanup())
 
-function fixture(fx: FixtureTypes, extraChannels?: ExtraChannel[]): DmxFixture {
-  return {
-    id: 't',
-    position: 0,
-    fixture: fx,
-    label: 'L',
-    name: 'L',
-    isStrobeEnabled: false,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxFixture['channels'],
-    ...(extraChannels ? { extraChannels } : {}),
-  }
-}
-
 describe('ExtraChannelsEditor', () => {
   it('appends a white channel at 0 (invalid-red) on Add Channel', () => {
     const onChange = jest.fn()
-    render(<ExtraChannelsEditor light={fixture(FixtureTypes.RGB)} onChange={onChange} />)
+    render(<ExtraChannelsEditor light={rgbFixture()} onChange={onChange} />)
     fireEvent.click(screen.getByText('+ Add Channel'))
     expect(onChange).toHaveBeenCalledWith([{ type: 'white', channel: 0 }])
   })
@@ -36,7 +23,7 @@ describe('ExtraChannelsEditor', () => {
     const onChange = jest.fn()
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        light={rgbFixture({ extraChannels: [{ type: 'amber', channel: 5 }] })}
         onChange={onChange}
       />,
     )
@@ -48,7 +35,7 @@ describe('ExtraChannelsEditor', () => {
     const onChange = jest.fn()
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        light={rgbFixture({ extraChannels: [{ type: 'amber', channel: 5 }] })}
         onChange={onChange}
       />,
     )
@@ -61,7 +48,7 @@ describe('ExtraChannelsEditor', () => {
     cleanup()
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [{ type: 'fixed', channel: 5, value: 42 }])}
+        light={rgbFixture({ extraChannels: [{ type: 'fixed', channel: 5, value: 42 }] })}
         onChange={onChange}
       />,
     )
@@ -72,9 +59,11 @@ describe('ExtraChannelsEditor', () => {
   it('shows a collision warning when two channels share a DMX number', () => {
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [
-          { type: 'amber', channel: 2 }, // collides with base red (2)
-        ])}
+        light={rgbFixture({
+          extraChannels: [
+            { type: 'amber', channel: 2 }, // collides with base green (2)
+          ],
+        })}
         onChange={jest.fn()}
       />,
     )
@@ -84,7 +73,7 @@ describe('ExtraChannelsEditor', () => {
   it('offers only Fixed value on a dedicated strobe fixture', () => {
     render(
       <ExtraChannelsEditor
-        light={{ ...fixture(FixtureTypes.STROBE, [{ type: 'fixed', channel: 5, value: 10 }]) }}
+        light={strobeFixture({ extraChannels: [{ type: 'fixed', channel: 5, value: 10 }] })}
         onChange={jest.fn()}
       />,
     )
@@ -96,7 +85,7 @@ describe('ExtraChannelsEditor', () => {
     const onChange = jest.fn()
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        light={rgbFixture({ extraChannels: [{ type: 'amber', channel: 5 }] })}
         onChange={onChange}
       />,
     )
@@ -114,7 +103,7 @@ describe('ExtraChannelsEditor', () => {
     const onChange = jest.fn()
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        light={rgbFixture({ extraChannels: [{ type: 'amber', channel: 5 }] })}
         onChange={onChange}
       />,
     )
@@ -127,7 +116,7 @@ describe('ExtraChannelsEditor', () => {
     const onChange = jest.fn()
     render(
       <ExtraChannelsEditor
-        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        light={rgbFixture({ extraChannels: [{ type: 'amber', channel: 5 }] })}
         onChange={onChange}
       />,
     )

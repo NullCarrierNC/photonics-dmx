@@ -27,11 +27,12 @@ import {
   type BrightnessScaling,
   type DmxLight,
   type LightingConfiguration,
+  type RgbLight,
 } from '../../../photonics-dmx/types'
 
 afterEach(() => cleanup())
 
-function light(brightnessScaling?: BrightnessScaling): DmxLight {
+function light(brightnessScaling?: BrightnessScaling): RgbLight {
   return {
     id: 'l1',
     fixtureId: 't1',
@@ -43,7 +44,7 @@ function light(brightnessScaling?: BrightnessScaling): DmxLight {
     group: 'front',
     universe: 1,
     mount: 'floor',
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxLight['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...(brightnessScaling ? { brightnessScaling } : {}),
   }
 }
@@ -83,7 +84,7 @@ function sharedAddressConfig(): LightingConfiguration {
           red: 11,
           green: 3,
           blue: 13,
-        } as unknown as DmxLight['channels'],
+        },
         extraChannels: [{ type: 'amber', channel: 3, scale: 50 }],
       },
     ],

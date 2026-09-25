@@ -3,11 +3,7 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import {
-  createMockDmxLight,
-  createMockMovingHeadDmxLight,
-  createMockLightingConfig,
-} from './testFixtures'
+import { rgbLight, rgbMovingHeadLight, createMockLightingConfig } from './testFixtures'
 import type { ClockSource } from '../../controllers/sequencer/Clock'
 import type { DmxLight, RGBIO } from '../../types'
 
@@ -94,8 +90,7 @@ const createLights = (
   startIndex: number,
   movingHead: boolean,
 ): DmxLight[] => {
-  const factory =
-    movingHead && group !== 'strobe' ? createMockMovingHeadDmxLight : createMockDmxLight
+  const factory = movingHead && group !== 'strobe' ? rgbMovingHeadLight : rgbLight
   return Array.from({ length: count }, (_, index) =>
     factory({
       id: `${group}-${startIndex + index + 1}`,

@@ -7,9 +7,8 @@ import {
   DmxRig,
   LightingConfiguration,
 } from '../../../../photonics-dmx/types'
-import { castToChannelType } from '../../../../photonics-dmx/helpers/dmxHelpers'
 import {
-  deriveBaseChannelsForMaster,
+  deriveChannelLayoutForMaster,
   deriveExtraChannelsForMaster,
   highestChannelUsed,
   maxMasterDimmerForTemplate,
@@ -103,8 +102,6 @@ export function createDmxLightInstance(
     selectedFixture,
   )
   const templateChannels = selectedFixture.channels
-  const recalculatedChannels = deriveBaseChannelsForMaster(selectedFixture, newMasterDimmer)
-  const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
   const extraChannels = deriveExtraChannelsForMaster(
     selectedFixture.extraChannels,
     templateChannels.masterDimmer,
@@ -116,12 +113,11 @@ export function createDmxLightInstance(
       id: crypto.randomUUID(),
       fixtureId: selectedFixture.id!,
       position: totalExisting + 1,
-      fixture: selectedFixture.fixture,
+      ...deriveChannelLayoutForMaster(selectedFixture, newMasterDimmer),
       label: selectedFixture.label,
       name: selectedFixture.name,
       isStrobeEnabled: selectedFixture.isStrobeEnabled,
       group,
-      channels: castChannels,
       config: selectedFixture.config || undefined,
       universe: selectedFixture.universe,
       mount: 'floor' as const,

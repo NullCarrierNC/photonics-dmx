@@ -106,7 +106,7 @@ function setup(options: { sendResult?: boolean } = {}): Ctx {
             red: 2,
             green: 3,
             blue: 4,
-          } as unknown as DmxRig['config']['frontLights'][number]['channels'],
+          },
         },
       ],
       backLights: [],

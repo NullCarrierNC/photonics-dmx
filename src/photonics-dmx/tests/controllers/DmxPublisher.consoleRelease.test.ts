@@ -9,7 +9,7 @@ import { LightStateManager } from '../../controllers/sequencer/LightStateManager
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import type { DmxRig } from '../../types'
 import { ManualTestClock } from '../helpers/sequencerHarness'
-import { createMockLightingConfig, createMockDmxLight } from '../helpers/testFixtures'
+import { createMockLightingConfig, rgbLight } from '../helpers/testFixtures'
 
 const UNMAPPED = 100
 
@@ -32,7 +32,7 @@ describe('console channels on a retaining wire sender', () => {
   beforeEach(async () => {
     clock = new ManualTestClock(10)
     nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => clock.getCurrentTimeMs())
-    const light = createMockDmxLight({
+    const light = rgbLight({
       id: 'front-1',
       group: 'front',
       position: 1,

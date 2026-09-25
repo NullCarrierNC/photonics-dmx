@@ -35,7 +35,7 @@ function light(position: number, group: 'front' | 'back'): DmxLight {
     group,
     universe: 1,
     mount: 'floor',
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxLight['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
   }
 }
 

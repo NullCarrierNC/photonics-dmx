@@ -5,7 +5,7 @@ import {
   FixtureConfig,
   LightingConfiguration,
   normalizeFixtureConfig,
-  RgbMovingHeadDmxChannels,
+  RgbMovingHeadLight,
 } from '../../../photonics-dmx/types'
 import {
   motorDegFromPanDmx,
@@ -48,7 +48,7 @@ const REVIEW_STEP = STEP_TITLES.length - 1
 const STEPS_REQUIRING_SET_CAPTURE = new Set([4, 5, 6])
 
 export interface MovingHeadCalibrationWizardProps {
-  light: DmxLight
+  light: RgbMovingHeadLight
   rigId: string
   /** Rig layout at wizard open (frozen for the 3D preview). */
   lightingConfig: LightingConfiguration
@@ -76,7 +76,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   // the hand-back to its successor.
   const consoleOwnerRef = useRef(0)
 
-  const ch = light.channels as RgbMovingHeadDmxChannels
+  const ch = light.channels
 
   const wizard3dLightingConfig = useMemo<LightingConfiguration>(() => {
     const derivedMount: 'floor' | 'ceiling' =

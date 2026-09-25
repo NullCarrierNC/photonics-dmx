@@ -5,7 +5,7 @@ import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
 } from '../types'
-import type { DmxLight, DmxRig } from '../types'
+import type { DmxLight, DmxRig, LightingConfiguration } from '../types'
 import {
   CURRENT_RIGS_SCHEMA_VERSION,
   migrateDmxRigsConfig,
@@ -113,7 +113,7 @@ describe('migrateLightingConfiguration', () => {
   })
 
   it('returns unchanged when already migrated', () => {
-    const input = {
+    const input: LightingConfiguration = {
       numLights: 1,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType: ConfigStrobeType.None,
@@ -128,7 +128,7 @@ describe('migrateLightingConfiguration', () => {
           isStrobeEnabled: false,
           group: 'front',
           channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
-          mount: 'floor' as const,
+          mount: 'floor',
         },
       ],
       backLights: [],

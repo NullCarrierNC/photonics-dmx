@@ -14,7 +14,7 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
 import { DEFAULT_STAGEKIT_CONFIG } from '../../listeners/RB3/StageKitTypes'
-import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { rgbLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { fakeLightingController } from '../helpers/fakeLightingController'
 
 function makeFourLightManager(): DmxLightManager {
@@ -22,10 +22,10 @@ function makeFourLightManager(): DmxLightManager {
     createMockLightingConfig({
       numLights: 4,
       frontLights: [
-        createMockDmxLight({ id: 'f0', position: 0, fixtureId: 'f0' }),
-        createMockDmxLight({ id: 'f1', position: 1, fixtureId: 'f1' }),
-        createMockDmxLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
-        createMockDmxLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
+        rgbLight({ id: 'f0', position: 0, fixtureId: 'f0' }),
+        rgbLight({ id: 'f1', position: 1, fixtureId: 'f1' }),
+        rgbLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
+        rgbLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
       ],
       backLights: [],
       strobeLights: [],
@@ -36,10 +36,10 @@ function makeFourLightManager(): DmxLightManager {
 /** A rig whose first two front lights are also flagged as strobes, so strobes have targets. */
 function makeStrobeLightManager(): DmxLightManager {
   const front = [
-    createMockDmxLight({ id: 'f0', position: 0, fixtureId: 'f0', isStrobeEnabled: true }),
-    createMockDmxLight({ id: 'f1', position: 1, fixtureId: 'f1', isStrobeEnabled: true }),
-    createMockDmxLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
-    createMockDmxLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
+    rgbLight({ id: 'f0', position: 0, fixtureId: 'f0', isStrobeEnabled: true }),
+    rgbLight({ id: 'f1', position: 1, fixtureId: 'f1', isStrobeEnabled: true }),
+    rgbLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
+    rgbLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
   ]
   return new DmxLightManager(
     createMockLightingConfig({

@@ -18,7 +18,13 @@ import {
   type DmxLight,
   type ExtraChannel,
   type LightingConfiguration,
+  type RgbFixture,
+  type RgbLight,
 } from '../../../photonics-dmx/types'
+import {
+  rgbMovingHeadFixture,
+  rgbMovingHeadLight,
+} from '../../../photonics-dmx/tests/helpers/testFixtures'
 
 jest.mock('./MovingHeadCalibrationWizard', () => ({
   __esModule: true,
@@ -28,7 +34,7 @@ jest.mock('./MovingHeadCalibrationWizard', () => ({
 import LightChannelsConfig from './LightChannelsConfig'
 
 /** An RGB template whose channels sit at master + 1, 2, 3. */
-function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
+function template(overrides: Partial<RgbFixture> = {}): RgbFixture {
   return {
     id: 't1',
     position: 0,
@@ -38,12 +44,12 @@ function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
     isStrobeEnabled: false,
     group: '',
     universe: 1,
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as DmxFixture['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }
 
-function light(overrides: Partial<DmxLight> = {}): DmxLight {
+function light(overrides: Partial<RgbLight> = {}): RgbLight {
   return {
     id: 'l1',
     fixtureId: 't1',
@@ -55,7 +61,7 @@ function light(overrides: Partial<DmxLight> = {}): DmxLight {
     group: 'front',
     universe: 1,
     mount: 'floor',
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as DmxLight['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...overrides,
   }
 }
@@ -69,8 +75,10 @@ const lightingConfig: LightingConfiguration = {
   strobeLights: [],
 }
 
+type OnLightChange = (updatedLight: DmxLight) => void
+
 function renderCard(opts: { light?: DmxLight; templates?: DmxFixture[] } = {}) {
-  const onChange = jest.fn()
+  const onChange = jest.fn<OnLightChange>()
   const view = render(
     <LightChannelsConfig
       light={opts.light ?? light()}
@@ -97,8 +105,8 @@ function commitMasterDimmer(value: string): void {
   fireEvent.blur(masterDimmerInput())
 }
 
-const lastLight = (onChange: jest.Mock): DmxLight =>
-  onChange.mock.calls[onChange.mock.calls.length - 1][0] as DmxLight
+const lastLight = (onChange: jest.Mock<OnLightChange>): DmxLight =>
+  onChange.mock.calls[onChange.mock.calls.length - 1][0]
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -107,7 +115,7 @@ afterEach(() => cleanup())
 
 describe('LightChannelsConfig rendering', () => {
   it('shows the channels derived from the light master dimmer', () => {
-    renderCard({ light: light({ channels: { masterDimmer: 10 } as DmxLight['channels'] }) })
+    renderCard({ light: light({ channels: { ...light().channels, masterDimmer: 10 } }) })
 
     expect(masterDimmerInput().value).toBe('10')
     // red/green/blue keep the template's offsets of +1/+2/+3.
@@ -170,7 +178,7 @@ describe('LightChannelsConfig master dimmer', () => {
 
   it('shows the capped master when the light already sits at the cap', () => {
     renderCard({
-      light: light({ channels: { masterDimmer: DMX_CHANNEL_MAX - 3 } as DmxLight['channels'] }),
+      light: light({ channels: { ...light().channels, masterDimmer: DMX_CHANNEL_MAX - 3 } }),
     })
 
     commitMasterDimmer('999')
@@ -199,7 +207,7 @@ describe('LightChannelsConfig master dimmer', () => {
 
   it('keeps the master dimmer when the box is cleared', () => {
     const { onChange } = renderCard({
-      light: light({ channels: { masterDimmer: 10 } as DmxLight['channels'] }),
+      light: light({ channels: { ...light().channels, masterDimmer: 10 } }),
     })
 
     fireEvent.change(masterDimmerInput(), { target: { value: '' } })
@@ -276,15 +284,9 @@ describe('LightChannelsConfig extra channels', () => {
 describe('LightChannelsConfig fixture config fields', () => {
   /** A moving head, whose config carries the numeric pan and tilt fields. */
   const movingHead = (): DmxLight =>
-    light({
-      fixture: FixtureTypes.RGBMH,
-      fixtureId: 'mh',
-      config: normalizeFixtureConfig({ panRangeDeg: 540 }),
-    })
+    rgbMovingHeadLight({ config: normalizeFixtureConfig({ panRangeDeg: 540 }) })
 
-  const templates = (): DmxFixture[] => [
-    { ...template(), id: 'mh', fixture: FixtureTypes.RGBMH } as DmxFixture,
-  ]
+  const templates = (): DmxFixture[] => [rgbMovingHeadFixture()]
 
   const panField = (): HTMLInputElement => screen.getByLabelText('panRangeDeg') as HTMLInputElement
 
