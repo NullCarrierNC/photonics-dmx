@@ -6,7 +6,14 @@
  * both, and `effects`, `rigs` and `cues` sit on top.
  */
 
-export { isBlendMode, isBrightness, isColor } from './types/lighting'
+export {
+  BLEND_MODE_OPTIONS,
+  BRIGHTNESS_OPTIONS,
+  COLOR_OPTIONS,
+  isBlendMode,
+  isBrightness,
+  isColor,
+} from './types/lighting'
 export type {
   BlendMode,
   Brightness,
@@ -87,7 +94,14 @@ export type {
   WhiteChannelMixMode,
 } from './types/fixtures'
 
-export { ConfigStrobeType, isLightTarget, isLocationGroup, WIRE_SENDER_IDS } from './types/rigs'
+export {
+  ConfigStrobeType,
+  isLightTarget,
+  isLocationGroup,
+  LIGHT_TARGET_OPTIONS,
+  LOCATION_OPTIONS,
+  WIRE_SENDER_IDS,
+} from './types/rigs'
 export type {
   ConfigLightLayoutType,
   DmxRig,

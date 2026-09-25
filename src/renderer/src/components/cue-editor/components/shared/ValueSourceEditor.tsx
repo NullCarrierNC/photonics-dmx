@@ -5,11 +5,8 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isVariableSource } from './nodeEditorUtils'
 import ColorListEditor from './ColorListEditor'
-import type { Color } from '../../../../../../photonics-dmx/types'
-import {
-  COLOR_OPTIONS,
-  AUDIO_EVENT_OPTIONS,
-} from '../../../../../../photonics-dmx/constants/options'
+import { COLOR_OPTIONS, type Color } from '../../../../../../photonics-dmx/types'
+import { AUDIO_EVENT_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
 import { YARG_EVENT_TYPES, RB3_EVENT_OPTIONS } from '../../lib/options'
 

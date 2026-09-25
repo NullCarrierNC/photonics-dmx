@@ -9,7 +9,7 @@ import {
   ValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
-import { COLOR_OPTIONS } from '../../../constants/options'
+import { COLOR_OPTIONS } from '../../../types'
 export const stringIdSchema: JSONSchemaType<string> = {
   type: 'string',
   minLength: 1,

@@ -8,7 +8,7 @@ import type { DmxRigsConfig, LightingConfiguration } from '../../photonics-dmx/t
 import {
   loadDmxFixture,
   loadDmxLight,
-  loadFixtureList,
+  parseFixtureList,
   type FixtureFaultReport,
 } from '../../photonics-dmx/helpers/fixtureParsing'
 import type { UserLightsConfig } from './startupMigrations'
@@ -24,11 +24,11 @@ function loadList<T>(
   load: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
   faults: string[],
 ): T[] {
-  const loaded = loadFixtureList(raw, path, load, faults)
+  const loaded = parseFixtureList(raw, path, load, faults)
   if (!loaded.ok) {
     throw new Error(loaded.error)
   }
-  return loaded.fixtures
+  return loaded.value
 }
 
 /** The loaded data, or the stored data itself when loading changed nothing, so nothing is saved. */

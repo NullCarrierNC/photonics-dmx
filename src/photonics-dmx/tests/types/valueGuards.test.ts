@@ -1,20 +1,18 @@
 import { describe, expect, it } from '@jest/globals'
 import {
+  BLEND_MODE_OPTIONS,
+  BRIGHTNESS_OPTIONS,
+  COLOR_OPTIONS,
   isBlendMode,
   isBrightness,
   isColor,
   isLightTarget,
   isLocationGroup,
   isWaitCondition,
-  WAIT_CONDITIONS,
-} from '../../types'
-import {
-  BLEND_MODE_OPTIONS,
-  BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS,
   LIGHT_TARGET_OPTIONS,
   LOCATION_OPTIONS,
-} from '../../constants/options'
+  WAIT_CONDITIONS,
+} from '../../types'
 import { EasingType, isEasingType } from '../../easing'
 
 const guards: [string, (value: unknown) => boolean, readonly string[]][] = [

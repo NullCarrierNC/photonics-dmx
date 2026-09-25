@@ -1,6 +1,6 @@
 import React from 'react'
 import type { ActionNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { LIGHT_TARGET_OPTIONS } from '../../../../../../../photonics-dmx/constants/options'
+import { LIGHT_TARGET_OPTIONS } from '../../../../../../../photonics-dmx/types'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import TargetGroupsMultiSelectEditor from '../../shared/TargetGroupsMultiSelectEditor'
 

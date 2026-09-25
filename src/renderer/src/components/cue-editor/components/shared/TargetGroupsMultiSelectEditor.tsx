@@ -1,7 +1,6 @@
 import React from 'react'
 import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { LOCATION_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
-import { isLocationGroup } from '../../../../../../photonics-dmx/types'
+import { isLocationGroup, LOCATION_OPTIONS } from '../../../../../../photonics-dmx/types'
 import { isVariableSource } from './nodeEditorUtils'
 
 interface TargetGroupsMultiSelectEditorProps {
