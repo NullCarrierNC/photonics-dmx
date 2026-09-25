@@ -18,7 +18,7 @@ import {
 } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
 import { effectParameterValue } from './effectParameters'
-import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
+import { VariableValue, NodeRuntimeCallbacks, variableValue } from './executionTypes'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { resolveValue } from './valueResolver'
@@ -205,10 +205,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
    */
   private initializeVariables(): void {
     for (const varDef of this.variableDefinitions) {
-      this.effectVarStore.set(varDef.name, {
-        type: varDef.type,
-        value: varDef.initialValue,
-      })
+      this.effectVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
     }
   }
 

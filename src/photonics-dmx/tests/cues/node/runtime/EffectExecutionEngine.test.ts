@@ -1213,21 +1213,18 @@ describe('EffectExecutionEngine', () => {
   })
 
   describe('Idle gating for callback-backed effects', () => {
+    const lights = [
+      { id: 'light1', position: 0 },
+      { id: 'light2', position: 1 },
+    ]
+
     const createForEachBlockingEffect = (): YargEffectDefinition => ({
       id: 'for-each-blocking-effect',
       mode: 'yarg',
       name: 'For Each Blocking Effect',
       description: '',
       variables: [
-        {
-          name: 'lights',
-          type: 'light-array',
-          scope: 'cue',
-          initialValue: [
-            { id: 'light1', position: 0 },
-            { id: 'light2', position: 1 },
-          ],
-        },
+        { name: 'lights', type: 'light-array', scope: 'cue', initialValue: [], isParameter: true },
         { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
       ],
@@ -1302,7 +1299,7 @@ describe('EffectExecutionEngine', () => {
         mockSequencer,
         mockLightManager,
         noopRuntimeBroadcaster(),
-        {},
+        { lights },
         createCueData(),
         { callerMode: 'yarg' },
       )
@@ -1339,7 +1336,7 @@ describe('EffectExecutionEngine', () => {
         mockSequencer,
         mockLightManager,
         noopRuntimeBroadcaster(),
-        {},
+        { lights },
         createCueData(),
         { callerMode: 'yarg' },
       )
@@ -1382,7 +1379,7 @@ describe('EffectExecutionEngine', () => {
         mockSequencer,
         mockLightManager,
         noopRuntimeBroadcaster(),
-        {},
+        { lights },
         createCueData(),
         { callerMode: 'yarg' },
       )

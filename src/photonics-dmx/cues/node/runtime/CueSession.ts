@@ -9,7 +9,7 @@
  * in the same group (per sequencer). When omitted, the session owns a private store.
  */
 
-import { VariableValue } from './executionTypes'
+import { VariableValue, variableValue } from './executionTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
 
 export class CueSession {
@@ -79,27 +79,18 @@ export class CueSession {
     for (const varDef of cueVariables) {
       if (varDef.scope === 'cue') {
         if (!this.cueLevelVarStore.has(varDef.name)) {
-          this.cueLevelVarStore.set(varDef.name, {
-            type: varDef.type,
-            value: varDef.initialValue,
-          })
+          this.cueLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
         }
       } else {
         // scope === 'cue-group'
         if (!this.groupLevelVarStore.has(varDef.name)) {
-          this.groupLevelVarStore.set(varDef.name, {
-            type: varDef.type,
-            value: varDef.initialValue,
-          })
+          this.groupLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
         }
       }
     }
     for (const varDef of groupVariables) {
       if (!this.groupLevelVarStore.has(varDef.name)) {
-        this.groupLevelVarStore.set(varDef.name, {
-          type: varDef.type,
-          value: varDef.initialValue,
-        })
+        this.groupLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
       }
     }
   }
@@ -109,10 +100,7 @@ export class CueSession {
     this.cueLevelVarStore.clear()
     for (const varDef of cueVariables) {
       if (varDef.scope === 'cue') {
-        this.cueLevelVarStore.set(varDef.name, {
-          type: varDef.type,
-          value: varDef.initialValue,
-        })
+        this.cueLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
       }
     }
   }

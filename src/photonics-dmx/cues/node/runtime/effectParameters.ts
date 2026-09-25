@@ -1,5 +1,5 @@
 import type { VariableDefinition } from '../../types/nodeCueTypes'
-import type { VariableValue } from './executionTypes'
+import { variableValue, type VariableValue } from './executionTypes'
 
 /**
  * The value an effect parameter takes: what the raiser sent, or else the variable's initial value,
@@ -9,7 +9,8 @@ export function effectParameterValue(
   given: VariableValue['value'] | undefined,
   variable: VariableDefinition,
 ): VariableValue['value'] {
-  const value = given ?? variable.initialValue
+  if (given === undefined) return variableValue(variable.type, variable.initialValue).value
+  const value = given
   if (variable.type === 'number') {
     if (typeof value === 'number' && !Number.isNaN(value)) return value
     if (typeof value === 'string') {

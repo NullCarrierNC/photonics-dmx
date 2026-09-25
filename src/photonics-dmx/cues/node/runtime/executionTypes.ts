@@ -1,4 +1,5 @@
-import { TrackedLight, Color } from '../../../types'
+import { TrackedLight, Color, isColor } from '../../../types'
+import type { VariableType } from '../../types/nodeCueTypes'
 
 /**
  * Variable value stored in variable stores.
@@ -14,6 +15,32 @@ export interface VariableValue {
     | 'cue-type'
     | 'event'
   value: number | boolean | string | TrackedLight[] | Color[]
+}
+
+/** A number from an authored or stored value, with 0 for anything unreadable. */
+function toNumber(raw: unknown): number {
+  if (typeof raw === 'boolean') return raw ? 1 : 0
+  const n = typeof raw === 'string' ? parseFloat(raw) : raw
+  return typeof n === 'number' && !Number.isNaN(n) ? n : 0
+}
+
+/**
+ * A variable of `type` holding `raw`, read as that type. Light arrays come only from the rig at
+ * runtime, so a light-array variable starts empty.
+ */
+export function variableValue(type: VariableType, raw: unknown): VariableValue {
+  switch (type) {
+    case 'number':
+      return { type, value: toNumber(raw) }
+    case 'boolean':
+      return { type, value: raw === true || raw === 'true' }
+    case 'light-array':
+      return { type, value: [] }
+    case 'color-array':
+      return { type, value: Array.isArray(raw) ? raw.filter(isColor) : [] }
+    default:
+      return { type, value: String(raw) }
+  }
 }
 
 /**
