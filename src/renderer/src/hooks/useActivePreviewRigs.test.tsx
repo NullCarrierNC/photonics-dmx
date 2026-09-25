@@ -7,6 +7,7 @@ import * as ipcApi from '../ipcApi'
 import { previewRigIdAtom } from '../atoms'
 import { useActivePreviewRigs } from './useActivePreviewRigs'
 import type { DmxRig } from '../../../photonics-dmx/types'
+import { createMockLightingConfig } from '../../../photonics-dmx/tests/helpers/testFixtures'
 
 jest.mock(
   '../ipcApi',
@@ -16,7 +17,12 @@ jest.mock(
     ).ipcApiMock,
 )
 
-const activeRig = (id: string) => ({ id, name: id, active: true, config: {} }) as unknown as DmxRig
+const activeRig = (id: string): DmxRig => ({
+  id,
+  name: id,
+  active: true,
+  config: createMockLightingConfig(),
+})
 
 const Harness = () => {
   useActivePreviewRigs()

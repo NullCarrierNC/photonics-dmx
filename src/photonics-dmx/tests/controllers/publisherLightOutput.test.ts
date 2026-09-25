@@ -1,8 +1,15 @@
 import { describe, expect, it } from '@jest/globals'
 import { resolveMovingHeadAxes, StrobePeakLatch } from '../../controllers/publisherLightOutput'
-import { DmxFixture, DmxRig, FixtureTypes } from '../../types'
+import {
+  ConfigStrobeType,
+  DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
+  FixtureTypes,
+  type DmxRig,
+  type FixtureConfig,
+  type RgbMovingHeadFixture,
+} from '../../types'
 
-function movingHead(config: Partial<DmxFixture['config']> = {}): DmxFixture {
+function movingHead(config: Partial<FixtureConfig> = {}): RgbMovingHeadFixture {
   return {
     id: 'mh1',
     name: 'MH1',
@@ -14,6 +21,7 @@ function movingHead(config: Partial<DmxFixture['config']> = {}): DmxFixture {
     position: 1,
     channels: { red: 1, green: 2, blue: 3, masterDimmer: 4, pan: 5, tilt: 6 },
     config: {
+      ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
       panMin: 0,
       panMax: 540,
       tiltMin: 0,
@@ -24,11 +32,24 @@ function movingHead(config: Partial<DmxFixture['config']> = {}): DmxFixture {
       invertTilt: false,
       ...config,
     },
-  } as unknown as DmxFixture
+  }
 }
 
 function rig(overrides: Partial<DmxRig> = {}): DmxRig {
-  return { id: 'r1', name: 'R1', active: true, ...overrides } as unknown as DmxRig
+  return {
+    id: 'r1',
+    name: 'R1',
+    active: true,
+    config: {
+      numLights: 0,
+      lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [],
+      backLights: [],
+      strobeLights: [],
+    },
+    ...overrides,
+  }
 }
 
 describe('resolveMovingHeadAxes', () => {

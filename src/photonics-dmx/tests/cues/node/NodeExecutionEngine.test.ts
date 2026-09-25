@@ -1231,7 +1231,7 @@ describe('NodeExecutionEngine', () => {
         if (groups === 'front') return mockFrontLights
         if (groups === 'back') return mockBackLights
         return []
-      }) as unknown as DmxLightManager['getLightsInGroup']
+      })
 
       const config1: LogicNode = {
         id: 'config1',
@@ -1344,9 +1344,7 @@ describe('NodeExecutionEngine', () => {
           panDirectionCW: false,
         },
       }
-      mockLightManager.getLights = jest
-        .fn()
-        .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
+      mockLightManager.getLights = jest.fn(() => [movingHead])
 
       const eventNode: NetEventNode = {
         id: 'event1',
@@ -1415,9 +1413,7 @@ describe('NodeExecutionEngine', () => {
         position: 1,
         config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
       }
-      mockLightManager.getLights = jest
-        .fn()
-        .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
+      mockLightManager.getLights = jest.fn(() => [movingHead])
 
       cueLevelVarStore.set('bearing', { type: 'number', value: 90 })
 

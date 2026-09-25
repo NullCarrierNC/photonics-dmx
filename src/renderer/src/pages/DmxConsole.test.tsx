@@ -10,7 +10,13 @@ import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { lightingPrefsAtom, previewRigIdAtom } from '../atoms'
 import DmxConsole from './DmxConsole'
-import type { DmxRig } from '../../../photonics-dmx/types'
+import {
+  ConfigStrobeType,
+  type DmxLight,
+  type DmxRig,
+  type RgbDmxChannels,
+} from '../../../photonics-dmx/types'
+import { rgbLight } from '../../../photonics-dmx/tests/helpers/testFixtures'
 
 // The page subscribes to live DMX values, which needs the preload bridge that jsdom has no copy of.
 jest.mock(
@@ -35,25 +41,29 @@ jest.mock(
     ).ipcApiMock,
 )
 
-const rig = {
+const rig: DmxRig = {
   id: 'rig-1',
   name: 'Rig one',
   active: true,
   config: {
+    numLights: 1,
+    lightLayout: { id: 'front', label: 'Front only' },
+    strobeType: ConfigStrobeType.None,
     frontLights: [
-      {
+      rgbLight({
         id: 'light-1',
         name: 'Front 1',
-        fixture: 'RGB',
+        label: 'Front 1',
+        position: 1,
         fixtureId: 'fixture-1',
         universe: 1,
-        channels: { red: 1, green: 2, blue: 3 },
-      },
+        channels: { masterDimmer: 20, red: 1, green: 2, blue: 3 },
+      }),
     ],
     backLights: [],
     strobeLights: [],
   },
-} as unknown as DmxRig
+}
 
 function renderConsole(): ReturnType<typeof renderWithProviders> {
   return renderWithProviders(<DmxConsole />, {
@@ -190,7 +200,7 @@ describe('DmxConsole while an enable is in flight', () => {
 })
 
 describe('DmxConsole rig choice', () => {
-  const inactiveRig = { ...rig, id: 'rig-2', name: 'Rig two', active: false } as DmxRig
+  const inactiveRig: DmxRig = { ...rig, id: 'rig-2', name: 'Rig two', active: false }
   const rigById = (id: string) => [rig, inactiveRig].find((r) => r.id === id)
 
   beforeEach(() => {
@@ -247,25 +257,27 @@ describe('DmxConsole rig choice', () => {
 })
 
 describe('DmxConsole channel remap', () => {
-  const front = (id: string, name: string, channels: Record<string, number>) => ({
-    id,
-    name,
-    fixture: 'RGB',
-    fixtureId: `fixture-${id}`,
-    universe: 1,
-    channels,
+  const front = (id: string, name: string, position: number, channels: RgbDmxChannels): DmxLight =>
+    rgbLight({
+      id,
+      name,
+      label: name,
+      position,
+      fixtureId: `fixture-${id}`,
+      universe: 1,
+      channels,
+    })
+  const twoLightRig = (second: RgbDmxChannels): DmxRig => ({
+    ...rig,
+    config: {
+      ...rig.config,
+      numLights: 2,
+      frontLights: [
+        front('light-1', 'Front 1', 1, { masterDimmer: 20, red: 1, green: 2, blue: 3 }),
+        front('light-2', 'Front 2', 2, second),
+      ],
+    },
   })
-  const twoLightRig = (second: Record<string, number>) =>
-    ({
-      ...rig,
-      config: {
-        ...rig.config,
-        frontLights: [
-          front('light-1', 'Front 1', { red: 1, green: 2, blue: 3 }),
-          front('light-2', 'Front 2', second),
-        ],
-      },
-    }) as unknown as DmxRig
 
   async function openConsole(withRig: DmxRig): Promise<void> {
     jest.mocked(ipcApi.getDmxRigs).mockImplementation((() => Promise.resolve([withRig])) as never)
@@ -303,7 +315,7 @@ describe('DmxConsole channel remap', () => {
   })
 
   it('refuses to move a channel onto one another light drives, and says so', async () => {
-    await openConsole(twoLightRig({ red: 4, green: 5, blue: 6 }))
+    await openConsole(twoLightRig({ masterDimmer: 21, red: 4, green: 5, blue: 6 }))
     fireEvent.change(sliderBeside(boxesOn(4)[0]), { target: { value: '200' } })
     const red = boxesOn(1)[0]
 
@@ -315,7 +327,7 @@ describe('DmxConsole channel remap', () => {
   })
 
   it('carries the value to a free channel', async () => {
-    await openConsole(twoLightRig({ red: 4, green: 5, blue: 6 }))
+    await openConsole(twoLightRig({ masterDimmer: 21, red: 4, green: 5, blue: 6 }))
     fireEvent.change(sliderBeside(boxesOn(1)[0]), { target: { value: '200' } })
 
     moveChannel(boxesOn(1)[0], 10)
@@ -324,7 +336,7 @@ describe('DmxConsole channel remap', () => {
   })
 
   it('leaves a channel lit for the light still on it when another light moves away', async () => {
-    await openConsole(twoLightRig({ red: 1, green: 7, blue: 8 }))
+    await openConsole(twoLightRig({ masterDimmer: 21, red: 1, green: 7, blue: 8 }))
     fireEvent.change(sliderBeside(boxesOn(1)[0]), { target: { value: '200' } })
 
     moveChannel(boxesOn(1)[0], 10)

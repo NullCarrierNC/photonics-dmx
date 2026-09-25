@@ -13,9 +13,12 @@ import {
   ConfigStrobeType,
   FixtureTypes,
   type BrightnessScaling,
+  type DmxLight,
   type DmxRig,
   type ExtraChannel,
   type RGBIO,
+  type RgbDmxChannels,
+  type RgbMovingHeadDmxChannels,
 } from '../../types'
 
 function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
@@ -40,33 +43,32 @@ function makeMockSender(ipc = true): MockSender {
   }
 }
 
-interface LightSpec {
+type LightSpec = {
   id: string
-  fixture?: FixtureTypes
-  channels: Record<string, number>
   extraChannels?: ExtraChannel[]
   brightnessScaling?: BrightnessScaling
   strobeValues?: { slow: number; medium: number; fast: number; fastest: number }
   isStrobeEnabled?: boolean
-}
+} & (
+  | { fixture?: FixtureTypes.RGB; channels: RgbDmxChannels }
+  | { fixture: FixtureTypes.RGBMH; channels: RgbMovingHeadDmxChannels }
+)
 
 function makeRig(lights: LightSpec[]): DmxRig {
-  const front = lights.map((l) => ({
-    id: l.id,
-    fixtureId: `tpl-${l.id}`,
-    position: 1,
-    name: l.id,
-    label: l.id,
-    fixture: l.fixture ?? FixtureTypes.RGB,
-    isStrobeEnabled: l.isStrobeEnabled ?? false,
-    group: 'front',
-    universe: 1,
-    mount: 'floor' as const,
-    channels: l.channels as unknown as DmxRig['config']['frontLights'][number]['channels'],
-    ...(l.extraChannels ? { extraChannels: l.extraChannels } : {}),
-    ...(l.brightnessScaling ? { brightnessScaling: l.brightnessScaling } : {}),
-    ...(l.strobeValues ? { strobeValues: l.strobeValues } : {}),
-  }))
+  const front = lights.map(
+    (l): DmxLight => ({
+      fixture: FixtureTypes.RGB,
+      fixtureId: `tpl-${l.id}`,
+      position: 1,
+      name: l.id,
+      label: l.id,
+      isStrobeEnabled: false,
+      group: 'front',
+      universe: 1,
+      mount: 'floor',
+      ...l,
+    }),
+  )
   return {
     id: 'rig-1',
     name: 'Rig',
@@ -75,7 +77,7 @@ function makeRig(lights: LightSpec[]): DmxRig {
       numLights: front.length,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType: ConfigStrobeType.AllCapable,
-      frontLights: front as unknown as DmxRig['config']['frontLights'],
+      frontLights: front,
       backLights: [],
       strobeLights: [],
     },

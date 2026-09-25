@@ -11,7 +11,7 @@ import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
 import { VenueFrameProcessor } from '../../controllers/VenueFrameProcessor'
 import { PostProcessingByte, SceneIndexByte } from '../../listeners/YARG/yargTypes'
 import type { CueRuntime } from '../../cueHandlers/CueRuntime'
-import { ConfigStrobeType, FixtureTypes, type DmxRig, type RGBIO } from '../../types'
+import { ConfigStrobeType, FixtureTypes, type DmxLight, type DmxRig, type RGBIO } from '../../types'
 import { buildYargPacket } from '../helpers/yargPacket'
 
 jest.mock('dgram', () => ({
@@ -45,19 +45,21 @@ function makeRig(): DmxRig {
   const lights = [
     { id: 'f1', channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } },
     { id: 'f2', channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 } },
-  ].map((light, index) => ({
-    id: light.id,
-    fixtureId: `tpl-${light.id}`,
-    position: index + 1,
-    name: light.id,
-    label: light.id,
-    fixture: FixtureTypes.RGB,
-    isStrobeEnabled: false,
-    group: 'front' as const,
-    universe: 1,
-    mount: 'floor' as const,
-    channels: light.channels,
-  }))
+  ].map(
+    (light, index): DmxLight => ({
+      id: light.id,
+      fixtureId: `tpl-${light.id}`,
+      position: index + 1,
+      name: light.id,
+      label: light.id,
+      fixture: FixtureTypes.RGB,
+      isStrobeEnabled: false,
+      group: 'front',
+      universe: 1,
+      mount: 'floor',
+      channels: light.channels,
+    }),
+  )
   return {
     id: 'rig-1',
     name: 'Rig',
@@ -66,7 +68,7 @@ function makeRig(): DmxRig {
       numLights: lights.length,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType: ConfigStrobeType.None,
-      frontLights: lights as unknown as DmxRig['config']['frontLights'],
+      frontLights: lights,
       backLights: [],
       strobeLights: [],
     },

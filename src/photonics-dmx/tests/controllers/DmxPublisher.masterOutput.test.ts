@@ -17,9 +17,12 @@ import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import {
   ConfigStrobeType,
   FixtureTypes,
+  type DmxLight,
   type DmxRig,
   type ExtraChannel,
   type RGBIO,
+  type RgbDmxChannels,
+  type RgbMovingHeadDmxChannels,
 } from '../../types'
 
 function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
@@ -44,33 +47,31 @@ function makeMockSender(): MockSender {
   }
 }
 
-interface LightSpec {
+type LightSpec = {
   id: string
-  fixture?: FixtureTypes
-  channels: Record<string, number>
   extraChannels?: ExtraChannel[]
   strobeValues?: { slow: number; medium: number; fast: number; fastest: number }
   isStrobeEnabled?: boolean
   /** Places the light in the rig's strobe group, which is what `getStrobeLightIds` reads. */
   inStrobeGroup?: boolean
-}
+} & (
+  | { fixture?: FixtureTypes.RGB; channels: RgbDmxChannels }
+  | { fixture: FixtureTypes.RGBMH; channels: RgbMovingHeadDmxChannels }
+)
 
-function makeLight(spec: LightSpec): DmxRig['config']['frontLights'][number] {
+function makeLight({ inStrobeGroup, ...spec }: LightSpec): DmxLight {
   return {
-    id: spec.id,
+    fixture: FixtureTypes.RGB,
     fixtureId: `tpl-${spec.id}`,
     position: 1,
     name: spec.id,
     label: spec.id,
-    fixture: spec.fixture ?? FixtureTypes.RGB,
-    isStrobeEnabled: spec.isStrobeEnabled ?? false,
-    group: spec.inStrobeGroup === true ? 'strobe' : 'front',
+    isStrobeEnabled: false,
+    group: inStrobeGroup === true ? 'strobe' : 'front',
     universe: 1,
-    mount: 'floor' as const,
-    channels: spec.channels as unknown as DmxRig['config']['frontLights'][number]['channels'],
-    ...(spec.extraChannels ? { extraChannels: spec.extraChannels } : {}),
-    ...(spec.strobeValues ? { strobeValues: spec.strobeValues } : {}),
-  } as unknown as DmxRig['config']['frontLights'][number]
+    mount: 'floor',
+    ...spec,
+  }
 }
 
 function makeRig(lights: LightSpec[]): DmxRig {
@@ -84,9 +85,9 @@ function makeRig(lights: LightSpec[]): DmxRig {
       numLights: front.length,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType: ConfigStrobeType.AllCapable,
-      frontLights: front as unknown as DmxRig['config']['frontLights'],
+      frontLights: front,
       backLights: [],
-      strobeLights: strobe as unknown as DmxRig['config']['strobeLights'],
+      strobeLights: strobe,
     },
   }
 }
@@ -445,7 +446,10 @@ describe('DmxPublisher strobe output gate', () => {
     master.setStrobeOutputEnabled(false)
     const strobeManager = new StrobeStateManager()
     const { publisher, wire } = setup(
-      [STROBE_LIGHT, { id: 'front1', channels: { masterDimmer: 11, red: 12 } }],
+      [
+        STROBE_LIGHT,
+        { id: 'front1', channels: { masterDimmer: 11, red: 12, green: 13, blue: 14 } },
+      ],
       master,
       strobeManager,
     )
@@ -483,7 +487,10 @@ describe('DmxPublisher strobe output gate', () => {
     master.setDimmerPercent(50)
     const strobeManager = new StrobeStateManager()
     const { publisher, wire } = setup(
-      [STROBE_LIGHT, { id: 'front1', channels: { masterDimmer: 11, red: 12 } }],
+      [
+        STROBE_LIGHT,
+        { id: 'front1', channels: { masterDimmer: 11, red: 12, green: 13, blue: 14 } },
+      ],
       master,
       strobeManager,
     )

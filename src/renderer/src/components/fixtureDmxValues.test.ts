@@ -4,10 +4,10 @@
  * it actually occupies still read the same.
  */
 import { describe, expect, it } from '@jest/globals'
-import { FixtureTypes, type DmxLight } from '../../../photonics-dmx/types'
+import { FixtureTypes, type RgbLight } from '../../../photonics-dmx/types'
 import { fixtureChannelNumbers, fixtureDmxValuesEqual } from './fixtureDmxValues'
 
-function light(over: Partial<DmxLight> = {}): DmxLight {
+function light(over: Partial<RgbLight> = {}): RgbLight {
   return {
     id: 'l1',
     fixtureId: 't1',
@@ -19,9 +19,9 @@ function light(over: Partial<DmxLight> = {}): DmxLight {
     group: 'front',
     universe: 1,
     mount: 'floor',
-    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } as unknown as DmxLight['channels'],
+    channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
     ...over,
-  } as DmxLight
+  }
 }
 
 describe('fixtureChannelNumbers', () => {
