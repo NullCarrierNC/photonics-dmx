@@ -63,6 +63,7 @@ export {
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
   EXTRA_CHANNEL_TYPES,
   FixtureTypes,
+  isExtraChannelType,
   isFixtureType,
   LEGACY_FIXTURE_RGB_STROBE,
   LEGACY_FIXTURE_RGBW,

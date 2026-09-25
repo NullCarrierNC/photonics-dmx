@@ -5,9 +5,9 @@
  */
 import {
   DMX_CHANNEL_MAX,
-  EXTRA_CHANNEL_TYPES,
   FixtureTypes,
   FIXTURE_CONFIG_FIELDS,
+  isExtraChannelType,
   isFixtureConfigFlagField,
   isFixtureType,
   normalizeFixtureConfig,
@@ -17,7 +17,6 @@ import type {
   DmxFixture,
   DmxLight,
   ExtraChannel,
-  ExtraChannelType,
   FixtureChannelLayout,
   FixtureConfig,
   LegacyFixtureConfigFields,
@@ -44,12 +43,6 @@ function isStoredChannel(value: unknown): value is number {
 
 function isDmxValue(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255
-}
-
-const EXTRA_CHANNEL_TYPE_SET: ReadonlySet<string> = new Set(EXTRA_CHANNEL_TYPES)
-
-function isExtraChannelType(value: unknown): value is ExtraChannelType {
-  return typeof value === 'string' && EXTRA_CHANNEL_TYPE_SET.has(value)
 }
 
 const FIXTURE_FIELDS: ReadonlySet<string> = new Set([

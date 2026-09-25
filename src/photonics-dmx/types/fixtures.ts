@@ -95,6 +95,12 @@ export const EXTRA_CHANNEL_TYPES = [
 ] as const
 export type ExtraChannelType = (typeof EXTRA_CHANNEL_TYPES)[number]
 
+const EXTRA_CHANNEL_TYPE_SET: ReadonlySet<string> = new Set(EXTRA_CHANNEL_TYPES)
+
+export function isExtraChannelType(value: unknown): value is ExtraChannelType {
+  return typeof value === 'string' && EXTRA_CHANNEL_TYPE_SET.has(value)
+}
+
 /**
  * One user-added channel on a fixture template beyond its archetype's closed channel map. Stored as
  * an ordered array on {@link DmxFixture.extraChannels}, and duplicates of a type are valid (all

@@ -5,6 +5,7 @@ import {
   ExtraChannel,
   ExtraChannelType,
   FixtureTypes,
+  isExtraChannelType,
 } from '../../../photonics-dmx/types'
 import {
   EXTRA_CHANNEL_TYPE_LABELS,
@@ -84,7 +85,9 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
             <select
               aria-label={`${label} type`}
               value={extra.type}
-              onChange={(e) => handleTypeChange(i, e.target.value as ExtraChannelType)}
+              onChange={(e) => {
+                if (isExtraChannelType(e.target.value)) handleTypeChange(i, e.target.value)
+              }}
               className="p-2 border border-gray-300 rounded text-black flex-grow">
               {offeredTypes.map((type) => (
                 <option key={type} value={type}>
