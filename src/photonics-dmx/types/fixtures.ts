@@ -17,6 +17,12 @@ export enum FixtureTypes {
   RGBMH = 'rgb/mh',
 }
 
+const FIXTURE_TYPE_VALUES: readonly string[] = Object.values(FixtureTypes)
+
+export function isFixtureType(value: unknown): value is FixtureTypes {
+  return typeof value === 'string' && FIXTURE_TYPE_VALUES.includes(value)
+}
+
 /** Legacy fixture identifiers replaced by the hasStrobeChannel model, retained for migration only. */
 export const LEGACY_FIXTURE_RGB_STROBE = 'rgb/s'
 export const LEGACY_FIXTURE_RGBW_STROBE = 'rgbw/s'

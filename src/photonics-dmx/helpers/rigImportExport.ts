@@ -1,7 +1,7 @@
 import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
-import { migrateFixtureSchema, migrateLightingConfiguration } from './lightingConfigMigration'
 import { isStorableBrightnessScale } from './brightnessScaling'
+import { loadDmxFixture, loadDmxLight, loadFixtureList } from './fixtureParsing'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -151,73 +151,78 @@ export function buildRigExportFile(rig: DmxRig, allTemplates: DmxFixture[]): Rig
   }
 }
 
+/** A rig export file as read, before its rig and templates are checked. */
+export interface RigExportEnvelope {
+  formatVersion: number
+  rig: Record<string, unknown>
+  templates: unknown[]
+}
+
 /**
- * Structural / envelope validation of a parsed rig-export file. Authoritative field validation of
- * `rig` and `templates` runs in the main-process handler via the shared input validators; this only
- * guards the envelope so the file is safe to hand to those validators and the dedup core.
+ * Structural / envelope validation of a parsed rig-export file. The templates and rig lights are
+ * loaded by {@link loadRigExportFixtures}, and the rig itself by the main-process input validators.
  */
 export function validateRigExportFile(
   parsed: unknown,
-): { ok: true; value: RigExportFile } | { ok: false; error: string } {
+): { ok: true; value: RigExportEnvelope } | { ok: false; error: string } {
   if (!isPlainObject(parsed)) {
     return { ok: false, error: 'File is not a valid rig export (expected a JSON object).' }
   }
   if (parsed.type !== RIG_EXPORT_TYPE) {
     return { ok: false, error: 'This file is not a Photonics rig export.' }
   }
-  if (typeof parsed.formatVersion !== 'number' || !Number.isFinite(parsed.formatVersion)) {
+  const { formatVersion, rig, templates } = parsed
+  if (typeof formatVersion !== 'number' || !Number.isFinite(formatVersion)) {
     return { ok: false, error: 'Rig export is missing a valid formatVersion.' }
   }
-  if (parsed.formatVersion > RIG_EXPORT_FORMAT_VERSION) {
+  if (formatVersion > RIG_EXPORT_FORMAT_VERSION) {
     return { ok: false, error: 'This rig file was created by a newer version of the app.' }
   }
-  if (!isPlainObject(parsed.rig)) {
+  if (!isPlainObject(rig)) {
     return { ok: false, error: 'Rig export is missing its rig data.' }
   }
-  if (!Array.isArray(parsed.templates)) {
+  if (!Array.isArray(templates)) {
     return { ok: false, error: 'Rig export is missing its templates list.' }
   }
-  for (let i = 0; i < parsed.templates.length; i++) {
-    const t = parsed.templates[i]
+  for (let i = 0; i < templates.length; i++) {
+    const t: unknown = templates[i]
     if (!isPlainObject(t) || typeof t.id !== 'string' || t.id.trim().length === 0) {
       return { ok: false, error: `templates[${i}] must have a non-empty string id.` }
     }
   }
-  return { ok: true, value: parsed as unknown as RigExportFile }
+  return { ok: true, value: { formatVersion, rig, templates } }
 }
 
 /**
- * Brings an imported rig file's fixtures onto the current fixture schema, in place of the version
- * the file was written with. A file exported by an older build can name fixture types this build has
- * collapsed (`rgbw`/`rgbw/mh`, `rgb/s`/`rgbw/s`), and the import validators check against the
- * current type list — so without this an old rig file would be rejected as invalid rather than
- * upgraded. Returns the same references when nothing needed migrating.
- *
- * The legacy `front-back` layout rename is skipped for the same reason it is skipped elsewhere: that
- * was a one-time v1 rig migration, and a file naming `front-back` today means the current semantic.
+ * Loads an imported file's templates and rig lights, in whichever build's fixture schema the file
+ * was written, collecting the repairs in `faults`. A file holding a fixture of a type no build
+ * wrote is refused.
  */
-export function migrateRigExportFixtures(file: RigExportFile): RigExportFile {
-  const { config, changed: rigChanged } = migrateLightingConfiguration(file.rig.config, {
-    skipLegacyRename: true,
-  })
-
-  let templatesChanged = false
-  const templates = file.templates.map((t) => {
-    const result = migrateFixtureSchema(t)
-    if (result.changed) {
-      templatesChanged = true
+export function loadRigExportFixtures(
+  file: RigExportEnvelope,
+  faults: string[],
+):
+  | { ok: true; rig: Record<string, unknown>; templates: DmxFixture[] }
+  | { ok: false; error: string } {
+  const templates = loadFixtureList(file.templates, 'templates', loadDmxFixture, faults)
+  if (!templates.ok) {
+    return templates
+  }
+  const config = file.rig.config
+  if (!isPlainObject(config)) {
+    return { ok: true, rig: file.rig, templates: templates.fixtures }
+  }
+  const loadedConfig: Record<string, unknown> = { ...config }
+  for (const list of ['frontLights', 'backLights', 'strobeLights'] as const) {
+    const lights = config[list]
+    if (!Array.isArray(lights)) continue
+    const loaded = loadFixtureList(lights, `rig.config.${list}`, loadDmxLight, faults)
+    if (!loaded.ok) {
+      return loaded
     }
-    return result.fixture
-  })
-
-  if (!rigChanged && !templatesChanged) {
-    return file
+    loadedConfig[list] = loaded.fixtures
   }
-  return {
-    ...file,
-    rig: rigChanged ? { ...file.rig, config } : file.rig,
-    templates: templatesChanged ? templates : file.templates,
-  }
+  return { ok: true, rig: { ...file.rig, config: loadedConfig }, templates: templates.fixtures }
 }
 
 /**

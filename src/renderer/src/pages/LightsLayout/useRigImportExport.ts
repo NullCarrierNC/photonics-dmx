@@ -142,6 +142,13 @@ export function useRigImportExport({
         }
         return
       }
+      if (result.repairs.length > 0) {
+        showToast(
+          `Some fixture values in ${result.sourceBasename} could not be used as stored and were reset or dropped: ${result.repairs.join(', ')}`,
+          'warning',
+          8000,
+        )
+      }
 
       // Preview the de-dup against the current My Lights so the modal can summarize it.
       const { templatesToAdd, fixtureIdMap, reusedCount } = reconcileImportedTemplates(

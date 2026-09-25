@@ -17,7 +17,17 @@ export interface AppShellInvokeMap {
   [RIGS.IMPORT_PICK]: {
     request: void
     response:
-      | { success: true; sourceBasename: string; rig: DmxRig; templates: DmxFixture[] }
+      | {
+          success: true
+          sourceBasename: string
+          rig: DmxRig
+          templates: DmxFixture[]
+          /**
+           * Fixture values the file held that could not be used as stored and were reset or
+           * dropped.
+           */
+          repairs: string[]
+        }
       | IpcErrorResult
   }
 

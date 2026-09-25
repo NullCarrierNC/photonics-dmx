@@ -13,10 +13,7 @@ import {
   hasStraySenderFlatKeys,
   LEGACY_FLAT_SENDER_PREF_KEYS,
 } from './preferencesMigration'
-import {
-  migrateLightingConfiguration,
-  migrateUserLightsSchema,
-} from '../../photonics-dmx/helpers/lightingConfigMigration'
+import { migrateLightingConfiguration } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import {
   ConfigStrobeType,
   type DmxFixture,
@@ -53,29 +50,10 @@ export function migrateLegacyLightsFormat(userLights: ConfigFile<UserLightsConfi
 }
 
 /**
- * One-time fixture-shape migrations for the user-defined fixture library (`MyLights`): the
- * strobe-channel schema (legacy `rgb/s`/`rgbw/s` onto `channels.strobeChannel` + `strobeValues`,
- * stray `channels.strobeSpeed` renamed) and the RGBW collapse (`rgbw`/`rgbw/mh` onto `rgb`/`rgb/mh`
- * with the white channel re-expressed as an extra channel).
- */
-export function migrateUserLightsFixtureSchema(userLights: ConfigFile<UserLightsConfig>): void {
-  const current = userLights.get()
-  if (!current || !Array.isArray(current.lights)) {
-    return
-  }
-  const { lights, changed } = migrateUserLightsSchema(current.lights)
-  if (!changed) {
-    return
-  }
-  userLights.applyLoadMigration({ ...current, lights })
-  log.info('[Photonics Config] Migrated user lights to the current fixture schema')
-}
-
-/**
- * Same fixture-shape migrations for the standalone lighting layout. It is still served to the
- * renderer and seeds the default rig on first run, so it must not keep serving fixture types the
- * rest of the app no longer knows. The legacy `front-back` rename is deliberately skipped: that
- * was the rigs' v1 migration, and a layout naming `front-back` today means the current semantic.
+ * The rig-config migrations (mount backfill, light count) for the standalone lighting layout, which
+ * is still served to the renderer and seeds the default rig on first run. The legacy `front-back`
+ * rename is skipped, since that was the rigs' v1 migration and a layout naming `front-back` means
+ * the current semantic.
  */
 export function migrateLightingLayoutFixtureSchema(
   lightingLayout: ConfigFile<LightingConfiguration>,
@@ -89,7 +67,7 @@ export function migrateLightingLayoutFixtureSchema(
     return
   }
   lightingLayout.applyLoadMigration(config)
-  log.info('[Photonics Config] Migrated lighting layout to the current fixture schema')
+  log.info('[Photonics Config] Migrated the lighting layout')
 }
 
 /**
@@ -165,13 +143,11 @@ export interface MigratableConfigFiles {
 }
 
 /**
- * Runs every startup migration in order. The legacy lights format has to be resolved before the
- * fixture-schema pass reads `lights`, and the rig migration reads the layout after its own
- * fixture-schema pass has run.
+ * Runs every startup migration in order. The rig migration reads the layout after the layout's own
+ * migration has run.
  */
 export function runStartupMigrations(files: MigratableConfigFiles): void {
   migrateLegacyLightsFormat(files.userLights)
-  migrateUserLightsFixtureSchema(files.userLights)
   migrateLightingLayoutFixtureSchema(files.lightingLayout)
   normalizeStraySenderFlatKeys(files.preferences)
   migrateToDmxRigs(files.lightingLayout, files.dmxRigs)

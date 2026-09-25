@@ -138,6 +138,7 @@ const PICKED = {
   sourceBasename: 'club.json',
   rig: { ...rig('x', 'Rig A'), config: { ...RIG_A.config, frontLights: [light('x-l1', 't2')] } },
   templates: [TEMPLATE, NEW_TEMPLATE],
+  repairs: [] as string[],
 }
 
 beforeEach(() => {
@@ -213,6 +214,21 @@ describe('useRigImportExport import', () => {
     const view = renderRigs()
     await run(view, (h) => h.handleImport())
     expect(view.showToast).toHaveBeenCalledWith('bad json', 'error', 5000)
+  })
+
+  it('warns about fixture values the file held that were reset', async () => {
+    jest.mocked(ipcApi.pickRigImportFile).mockResolvedValue({
+      ...PICKED,
+      repairs: ['templates[0].channels.blue is missing'],
+    })
+    const view = renderRigs()
+    await run(view, (h) => h.handleImport())
+    expect(view.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('templates[0].channels.blue is missing'),
+      'warning',
+      8000,
+    )
+    expect(view.result.current.pendingImport).not.toBeNull()
   })
 
   it('holds a picked rig for confirmation with a summary and a free name', async () => {

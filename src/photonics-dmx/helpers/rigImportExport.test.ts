@@ -9,11 +9,12 @@ import {
   countOrphanLights,
   duplicateRig,
   mapLightsToNewIdsForSave,
-  migrateRigExportFixtures,
+  loadRigExportFixtures,
   prepareImportedRig,
   reconcileImportedTemplates,
   suggestUniqueName,
   validateRigExportFile,
+  type RigExportEnvelope,
 } from './rigImportExport'
 
 // Deterministic id factory for assertions.
@@ -136,51 +137,69 @@ describe('buildRigExportFile', () => {
   })
 })
 
-describe('migrateRigExportFixtures', () => {
-  /** A rig file as an older build wrote it: discrete rgbw templates and rig lights. */
-  const legacyFile = () => {
-    const file = buildRigExportFile(makeRig(), [rgbTemplate, rgbwTemplate])
-    const legacy = JSON.parse(JSON.stringify(file)) as typeof file
-    legacy.templates = legacy.templates.map((t) =>
-      t.id === 'tpl-rgbw'
-        ? ({
-            ...t,
-            fixture: 'rgbw',
-            channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, white: 4 },
-            extraChannels: undefined,
-          } as unknown as DmxFixture)
-        : t,
-    )
-    legacy.rig.config.frontLights = legacy.rig.config.frontLights.map((l) => {
-      if (l.fixtureId !== 'tpl-rgbw') return l
-      const legacyLight = {
-        ...l,
-        fixture: 'rgbw',
-        channels: { masterDimmer: 10, red: 11, green: 12, blue: 13, white: 14 },
-      } as unknown as DmxLight
-      // A file written before extras existed carries none.
-      delete legacyLight.extraChannels
-      return legacyLight
-    })
-    return legacy
+describe('loadRigExportFixtures', () => {
+  const rig = makeRig()
+  /** A rig file as an older build wrote it: a discrete rgbw template and rig light. */
+  const legacyFile = (): RigExportEnvelope => {
+    const { extraChannels: _templateExtras, ...rgbw } = rgbwTemplate
+    const { extraChannels: _lightExtras, ...rgbwLight } = rig.config.frontLights[1]!
+    return {
+      formatVersion: RIG_EXPORT_FORMAT_VERSION,
+      rig: {
+        ...rig,
+        config: {
+          ...rig.config,
+          frontLights: [
+            rig.config.frontLights[0],
+            {
+              ...rgbwLight,
+              fixture: 'rgbw',
+              channels: { masterDimmer: 10, red: 11, green: 12, blue: 13, white: 14 },
+            },
+          ],
+        },
+      },
+      templates: [
+        rgbTemplate,
+        {
+          ...rgbw,
+          fixture: 'rgbw',
+          channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, white: 4 },
+        },
+      ],
+    }
   }
 
   it('brings legacy rgbw templates and rig lights onto the current fixture schema', () => {
-    const migrated = migrateRigExportFixtures(legacyFile())
+    const faults: string[] = []
+    const loaded = loadRigExportFixtures(legacyFile(), faults)
+    if (!loaded.ok) throw new Error(loaded.error)
 
-    const template = migrated.templates.find((t) => t.id === 'tpl-rgbw')!
-    expect(template.fixture).toBe(FixtureTypes.RGB)
-    expect(template.extraChannels).toEqual([{ type: 'white', channel: 4 }])
-
-    const light = migrated.rig.config.frontLights.find((l) => l.fixtureId === 'tpl-rgbw')!
-    expect(light.fixture).toBe(FixtureTypes.RGB)
-    expect(light.extraChannels).toEqual([{ type: 'white', channel: 14 }])
-    expect((light.channels as unknown as Record<string, number>).white).toBeUndefined()
+    expect(loaded.templates[1]).toMatchObject({
+      fixture: FixtureTypes.RGB,
+      channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 },
+      extraChannels: [{ type: 'white', channel: 4 }],
+    })
+    expect(loaded.rig.config).toMatchObject({
+      frontLights: [
+        expect.anything(),
+        expect.objectContaining({
+          fixture: FixtureTypes.RGB,
+          channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 },
+          extraChannels: [{ type: 'white', channel: 14 }],
+        }),
+      ],
+    })
+    expect(faults).toEqual([])
   })
 
-  it('returns the same reference for a file already on the current schema', () => {
-    const file = buildRigExportFile(makeRig(), [rgbTemplate, rgbwTemplate])
-    expect(migrateRigExportFixtures(file)).toBe(file)
+  it('loads a file on the current schema as it is', () => {
+    const file = buildRigExportFile(rig, [rgbTemplate, rgbwTemplate])
+    const faults: string[] = []
+    const loaded = loadRigExportFixtures({ ...file, rig: { ...file.rig } }, faults)
+
+    expect(loaded).toEqual({ ok: true, rig: file.rig, templates: file.templates })
+    expect(faults).toEqual([])
   })
 })
 
