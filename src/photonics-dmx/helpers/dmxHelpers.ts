@@ -3,6 +3,7 @@ import {
   Brightness,
   Color,
   FixtureTypes,
+  isColor,
   RgbDmxChannels,
   RGBIO,
   RgbMovingHeadDmxChannels,
@@ -202,16 +203,14 @@ const colorMap: { [key in Color]: { r: number; g: number; b: number } } = {
 }
 
 /**
- * Validates a string and converts it to a Color type.
- * Uses the colorMap as the single source of truth for valid colors.
+ * Validates a string, case-insensitively, and converts it to a Color type.
  *
  * @param colorString - The color string to validate
  * @returns A valid Color type, or 'white' as fallback if invalid
  */
 export const validateColorString = (colorString: string): Color => {
-  const normalizedColor = colorString.toLowerCase() as Color
-  // Check if the normalized string exists as a key in colorMap
-  return normalizedColor in colorMap ? normalizedColor : 'white'
+  const normalizedColor = colorString.toLowerCase()
+  return isColor(normalizedColor) ? normalizedColor : 'white'
 }
 
 /**

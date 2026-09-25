@@ -10,9 +10,15 @@ import {
   LocationGroup,
   LightTarget,
   TrackedLight,
+  isBlendMode,
+  isBrightness,
+  isColor,
+  isLightTarget,
+  isLocationGroup,
+  isWaitCondition,
+  WaitCondition,
 } from '../../../types'
 import { ValueSource, VariableType } from '../../types/nodeCueTypes'
-import { BLEND_MODE_OPTIONS, COLOR_OPTIONS, LIGHT_TARGET_OPTIONS } from '../../../constants/options'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
 
@@ -131,60 +137,65 @@ export function inferSourceType(source: ValueSource | undefined): VariableType {
 }
 
 /**
- * Resolve location groups from ValueSource (comma-separated string to array).
+ * Comma-separated group names ("front,back"), keeping the known ones, or the front group when
+ * none is known.
  */
+export function parseLocationGroups(value: unknown): LocationGroup[] {
+  const groups =
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((g) => g.trim())
+          .filter(isLocationGroup)
+      : []
+  return groups.length > 0 ? groups : ['front']
+}
+
+export function parseLightTarget(value: unknown): LightTarget {
+  return isLightTarget(value) ? value : 'all'
+}
+
+export function parseColor(value: unknown): Color {
+  return isColor(value) ? value : 'blue'
+}
+
+export function parseBrightness(value: unknown): Brightness {
+  return isBrightness(value) ? value : 'medium'
+}
+
+export function parseBlendMode(value: unknown): BlendMode {
+  return isBlendMode(value) ? value : 'replace'
+}
+
+export function parseWaitCondition(value: unknown): WaitCondition {
+  return isWaitCondition(value) ? value : 'none'
+}
+
 export function resolveLocationGroups(
   source: ValueSource,
   context: ExecutionContext,
 ): LocationGroup[] {
-  const value = resolveValue('string', source, context)
-  if (typeof value !== 'string') return ['front']
-
-  // Parse comma-separated groups: "front,back" → ['front', 'back']
-  const validGroups: LocationGroup[] = ['front', 'back', 'strobe']
-  return value
-    .split(',')
-    .map((g) => g.trim())
-    .filter((g) => validGroups.includes(g as LocationGroup)) as LocationGroup[]
+  return parseLocationGroups(resolveValue('string', source, context))
 }
 
-/**
- * Resolve light target filter from ValueSource.
- */
 export function resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
-  const value = resolveValue('string', source, context)
-  const valid: LightTarget[] = LIGHT_TARGET_OPTIONS
-  return valid.includes(value as LightTarget) ? (value as LightTarget) : 'all'
+  return parseLightTarget(resolveValue('string', source, context))
 }
 
-/**
- * Resolve color name from ValueSource.
- */
 export function resolveColor(source: ValueSource, context: ExecutionContext): Color {
-  const value = resolveValue('string', source, context)
-  const validColors: Color[] = COLOR_OPTIONS
-  return validColors.includes(value as Color) ? (value as Color) : 'blue'
+  return parseColor(resolveValue('string', source, context))
 }
 
-/**
- * Resolve brightness level from ValueSource.
- */
 export function resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
-  const value = resolveValue('string', source, context)
-  const valid: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
-  return valid.includes(value as Brightness) ? (value as Brightness) : 'medium'
+  return parseBrightness(resolveValue('string', source, context))
 }
 
-/**
- * Resolve blend mode from ValueSource.
- */
 export function resolveBlendMode(
   source: ValueSource | undefined,
   context: ExecutionContext,
 ): BlendMode | undefined {
   if (!source) return undefined
-  const value = resolveValue('string', source, context)
-  return BLEND_MODE_OPTIONS.includes(value as BlendMode) ? (value as BlendMode) : 'replace'
+  return parseBlendMode(resolveValue('string', source, context))
 }
 
 /**

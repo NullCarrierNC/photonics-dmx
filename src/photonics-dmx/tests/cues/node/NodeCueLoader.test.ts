@@ -53,7 +53,7 @@ function rb3LightingFile(
     type: 'action',
     effectType: 'set-color',
     target: {
-      groups: { source: 'literal', value: 'all' },
+      groups: { source: 'literal', value: 'front' },
       filter: { source: 'literal', value: 'all' },
     },
     color: {

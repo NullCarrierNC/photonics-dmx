@@ -3,35 +3,61 @@
  */
 
 /**
+ * Every colour name the lighting system knows, in the order the editors list them.
+ */
+export const COLOR_OPTIONS = [
+  'amber',
+  'black',
+  'blue',
+  'chartreuse',
+  'cyan',
+  'green',
+  'magenta',
+  'orange',
+  'purple',
+  'red',
+  'teal',
+  'transparent',
+  'vermilion',
+  'violet',
+  'white',
+  'yellow',
+] as const
+
+/**
  * Represents available colors in the lighting system
  */
-export type Color =
-  | 'red'
-  | 'blue'
-  | 'yellow'
-  | 'green'
-  | 'cyan'
-  | 'orange'
-  | 'purple'
-  | 'chartreuse'
-  | 'teal'
-  | 'violet'
-  | 'magenta'
-  | 'vermilion'
-  | 'amber'
-  | 'white'
-  | 'black'
-  | 'transparent'
+export type Color = (typeof COLOR_OPTIONS)[number]
+
+export function isColor(value: unknown): value is Color {
+  return typeof value === 'string' && (COLOR_OPTIONS as readonly string[]).includes(value)
+}
+
+/**
+ * The supported layer blend modes. A cue blendMode outside this set is coerced to 'replace' at
+ * runtime (valueResolver / LightTransitionController).
+ */
+export const BLEND_MODE_OPTIONS = ['mix', 'add', 'replace'] as const
 
 /**
  * Represents how a color should blend with colors on lower layers
  */
-export type BlendMode = 'replace' | 'add' | 'mix'
+export type BlendMode = (typeof BLEND_MODE_OPTIONS)[number]
+
+export function isBlendMode(value: unknown): value is BlendMode {
+  return typeof value === 'string' && (BLEND_MODE_OPTIONS as readonly string[]).includes(value)
+}
+
+export const BRIGHTNESS_OPTIONS = ['low', 'medium', 'high', 'max', 'linear'] as const
 
 /**
  * Represents brightness levels for lights
  */
-export type Brightness = 'low' | 'medium' | 'high' | 'max' | 'linear'
+export type Brightness = (typeof BRIGHTNESS_OPTIONS)[number]
+
+export function isBrightness(value: unknown): value is Brightness {
+  return typeof value === 'string' && (BRIGHTNESS_OPTIONS as readonly string[]).includes(value)
+}
 
 /**
  * Interface representing RGB, Intensity, Pan/Tilt values for a light

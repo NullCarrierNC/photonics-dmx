@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import type { AudioGameModeConfig } from '../../../shared/ipcTypes'
+import { isBrightness, isColor } from '../../../photonics-dmx/types'
 import type { Brightness, Color } from '../../../photonics-dmx/types'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioGameMode } from '../ipcApi'
@@ -167,7 +168,9 @@ const AudioIdleDetectionSettings: React.FC = () => {
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
             value={idle.idleColor}
             disabled={fieldsDisabled}
-            onChange={(e) => write({ idleColor: e.target.value as Color })}>
+            onChange={(e) => {
+              if (isColor(e.target.value)) write({ idleColor: e.target.value })
+            }}>
             {COLORS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -183,7 +186,9 @@ const AudioIdleDetectionSettings: React.FC = () => {
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
             value={idle.idleBrightness}
             disabled={fieldsDisabled}
-            onChange={(e) => write({ idleBrightness: e.target.value as Brightness })}>
+            onChange={(e) => {
+              if (isBrightness(e.target.value)) write({ idleBrightness: e.target.value })
+            }}>
             {BRIGHTNESS.map((b) => (
               <option key={b} value={b}>
                 {b}

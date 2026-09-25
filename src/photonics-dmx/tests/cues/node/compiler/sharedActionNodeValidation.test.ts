@@ -11,6 +11,7 @@ import {
 import type {
   ActionNode,
   NetLightingNodeCueDefinition,
+  NodeColorSetting,
   YargEffectDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
@@ -30,14 +31,19 @@ function baseValidAction(): ActionNode {
     type: 'action',
     effectType: 'set-color',
     target: {
-      groups: { source: 'literal', value: 'g1' },
+      groups: { source: 'literal', value: 'front' },
       filter: { source: 'literal', value: 'all' },
     },
-    color: {
-      name: { source: 'literal', value: 'red' },
-      brightness: { source: 'literal', value: 'high' },
-    },
+    color: baseColor(),
     timing: createDefaultActionTiming(),
+  }
+}
+
+function baseColor(overrides: Partial<NodeColorSetting> = {}): NodeColorSetting {
+  return {
+    name: { source: 'literal', value: 'red' },
+    brightness: { source: 'literal', value: 'high' },
+    ...overrides,
   }
 }
 
@@ -114,7 +120,7 @@ const PARITY_CASES: ParityCase[] = [
     action: {
       ...baseValidAction(),
       target: {
-        groups: { source: 'literal', value: 'g1' },
+        groups: { source: 'literal', value: 'front' },
         filter: undefined as unknown as ActionNode['target']['filter'],
       },
     },
@@ -125,11 +131,46 @@ const PARITY_CASES: ParityCase[] = [
     action: {
       ...baseValidAction(),
       target: {
-        groups: { source: 'literal', value: 'g1' },
+        groups: { source: 'literal', value: 'front' },
         filter: { source: 'literal', value: 'not-a-real-target' },
       },
     },
     expectedMessageMatch: /target\.filter 'not-a-real-target' is not a known LightTarget/,
+  },
+  {
+    description: 'rejects an unknown literal group in a group list',
+    action: {
+      ...baseValidAction(),
+      target: {
+        groups: { source: 'literal', value: 'front, frnt' },
+        filter: { source: 'literal', value: 'all' },
+      },
+    },
+    expectedMessageMatch: /target\.groups 'frnt' is not a known LocationGroup/,
+  },
+  {
+    description: 'rejects an unknown literal colour',
+    action: {
+      ...baseValidAction(),
+      color: baseColor({ name: { source: 'literal', value: 'bleu' } }),
+    },
+    expectedMessageMatch: /color\.name 'bleu' is not a known Color/,
+  },
+  {
+    description: 'rejects an unknown literal brightness',
+    action: {
+      ...baseValidAction(),
+      color: baseColor({ brightness: { source: 'literal', value: 'bright' } }),
+    },
+    expectedMessageMatch: /color\.brightness 'bright' is not a known Brightness/,
+  },
+  {
+    description: 'rejects an unknown literal blend mode',
+    action: {
+      ...baseValidAction(),
+      color: baseColor({ blendMode: { source: 'literal', value: 'multiply' } }),
+    },
+    expectedMessageMatch: /color\.blendMode 'multiply' is not a known BlendMode/,
   },
   {
     description: 'rejects set-color without color',

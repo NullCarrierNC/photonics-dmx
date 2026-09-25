@@ -103,6 +103,10 @@ export const WAIT_CONDITIONS = ['none', 'delay', ...YARG_SONG_EVENTS, ...RB3_SON
  */
 export type WaitCondition = (typeof WAIT_CONDITIONS)[number]
 
+export function isWaitCondition(value: unknown): value is WaitCondition {
+  return typeof value === 'string' && (WAIT_CONDITIONS as readonly string[]).includes(value)
+}
+
 /**
  * Combined event types for YARG event nodes.
  * Includes both system events and song events.

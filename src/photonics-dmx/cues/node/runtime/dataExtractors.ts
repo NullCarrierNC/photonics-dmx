@@ -6,7 +6,7 @@
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
-import { TrackedLight, LightTarget } from '../../../types'
+import { TrackedLight } from '../../../types'
 import { NodeCueMode } from '../../types/nodeCueTypes'
 import { parsePatternPropertyId, configLightGroupToLocationGroups } from '../utils/patternUtils'
 import { getCueDomain } from '../../domains'
@@ -58,7 +58,7 @@ export function extractConfigDataValue(
   const parsed = parsePatternPropertyId(property)
   if (parsed) {
     const locationGroups = configLightGroupToLocationGroups(parsed.group)
-    return lightManager.getLights(locationGroups, parsed.target as LightTarget)
+    return lightManager.getLights(locationGroups, parsed.target)
   }
 
   return 0

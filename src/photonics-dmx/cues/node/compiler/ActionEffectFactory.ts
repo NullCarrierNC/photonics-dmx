@@ -1,17 +1,14 @@
-import {
-  WaitCondition,
-  TrackedLight,
-  Effect,
-  EffectTransition,
-  RGBIO,
-  LocationGroup,
-  Color,
-  Brightness,
-  BlendMode,
-  LightTarget,
-} from '../../../types'
+import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO } from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { VariableValue } from '../runtime/executionTypes'
+import {
+  parseBlendMode,
+  parseBrightness,
+  parseColor,
+  parseLightTarget,
+  parseLocationGroups,
+  parseWaitCondition,
+} from '../runtime/valueResolver'
 import type {
   ActionTimingConfig,
   NodeActionTarget,
@@ -38,58 +35,48 @@ import {
   safeDuration,
 } from './effectBuilders'
 
+/** A value source's literal, or undefined for a value held in a variable. */
+const literalValue = (
+  source: ValueSource | undefined,
+): Extract<ValueSource, { source: 'literal' }>['value'] | undefined =>
+  source?.source === 'literal' ? source.value : undefined
+
 export class ActionEffectFactory {
   private static resolveTarget(target: NodeActionTarget): ResolvedActionTarget {
-    const groupsValue = target.groups.source === 'literal' ? String(target.groups.value) : 'front'
-    const filterValue = target.filter.source === 'literal' ? String(target.filter.value) : 'all'
-
     return {
-      groups: groupsValue.split(',').map((g) => g.trim()) as LocationGroup[],
-      filter: filterValue as LightTarget,
+      groups: parseLocationGroups(literalValue(target.groups)),
+      filter: parseLightTarget(literalValue(target.filter)),
     }
   }
 
   private static resolveColorSetting(color: NodeColorSetting): ResolvedColorSetting {
-    const name = color.name.source === 'literal' ? String(color.name.value) : 'blue'
-    const brightness =
-      color.brightness.source === 'literal' ? String(color.brightness.value) : 'medium'
-    const blendMode =
-      color.blendMode?.source === 'literal' ? String(color.blendMode.value) : 'replace'
     const opacity = color.opacity?.source === 'literal' ? Number(color.opacity.value) : undefined
 
     return {
-      name: name as Color,
-      brightness: brightness as Brightness,
-      blendMode: blendMode as BlendMode,
+      name: parseColor(literalValue(color.name)),
+      brightness: parseBrightness(literalValue(color.brightness)),
+      blendMode: parseBlendMode(literalValue(color.blendMode)),
       opacity: opacity !== undefined ? clamp(opacity, 0, 1) : undefined,
     }
   }
 
   /** An action's timing from its literals, with the fallbacks for anything else. */
   private static resolveTiming(timing: ActionTimingConfig): ResolvedActionTiming {
-    const literal = (
-      source: ValueSource | undefined,
-    ): Extract<ValueSource, { source: 'literal' }>['value'] | undefined =>
-      source?.source === 'literal' ? source.value : undefined
-    const condition = (source: ValueSource): WaitCondition => {
-      const value = literal(source)
-      return value === undefined ? 'none' : (String(value) as WaitCondition)
-    }
     const count = (source: ValueSource | undefined): number | undefined => {
-      const value = literal(source)
+      const value = literalValue(source)
       return value === undefined ? undefined : finiteOr(value, undefined)
     }
-    const easing = literal(timing.easing)
+    const easing = literalValue(timing.easing)
     return {
-      waitForCondition: condition(timing.waitForCondition),
-      waitForTime: finiteOr(literal(timing.waitForTime), 0),
+      waitForCondition: parseWaitCondition(literalValue(timing.waitForCondition)),
+      waitForTime: finiteOr(literalValue(timing.waitForTime), 0),
       waitForConditionCount: count(timing.waitForConditionCount),
-      duration: finiteOr(literal(timing.duration), 200),
-      waitUntilCondition: condition(timing.waitUntilCondition),
-      waitUntilTime: finiteOr(literal(timing.waitUntilTime), 0),
+      duration: finiteOr(literalValue(timing.duration), 200),
+      waitUntilCondition: parseWaitCondition(literalValue(timing.waitUntilCondition)),
+      waitUntilTime: finiteOr(literalValue(timing.waitUntilTime), 0),
       waitUntilConditionCount: count(timing.waitUntilConditionCount),
       easing: easing === undefined ? undefined : String(easing),
-      level: finiteOr(literal(timing.level), 1),
+      level: finiteOr(literalValue(timing.level), 1),
     }
   }
 
@@ -109,23 +96,17 @@ export class ActionEffectFactory {
 
       // If it's a string variable, treat as group name(s) and resolve with filter
       if (varValue && typeof varValue.value === 'string') {
-        const groupsStr = varValue.value || 'front'
-        const groups = groupsStr.split(',').map((g) => g.trim()) as LocationGroup[]
-        let filter: LightTarget = 'all'
-        if (target.filter.source === 'variable') {
-          const filterVar = variableResolver(target.filter.name)
-          if (filterVar?.value) filter = String(filterVar.value) as LightTarget
-        } else {
-          filter = String(target.filter.value) as LightTarget
-        }
-        return lightManager.getLights(groups, filter)
+        const filter =
+          target.filter.source === 'variable'
+            ? parseLightTarget(variableResolver(target.filter.name)?.value)
+            : parseLightTarget(target.filter.value)
+        return lightManager.getLights(parseLocationGroups(varValue.value), filter)
       }
     }
 
     // Standard group/filter resolution
     const resolved = this.resolveTarget(target)
-    const groups: LocationGroup[] = resolved.groups.length > 0 ? resolved.groups : ['front']
-    return lightManager.getLights(groups, resolved.filter)
+    return lightManager.getLights(resolved.groups, resolved.filter)
   }
 
   public static buildEffect(params: BuildEffectParams): Effect | null {

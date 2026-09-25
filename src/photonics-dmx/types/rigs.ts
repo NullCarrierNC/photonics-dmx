@@ -86,10 +86,41 @@ export interface DmxRigsConfig {
   schemaVersion?: number
 }
 
+export const LOCATION_OPTIONS = ['front', 'back', 'strobe'] as const
+
 /**
  * Defines the location a light can be placed.
  */
-export type LocationGroup = 'front' | 'back' | 'strobe'
+export type LocationGroup = (typeof LOCATION_OPTIONS)[number]
+
+export function isLocationGroup(value: unknown): value is LocationGroup {
+  return typeof value === 'string' && (LOCATION_OPTIONS as readonly string[]).includes(value)
+}
+
+export const LIGHT_TARGET_OPTIONS = [
+  'all',
+  'even',
+  'odd',
+  'half-1',
+  'half-2',
+  'outter-half-major',
+  'outter-half-minor',
+  'inner-half-major',
+  'inner-half-minor',
+  'third-1',
+  'third-2',
+  'third-3',
+  'quarter-1',
+  'quarter-2',
+  'quarter-3',
+  'quarter-4',
+  'linear',
+  'inverse-linear',
+  'random-1',
+  'random-2',
+  'random-3',
+  'random-4',
+] as const
 
 /**
  * Within a location group, which sets of lights we should target for an effect.
@@ -106,26 +137,8 @@ export type LocationGroup = 'front' | 'back' | 'strobe'
  * Linear: Sequentially applies the effect to the first, then second, then third, etc., lights
  * Inverse-Linear: The reverse of linear, starting at the last to first.
  */
-export type LightTarget =
-  | 'all'
-  | 'even'
-  | 'odd'
-  | 'half-1'
-  | 'half-2'
-  | 'outter-half-major'
-  | 'outter-half-minor'
-  | 'inner-half-major'
-  | 'inner-half-minor'
-  | 'third-1'
-  | 'third-2'
-  | 'third-3'
-  | 'quarter-1'
-  | 'quarter-2'
-  | 'quarter-3'
-  | 'quarter-4'
-  | 'linear'
-  | 'inverse-linear'
-  | 'random-1'
-  | 'random-2'
-  | 'random-3'
-  | 'random-4'
+export type LightTarget = (typeof LIGHT_TARGET_OPTIONS)[number]
+
+export function isLightTarget(value: unknown): value is LightTarget {
+  return typeof value === 'string' && (LIGHT_TARGET_OPTIONS as readonly string[]).includes(value)
+}

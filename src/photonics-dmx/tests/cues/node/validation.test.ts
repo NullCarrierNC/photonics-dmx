@@ -1012,6 +1012,28 @@ describe('Node cue validation', () => {
 
     const { id: _id, ...cueWithoutId } = validCue()
 
+    const withPalette = (initialValue: unknown) => ({
+      ...validFile(),
+      cues: [
+        {
+          ...validCue(),
+          variables: [{ name: 'palette', type: 'color-array', scope: 'cue', initialValue }],
+        },
+      ],
+    })
+
+    it('accepts a colour-array variable that starts as known colours', () => {
+      expect(validateNodeCueFile(withPalette(['red', 'amber'])).valid).toBe(true)
+    })
+
+    it.each([
+      ['an unknown colour', ['red', 'bleu']],
+      ['a number', ['red', 3]],
+      ['a single colour', 'red'],
+    ])('rejects a colour-array variable that starts as %s', (_label, initialValue) => {
+      expect(validateNodeCueFile(withPalette(initialValue)).valid).toBe(false)
+    })
+
     it.each([
       ['cue missing id', cueWithoutId],
       ['cue missing name', { ...validCue(), name: undefined }],

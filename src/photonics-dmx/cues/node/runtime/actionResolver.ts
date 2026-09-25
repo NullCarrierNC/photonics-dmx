@@ -4,7 +4,13 @@
  */
 
 import { ExecutionContext } from './ExecutionContext'
-import { resolveValue, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver'
+import {
+  parseWaitCondition,
+  resolveValue,
+  resolveColor,
+  resolveBrightness,
+  resolveBlendMode,
+} from './valueResolver'
 import {
   ResolvedActionTiming,
   ResolvedColorSetting,
@@ -23,7 +29,6 @@ import {
   type MotionPatternType,
   type WaveformType,
 } from '../../types/nodeCueTypes'
-import type { WaitCondition } from '../../../types'
 import {
   normalizeBearingDegrees,
   parseBearingFromResolvedValue,
@@ -43,9 +48,9 @@ export function resolveActionTiming(
   timing: ActionTimingConfig,
   context: ExecutionContext,
 ): ResolvedActionTiming {
-  let waitUntilCondition = String(
+  let waitUntilCondition = parseWaitCondition(
     resolveValue('string', timing.waitUntilCondition, context),
-  ) as WaitCondition
+  )
   let waitUntilTime = Number(resolveValue('number', timing.waitUntilTime, context))
 
   // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait so the effect
@@ -60,9 +65,7 @@ export function resolveActionTiming(
 
   return {
     ...timing,
-    waitForCondition: String(
-      resolveValue('string', timing.waitForCondition, context),
-    ) as WaitCondition,
+    waitForCondition: parseWaitCondition(resolveValue('string', timing.waitForCondition, context)),
     waitUntilCondition,
     waitForTime: Number(resolveValue('number', timing.waitForTime, context)),
     waitForConditionCount: timing.waitForConditionCount

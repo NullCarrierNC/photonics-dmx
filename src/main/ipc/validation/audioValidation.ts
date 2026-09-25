@@ -2,7 +2,7 @@
  * Audio listener payloads: device and band configuration, idle detection and audio game mode.
  */
 
-import type { Brightness, Color } from '../../../photonics-dmx/types'
+import { isBrightness, isColor } from '../../../photonics-dmx/types'
 import type {
   AudioBandDefinition,
   AudioConfig,
@@ -31,27 +31,6 @@ const AUDIO_CONFIG_KEYS = new Set([
   'strobeProbability',
   'idleDetection',
 ])
-
-const VALID_AUDIO_IDLE_COLORS = new Set<Color>([
-  'red',
-  'blue',
-  'yellow',
-  'green',
-  'cyan',
-  'orange',
-  'purple',
-  'chartreuse',
-  'teal',
-  'violet',
-  'magenta',
-  'vermilion',
-  'amber',
-  'white',
-  'black',
-  'transparent',
-])
-
-const VALID_AUDIO_IDLE_BRIGHTNESS = new Set<Brightness>(['low', 'medium', 'high', 'max', 'linear'])
 
 const WEB_AUDIO_FFT_MIN = 32
 const WEB_AUDIO_FFT_MAX = 32768
@@ -133,10 +112,10 @@ function validateCompleteIdleDetectionPayload(
   if (!minIdleSeconds.ok) return minIdleSeconds
   const resumeSeconds = validateNumberInRange(o.resumeSeconds, 0, 60, 'idleDetection.resumeSeconds')
   if (!resumeSeconds.ok) return resumeSeconds
-  if (!VALID_AUDIO_IDLE_COLORS.has(o.idleColor as Color)) {
+  if (!isColor(o.idleColor)) {
     return { ok: false, error: 'idleDetection.idleColor is not a valid color' }
   }
-  if (!VALID_AUDIO_IDLE_BRIGHTNESS.has(o.idleBrightness as Brightness)) {
+  if (!isBrightness(o.idleBrightness)) {
     return { ok: false, error: 'idleDetection.idleBrightness is not a valid brightness' }
   }
   return {
@@ -146,8 +125,8 @@ function validateCompleteIdleDetectionPayload(
       thresholdPct: thresholdPct.value,
       minIdleSeconds: minIdleSeconds.value,
       resumeSeconds: resumeSeconds.value,
-      idleColor: o.idleColor as Color,
-      idleBrightness: o.idleBrightness as Brightness,
+      idleColor: o.idleColor,
+      idleBrightness: o.idleBrightness,
     },
   }
 }

@@ -3,7 +3,7 @@
  * Single source of truth for pattern filters, light groups, and cue data properties.
  */
 
-import type { LocationGroup } from '../types'
+import type { LightTarget, LocationGroup } from '../types'
 
 // ============================================================================
 // Light Pattern Filters
@@ -29,9 +29,13 @@ export const PATTERN_TARGETS = [
   'quarter-2',
   'quarter-3',
   'quarter-4',
-] as const
+] as const satisfies readonly LightTarget[]
 
 export type PatternTarget = (typeof PATTERN_TARGETS)[number]
+
+export function isPatternTarget(value: unknown): value is PatternTarget {
+  return typeof value === 'string' && (PATTERN_TARGETS as readonly string[]).includes(value)
+}
 
 /**
  * Location groups for config data light patterns.

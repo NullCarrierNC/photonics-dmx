@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { LOCATION_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
+import { isLocationGroup } from '../../../../../../photonics-dmx/types'
 import { isVariableSource } from './nodeEditorUtils'
 
 interface TargetGroupsMultiSelectEditorProps {
@@ -22,14 +23,16 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
   }
   const isLiteral = source.source === 'literal'
 
-  // Parse comma-separated string to array (front, back, strobe; same as runtime resolveLocationGroups)
-  const selectedGroups =
+  // Split the comma-separated literal into known groups and names it does not know.
+  const literalGroups =
     isLiteral && typeof source.value === 'string'
       ? source.value
           .split(',')
           .map((g) => g.trim())
-          .filter((g) => LOCATION_OPTIONS.includes(g as (typeof LOCATION_OPTIONS)[number]))
+          .filter((g) => g.length > 0)
       : []
+  const selectedGroups = literalGroups.filter(isLocationGroup)
+  const unknownGroups = literalGroups.filter((g) => !isLocationGroup(g))
 
   // Check if group is selected
   const isSelected = (group: (typeof LOCATION_OPTIONS)[number]) => selectedGroups.includes(group)
@@ -90,6 +93,11 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
               </label>
             ))}
           </div>
+          {unknownGroups.map((group) => (
+            <span key={group} className="block text-[10px] text-red-500">
+              '{group}' is not a known group
+            </span>
+          ))}
         </div>
       ) : (
         // Variable mode: switch on top, variable dropdown only

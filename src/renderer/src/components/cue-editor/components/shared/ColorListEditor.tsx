@@ -1,4 +1,5 @@
 import React from 'react'
+import { isColor } from '../../../../../../photonics-dmx/types'
 import type { Color } from '../../../../../../photonics-dmx/types'
 import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 
@@ -24,7 +25,7 @@ const ColorListEditor: React.FC<ColorListEditorProps> = ({
   }
 
   const addColor = (): void => {
-    const fallback = (COLOR_OPTIONS[0] ?? 'blue') as Color
+    const fallback: Color = COLOR_OPTIONS[0]
     onColorsChange([...colors, colors[colors.length - 1] ?? fallback])
   }
 
@@ -42,7 +43,9 @@ const ColorListEditor: React.FC<ColorListEditorProps> = ({
           <select
             className="flex-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
             value={color}
-            onChange={(event) => updateColorAt(index, event.target.value as Color)}>
+            onChange={(event) => {
+              if (isColor(event.target.value)) updateColorAt(index, event.target.value)
+            }}>
             {COLOR_OPTIONS.map((c) => (
               <option key={c} value={c}>
                 {c}

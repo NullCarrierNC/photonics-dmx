@@ -5,9 +5,8 @@
  * These read and write the controller's maps, so they take them as arguments rather than closing
  * over them.
  */
-import { BLEND_MODE_OPTIONS } from '../../constants/options'
 import { opaqueBlack } from './lightBlending'
-import type { BlendMode, RGBIO } from '../../types'
+import { isBlendMode, type RGBIO } from '../../types'
 import type { LightStateManager } from './LightStateManager'
 import type { TransitionData } from './LightTransitionController'
 import { createLogger } from '../../../shared/logger'
@@ -32,7 +31,7 @@ export function correctLightState(state: RGBIO): RGBIO {
   corrected.opacity = Math.max(0, Math.min(1, corrected.opacity ?? 1))
 
   // Ensure blend mode is valid
-  if (!BLEND_MODE_OPTIONS.includes(corrected.blendMode as BlendMode)) {
+  if (!isBlendMode(corrected.blendMode)) {
     corrected.blendMode = 'replace'
   }
 
