@@ -217,6 +217,11 @@ export const variableDefinitionSchema = {
     isParameter: { type: 'boolean', nullable: true },
     validValues: { type: 'array', items: { type: 'string' }, nullable: true },
   },
+  // A colour-array variable starts as a list of known colours.
+  if: { properties: { type: { const: 'color-array' } } },
+  then: {
+    properties: { initialValue: { type: 'array', items: { type: 'string', enum: COLOR_OPTIONS } } },
+  },
 } as unknown as JSONSchemaType<VariableDefinition>
 
 export const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
