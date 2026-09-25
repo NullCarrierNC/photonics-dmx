@@ -235,6 +235,13 @@ export type FixtureChannelLayout =
 /** A fixture template, its channel map tied to its fixture type. */
 export type DmxFixture = RgbFixture | RgbMovingHeadFixture | StrobeFixture
 
+/** A template saved to the user's library, which always has an id for rig lights to reference. */
+export type SavedFixture = DmxFixture & { id: string }
+
+export function isSavedFixture(fixture: DmxFixture): fixture is SavedFixture {
+  return fixture.id !== null
+}
+
 /** A rig light: a fixture plus the id of the template it came from. */
 export type DmxLight = DmxFixture & { fixtureId: string }
 

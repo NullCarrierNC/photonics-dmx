@@ -4,7 +4,7 @@ import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
 } from '../../../../photonics-dmx/types'
-import type { DmxFixture, DmxLight, LightingConfiguration } from '../../../../photonics-dmx/types'
+import type { DmxLight, LightingConfiguration, SavedFixture } from '../../../../photonics-dmx/types'
 import { findSharedChannelNumbers } from '../../components/lightChannelDisplay'
 import { rgbLight } from '../../../../photonics-dmx/tests/helpers/testFixtures'
 import {
@@ -108,7 +108,7 @@ describe('buildMergedPrimaryLightsFromConfig', () => {
 })
 
 describe('createDmxLightInstance', () => {
-  const rgbTemplate: DmxFixture = {
+  const rgbTemplate: SavedFixture = {
     id: 'tpl-rgb',
     position: 1,
     fixture: FixtureTypes.RGB,
@@ -120,13 +120,13 @@ describe('createDmxLightInstance', () => {
   }
 
   /** A template occupying 14 channels: masterDimmer 1 plus base 2-4 plus an extra at 14. */
-  const wideTemplate: DmxFixture = {
+  const wideTemplate: SavedFixture = {
     ...rgbTemplate,
     id: 'tpl-wide',
     extraChannels: [{ type: 'amber', channel: 14 }],
   }
 
-  const place = (existing: DmxLight[], template: DmxFixture): DmxLight => {
+  const place = (existing: DmxLight[], template: SavedFixture): DmxLight => {
     const { light } = createDmxLightInstance('front', existing, [template])
     return light
   }

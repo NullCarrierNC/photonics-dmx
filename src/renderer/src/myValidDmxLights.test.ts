@@ -48,3 +48,11 @@ describe('myValidDmxLightsAtom with extra channels', () => {
     expect(store.get(myValidDmxLightsAtom).map((l) => l.name)).toEqual(['ok'])
   })
 })
+
+describe('myValidDmxLightsAtom', () => {
+  it('excludes a template without an id', () => {
+    const store = createStore()
+    store.set(myDmxLightsAtom, [{ ...fixture('unsaved', RGB), id: null }, fixture('saved', RGB)])
+    expect(store.get(myValidDmxLightsAtom).map((l) => l.name)).toEqual(['saved'])
+  })
+})

@@ -8,7 +8,7 @@ import LightChannelAssignmentSection from './LightChannelAssignmentSection'
 import { isTwoRowPrimaryLayout } from './lightsLayoutHelpers'
 import type { LightsLayoutDrag } from './useLightsLayoutDrag'
 import { ConfigStrobeType } from '../../../../photonics-dmx/types'
-import type { DmxFixture, DmxLight, LightingConfiguration } from '../../../../photonics-dmx/types'
+import type { DmxLight, LightingConfiguration, SavedFixture } from '../../../../photonics-dmx/types'
 
 interface LightsLayoutCanvasProps {
   drag: LightsLayoutDrag
@@ -19,7 +19,7 @@ interface LightsLayoutCanvasProps {
   selectedStrobe: ConfigStrobeType
   allPrimaryLights: DmxLight[]
   currentLightingConfig: LightingConfiguration
-  myFixtures: DmxFixture[]
+  myFixtures: SavedFixture[]
   activeRigId: string | null
   highlightedLight: number | null
   onLightClick: (position: number) => void
