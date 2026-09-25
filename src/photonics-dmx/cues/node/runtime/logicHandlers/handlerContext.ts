@@ -14,7 +14,6 @@ import type {
   VariableDefinition,
   VariableType,
 } from '../../../types/nodeCueTypes'
-import type { Color, TrackedLight } from '../../../../types'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import type { ExecutionContext } from '../ExecutionContext'
 import type { VariableValue } from '../executionTypes'
@@ -23,15 +22,23 @@ import { createLogger } from '../../../../../shared/logger'
 /** Shared by every handler, so log lines carry one prefix whichever module they come from. */
 export const log = createLogger('logicNodeEvaluator')
 
-/** The empty-slot / uninitialised value for a variable type, matching resolveValue's no-source defaults
- *  (arrays -> [], number -> 0, boolean -> false, others -> ''), with 'transparent' for a colour so an
- *  unwritten colour cell shows through rather than resolving to black. */
-export function zeroForType(t: VariableType): number | boolean | string | TrackedLight[] | Color[] {
-  if (t === 'light-array' || t === 'color-array') return []
-  if (t === 'number') return 0
-  if (t === 'boolean') return false
-  if (t === 'color') return 'transparent'
-  return ''
+/** The empty-slot / uninitialised value for a variable type, matching the readers' no-source
+ *  defaults (arrays -> [], number -> 0, boolean -> false, others -> ''), with 'transparent' for a
+ *  colour so an unwritten colour cell shows through. */
+export function zeroForType(type: VariableType): VariableValue {
+  switch (type) {
+    case 'number':
+      return { type, value: 0 }
+    case 'boolean':
+      return { type, value: false }
+    case 'light-array':
+    case 'color-array':
+      return { type, value: [] }
+    case 'color':
+      return { type, value: 'transparent' }
+    default:
+      return { type, value: '' }
+  }
 }
 
 /** Expression nodes whose formula failed to parse and have already been warned about, keyed by

@@ -5,7 +5,7 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isVariableSource } from './nodeEditorUtils'
 import ColorListEditor from './ColorListEditor'
-import { COLOR_OPTIONS, type Color } from '../../../../../../photonics-dmx/types'
+import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/types'
 import { AUDIO_EVENT_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
 import { YARG_EVENT_TYPES, RB3_EVENT_OPTIONS } from '../../lib/options'
@@ -136,8 +136,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   if (isColorArray) {
     const colorArrayVars = availableVariables.filter((v) => v.type === 'color-array')
     const useVariable = isVariableSource(source)
-    const literalColors =
-      !useVariable && Array.isArray(source.value) ? (source.value as Color[]) : []
+    const literalColors = !useVariable && Array.isArray(source.value) ? source.value : []
 
     return (
       <div className="space-y-1">

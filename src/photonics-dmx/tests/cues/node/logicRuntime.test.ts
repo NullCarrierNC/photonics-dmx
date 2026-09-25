@@ -347,7 +347,9 @@ describe('Node cue logic runtime', () => {
         { id: 'l2', position: 1, config: {} as any },
         { id: 'l3', position: 2, config: {} as any },
       ]
-      const cueLevelVarStore = new Map<string, VariableValue>()
+      const cueLevelVarStore = new Map<string, VariableValue>([
+        ['arr', { type: 'light-array', value: mockLights }],
+      ])
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = fakeLightingController({
         addEffectUnblockedNameWithCallback: (
@@ -370,15 +372,6 @@ describe('Node cue logic runtime', () => {
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
-      const initNode: LogicNode = {
-        id: 'init1',
-        type: 'logic',
-        logicType: 'variable',
-        mode: 'init',
-        varName: 'arr',
-        valueType: 'light-array',
-        value: { source: 'literal', value: mockLights },
-      }
       const shuffleNode: LogicNode = {
         id: 'shuffle1',
         type: 'logic',
@@ -396,11 +389,10 @@ describe('Node cue logic runtime', () => {
         nodes: {
           events: [eventNode],
           actions: [action],
-          logic: [initNode, shuffleNode],
+          logic: [shuffleNode],
         },
         connections: [
-          { from: 'e1', to: 'init1' },
-          { from: 'init1', to: 'shuffle1' },
+          { from: 'e1', to: 'shuffle1' },
           { from: 'shuffle1', to: 'action1' },
         ],
         variables: [
@@ -423,9 +415,8 @@ describe('Node cue logic runtime', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       const out = cueLevelVarStore.get('out')
-      expect(out).toBeDefined()
-      expect(out?.type).toBe('light-array')
-      const arr = out?.value as TrackedLight[]
+      if (out?.type !== 'light-array') throw new Error('out is not a light array')
+      const arr = out.value
       expect(arr).toHaveLength(3)
       const ids = new Set(arr.map((l) => l.id))
       expect(ids).toEqual(new Set(['l1', 'l2', 'l3']))
@@ -592,12 +583,9 @@ describe('Node cue logic runtime', () => {
 
       const ring = cueLevelVarStore.get('ring')
       const groupSize = cueLevelVarStore.get('ringGroupSize')
-      expect(ring?.type).toBe('light-array')
-      expect(groupSize?.type).toBe('number')
-      return {
-        ringIds: (ring?.value as TrackedLight[]).map((l) => l.id),
-        groupSize: groupSize?.value as number,
-      }
+      if (ring?.type !== 'light-array') throw new Error('ring is not a light array')
+      if (groupSize?.type !== 'number') throw new Error('ringGroupSize is not a number')
+      return { ringIds: ring.value.map((l) => l.id), groupSize: groupSize.value }
     }
 
     it('4 lights: ring is the array doubled with group size 1', () => {
@@ -992,8 +980,8 @@ describe('Node cue logic runtime', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       const picked = cueLevelVarStore.get('picked')
-      expect(picked?.type).toBe('light-array')
-      const arr = picked?.value as TrackedLight[]
+      if (picked?.type !== 'light-array') throw new Error('picked is not a light array')
+      const arr = picked.value
       expect(arr).toHaveLength(1)
       expect(['front1', 'front2']).toContain(arr[0].id)
     })

@@ -1,17 +1,16 @@
 /** Handlers for the numeric logic nodes: arithmetic, formulas, clamping, wall-clock pulses, rolls. */
 
 import type { RandomRoll } from '../../../types/nodeCueTypes'
-import type { TrackedLight } from '../../../../types'
 import { randomBetween, shuffle } from '../../../../helpers/utils'
-import { resolveValue } from '../valueResolver'
+import { resolveNumber } from '../valueResolver'
 import { compileExpression } from '../expressionEvaluator'
 import { monotonicNowMs } from '../../../../../shared/time'
 import { log, warnedExpressionParseErrors, type LogicHandler } from './handlerContext'
 
 export const mathHandler: LogicHandler<'math'> = (logicNode, ctx) => {
   const { context, variableDefinitions, getVarStore } = ctx
-  const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions))
-  const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions))
+  const left = resolveNumber(logicNode.left, context, variableDefinitions)
+  const right = resolveNumber(logicNode.right, context, variableDefinitions)
   let result = 0
 
   switch (logicNode.operator) {
@@ -58,9 +57,7 @@ export const expressionHandler: LogicHandler<'expression'> = (logicNode, ctx) =>
   try {
     result = compileExpression(logicNode.expression).evaluate((name) => {
       try {
-        return Number(
-          resolveValue('number', { source: 'variable', name }, context, variableDefinitions),
-        )
+        return Number(resolveNumber({ source: 'variable', name }, context, variableDefinitions))
       } catch {
         return 0
       }
@@ -80,9 +77,9 @@ export const expressionHandler: LogicHandler<'expression'> = (logicNode, ctx) =>
 
 export const clampHandler: LogicHandler<'clamp'> = (logicNode, ctx) => {
   const { context, variableDefinitions, getVarStore } = ctx
-  const value = Number(resolveValue('number', logicNode.value, context, variableDefinitions))
-  const min = Number(resolveValue('number', logicNode.min, context, variableDefinitions))
-  const max = Number(resolveValue('number', logicNode.max, context, variableDefinitions))
+  const value = resolveNumber(logicNode.value, context, variableDefinitions)
+  const min = resolveNumber(logicNode.min, context, variableDefinitions)
+  const max = resolveNumber(logicNode.max, context, variableDefinitions)
   // Constrain value to [min, max]. A degenerate range (min > max) clamps to max, since
   // Math.min(max, Math.max(min, value)) resolves to max rather than throwing.
   const result = Math.min(Math.max(value, min), max)
@@ -108,10 +105,7 @@ export const pulseHandler: LogicHandler<'pulse'> = (logicNode, ctx) => {
     anchorStore.set(logicNode.anchorVar, { type: 'number', value: anchor })
   }
   // Guard interval to >= 1ms: a zero/negative/NaN interval would divide-by-zero the cycle math.
-  const interval = Math.max(
-    1,
-    Number(resolveValue('number', logicNode.interval, context, variableDefinitions)),
-  )
+  const interval = Math.max(1, resolveNumber(logicNode.interval, context, variableDefinitions))
   const cycles = (now - anchor) / interval
   const index = Math.floor(cycles)
   getVarStore(logicNode.assignTo).set(logicNode.assignTo, { type: 'number', value: index })
@@ -132,20 +126,10 @@ export const randomHandler: LogicHandler<'random'> = (logicNode, ctx) => {
     const varStore = getVarStore(roll.assignTo)
     if (roll.mode === 'random-integer') {
       const minVal = Number(
-        resolveValue(
-          'number',
-          roll.min ?? { source: 'literal', value: 0 },
-          context,
-          variableDefinitions,
-        ),
+        resolveNumber(roll.min ?? { source: 'literal', value: 0 }, context, variableDefinitions),
       )
       const maxVal = Number(
-        resolveValue(
-          'number',
-          roll.max ?? { source: 'literal', value: 1 },
-          context,
-          variableDefinitions,
-        ),
+        resolveNumber(roll.max ?? { source: 'literal', value: 1 }, context, variableDefinitions),
       )
       const min = Math.floor(minVal)
       const max = Math.floor(maxVal)
@@ -164,14 +148,9 @@ export const randomHandler: LogicHandler<'random'> = (logicNode, ctx) => {
         )
         return
       }
-      const lightsArray = sourceVar.value as TrackedLight[]
+      const lightsArray = sourceVar.value
       const countVal = Number(
-        resolveValue(
-          'number',
-          roll.count ?? { source: 'literal', value: 1 },
-          context,
-          variableDefinitions,
-        ),
+        resolveNumber(roll.count ?? { source: 'literal', value: 1 }, context, variableDefinitions),
       )
       const count = Math.max(0, Math.min(Math.floor(countVal), lightsArray.length))
       const shuffled = shuffle(lightsArray)

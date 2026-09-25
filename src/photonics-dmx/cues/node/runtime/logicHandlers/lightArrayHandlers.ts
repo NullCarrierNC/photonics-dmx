@@ -23,7 +23,7 @@ export const lightsFromIndexHandler: LogicHandler<'lights-from-index'> = (logicN
     return ctx.next()
   }
 
-  const lightsArray = sourceVar.value as TrackedLight[]
+  const lightsArray = sourceVar.value
 
   if (lightsArray.length === 0) {
     warnOncePerNode(
@@ -89,16 +89,8 @@ export const lightsFromIndexHandler: LogicHandler<'lights-from-index'> = (logicN
             indices = [parsed]
           }
         }
-      } else if (Array.isArray(varValue.value)) {
-        // Array variable - assume it's an array of numbers (for future support)
-        indices = (varValue.value as unknown[])
-          .map((v) => {
-            const num = typeof v === 'number' ? v : Number(v)
-            return isNaN(num) ? null : Math.floor(num)
-          })
-          .filter((idx): idx is number => idx !== null)
-      } else {
-        // Try to parse as number
+      } else if (!Array.isArray(varValue.value)) {
+        // A light or colour array holds no indices. Anything else is parsed as a number.
         const parsed = Number(varValue.value)
         if (!isNaN(parsed)) {
           indices = [Math.floor(parsed)]
@@ -147,7 +139,7 @@ export const reverseLightsHandler: LogicHandler<'reverse-lights'> = (logicNode, 
     return ctx.next()
   }
 
-  const lightsArray = sourceVar.value as TrackedLight[]
+  const lightsArray = sourceVar.value
   const reversedLights = [...lightsArray].reverse()
 
   // Assign the reversed array to the target variable
@@ -170,7 +162,7 @@ export const createPairsHandler: LogicHandler<'create-pairs'> = (logicNode, ctx)
     return ctx.next()
   }
 
-  const lightsArray = sourceVar.value as TrackedLight[]
+  const lightsArray = sourceVar.value
   let pairedLights: TrackedLight[]
 
   if (logicNode.pairType === 'opposite') {
@@ -198,7 +190,7 @@ export const concatLightsHandler: LogicHandler<'concat-lights'> = (logicNode, ct
     const sourceVar = sourceVarStore.get(varName)
 
     if (sourceVar && sourceVar.type === 'light-array') {
-      concatResult.push(...(sourceVar.value as TrackedLight[]))
+      concatResult.push(...sourceVar.value)
     } else {
       warnOncePerNode(
         degenerateKey(`concat:${varName}`),
@@ -270,7 +262,7 @@ export const shuffleLightsHandler: LogicHandler<'shuffle-lights'> = (logicNode, 
     return ctx.next()
   }
 
-  const lightsArray = sourceVar.value as TrackedLight[]
+  const lightsArray = sourceVar.value
   const shuffled = shuffle(lightsArray)
   const targetVarStore = getVarStore(logicNode.assignTo)
   targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: shuffled })

@@ -110,6 +110,27 @@ describe('useFlowSync', () => {
     })
   })
 
+  it('leaves an array parameter to the initial value of the effect it raises', () => {
+    const withLights = {
+      ...SWEEP,
+      variables: [
+        ...SWEEP.variables!,
+        { name: 'targets', type: 'light-array', scope: 'cue', isParameter: true, initialValue: [] },
+        { name: 'palette', type: 'color-array', scope: 'cue', isParameter: true, initialValue: [] },
+      ],
+    } as YargEffectDefinition
+    const { result, rerender } = renderSync()
+    act(() => result.current.loadCueIntoFlow(CUE))
+    rerender({ definitions: new Map([['sweep', withLights]]) })
+
+    expect((raiser(result.current.nodes).data.payload as EffectRaiserNode).parameterValues).toEqual(
+      {
+        speed: { source: 'literal', value: 9 },
+        colour: { source: 'literal', value: 'red' },
+      },
+    )
+  })
+
   it('leaves the nodes alone when the definitions change nothing', () => {
     const { result, rerender } = renderSync()
     act(() => result.current.loadCueIntoFlow(CUE))

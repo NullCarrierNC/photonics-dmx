@@ -7,7 +7,12 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { COLOR_OPTIONS, type TrackedLight, type Color } from '../../../../../../photonics-dmx/types'
+import {
+  COLOR_OPTIONS,
+  isColor,
+  type TrackedLight,
+  type Color,
+} from '../../../../../../photonics-dmx/types'
 import ColorListEditor from '../shared/ColorListEditor'
 import { DraftNumberField } from '../../../controls/DraftField'
 import {
@@ -114,7 +119,7 @@ function getInitialValueInput(
     case 'color-array':
       return (
         <ColorListEditor
-          colors={Array.isArray(value) ? (value as Color[]) : []}
+          colors={Array.isArray(value) ? value.filter(isColor) : []}
           onColorsChange={(colors) => onChange(colors)}
         />
       )

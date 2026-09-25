@@ -103,7 +103,7 @@ describe('Effect runtime with real Sequencer', () => {
 
   const runEffect = (
     effect: YargEffectDefinition,
-    parameters: Record<string, VariableValue['value']> = {},
+    parameters: Record<string, VariableValue> = {},
   ) => {
     const engine = new EffectExecutionEngine(
       EffectCompiler.compile(effect),
@@ -136,14 +136,14 @@ describe('Effect runtime with real Sequencer', () => {
     name: string
     variables?: VariableDefinition[]
     color?: Partial<NodeColorSetting>
-    parameters?: Record<string, VariableValue['value']>
+    parameters?: Record<string, VariableValue>
     expected: Parameters<typeof getColor>
   }>([
     {
       name: 'maps effect parameters into action values',
       variables: [parameter('colorParam', 'string', 'red')],
       color: { name: variable('colorParam') },
-      parameters: { colorParam: 'green' },
+      parameters: { colorParam: { type: 'string', value: 'green' } },
       expected: ['green', 'high'],
     },
     {
@@ -158,7 +158,11 @@ describe('Effect runtime with real Sequencer', () => {
         brightness: variable('brightness'),
         blendMode: variable('blendMode'),
       },
-      parameters: { colorName: 'red', brightness: 'max', blendMode: 'add' },
+      parameters: {
+        colorName: { type: 'string', value: 'red' },
+        brightness: { type: 'string', value: 'max' },
+        blendMode: { type: 'string', value: 'add' },
+      },
       expected: ['red', 'max', 'add'],
     },
     {
@@ -180,7 +184,7 @@ describe('Effect runtime with real Sequencer', () => {
       buildEffect('delay-param-effect', action, {
         variables: [parameter('startDelay', 'number', 0)],
       }),
-      { startDelay: 30 },
+      { startDelay: { type: 'number', value: 30 } },
     )
 
     const lightId = harness.frontLightIds[0]
@@ -199,7 +203,7 @@ describe('Effect runtime with real Sequencer', () => {
       buildEffect('duration-param-effect', action, {
         variables: [parameter('fadeDuration', 'number', 0)],
       }),
-      { fadeDuration: 40 },
+      { fadeDuration: { type: 'number', value: 40 } },
     )
 
     const lightId = harness.frontLightIds[0]
@@ -296,7 +300,7 @@ describe('Effect runtime with real Sequencer', () => {
       buildEffect('light-array-param', action, {
         variables: [parameter('targetLights', 'light-array', [])],
       }),
-      { targetLights: selectedLights },
+      { targetLights: { type: 'light-array', value: selectedLights } },
     )
 
     for (const lightId of harness.frontLightIds) {

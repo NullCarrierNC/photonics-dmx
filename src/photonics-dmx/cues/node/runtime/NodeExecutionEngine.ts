@@ -28,7 +28,6 @@ import {
   EffectRaiserNode,
   LogicNode,
   VariableDefinition,
-  VariableType,
   NodeCueMode,
 } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
@@ -43,7 +42,7 @@ import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { ContextLifecycleEvent } from './executionStateMachineLifecycle'
-import { resolveValue, inferSourceType } from './valueResolver'
+import { resolveVariableValue } from './valueResolver'
 import { debugPreview } from './nodeDebugPreview'
 import { resolveActionTiming, resolveActionLayer, resolveMotionPattern } from './actionResolver'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -502,14 +501,12 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
         return
       }
 
-      // Resolve parameter values using the effect's declared parameter types so string/color/event
-      // params are not coerced through a numeric fallback.
-      const paramValues: Record<string, VariableValue['value']> = {}
+      // Each parameter the effect declares, resolved as its declared type.
+      const paramValues: Record<string, VariableValue> = {}
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
         const paramDef = compiledEffect.parameters.get(paramName)
-        const expectedType: VariableType =
-          paramDef != null ? paramDef.type : inferSourceType(valueSource)
-        paramValues[paramName] = resolveValue(expectedType, valueSource, context)
+        if (paramDef)
+          paramValues[paramName] = resolveVariableValue(paramDef.type, valueSource, context)
       }
 
       // Create effect execution engine (share initial-clear policy so first submission in cue or effect uses setEffect)

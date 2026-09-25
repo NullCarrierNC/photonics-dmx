@@ -15,7 +15,7 @@ import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { ExecutionContext } from './ExecutionContext'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
-import { VariableValue, type NodeCueDebugSwitch } from './executionTypes'
+import { VariableValue, variableValue, type NodeCueDebugSwitch } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
 import { AudioEventRuns } from './audioEventRuns'
@@ -427,20 +427,14 @@ export abstract class BaseAudioNodeCue {
     const cueVariables = definition.variables ?? []
     for (const varDef of cueVariables) {
       if (!state.cueLevelVarStore.has(varDef.name)) {
-        state.cueLevelVarStore.set(varDef.name, {
-          type: varDef.type,
-          value: varDef.initialValue,
-        })
+        state.cueLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
       }
     }
 
     const groupVariables = this.compiledCue.groupVariables ?? []
     for (const varDef of groupVariables) {
       if (!state.groupLevelVarStore.has(varDef.name)) {
-        state.groupLevelVarStore.set(varDef.name, {
-          type: varDef.type,
-          value: varDef.initialValue,
-        })
+        state.groupLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
       }
     }
   }

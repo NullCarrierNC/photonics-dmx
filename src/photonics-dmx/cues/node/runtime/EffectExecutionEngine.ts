@@ -17,11 +17,10 @@ import {
   LogicNode,
 } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
-import { effectParameterValue } from './effectParameters'
-import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
+import { VariableValue, NodeRuntimeCallbacks, variableValue } from './executionTypes'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
-import { resolveValue } from './valueResolver'
+import { resolveNumber } from './valueResolver'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
@@ -47,7 +46,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
 
   private compiledEffect: CompiledEffect<BaseEventNode>
   private effectVarStore: Map<string, VariableValue> // Effect-local variables
-  private parameterValues: Record<string, VariableValue['value']>
+  private parameterValues: Record<string, VariableValue>
   private callerCueData: CueData | AudioCueData // Cue data from caller
   private onIdleCallback?: () => void // Called when all contexts complete
   /** Prevents re-entrant onIdleCallback when triggerEffect completes synchronously (e.g. persistent raiser re-trigger). */
@@ -80,7 +79,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     sequencer: ILightingController,
     lightManager: DmxLightManager,
     broadcaster: RuntimeBroadcaster,
-    parameterValues: Record<string, VariableValue['value']>,
+    parameterValues: Record<string, VariableValue>,
     callerCueData: CueData | AudioCueData,
     options: EffectExecutionEngineOptions,
   ) {
@@ -205,10 +204,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
    */
   private initializeVariables(): void {
     for (const varDef of this.variableDefinitions) {
-      this.effectVarStore.set(varDef.name, {
-        type: varDef.type,
-        value: varDef.initialValue,
-      })
+      this.effectVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
     }
   }
 
@@ -267,21 +263,17 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
 
   /**
    * Apply parameter values to effect variables.
-   * Parameters are variables with isParameter: true in the effect definition.
-   * Caller (NodeExecutionEngine) passes resolved primitives with correct types (e.g. waitUntilCondition
-   * 'delay', waitUntilTime 500/200, color 'yellow'/'blue'); we store them per param type for action timing.
+   * Parameters are variables with isParameter: true in the effect definition. Each takes the value
+   * the raiser (NodeExecutionEngine) resolved as its declared type, or else its initial value.
    */
   private applyParameterValues(_listener: EffectEventListenerNode): void {
-    // Get all variables marked as parameters
     const parameterVars = this.variableDefinitions.filter((v) => v.isParameter)
 
     for (const paramVar of parameterVars) {
-      const value = effectParameterValue(this.parameterValues[paramVar.name], paramVar)
-
-      this.effectVarStore.set(paramVar.name, {
-        type: paramVar.type,
-        value: value,
-      })
+      this.effectVarStore.set(
+        paramVar.name,
+        this.parameterValues[paramVar.name] ?? variableValue(paramVar.type, paramVar.initialValue),
+      )
     }
   }
 
@@ -296,7 +288,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     context: ExecutionContext,
   ): number {
     if (logicNode.groupSize) {
-      const resolved = Number(resolveValue('number', logicNode.groupSize, context))
+      const resolved = resolveNumber(logicNode.groupSize, context)
       if (typeof resolved === 'number' && !Number.isNaN(resolved) && resolved > 0) {
         return Math.floor(resolved)
       }

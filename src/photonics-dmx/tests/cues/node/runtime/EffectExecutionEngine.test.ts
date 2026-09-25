@@ -5,6 +5,7 @@ import type { CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
+import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
 
 /** The idle callback is queued as a microtask, so let it run before asserting on it. */
 const flushIdle = (): Promise<void> => Promise.resolve()
@@ -135,9 +136,9 @@ describe('EffectExecutionEngine', () => {
       }
 
       const compiledEffect = EffectCompiler.compile(effect)
-      const parameterValues = {
-        speed: 150,
-        color: 'blue',
+      const parameterValues: Record<string, VariableValue> = {
+        speed: { type: 'number', value: 150 },
+        color: { type: 'string', value: 'blue' },
       }
 
       const engine = new EffectExecutionEngine(
@@ -203,7 +204,7 @@ describe('EffectExecutionEngine', () => {
       }
 
       const compiledEffect = EffectCompiler.compile(effect)
-      const parameterValues = {} // Missing 'speed'
+      const parameterValues: Record<string, VariableValue> = {} // Missing 'speed'
 
       const engine = new EffectExecutionEngine(
         compiledEffect,
@@ -303,14 +304,17 @@ describe('EffectExecutionEngine', () => {
       }
 
       const compiledEffect = EffectCompiler.compile(effect)
-      const parameterValues = {
-        lights: [
-          { id: 'light1', position: 0 },
-          { id: 'light2', position: 1 },
-        ],
-        color: 'yellow',
-        waitUntilCondition: 'delay',
-        waitUntilTime: 500,
+      const parameterValues: Record<string, VariableValue> = {
+        lights: {
+          type: 'light-array',
+          value: [
+            { id: 'light1', position: 0 },
+            { id: 'light2', position: 1 },
+          ],
+        },
+        color: { type: 'color', value: 'yellow' },
+        waitUntilCondition: { type: 'string', value: 'delay' },
+        waitUntilTime: { type: 'number', value: 500 },
       }
 
       let submittedEffect: any
@@ -407,7 +411,10 @@ describe('EffectExecutionEngine', () => {
       }
 
       const compiledEffect = EffectCompiler.compile(effect)
-      const parameterValues = { waitUntilCondition: 'delay', waitUntilTime: 500 }
+      const parameterValues: Record<string, VariableValue> = {
+        waitUntilCondition: { type: 'string', value: 'delay' },
+        waitUntilTime: { type: 'number', value: 500 },
+      }
 
       const submitted: any[] = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
@@ -524,10 +531,10 @@ describe('EffectExecutionEngine', () => {
 
       const compiledEffect = EffectCompiler.compile(effect)
       const lights = [{ id: 'light1', position: 0 }]
-      const parameterValues = {
-        lights,
-        waitUntilCondition: 'delay',
-        waitUntilTime: 0,
+      const parameterValues: Record<string, VariableValue> = {
+        lights: { type: 'light-array', value: lights },
+        waitUntilCondition: { type: 'string', value: 'delay' },
+        waitUntilTime: { type: 'number', value: 0 },
       }
 
       const submitted: any[] = []
@@ -698,10 +705,10 @@ describe('EffectExecutionEngine', () => {
       }
 
       const compiledEffect = EffectCompiler.compile(effect)
-      const parameterValues = {
-        lights: [{ id: 'light1', position: 0 }],
-        waitUntilCondition: 'delay',
-        waitUntilTime: 200,
+      const parameterValues: Record<string, VariableValue> = {
+        lights: { type: 'light-array', value: [{ id: 'light1', position: 0 }] },
+        waitUntilCondition: { type: 'string', value: 'delay' },
+        waitUntilTime: { type: 'number', value: 200 },
       }
 
       let submittedEffect: any
@@ -811,7 +818,10 @@ describe('EffectExecutionEngine', () => {
         { id: 'light3', position: 2 },
         { id: 'light4', position: 3 },
       ]
-      const parameterValues = { lights, groupSize: 2 }
+      const parameterValues: Record<string, VariableValue> = {
+        lights: { type: 'light-array', value: lights },
+        groupSize: { type: 'number', value: 2 },
+      }
 
       const submissions: any[] = []
       const captureEffect = (_name: string, effectArg: any) => submissions.push(effectArg)
@@ -1213,21 +1223,18 @@ describe('EffectExecutionEngine', () => {
   })
 
   describe('Idle gating for callback-backed effects', () => {
+    const lights = [
+      { id: 'light1', position: 0 },
+      { id: 'light2', position: 1 },
+    ]
+
     const createForEachBlockingEffect = (): YargEffectDefinition => ({
       id: 'for-each-blocking-effect',
       mode: 'yarg',
       name: 'For Each Blocking Effect',
       description: '',
       variables: [
-        {
-          name: 'lights',
-          type: 'light-array',
-          scope: 'cue',
-          initialValue: [
-            { id: 'light1', position: 0 },
-            { id: 'light2', position: 1 },
-          ],
-        },
+        { name: 'lights', type: 'light-array', scope: 'cue', initialValue: [], isParameter: true },
         { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
       ],
@@ -1302,7 +1309,7 @@ describe('EffectExecutionEngine', () => {
         mockSequencer,
         mockLightManager,
         noopRuntimeBroadcaster(),
-        {},
+        { lights: { type: 'light-array', value: lights } },
         createCueData(),
         { callerMode: 'yarg' },
       )
@@ -1339,7 +1346,7 @@ describe('EffectExecutionEngine', () => {
         mockSequencer,
         mockLightManager,
         noopRuntimeBroadcaster(),
-        {},
+        { lights: { type: 'light-array', value: lights } },
         createCueData(),
         { callerMode: 'yarg' },
       )
@@ -1382,7 +1389,7 @@ describe('EffectExecutionEngine', () => {
         mockSequencer,
         mockLightManager,
         noopRuntimeBroadcaster(),
-        {},
+        { lights: { type: 'light-array', value: lights } },
         createCueData(),
         { callerMode: 'yarg' },
       )

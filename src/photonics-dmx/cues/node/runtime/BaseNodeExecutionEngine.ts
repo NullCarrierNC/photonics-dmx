@@ -34,7 +34,7 @@ import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
 import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
-import type { Effect, TrackedLight } from '../../../types'
+import type { Effect } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { delayPlaceholderAction, indexEventListeners } from './engineUtils'
 import { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
@@ -48,7 +48,7 @@ import {
 } from '../compiler/ActionEffectFactory'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import {
-  resolveValue,
+  resolveNumber,
   getVariableStore,
   resolveLocationGroups,
   resolveLightTarget,
@@ -422,7 +422,7 @@ export abstract class BaseNodeExecutionEngine {
   ): void {
     const nodeId = delayNode.id
     try {
-      const delayMs = Number(resolveValue('number', delayNode.delayTime, context))
+      const delayMs = resolveNumber(delayNode.delayTime, context)
       this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs })
 
       // Registered as active so the delay blocks the nodes after it until it fires.
@@ -519,7 +519,7 @@ export abstract class BaseNodeExecutionEngine {
       return
     }
 
-    const lightsArray = sourceVar.value as TrackedLight[]
+    const lightsArray = sourceVar.value
     const rawLength = lightsArray.length
 
     const groupSize = this.resolveForEachGroupSize(logicNode, context)
