@@ -43,12 +43,21 @@ const layoutWith = (frontLights: unknown[]) => ({
   strobeLights: [],
 })
 
-/** Boots a manager against the given stored files, with empty defaults for the rest. */
-function boot(files: { lights?: unknown[]; layoutLights?: unknown[] }): ConfigurationManager {
+/**
+ * Boots a manager against the given stored files, with empty defaults for the rest. `lightsFile` is
+ * the whole of lights.json, and `lights` the list inside an unversioned one.
+ */
+function boot(files: {
+  lights?: unknown[]
+  lightsFile?: unknown
+  layoutLights?: unknown[]
+}): ConfigurationManager {
   ;(fs.existsSync as jest.Mock).mockReturnValue(true)
   ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
     if (path.includes('prefs.json')) return JSON.stringify({ effectDebounce: 0 })
-    if (path.includes('lights.json')) return JSON.stringify({ lights: files.lights ?? [] })
+    if (path.includes('lights.json')) {
+      return JSON.stringify(files.lightsFile ?? { lights: files.lights ?? [] })
+    }
     if (path.includes('lightsLayout.json')) {
       return JSON.stringify(layoutWith(files.layoutLights ?? []))
     }
@@ -121,6 +130,20 @@ describe('ConfigurationManager fixture loading', () => {
 
     expect(cm.getUserLights()[0].id).toEqual(expect.any(String))
     expect(reportsFor(cm, 'lights.json')[0]?.message).toContain('[0].id')
+  })
+
+  it.each([
+    ['an unversioned', [template({})]],
+    ['a versioned', { version: 1, data: [template({})] }],
+  ])('loads the templates from %s array', (_, lightsFile) => {
+    const cm = boot({ lightsFile })
+
+    expect(cm.getUserLights()).toEqual([expect.objectContaining({ id: 'tpl-1' })])
+    const moved = (fs.renameSync as jest.Mock).mock.calls.some((c) =>
+      String(c[0]).endsWith('lights.json'),
+    )
+    expect(moved).toBe(false)
+    expect(reportsFor(cm, 'lights.json')).toEqual([])
   })
 
   it('moves a lights file aside when it names a fixture type no build wrote', () => {
