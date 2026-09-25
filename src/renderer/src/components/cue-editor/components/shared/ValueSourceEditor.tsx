@@ -95,6 +95,13 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   const isString =
     expected === 'string' || expected === 'color' || expected === 'event' || expected === 'cue-type'
   const allowTextInput = isString || expected === 'either'
+  // A stored literal the choices do not include (from a hand-edited file, say) is shown as it is
+  // and flagged.
+  const literalText = isLiteral ? String(source.value) : ''
+  const isUnknownLiteral =
+    isLiteral &&
+    constrainedLiteralChoices !== undefined &&
+    !constrainedLiteralChoices.some((opt) => opt.value === literalText)
 
   if (isLightArray) {
     const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
@@ -244,16 +251,28 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
             </select>
           ) : constrainedLiteralChoices ? (
             // Show dropdown for constrained literals (e.g., colours, bearing directions)
-            <select
-              className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={String(source.value)}
-              onChange={(event) => onChange({ ...source, value: event.target.value })}>
-              {constrainedLiteralChoices.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={literalText}
+                onChange={(event) => onChange({ ...source, value: event.target.value })}>
+                {isUnknownLiteral && (
+                  <option value={literalText} disabled>
+                    {literalText || '-- Select --'}
+                  </option>
+                )}
+                {constrainedLiteralChoices.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {isUnknownLiteral && (
+                <span className="text-[10px] text-red-500">
+                  {literalText ? `'${literalText}' is not a known value` : 'Select a value'}
+                </span>
+              )}
+            </>
           ) : (
             <input
               type={allowTextInput ? 'text' : 'number'}

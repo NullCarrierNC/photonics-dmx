@@ -3,16 +3,59 @@ import type {
   ActionNode,
   NodeCueMode,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { WaitCondition } from '../../../../../../../photonics-dmx/types'
 import { EASING_OPTIONS, getActionWaitOptions } from '../../../lib/options'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
+/** The stored condition literal, or 'none' for a condition held in a variable. */
 function conditionFromValueSource(
   vs: { source: string; value?: unknown; name?: string } | undefined,
-): WaitCondition {
+): string {
   if (!vs) return 'none'
-  if (vs.source === 'literal') return String(vs.value) as WaitCondition
+  if (vs.source === 'literal') return String(vs.value)
   return 'none'
+}
+
+type WaitConditionSelectProps = {
+  value: string
+  activeMode: NodeCueMode
+  disabled?: boolean
+  onChange: (value: string) => void
+}
+
+/** The mode's wait conditions, showing and flagging a stored one the mode does not offer. */
+const WaitConditionSelect: React.FC<WaitConditionSelectProps> = ({
+  value,
+  activeMode,
+  disabled,
+  onChange,
+}) => {
+  const options = getActionWaitOptions(activeMode)
+  const isUnknown = !options.some((option) => option.value === value)
+  return (
+    <>
+      <select
+        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}>
+        {isUnknown && (
+          <option value={value} disabled>
+            {value}
+          </option>
+        )}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {isUnknown && (
+        <span className="text-[10px] text-red-500">
+          &apos;{value}&apos; is not a known wait condition
+        </span>
+      )}
+    </>
+  )
 }
 
 type ActionTimingSectionProps = {
@@ -36,19 +79,12 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
     <div className="space-y-2">
       <label className="flex flex-col font-medium">
         Wait For Condition
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+        <WaitConditionSelect
           value={conditionFromValueSource(currentTiming.waitForCondition)}
-          onChange={(event) =>
-            updateTiming({ waitForCondition: { source: 'literal', value: event.target.value } })
-          }
-          disabled={selectedActionHasEventParent}>
-          {getActionWaitOptions(activeMode).map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          activeMode={activeMode}
+          disabled={selectedActionHasEventParent}
+          onChange={(value) => updateTiming({ waitForCondition: { source: 'literal', value } })}
+        />
         {selectedActionHasEventParent && (
           <span className="text-[10px] text-gray-500">Inherited from event parent</span>
         )}
@@ -87,24 +123,18 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
     <div className="space-y-2">
       <label className="flex flex-col font-medium">
         Wait Until Condition
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+        <WaitConditionSelect
           value={conditionFromValueSource(currentTiming.waitUntilCondition)}
-          onChange={(event) => {
-            const value = event.target.value as WaitCondition
+          activeMode={activeMode}
+          onChange={(value) =>
             updateTiming({
               waitUntilCondition: { source: 'literal', value },
               ...(value !== 'none' && {
                 waitUntilConditionCount: { source: 'literal', value: 1 },
               }),
             })
-          }}>
-          {getActionWaitOptions(activeMode).map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          }
+        />
       </label>
       {!(
         node.effectType === 'set-color' &&
