@@ -88,17 +88,19 @@ function validateColorLiterals(
   label: string,
   createError: (message: string) => Error,
 ): void {
-  const fields: [string, ValueSource | undefined, (value: unknown) => boolean, string][] = [
-    ['name', color.name, isColor, 'Color'],
-    ['brightness', color.brightness, isBrightness, 'Brightness'],
-    ['blendMode', color.blendMode, isBlendMode, 'BlendMode'],
-  ]
-  for (const [field, source, isKnown, typeName] of fields) {
-    if (source?.source === 'literal' && !isKnown(source.value)) {
-      throw createError(
-        `Action '${label}' color.${field} '${String(source.value)}' is not a known ${typeName}.`,
-      )
-    }
+  const { name, brightness, blendMode } = color
+  if (name.source === 'literal' && !isColor(name.value)) {
+    throw createError(`Action '${label}' color.name '${String(name.value)}' is not a known Color.`)
+  }
+  if (brightness.source === 'literal' && !isBrightness(brightness.value)) {
+    throw createError(
+      `Action '${label}' color.brightness '${String(brightness.value)}' is not a known Brightness.`,
+    )
+  }
+  if (blendMode?.source === 'literal' && !isBlendMode(blendMode.value)) {
+    throw createError(
+      `Action '${label}' color.blendMode '${String(blendMode.value)}' is not a known BlendMode.`,
+    )
   }
 }
 

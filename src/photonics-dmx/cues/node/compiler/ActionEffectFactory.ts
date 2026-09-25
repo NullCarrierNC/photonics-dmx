@@ -36,9 +36,7 @@ import {
 } from './effectBuilders'
 
 /** A value source's literal, or undefined for a value held in a variable. */
-const literalValue = (
-  source: ValueSource | undefined,
-): Extract<ValueSource, { source: 'literal' }>['value'] | undefined =>
+const literalValue = (source: ValueSource | undefined) =>
   source?.source === 'literal' ? source.value : undefined
 
 export class ActionEffectFactory {
