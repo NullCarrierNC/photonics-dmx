@@ -68,10 +68,10 @@ export const lightsFromIndexHandler: LogicHandler<'lights-from-index'> = (logicN
     if (varValue) {
       if (varValue.type === 'number') {
         // Single number variable
-        indices = [Math.floor(Number(varValue.value))]
+        indices = [Math.floor(varValue.value)]
       } else if (varValue.type === 'string') {
         // String variable - could be a single number or comma-separated list
-        const strValue = String(varValue.value)
+        const strValue = varValue.value
         if (strValue.includes(',')) {
           // Comma-separated list
           indices = strValue
