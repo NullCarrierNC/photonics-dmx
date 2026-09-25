@@ -43,11 +43,6 @@ const areParameterDefinitionsEqual = (
   })
 }
 
-const buildDefaultValueSource = (def: VariableDefinition): ValueSource => ({
-  source: 'literal',
-  value: def.initialValue,
-})
-
 export function useFlowSync({
   setNodes,
   setEdges,
@@ -86,9 +81,12 @@ export function useFlowSync({
             valuesChanged = true
           }
         }
+        // A raiser's literal holds no array, so an array parameter is left to the effect's
+        // initial value.
         for (const paramDef of parameterDefinitions) {
-          if (nextParameterValues[paramDef.name] === undefined) {
-            nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef)
+          const initialValue = paramDef.initialValue
+          if (nextParameterValues[paramDef.name] === undefined && !Array.isArray(initialValue)) {
+            nextParameterValues[paramDef.name] = { source: 'literal', value: initialValue }
             valuesChanged = true
           }
         }
