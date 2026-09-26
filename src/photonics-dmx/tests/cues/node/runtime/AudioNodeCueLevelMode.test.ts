@@ -374,6 +374,51 @@ describe('AudioNodeCue level mode', () => {
     expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 20)
   })
 
+  it('reads a cue-group variable the cue declares before any node writes it', async () => {
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-group-var',
+      cueTypeId: 'level-group-var',
+      name: 'Level group var',
+      style: 'primary',
+      variables: [{ name: 'gate', type: 'number', scope: 'cue-group', initialValue: 1 }],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [setColor('sc1', { source: 'literal', value: 'front' })],
+        logic: [
+          {
+            id: 'cond-gate',
+            type: 'logic',
+            logicType: 'conditional',
+            comparator: '>=',
+            left: { source: 'variable', name: 'gate' },
+            right: { source: 'literal', value: 1 },
+          },
+        ],
+      },
+      connections: [
+        { from: 'ev-energy', to: 'cond-gate' },
+        { from: 'cond-gate', to: 'sc1', fromPort: 'true' },
+      ],
+      layout: { nodePositions: {} },
+    }
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+
+    try {
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      h.advanceBy(20)
+
+      expect(h.getLightState(h.frontLightIds[0])?.red ?? 0).toBeGreaterThan(0)
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
+  })
+
   it.each([
     ['on layer 0', 0],
     ['with no layer', undefined],

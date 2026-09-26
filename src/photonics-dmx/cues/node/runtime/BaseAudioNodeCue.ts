@@ -424,10 +424,12 @@ export abstract class BaseAudioNodeCue {
   private initializeVariables(state: AudioCueRunState): void {
     const definition = this.compiledCue.definition as AudioNodeCueDefinition
 
+    // A cue variable lives in the store its scope names, where every read looks for it.
     const cueVariables = definition.variables ?? []
     for (const varDef of cueVariables) {
-      if (!state.cueLevelVarStore.has(varDef.name)) {
-        state.cueLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
+      const store = varDef.scope === 'cue' ? state.cueLevelVarStore : state.groupLevelVarStore
+      if (!store.has(varDef.name)) {
+        store.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
       }
     }
 
