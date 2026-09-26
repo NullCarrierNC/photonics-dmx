@@ -1,8 +1,10 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { act, render, waitFor } from '@testing-library/react'
+import { useState } from 'react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { Provider, createStore } from 'jotai'
 import { useBlackoutShortcut } from './useBlackoutShortcut'
+import Modal, { type ModalProps } from '../components/Modal'
 import { masterOutputAtom } from '../state/masterOutput'
 import { claimEscape, resetEscapeClaims } from '../utils/escClaims'
 import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -90,10 +92,20 @@ function watchBubblePhase(): jest.Mock {
   return seen
 }
 
-function openDialog(): void {
-  const dialog = document.createElement('div')
-  dialog.setAttribute('aria-modal', 'true')
-  document.body.appendChild(dialog)
+function Dialog(props: Partial<ModalProps>) {
+  const [open, setOpen] = useState(true)
+  if (!open) return null
+  return (
+    <Modal onClose={() => setOpen(false)} panelClassName="" {...props}>
+      <input aria-label="Name" />
+    </Modal>
+  )
+}
+
+/** Opens a dialog that takes focus as it opens and unmounts when it closes. */
+function openDialog(props: Partial<ModalProps> = {}): HTMLElement {
+  render(<Dialog {...props} />)
+  return screen.getByRole('dialog')
 }
 
 function focusedElement<T extends HTMLElement>(el: T): T {
@@ -122,17 +134,27 @@ describe('useBlackoutShortcut', () => {
       expect(event.defaultPrevented).toBe(true)
     })
 
-    it('leaves Escape to an open dialog', async () => {
-      const seen = watchBubblePhase()
+    it('leaves Escape pressed inside a dialog to the dialog, which closes', async () => {
       const { store } = await mount()
-      openDialog()
+      const dialog = openDialog()
 
-      press('escape')
+      act(() => {
+        press('escape', dialog)
+      })
       await Promise.resolve()
 
       expect(store.get(masterOutputAtom).blackout).toBe(false)
-      // The dialog's own handler still gets the key, so it closes instead.
-      expect(seen).toHaveBeenCalled()
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('blacks out on Escape pressed with focus outside an open dialog', async () => {
+      const { store } = await mount()
+      openDialog()
+
+      press('escape', document.body)
+
+      await waitFor(() => expect(store.get(masterOutputAtom).blackout).toBe(true))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('leaves Escape to a drag that has claimed it', async () => {
