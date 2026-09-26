@@ -138,7 +138,7 @@ function pushGateSteps(hookText) {
         name: [command, ...trimmed].join(' '),
         command,
         args: trimmed,
-        note: 'held to HEAD and the branch base, without the refs of a push',
+        note: 'run over the working tree, without the refs of a push',
       })
     } else {
       skipped.push({ name, reason: 'it reads the refs of a push from stdin' })

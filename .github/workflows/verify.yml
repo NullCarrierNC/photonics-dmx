@@ -64,9 +64,12 @@ jobs:
       - name: Referenced paths are tracked
         run: npm run paths:check
 
-      # The cueVersion guard reads where HEAD meets development from the history this job fetches.
+      # The cueVersion guard holds bundled files to the branch as it stood before the push, or to
+      # the target of a pull request, as the coverage guard below does.
       - name: Bundled cue timelines and cueVersions
         run: npm run cue-sim:check
+        env:
+          CUE_VERSION_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
 
       # The branch as it stood before the push, or the target of a pull request, so a threshold
       # lowered on development itself is still held to what development had.

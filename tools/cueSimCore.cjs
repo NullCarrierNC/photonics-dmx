@@ -5,6 +5,8 @@
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- the tests require this core
 const { createHash } = require('node:crypto')
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a sibling tool core
+const { isMissingCommit } = require('./coverageThresholdCore.cjs')
 
 /** The rig, tempo and length every cue runs with, and the width of a fingerprint window. */
 const SETTINGS = {
@@ -290,6 +292,84 @@ function cueVersionProblems(files) {
   return problems
 }
 
+/**
+ * @typedef {{ localRef: string, localSha: string, remoteRef: string, remoteSha: string }} PushedRef
+ * @typedef {{ what: string, commit: string | null, base: string, against: string }} VersionBase
+ *   `commit` is the commit whose files are compared, or null for the working tree
+ * @typedef {{
+ *   pushed: PushedRef[] | null,
+ *   namedBase: string | undefined,
+ *   hasCommit: (sha: string) => boolean,
+ *   branchBase: (commit: string, ref: string) => string | null,
+ *   mergeBase: (commit: string, other: string) => string | null,
+ * }} VersionBaseInput
+ */
+
+/**
+ * What the cueVersion guard compares bundled files against. Without the refs of a push, the
+ * working tree is held to where HEAD meets its upstream or development. With them, as the pre-push
+ * hook gives them, each pushed commit is held to what the remote already has, or to where it meets
+ * its upstream or development when the remote has nothing for it yet. A named base, which CI gives
+ * as the commit a push or pull request starts from, also holds the working tree to where HEAD meets
+ * it. A base that cannot be found is a problem, so the guard never passes having compared nothing.
+ * @param {VersionBaseInput} input
+ * @returns {{ bases: VersionBase[], problems: string[] }}
+ */
+function cueVersionBases({ pushed, namedBase, hasCommit, branchBase, mergeBase }) {
+  /** @type {VersionBase[]} */
+  const bases = []
+  /** @type {string[]} */
+  const problems = []
+  const noBranchBase = (/** @type {string} */ what) =>
+    `${what}: no commit where it meets its upstream or development to compare bundled files with`
+  if (pushed === null) {
+    const base = branchBase('HEAD', 'HEAD')
+    if (base)
+      bases.push({ what: 'the working tree', commit: null, base, against: 'the branch base' })
+    else problems.push(noBranchBase('the working tree'))
+  } else {
+    for (const ref of pushed) {
+      if (!isMissingCommit(ref.remoteSha)) {
+        if (hasCommit(ref.remoteSha)) {
+          bases.push({
+            what: ref.localRef,
+            commit: ref.localSha,
+            base: ref.remoteSha,
+            against: `${ref.remoteRef} on the remote`,
+          })
+        } else {
+          problems.push(
+            `${ref.localRef}: ${ref.remoteRef} on the remote is at ${ref.remoteSha.slice(0, 8)}, which this clone does not have. Fetch it and push again.`,
+          )
+        }
+        continue
+      }
+      const base = branchBase(ref.localSha, ref.localRef)
+      if (base) {
+        bases.push({ what: ref.localRef, commit: ref.localSha, base, against: 'its branch base' })
+      } else {
+        problems.push(noBranchBase(ref.localRef))
+      }
+    }
+  }
+  if (namedBase && !isMissingCommit(namedBase)) {
+    const base = hasCommit(namedBase) ? mergeBase('HEAD', namedBase) : null
+    if (base) {
+      bases.push({
+        what: 'the working tree',
+        commit: null,
+        base,
+        against: 'where HEAD meets CUE_VERSION_BASE_REF',
+      })
+    } else {
+      problems.push(
+        `CUE_VERSION_BASE_REF names ${namedBase.slice(0, 8)}, which this clone does not have in HEAD's history`,
+      )
+    }
+  }
+  return { bases, problems }
+}
+
 module.exports = {
   SETTINGS,
   SCENARIOS,
@@ -303,4 +383,5 @@ module.exports = {
   compareFingerprints,
   describeMove,
   cueVersionProblems,
+  cueVersionBases,
 }

@@ -176,7 +176,7 @@ describe('pushGateSteps', () => {
       { name: 'npm run pushed:check', reason: 'it reads the refs of a push from stdin' },
     ])
     expect(gate.steps.find((step) => step.name === 'npm run coverage:check')?.note).toBe(
-      'held to HEAD and the branch base, without the refs of a push',
+      'run over the working tree, without the refs of a push',
     )
   })
 
@@ -190,6 +190,7 @@ describe('pushGateSteps', () => {
         'npm run format:check',
         'npx electron-vite build',
         'npm run knip:budget',
+        'npm run cue-sim:check',
         'npm run coverage:check',
         'npm run audit:check',
         'npm run test:coverage -- --randomize',
