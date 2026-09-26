@@ -1,5 +1,4 @@
 import { useAtom, useAtomValue } from 'jotai'
-import { useId } from 'react'
 import {
   yargListenerEnabledAtom,
   rb3eListenerEnabledAtom,
@@ -7,6 +6,7 @@ import {
 } from '../atoms'
 import { enableYarg, disableYarg, enableRb3, disableRb3 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { ToggleSwitch } from './controls/ToggleSwitch'
 const log = createLogger('ListenerToggle')
 
 /** What sets one game listener's switch apart from the other's. */
@@ -41,7 +41,6 @@ const ListenerToggle = ({ listener, disabled = false }: ListenerToggleProps) => 
   const [isEnabled, setIsEnabled] = useAtom(enabledAtom)
   const isOtherEnabled = useAtomValue(otherAtom)
   const isAudioEnabled = useAtomValue(audioListenerEnabledAtom)
-  const labelId = useId()
   const held = isOtherEnabled || isAudioEnabled || disabled
 
   const handleToggle = () => {
@@ -56,28 +55,13 @@ const ListenerToggle = ({ listener, disabled = false }: ListenerToggleProps) => 
   }
 
   return (
-    <div className="flex items-center mb-4 w-[190px] justify-between">
-      <label
-        id={labelId}
-        className={`mr-4 text-lg font-semibold ${
-          held ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
-        }`}>
-        Enable {name}
-      </label>
-      <button
-        role="switch"
-        aria-checked={isEnabled}
-        aria-labelledby={labelId}
-        onClick={handleToggle}
+    <div className="mb-4 w-[190px]">
+      <ToggleSwitch
+        label={`Enable ${name}`}
+        checked={isEnabled}
+        onToggle={handleToggle}
         disabled={held}
-        className={`w-12 h-6 rounded-full ${
-          isEnabled ? 'bg-green-500' : 'bg-gray-400'
-        } relative focus:outline-none ${held ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-        <div
-          className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-            isEnabled ? 'translate-x-6' : 'translate-x-0'
-          }`}></div>
-      </button>
+      />
     </div>
   )
 }

@@ -12,8 +12,9 @@ export interface ToggleSwitchProps {
 /**
  * The sliding on/off switch used across the settings surfaces.
  *
- * Every settings toggle draws from here, so the colour animation and the label spacing match
- * wherever two of them sit in the same row.
+ * The output sender and game listener switches draw from here, so the colour animation and the
+ * label spacing match where they share a row. The audio, smoothing and cue editor toolbar switches
+ * draw their own.
  */
 export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
   label,
