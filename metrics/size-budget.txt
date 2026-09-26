@@ -9,4 +9,5 @@ Regenerate after a split with node tools/size-budget.mjs --write, which only low
 641 src/main/ipc/validation/prefsValidation.ts
 621 src/photonics-dmx/controllers/sequencer/EffectManager.ts
 619 src/renderer/src/services/AudioCaptureManager.ts
+604 src/main/controllers/ControllerManager.ts
 602 src/services/configuration/preferencesMigration.ts

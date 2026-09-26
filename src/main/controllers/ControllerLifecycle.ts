@@ -15,6 +15,10 @@ export class LifecycleAbortedError extends Error {
   }
 }
 
+/** The refusal an input enable or console entry gets while an uncaught fault is held. */
+export const FAULT_HELD_MESSAGE =
+  'The lighting controllers stopped after an error. Restart them first.'
+
 /**
  * The transitions each phase may move to. A transition outside this table is still performed (the
  * running graph knows more than the table does) but logged as a warning so protocol violations
@@ -66,6 +70,10 @@ export class ControllerLifecycle {
   private activeOp: Promise<unknown> | null = null
   /** Set by an uncaught fault and cleared when the phase leaves `failed`. Refuses input enables. */
   private faulted = false
+  /** How many faults have been marked. Work reads it as it starts, see {@link faultMark}. */
+  private faultCount = 0
+  /** The fault count the running restart read as it started, so its rebuild is judged from then. */
+  private restartFaultMark: number | null = null
 
   /**
    * @param broadcastPhase Called on every real phase transition so the renderer can disable
@@ -93,23 +101,49 @@ export class ControllerLifecycle {
 
   /**
    * Hold the graph `failed` after an uncaught fault, refusing input enables until a restart or
-   * init moves the phase on. Returns false, and changes nothing, once a shutdown has begun or while
-   * a fault is already held.
+   * init that starts after the fault moves the phase on. Returns false, and changes nothing, once a
+   * shutdown has begun or while a fault is already held.
    */
   public markFaulted(): boolean {
     if (this.isShuttingDown() || this.faulted) return false
     this.setPhase('failed')
     this.faulted = true
+    this.faultCount += 1
     return true
   }
 
   /**
-   * Move to `next` unless a shutdown has begun, which owns every phase from then on. Work that was
-   * already under way when the shutdown started finishes without reopening the phase.
+   * The mark work reads as it starts and hands to {@link settlePhase} or {@link faultedSince} when
+   * it lands. Inside a running restart it is the restart's own mark, so a reinit the restart runs
+   * is judged from when the restart started.
    */
-  public setPhaseUnlessShuttingDown(next: LifecyclePhase): void {
-    if (this.isShuttingDown()) return
+  public faultMark(): number {
+    return this.restartFaultMark ?? this.faultCount
+  }
+
+  /** Whether an uncaught fault is held. */
+  public isFaulted(): boolean {
+    return this.faulted
+  }
+
+  /** Whether a fault marked after `mark` was read is still held. */
+  public faultedSince(mark: number): boolean {
+    return this.faulted && this.faultCount !== mark
+  }
+
+  /**
+   * Move to `next` as work that read `mark` when it started lands. A shutdown that has begun owns
+   * every phase from then on, and a fault that arose while the work ran stays held, since that work
+   * may have been what the fault left half done. Returns whether the phase moved.
+   */
+  public settlePhase(next: LifecyclePhase, mark: number): boolean {
+    if (this.isShuttingDown()) return false
+    if (this.faultedSince(mark)) {
+      log.warn(`Holding the lifecycle failed: a fault arose before it could move to ${next}`)
+      return false
+    }
     this.setPhase(next)
+    return true
   }
 
   /** Whether a shutdown has begun, whether or not it has finished. */
@@ -227,9 +261,14 @@ export class ControllerLifecycle {
       return this.restartRebuildStarted ? this.queueFollowUpRestart(work) : this.restartInFlight
     }
     this.restartRebuildStarted = false
-    this.restartInFlight = this.runOp(() => this.runActive(work)).finally(() => {
+    const marked = (): Promise<void> => {
+      this.restartFaultMark = this.faultCount
+      return this.runActive(work)
+    }
+    this.restartInFlight = this.runOp(marked).finally(() => {
       this.restartInFlight = null
       this.restartRebuildStarted = false
+      this.restartFaultMark = null
     })
     return this.restartInFlight
   }
@@ -284,13 +323,22 @@ export class ControllerLifecycle {
     })
   }
 
-  /** Run an input enable as a queued op, refused while an uncaught fault is held. */
+  /**
+   * Run an input enable as a queued op, refused while an uncaught fault is held. An enable that
+   * lands after a fault arose is refused too, and the fault response stops the input it started
+   * once the op settles.
+   */
   public runQueuedEnable<T>(op: () => Promise<T>): Promise<T> {
     return this.runQueuedOp(async () => {
       if (this.faulted) {
-        throw new Error('The lighting controllers stopped after an error. Restart them first.')
+        throw new Error(FAULT_HELD_MESSAGE)
       }
-      return op()
+      const mark = this.faultCount
+      const result = await op()
+      if (this.faultedSince(mark)) {
+        throw new Error(FAULT_HELD_MESSAGE)
+      }
+      return result
     })
   }
 

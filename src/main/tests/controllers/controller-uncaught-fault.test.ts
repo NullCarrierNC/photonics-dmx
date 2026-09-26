@@ -34,6 +34,19 @@ describe('ControllerManager on an uncaught exception', () => {
     expect(listeners.audio.disableAudio).toHaveBeenCalled()
   })
 
+  it('stops a running motion simulation', async () => {
+    const { manager } = faultedManager()
+    let simulating = true
+    manager.setOnSimulationPreempt(() => {
+      simulating = false
+    })
+
+    manager.handleUncaughtException(new Error('frame path threw'))
+    await settle()
+
+    expect(simulating).toBe(false)
+  })
+
   it.each(['enableYarg', 'enableRb3', 'enableAudio'] as const)(
     'refuses %s until a restart',
     async (enable) => {

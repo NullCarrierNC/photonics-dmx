@@ -51,7 +51,8 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
  * - `shutdown()`: from `initializing` (if early exit), `running`, `restarting`, `consoleMode`, or `failed`
  *   → `shuttingDown` while teardown is in flight, then → `stopped` when teardown succeeds.
  *   If teardown rejects, phase stays at `shuttingDown` and `shutdown()` may be retried.
- * - `failed`: reinitialization after teardown did not complete; call `restartControllers()` or `init()` to recover.
+ * - `failed`: reinitialization after teardown did not complete, or an uncaught fault is held. Call
+ *   `restartControllers()` or `init()` to recover.
  *
  * Concurrency:
  * - Listener toggles, audio included, console entry and restarts share one lifecycle queue
@@ -184,6 +185,7 @@ export class ControllerManager {
         this.refreshAudioCueSelection()
       },
       getIsAudioEnabled: () => this.getIsAudioEnabled(),
+      getLifecyclePhase: () => this.lifecycle.phase,
       pauseYarg: () => this.listenerLifecycle.yargRb3.disableYarg(),
       pauseRb3: () => this.listenerLifecycle.yargRb3.disableRb3(),
       pauseAudio: () => this.listenerLifecycle.audio.disableAudio(),
@@ -212,6 +214,7 @@ export class ControllerManager {
       )
     }
     this.lifecycle.assertPhase(['initializing', 'restarting', 'failed'], 'init')
+    const faultMark = this.lifecycle.faultMark()
 
     try {
       this.senderLifecycle.ensureSenderManager()
@@ -249,7 +252,7 @@ export class ControllerManager {
     }
 
     this.isInitialized = true
-    this.lifecycle.setPhaseUnlessShuttingDown('running')
+    this.lifecycle.settlePhase('running', faultMark)
   }
 
   /**
@@ -261,8 +264,11 @@ export class ControllerManager {
     await this.rb3TestEffectRunner.stopTestEffect()
   }
 
-  /** Stop the simulations. Every input enable runs this first, as the input owns the rig chains. */
-  private async preemptSimulation(): Promise<void> {
+  /**
+   * Stop the simulations. Every input enable runs this first, as the input owns the rig chains, and
+   * so does the fault response.
+   */
+  public async preemptSimulation(): Promise<void> {
     await this.stopTestEffect()
     this.onSimulationPreempt?.()
   }
@@ -577,10 +583,9 @@ export class ControllerManager {
       if (this.lifecycle.phase !== 'running' && this.lifecycle.phase !== 'consoleMode') {
         return { success: false as const, error: CONSOLE_UNAVAILABLE_MESSAGE }
       }
+      const faultMark = this.lifecycle.faultMark()
       const r = await this.consoleMode.enableConsoleMode(rigId)
-      if (r.success) {
-        this.lifecycle.setPhaseUnlessShuttingDown('consoleMode')
-      }
+      if (r.success) this.lifecycle.settlePhase('consoleMode', faultMark)
       return r
     })
   }

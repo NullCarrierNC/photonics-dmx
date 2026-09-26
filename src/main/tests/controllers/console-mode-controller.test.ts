@@ -12,6 +12,7 @@ function baseDeps(
     getDmxPublisher: () => null,
     getListenerSnapshot: () => ({ yarg: false, rb3: false }),
     getIsAudioEnabled: () => false,
+    getLifecyclePhase: () => 'consoleMode',
     pauseYarg: () => Promise.resolve(),
     pauseRb3: () => Promise.resolve(),
     pauseAudio: () => Promise.resolve(),

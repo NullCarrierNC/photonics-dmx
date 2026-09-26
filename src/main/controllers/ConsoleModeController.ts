@@ -11,6 +11,8 @@ import {
 } from '../../photonics-dmx/types'
 import { createLogger } from '../../shared/logger'
 import { ipcError, restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
+import type { LifecyclePhase } from '../../shared/ipcTypes'
+import { FAULT_HELD_MESSAGE } from './ControllerLifecycle'
 
 const log = createLogger('ConsoleModeController')
 
@@ -31,6 +33,7 @@ export interface ConsoleModeControllerDeps {
   } | null
   getListenerSnapshot: () => ListenerChannelSnapshot
   getIsAudioEnabled: () => boolean
+  getLifecyclePhase: () => LifecyclePhase
   /** The three pauses run while console entry holds the lifecycle queue, so they must not queue. */
   pauseYarg: () => Promise<void>
   pauseRb3: () => Promise<void>
@@ -79,15 +82,23 @@ export class ConsoleModeController {
       return { success: true }
     }
     const s = this.deps.getListenerSnapshot()
-    this.consoleRestore = { yarg: s.yarg, rb3: s.rb3, audio: this.deps.getIsAudioEnabled() }
-    if (this.consoleRestore.yarg) {
+    const restore = { yarg: s.yarg, rb3: s.rb3, audio: this.deps.getIsAudioEnabled() }
+    this.consoleRestore = restore
+    if (restore.yarg) {
       await this.deps.pauseYarg()
     }
-    if (this.consoleRestore.rb3) {
+    if (restore.rb3) {
       await this.deps.pauseRb3()
     }
-    if (this.consoleRestore.audio) {
+    if (restore.audio) {
       await this.deps.pauseAudio()
+    }
+    // Entry is admitted only while the controllers run, so `failed` here means an uncaught fault
+    // arose during it and the fault response has left the console. The entry stays closed, so the
+    // wire keeps the fault's blackout.
+    if (this.deps.getLifecyclePhase() === 'failed') {
+      this.consoleRestore = null
+      return { success: false, error: FAULT_HELD_MESSAGE }
     }
     this.deps.getDmxPublisher()?.setManualBuffer({})
     return { success: true }
@@ -113,11 +124,16 @@ export class ConsoleModeController {
    * Gated on console mode being open, because `setManualBuffer` latches the publisher into manual
    * output and only `disableConsoleMode` lifts it, which returns early when it has no console
    * state to restore. Ungated, one stray message from a renderer would freeze cue output for the
-   * rest of the session with nothing reporting it.
+   * rest of the session with nothing reporting it. Refused too while the controllers are held
+   * failed, as the fault response has taken the wire dark.
    */
   public sendConsoleDmx(buffer: Record<number, number>): void {
     if (this.consoleRestore === null) {
       log.warn('Ignoring console DMX: console mode is not open')
+      return
+    }
+    if (this.deps.getLifecyclePhase() === 'failed') {
+      log.warn('Ignoring console DMX: the lighting controllers are held failed')
       return
     }
     this.deps.getDmxPublisher()?.setManualBuffer(buffer)

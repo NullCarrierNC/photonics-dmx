@@ -12,7 +12,8 @@ const FAULT_STEP_TIMEOUT_MS = 1000
 /** The manager surfaces the fault response drives. */
 export interface FaultHost {
   getChainFanout(): ChainFanout
-  stopTestEffect(): Promise<void>
+  disableConsoleMode(): Promise<unknown>
+  preemptSimulation(): Promise<void>
   getListenerLifecycle(): ListenerLifecycleController
 }
 
@@ -39,10 +40,11 @@ async function boundedStep(name: string, step: () => Promise<void>): Promise<voi
  * The response to an uncaught exception that is not a network sender error.
  *
  * The throw may have left a controller half updated, so the graph is held `failed`: the renderer
- * shows its retry banner and input enables are refused until a restart rebuilds the graph. The rig
- * is blacked out and every input stopped, each step bounded so a wedged one cannot hold up the
- * rest. The process carries on, since DMX receivers hold the last frame they got and an exit would
- * leave the rig lit.
+ * shows its retry banner, and input enables and console entry are refused until a restart rebuilds
+ * the graph. The console is left first, since the publisher ignores cue frames while it holds a
+ * manual buffer. The rig is then blacked out and every simulation and input stopped, each step
+ * bounded so a wedged one cannot hold up the rest. The process carries on, since DMX receivers
+ * hold the last frame they got and an exit would leave the rig lit.
  */
 export async function holdFailedAfterFault(
   error: unknown,
@@ -53,10 +55,21 @@ export async function holdFailedAfterFault(
   log.error('Holding the lighting controllers failed and dark until they are restarted')
 
   const listeners = host.getListenerLifecycle()
+  const stopInputs = async (): Promise<void> => {
+    await boundedStep('Disabling YARG', () => listeners.yargRb3.disableYarg())
+    await boundedStep('Disabling RB3', () => listeners.yargRb3.disableRb3())
+    await boundedStep('Disabling audio', () => listeners.audio.disableAudio())
+  }
+  await boundedStep('Leaving the console', async () => {
+    await host.disableConsoleMode()
+  })
   await boundedStep('Blackout', () => host.getChainFanout().blackout(0))
   await boundedStep('Waiting for the running toggle', () => lifecycle.awaitActiveOp())
-  await boundedStep('Stopping the test effect', () => host.stopTestEffect())
-  await boundedStep('Disabling YARG', () => listeners.yargRb3.disableYarg())
-  await boundedStep('Disabling RB3', () => listeners.yargRb3.disableRb3())
-  await boundedStep('Disabling audio', () => listeners.audio.disableAudio())
+  await boundedStep('Stopping the simulations', () => host.preemptSimulation())
+  await stopInputs()
+
+  // An enable or restart that outlasted its wait binds its input as it lands, so the inputs are
+  // stopped again once it settles, unless a restart has cleared the fault by then.
+  await lifecycle.awaitActiveOp()
+  if (lifecycle.isFaulted()) await stopInputs()
 }
