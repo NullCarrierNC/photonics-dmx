@@ -1,6 +1,7 @@
 /**
- * The signing rules. No build is signed with a certificate: electron-builder.yml sets mac.identity
- * to null, and every script that packages turns identity discovery off.
+ * The package check's signing rules. No build is signed with a certificate: electron-builder.yml
+ * sets mac.identity to null, every script that packages turns identity discovery off, and a
+ * packaged binary may carry an ad-hoc signature but never a certificate authority.
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- the tests require this core
 const { createRequire } = require('node:module')
@@ -45,4 +46,27 @@ function packagingScriptProblems(scripts) {
   return problems
 }
 
-module.exports = { signingConfigProblems, packagingScriptProblems }
+/**
+ * @param {string} codesignOutput what `codesign -dvv` prints for one file
+ * @returns {string[]} the certificate authorities its signature names, empty for an ad-hoc or
+ *   unsigned file
+ */
+function signatureAuthorities(codesignOutput) {
+  return codesignOutput
+    .split('\n')
+    .filter((line) => line.startsWith('Authority='))
+    .map((line) => line.slice('Authority='.length).trim())
+}
+
+/** Mach-O and universal-binary magic numbers, as the first four bytes of a file read them. */
+const MACH_O_MAGIC = new Set(['feedface', 'feedfacf', 'cefaedfe', 'cffaedfe', 'cafebabe'])
+
+/**
+ * @param {Buffer} head at least the first four bytes of a file
+ * @returns {boolean} whether the file is a Mach-O binary or a universal binary
+ */
+function isMachO(head) {
+  return head.length >= 4 && MACH_O_MAGIC.has(head.subarray(0, 4).toString('hex'))
+}
+
+module.exports = { signingConfigProblems, packagingScriptProblems, signatureAuthorities, isMachO }

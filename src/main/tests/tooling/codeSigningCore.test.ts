@@ -6,6 +6,8 @@ import { join } from 'node:path'
 const {
   signingConfigProblems,
   packagingScriptProblems,
+  signatureAuthorities,
+  isMachO,
 } = require('../../../../tools/codeSigningCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -59,5 +61,42 @@ describe('packagingScriptProblems', () => {
   it('holds every repository script that packages to identity discovery off', () => {
     const { scripts } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
     expect(packagingScriptProblems(scripts)).toEqual([])
+  })
+})
+
+describe('signatureAuthorities', () => {
+  it('lists the authorities a certificate signature names', () => {
+    const output = [
+      'Executable=/tmp/Example.app/Contents/MacOS/Example',
+      'Identifier=com.example',
+      'Authority=Apple Development: Example Person (ABCDE12345)',
+      'Authority=Apple Worldwide Developer Relations Certification Authority',
+      'Authority=Apple Root CA',
+      'TeamIdentifier=ABCDE12345',
+    ].join('\n')
+    expect(signatureAuthorities(output)).toEqual([
+      'Apple Development: Example Person (ABCDE12345)',
+      'Apple Worldwide Developer Relations Certification Authority',
+      'Apple Root CA',
+    ])
+  })
+
+  it('finds none in an ad-hoc signature', () => {
+    const output = 'Identifier=com.example\nSignature=adhoc\nTeamIdentifier=not set\n'
+    expect(signatureAuthorities(output)).toEqual([])
+  })
+})
+
+describe('isMachO', () => {
+  it.each(['cffaedfe', 'cefaedfe', 'feedfacf', 'feedface', 'cafebabe'])(
+    'recognises the %s magic number',
+    (magic) => {
+      expect(isMachO(Buffer.from(`${magic}00000000`, 'hex'))).toBe(true)
+    },
+  )
+
+  it('rejects other files and anything shorter than a magic number', () => {
+    expect(isMachO(Buffer.from('{"name":"x"}'))).toBe(false)
+    expect(isMachO(Buffer.from('cffa', 'hex'))).toBe(false)
   })
 })

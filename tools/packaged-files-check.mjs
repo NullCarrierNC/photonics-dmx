@@ -13,6 +13,9 @@
  * It also checks app.asar.unpacked and the packaged defaults, with the rules in
  * packagedContentCore.cjs.
  *
+ * No build is signed with a certificate. The signing config and every packaging script are held to
+ * that, and each Mach-O file in a packaged macOS app may carry an ad-hoc signature and nothing more.
+ *
  * Run it after `npm run build:unpack` or any of the per-platform builds.
  */
 import {
@@ -23,8 +26,10 @@ import {
   readFileSync,
   readdirSync,
   statSync,
+  lstatSync,
 } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { dirname, join, relative } from 'node:path'
 import { createRequire } from 'node:module'
 import fuses from '@electron/fuses'
 
@@ -36,6 +41,12 @@ const {
   unpackedProblems,
   defaultsProblems,
 } = require('./packagedContentCore.cjs')
+const {
+  signingConfigProblems,
+  packagingScriptProblems,
+  signatureAuthorities,
+  isMachO,
+} = require('./codeSigningCore.cjs')
 const { getCurrentFuseWire, FuseV1Options } = fuses
 
 /** What a packaged build holds at the top level of its archive. */
@@ -186,6 +197,58 @@ function namesIn(index, dir) {
   return Object.keys(index?.files?.[dir]?.files ?? {})
 }
 
+/** Every Mach-O file inside a directory, links left out so a framework's Current is read once. */
+function machOFiles(dir, found = []) {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    const stat = lstatSync(full)
+    if (stat.isSymbolicLink()) continue
+    if (stat.isDirectory()) {
+      machOFiles(full, found)
+    } else if (stat.isFile() && stat.size >= 4) {
+      const head = Buffer.alloc(4)
+      const fd = openSync(full, 'r')
+      try {
+        readSync(fd, head, 0, 4, 0)
+      } finally {
+        closeSync(fd)
+      }
+      if (isMachO(head)) found.push(full)
+    }
+  }
+  return found
+}
+
+/**
+ * The files in a macOS app bundle whose signature names a certificate authority, the bundle
+ * itself included. The authority is not printed, so a failure never copies an identity into a log.
+ */
+function certificateSignedFiles(app) {
+  const problems = []
+  for (const file of [app, ...machOFiles(app)]) {
+    const result = spawnSync('codesign', ['-dvv', file], { encoding: 'utf8' })
+    if (result.error) {
+      return [`codesign could not read ${relative(app, file) || app}: ${result.error.message}`]
+    }
+    if (signatureAuthorities(`${result.stdout}\n${result.stderr}`).length > 0) {
+      problems.push(`${relative(dirname(app), file)} is signed with a certificate`)
+    }
+  }
+  return problems
+}
+
+const signingIssues = [
+  ...signingConfigProblems(readFileSync('electron-builder.yml', 'utf8')),
+  ...packagingScriptProblems(JSON.parse(readFileSync('package.json', 'utf8')).scripts ?? {}),
+]
+if (signingIssues.length > 0) {
+  console.error('A build could be signed with a certificate')
+  for (const issue of signingIssues) {
+    console.error(`  ${issue}`)
+  }
+  process.exit(1)
+}
+
 const configIssues = fuseConfigProblems(EXPECTED_FUSES)
 if (configIssues.length > 0) {
   console.error('electron-builder.yml does not harden the Electron fuses')
@@ -218,6 +281,20 @@ for (const archive of archives) {
     console.error(`${archive}: Electron fuses are not set as electron-builder.yml sets them`)
     for (const issue of fuseIssues) {
       console.error(`  ${issue}`)
+    }
+  }
+
+  const binary = binaryFor(archive)
+  if (binary?.endsWith('.app')) {
+    const signed = certificateSignedFiles(binary)
+    if (signed.length > 0) {
+      failed = true
+      console.error(`${archive}: the app is signed with a certificate, and builds must not be`)
+      for (const issue of signed) {
+        console.error(`  ${issue}`)
+      }
+    } else {
+      console.log(`${archive}: no file in the app is signed with a certificate`)
     }
   }
 
