@@ -87,7 +87,10 @@ export function fakeLightingController(
 
 /** A fake whose completions wait for the suite, as the real sequencer's wait for a later frame. */
 export type CompletingLightingController = FakeLightingController & {
-  /** Finishes every held effect, oldest first, and settles a pending blackout. */
+  /**
+   * Ends a pending blackout fade, cancelling every held effect as the fade's closing wipe does.
+   * With no fade pending it finishes every held effect, oldest first.
+   */
   tick(): void
   /** The names whose completion callbacks are held, oldest first. */
   heldCompletions(): string[]
@@ -102,33 +105,48 @@ export type CompletingLightingController = FakeLightingController & {
 export function completingLightingController(
   overrides: Partial<ILightingController> = {},
 ): CompletingLightingController {
-  /** A submission still running: its layer, and its completion callback when it has one. */
-  type Run = { name: string; layer: number; onComplete?: (cancelled: boolean) => void }
+  /** A submission still running: its layer, and the completion callbacks waiting on it. */
+  type Run = { name: string; layer: number; waiters: Array<(cancelled: boolean) => void> }
   let runs: Run[] = []
   let blackouts: Array<() => void> = []
   const wipeListeners = new Set<() => void>()
+  const layerOf = (effect: Effect): number => effect.transitions[0]?.layer ?? 0
   const start = (name: string, effect: Effect, onComplete?: (cancelled: boolean) => void): void => {
-    runs.push({ name, layer: effect.transitions[0]?.layer ?? 0, onComplete })
+    runs.push({ name, layer: layerOf(effect), waiters: onComplete ? [onComplete] : [] })
   }
   const end = (matches: (run: Run) => boolean, cancelled: boolean): void => {
     const due = runs.filter(matches)
     runs = runs.filter((run) => !matches(run))
-    for (const run of due) run.onComplete?.(cancelled)
+    for (const run of due) for (const waiter of run.waiters) waiter(cancelled)
   }
   const cancelAll = (): void => end(() => true, true)
   const named =
     (name: string) =>
     (run: Run): boolean =>
       run.name === name
+  /** Adds a waiter to the oldest run of `name`, reporting whether one was running. */
+  const park = (name: string, onComplete: (cancelled: boolean) => void): boolean => {
+    const running = runs.find(named(name))
+    running?.waiters.push(onComplete)
+    return running !== undefined
+  }
   const blackoutPending = (): boolean => blackouts.length > 0
   const settleBlackouts = (): void => {
     const due = blackouts
     blackouts = []
     for (const resolve of due) resolve()
   }
+  /** An add or replace below the system layer cancels a fading blackout. */
+  const cancelFadeBelowSystemLayer = (effect: Effect): void => {
+    if (layerOf(effect) < 255) settleBlackouts()
+  }
   const fake = fakeLightingController({
-    addEffect: (name, effect) => start(name, effect),
+    addEffect: (name, effect) => {
+      cancelFadeBelowSystemLayer(effect)
+      start(name, effect)
+    },
     setEffect: (name, effect) => {
+      settleBlackouts()
       cancelAll()
       start(name, effect)
     },
@@ -138,6 +156,7 @@ export function completingLightingController(
       start(name, effect, onComplete)
     },
     replaceEffectWithCallback: (name, effect, onComplete) => {
+      cancelFadeBelowSystemLayer(effect)
       end(named(name), true)
       start(name, effect, onComplete)
       return true
@@ -148,25 +167,27 @@ export function completingLightingController(
       return true
     },
     setEffectUnblockedName: (name, effect) => {
-      if (blackoutPending()) return false
+      if (blackoutPending() || runs.some(named(name))) return false
       cancelAll()
       start(name, effect)
       return true
     },
     addEffectUnblockedNameWithCallback: (name, effect, onComplete) => {
       if (blackoutPending()) return false
+      if (park(name, onComplete)) return true
       start(name, effect, onComplete)
       return true
     },
     setEffectUnblockedNameWithCallback: (name, effect, onComplete) => {
       if (blackoutPending()) return false
+      if (park(name, onComplete)) return true
       cancelAll()
       start(name, effect, onComplete)
       return true
     },
     removeEffect: (name, layer) => end((run) => run.name === name && run.layer === layer, true),
     removeEffectCallback: (name) => {
-      for (const run of runs.filter(named(name))) run.onComplete = undefined
+      for (const run of runs.filter(named(name))) run.waiters = []
     },
     removeAllEffects: () => {
       settleBlackouts()
@@ -181,9 +202,11 @@ export function completingLightingController(
     },
     blackout: (duration) => {
       if (duration <= 0) {
+        settleBlackouts()
         cancelAll()
         return Promise.resolve()
       }
+      if (blackoutPending()) return Promise.resolve()
       return new Promise<void>((resolve) => blackouts.push(resolve))
     },
     cancelBlackout: settleBlackouts,
@@ -192,9 +215,13 @@ export function completingLightingController(
   })
   return Object.assign(fake, {
     tick: () => {
-      settleBlackouts()
-      end(() => true, false)
+      if (blackoutPending()) {
+        cancelAll()
+        settleBlackouts()
+      } else {
+        end(() => true, false)
+      }
     },
-    heldCompletions: () => runs.filter((run) => run.onComplete).map((run) => run.name),
+    heldCompletions: () => runs.filter((run) => run.waiters.length > 0).map((run) => run.name),
   })
 }
