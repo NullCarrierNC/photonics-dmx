@@ -30,6 +30,7 @@ import {
   SimLightOrder,
   SimLightSample,
   SimSample,
+  SimSampling,
   SimTimeline,
   VenueSize,
 } from './types'
@@ -49,8 +50,13 @@ export interface CueSimulatorOptions {
   venue?: VenueSize
   /** Cue re-dispatch (`cue-called`) cadence; mirrors YARG's ~30 Hz frame rate. */
   frameRateHz?: number
-  /** How often to capture a light-state sample. */
+  /** How often to capture a light-state sample under interval sampling. */
   sampleIntervalMs?: number
+  /**
+   * When a row is recorded: `interval` every `sampleIntervalMs`, or `publish` at every light-state
+   * publish, which is every state the output sees, however briefly it holds.
+   */
+  sampling?: SimSampling
   /** Sequencer frame granularity; production default is 10 ms. */
   frameStepMs?: number
   /** Audio only: the starting input level from 0 to 1. */
@@ -151,6 +157,7 @@ export class CueSimulator {
       venue: options.venue ?? 'Large',
       frameRateHz: options.frameRateHz ?? 30,
       sampleIntervalMs: options.sampleIntervalMs ?? 50,
+      sampling: options.sampling ?? 'interval',
       frameStepMs: options.frameStepMs ?? 10,
       level: options.level ?? 0.6,
     }
@@ -297,7 +304,7 @@ export class CueSimulator {
   /**
    * Run the simulation for `durationMs` of virtual time, returning the recorded timeline.
    * Beats are synthesized from BPM, cue frames re-dispatched at `frameRateHz`, scenario steps
-   * applied at their scheduled times, and light states sampled at `sampleIntervalMs`.
+   * applied at their scheduled times, and light states sampled as `sampling` says.
    */
   public async run(durationMs: number): Promise<SimTimeline> {
     if (this.currentCue === undefined) {
@@ -317,8 +324,15 @@ export class CueSimulator {
       .sort((a, b) => a.absAt - b.absAt)
     let scenarioIdx = 0
 
+    const onPublish = (): void => this.recordSample(this.virtualTime.getCurrentTimeMs())
+    const samplePublishes = this.opts.sampling === 'publish'
+    if (samplePublishes) {
+      this.recordSample(startTime)
+      this.lightStateManager.onLightStatesUpdated(onPublish)
+    }
+
     let nextSustain = startTime
-    let nextSample = startTime
+    let nextSample = samplePublishes ? Infinity : startTime
     let nextBeat = this.bpm > 0 ? startTime : Infinity
     let beatCounter = 0
 
@@ -361,6 +375,7 @@ export class CueSimulator {
       }
     }
 
+    if (samplePublishes) this.lightStateManager.offLightStatesUpdated(onPublish)
     this.recordSample(this.virtualTime.getCurrentTimeMs(), true)
 
     this.lastTimeline = {
@@ -370,6 +385,7 @@ export class CueSimulator {
       bpm: this.bpm,
       durationMs,
       sampleIntervalMs: this.opts.sampleIntervalMs,
+      sampling: this.opts.sampling,
       frameRateHz: this.opts.frameRateHz,
       lightOrder: this.lightOrder,
       samples: this.samples,

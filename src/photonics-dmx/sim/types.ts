@@ -70,6 +70,9 @@ export interface SimLightOrder {
   strobe: string[]
 }
 
+/** When the simulator records a row: on an interval, or at every light-state publish. */
+export type SimSampling = 'interval' | 'publish'
+
 /** The full result of a simulation run. */
 export interface SimTimeline {
   cue: string
@@ -78,6 +81,7 @@ export interface SimTimeline {
   bpm: number
   durationMs: number
   sampleIntervalMs: number
+  sampling: SimSampling
   frameRateHz: number
   lightOrder: SimLightOrder
   samples: SimSample[]

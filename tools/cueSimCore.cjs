@@ -8,7 +8,10 @@ const { createHash } = require('node:crypto')
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- a sibling tool core
 const { isMissingCommit } = require('./coverageThresholdCore.cjs')
 
-/** The rig, tempo and length every cue runs with, and the width of a fingerprint window. */
+/**
+ * The rig, tempo and length every cue runs with, the width of a fingerprint window, and when a row
+ * is recorded: at every light-state publish, so a state that holds for one frame shows.
+ */
 const SETTINGS = {
   durationMs: 4000,
   frontCount: 4,
@@ -17,6 +20,17 @@ const SETTINGS = {
   bpm: 120,
   level: 0.6,
   windowMs: 250,
+  sampling: 'publish',
+}
+
+/** The CueSimulator options every cue runs with, beside its library and domain. */
+const SIMULATOR_OPTIONS = {
+  frontCount: SETTINGS.frontCount,
+  backCount: SETTINGS.backCount,
+  strobeCount: SETTINGS.strobeCount,
+  bpm: SETTINGS.bpm,
+  level: SETTINGS.level,
+  sampling: SETTINGS.sampling,
 }
 
 /** One fixed scenario per domain, applied at `at` ms into the run. */
@@ -158,7 +172,7 @@ function settingsLine() {
   const s = SETTINGS
   return (
     `duration ${s.durationMs} bpm ${s.bpm} front ${s.frontCount} back ${s.backCount}` +
-    ` strobe ${s.strobeCount} level ${s.level} window ${s.windowMs}`
+    ` strobe ${s.strobeCount} level ${s.level} window ${s.windowMs} sampling ${s.sampling}`
   )
 }
 
@@ -372,6 +386,7 @@ function cueVersionBases({ pushed, namedBase, hasCommit, branchBase, mergeBase }
 
 module.exports = {
   SETTINGS,
+  SIMULATOR_OPTIONS,
   SCENARIOS,
   DOMAINS,
   seededRandom,
