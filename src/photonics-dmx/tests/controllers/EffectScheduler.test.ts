@@ -204,8 +204,8 @@ describe('EffectScheduler', () => {
     })
 
     it('advances past a first transition that needs neither time nor an event', () => {
-      // Duration 0 with an event condition counted zero times: nothing will ever supply the event,
-      // so the effect has to move on by itself rather than sit in waitingUntil forever.
+      // Duration 0 with an event condition counted zero times needs no event, so the effect moves
+      // on in the call that starts it.
       const instant: EffectTransition = {
         ...transition(1),
         transform: { ...transition(1).transform, duration: 0 },

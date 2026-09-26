@@ -2,7 +2,11 @@ import { AudioCueData, AudioCueType, EventContext } from '../../types/audioCueTy
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CompiledAudioCue } from '../compiler/NodeCueCompiler'
-import { ActionEffectFactory } from '../compiler/ActionEffectFactory'
+import {
+  ActionEffectFactory,
+  type ResolvedActionTiming,
+  type ResolvedColorSetting,
+} from '../compiler/ActionEffectFactory'
 import {
   AudioEventNode,
   AudioTriggerNode,
@@ -13,6 +17,7 @@ import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { ExecutionContext } from './ExecutionContext'
+import { resolveActionColor, resolveActionLayer, resolveActionTiming } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import { VariableValue, variableValue, type NodeCueDebugSwitch } from './executionTypes'
@@ -274,17 +279,17 @@ export abstract class BaseAudioNodeCue {
           ...safeData,
           eventContext,
         }
+        const execContext = new ExecutionContext(
+          event,
+          cueData,
+          state.cueLevelVarStore,
+          state.groupLevelVarStore,
+        )
         let actionId: string | null = null
         try {
-          actionId = this.findFirstAction(state, event, cueData, lightManager)
+          actionId = this.findFirstAction(state, event, execContext, lightManager)
         } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error)
-          this.runtimeBroadcaster.emit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, {
-            graphId: this.id,
-            nodeId: event.id,
-            message: msg,
-          })
-          log.error(`Error in findFirstAction for event ${event.id}:`, error)
+          this.reportLevelError(event.id, 'findFirstAction', error)
           continue
         }
         if (!actionId) {
@@ -306,15 +311,28 @@ export abstract class BaseAudioNodeCue {
         if (!lights.length) continue
 
         if (evaluation.active) {
+          let resolvedColor: ResolvedColorSetting | undefined
+          let resolvedTiming: ResolvedActionTiming
+          let layer: number
+          try {
+            resolvedColor = action.color ? resolveActionColor(action.color, execContext) : undefined
+            resolvedTiming = resolveActionTiming(action.timing, execContext)
+            layer = resolveActionLayer(action.layer, execContext)
+          } catch (error) {
+            this.reportLevelError(event.id, 'resolving action', error)
+            continue
+          }
           const effect = ActionEffectFactory.buildEffect({
             action,
             lights,
             waitCondition: 'none',
             intensityScale: evaluation.intensity,
+            resolvedColor,
+            resolvedTiming,
+            resolvedLayer: layer,
           })
 
           if (effect) {
-            const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
             if (state.firstSubmissionUsesSetEffectRef.use) {
               // The first submission replaces the look like the engine's, leaving motion running.
               state.firstSubmissionUsesSetEffectRef.use = false
@@ -424,10 +442,12 @@ export abstract class BaseAudioNodeCue {
   private initializeVariables(state: AudioCueRunState): void {
     const definition = this.compiledCue.definition as AudioNodeCueDefinition
 
+    // A cue variable lives in the store its scope names, where every read looks for it.
     const cueVariables = definition.variables ?? []
     for (const varDef of cueVariables) {
-      if (!state.cueLevelVarStore.has(varDef.name)) {
-        state.cueLevelVarStore.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
+      const store = varDef.scope === 'cue' ? state.cueLevelVarStore : state.groupLevelVarStore
+      if (!store.has(varDef.name)) {
+        store.set(varDef.name, variableValue(varDef.type, varDef.initialValue))
       }
     }
 
@@ -479,16 +499,10 @@ export abstract class BaseAudioNodeCue {
   private findFirstAction(
     runState: AudioCueRunState,
     event: BaseEventNode,
-    cueData: AudioCueData,
+    execContext: ExecutionContext,
     lightManager: DmxLightManager,
   ): string | null {
     const definition = this.compiledCue.definition as AudioNodeCueDefinition
-    const execContext = new ExecutionContext(
-      event,
-      cueData,
-      runState.cueLevelVarStore,
-      runState.groupLevelVarStore,
-    )
     const evaluatorContext: LogicNodeEvaluatorContext = {
       cueId: this.id,
       // Audio cues are always the audio family; they never route through the net extractor.
@@ -535,6 +549,17 @@ export abstract class BaseAudioNodeCue {
     }
 
     return null
+  }
+
+  /** Send a level-mode evaluation error to the renderer and the log. */
+  private reportLevelError(eventId: string, stage: string, error: unknown): void {
+    const msg = error instanceof Error ? error.message : String(error)
+    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, {
+      graphId: this.id,
+      nodeId: eventId,
+      message: msg,
+    })
+    log.error(`Error in ${stage} for event ${eventId}:`, error)
   }
 
   private effectKey(eventId: string): string {

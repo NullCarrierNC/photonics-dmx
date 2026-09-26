@@ -94,6 +94,43 @@ describe('EffectLoader.resolveEffectFilePathForIpc (used by EXPORT)', () => {
   })
 })
 
+describe('EffectLoader.loadAll', () => {
+  let tmpDir: string
+  let outside: string
+  let loader: EffectLoader
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-load-'))
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-outside-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    fs.rmSync(outside, { recursive: true, force: true })
+  })
+
+  it('skips a file whose link leads outside the effect root', async () => {
+    const yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    const write = (filePath: string, groupId: string): void =>
+      fs.writeFileSync(filePath, JSON.stringify(minimalYargEffectFixture(groupId)), 'utf-8')
+    write(path.join(yargDir, 'inside.json'), 'grp-inside')
+    write(path.join(outside, 'elsewhere.json'), 'grp-elsewhere')
+    fs.symlinkSync(path.join(outside, 'elsewhere.json'), path.join(yargDir, 'linked.json'))
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      const result = await loader.loadAll()
+
+      expect(loader.getSummary().yarg.map((s) => path.basename(s.path))).toEqual(['inside.json'])
+      expect(result.loaded).toBe(1)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+})
+
 describe('EffectLoader.saveFile group id uniqueness', () => {
   let tmpDir: string
   let loader: EffectLoader

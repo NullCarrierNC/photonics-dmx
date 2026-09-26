@@ -11,7 +11,13 @@ import {
 import type { ExecutionContext } from '../../../../cues/node/runtime/ExecutionContext'
 import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
-import type { Connection, LightsFromIndexLogicNode } from '../../../../cues/types/nodeCueTypes'
+import { createMockTrackedLight } from '../../../helpers/testFixtures'
+import type {
+  Connection,
+  CueDataLogicNode,
+  LightsFromIndexLogicNode,
+  LogicNode,
+} from '../../../../cues/types/nodeCueTypes'
 
 /** Evaluator wired to one cue, with `backLights` declared and left empty. */
 function harness(options: { cueId?: string; rigLabel?: string; rigId?: string } = {}) {
@@ -44,7 +50,9 @@ function harness(options: { cueId?: string; rigLabel?: string; rigId?: string } 
   const edges: Connection[] = [{ from: 'bpick', to: 'downstream' }]
   const run = (nodeId: string) =>
     evaluateLogicNode(pickFromEmpty(nodeId), nodeId, edges, context, evalCtx)
-  return { run }
+  const evaluate = (node: LogicNode, nodeEdges: Connection[]) =>
+    evaluateLogicNode(node, node.id, nodeEdges, context, evalCtx)
+  return { run, evaluate, cueStore }
 }
 
 const pickFromEmpty = (id: string): LightsFromIndexLogicNode => ({
@@ -111,5 +119,49 @@ describe('lights-from-index against an empty group', () => {
       .filter((message) => message.includes('source array is empty'))
 
     expect(emptyWarnings).toHaveLength(2)
+  })
+})
+
+describe('lights-from-index indexed by a frame field the frame lacks', () => {
+  let warn: jest.SpiedFunction<typeof console.warn>
+
+  beforeEach(() => {
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warn.mockRestore()
+  })
+
+  it('warns that no index was found and continues downstream', () => {
+    const { evaluate, cueStore } = harness()
+    cueStore.set('backLights', {
+      type: 'light-array',
+      value: [createMockTrackedLight({ id: 'back-1', position: 1 })],
+    })
+    const readSection: CueDataLogicNode = {
+      id: 'read-section',
+      type: 'logic',
+      logicType: 'cue-data',
+      dataProperty: 'song-section',
+      assignTo: 'section',
+    }
+    const pick: LightsFromIndexLogicNode = {
+      id: 'pick-by-section',
+      type: 'logic',
+      logicType: 'lights-from-index',
+      sourceVariable: 'backLights',
+      index: { source: 'variable', name: 'section' },
+      assignTo: 'curBpick',
+    }
+    const edges: Connection[] = [{ from: 'pick-by-section', to: 'downstream' }]
+
+    evaluate(readSection, [])
+    const next = evaluate(pick, edges)
+
+    expect(next).toEqual(['downstream'])
+    expect(warn.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining('lights-from-index node pick-by-section: no valid indices found'),
+    )
   })
 })

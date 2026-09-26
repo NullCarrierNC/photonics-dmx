@@ -80,6 +80,17 @@ describe('CueSimulator (audio)', () => {
     }
   })
 
+  it('refuses a cue that only the default audio library carries', async () => {
+    const sim = await CueSimulator.create({ library: LIBRARY, domain: 'audio' })
+    try {
+      expect(() => sim.setCue('audio-70s-bass-cymbal')).toThrow(
+        /Unknown audio cue 'audio-70s-bass-cymbal' in 'audio-stagekit'/,
+      )
+    } finally {
+      sim.dispose()
+    }
+  })
+
   it('refuses a YARG-only scenario event', async () => {
     const sim = await CueSimulator.create({ library: LIBRARY, domain: 'audio' })
     try {
