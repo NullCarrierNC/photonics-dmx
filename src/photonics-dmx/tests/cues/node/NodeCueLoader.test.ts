@@ -578,6 +578,59 @@ describe('NodeCueLoader', () => {
     })
   })
 
+  describe('a group id two files on disk share', () => {
+    const shared = 'loader-test-yarg-motion'
+    const refusal = (file: string, holder: string): string =>
+      `${file}: The yarg cue file ${holder} already uses group id '${shared}'. Import this file to give it a group ID of its own.`
+
+    /** A motion-only file whose one motion cue has the given id. */
+    function writeMotionFile(name: string, cueId: string): string {
+      const file = yargMotionOnlyFile()
+      file.cues = file.cues.map((cue) => ({ ...cue, id: cueId }))
+      const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      fs.mkdirSync(yargDir, { recursive: true })
+      const filePath = path.join(yargDir, name)
+      fs.writeFileSync(filePath, JSON.stringify(file), 'utf-8')
+      return filePath
+    }
+
+    it('loads the first in name order and refuses the other, naming the file that holds it', async () => {
+      writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+
+      const result = await loader.loadAll()
+
+      expect(result.errors).toEqual([refusal('b.json', 'a.json')])
+      const group = yargRegistry.getGroup(shared)
+      expect([...(group?.motionCues?.keys() ?? [])]).toEqual(['from-a'])
+      expect(loader.getSummary().yarg.find((s) => s.path.endsWith('b.json'))?.errors).toEqual([
+        refusal('b.json', 'a.json').slice('b.json: '.length),
+      ])
+    })
+
+    it('keeps the group when the refused file is deleted', async () => {
+      writeMotionFile('a.json', 'from-a')
+      const refused = writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      fs.rmSync(refused)
+      await loader.reload()
+
+      expect([...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]).toEqual(['from-a'])
+    })
+
+    it('leaves the id with the file holding it when an earlier-named file arrives', async () => {
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      writeMotionFile('a.json', 'from-a')
+      const result = await loader.reload()
+
+      expect(result.errors).toEqual([refusal('a.json', 'b.json')])
+      expect([...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]).toEqual(['from-b'])
+    })
+  })
+
   describe('saveFile group id uniqueness', () => {
     it('rejects saving a second cue file with the same group.id on a different path', async () => {
       const file = yargMotionOnlyFile()

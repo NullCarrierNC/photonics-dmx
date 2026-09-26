@@ -237,3 +237,54 @@ describe('EffectLoader watcher reports', () => {
     expect(loader.getSummary().yarg[0].groupName).toBe('Edited')
   })
 })
+
+describe('EffectLoader with a group id two files on disk share', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+  let yargDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-shared-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+    yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  /** An effect file in the shared group whose one effect has the given name. */
+  function writeEffectFile(name: string, effectName: string): void {
+    const file = minimalYargEffectFixture('shared-effects')
+    file.effects = file.effects.map((effect) => ({ ...effect, name: effectName }))
+    fs.writeFileSync(path.join(yargDir, name), JSON.stringify(file), 'utf-8')
+  }
+
+  it('loads the first in name order and refuses the other, naming the file that holds it', async () => {
+    writeEffectFile('a.json', 'From a')
+    writeEffectFile('b.json', 'From b')
+
+    const result = await loader.loadAll()
+
+    expect(result.errors).toEqual([
+      "b.json: The yarg effect file a.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+    ])
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+    expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From a')
+  })
+
+  it('hands cue builds the file holding the id when an earlier-named file arrives', async () => {
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    writeEffectFile('a.json', 'From a')
+    const result = await loader.reload()
+
+    expect(result.errors).toEqual([
+      "a.json: The yarg effect file b.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+    ])
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+    expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From b')
+  })
+})

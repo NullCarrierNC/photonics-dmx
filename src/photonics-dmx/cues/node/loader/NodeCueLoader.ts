@@ -224,7 +224,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
-    this.assertNoConflictingGroupIdForPath(filePath, mode, content.group.id)
+    this.assertGroupIdFree(filePath, mode, content.group.id, 'Choose a different group ID.')
 
     await this.writeSavedFile(
       filePath,
@@ -283,6 +283,13 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     const file = validation.data
+    // The file already holding the group id keeps it. A full load goes in name order.
+    this.assertGroupIdFree(
+      filePath,
+      mode,
+      file.group.id,
+      'Import this file to give it a group ID of its own.',
+    )
     // Per-cue compile failures are collected here rather than only logged, so the editor
     // can surface them on the file's summary instead of the file appearing to load cleanly.
     const compileErrors: string[] = []
@@ -456,33 +463,45 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.fileRegistrations.delete(filePath)
   }
 
+  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
+  private assertGroupIdFree(
+    filePath: string,
+    mode: NodeCueMode,
+    groupId: string,
+    advice: string,
+  ): void {
+    const holder = this.groupIdHolder(filePath, mode, groupId)
+    if (holder) {
+      throw new Error(
+        `The ${mode} cue file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
+      )
+    }
+  }
+
   /**
-   * Prevents two cue files in the same domain (yarg vs audio) from sharing one `group.id`,
-   * which would overwrite the other in the registry (see registerFile / unregisterGroup).
+   * The path of another registered file in the mode that holds this group id, if one does. Two
+   * files sharing one would overwrite each other in the registry (see registerFile).
    */
-  private assertNoConflictingGroupIdForPath(
+  private groupIdHolder(
     targetPath: string,
     mode: NodeCueMode,
     groupId: string,
-  ): void {
+  ): string | undefined {
     const normalizedTarget = path.resolve(targetPath)
     const key = groupId.trim().toLowerCase()
     if (!key) {
-      return
+      return undefined
     }
     for (const [registeredPath, reg] of this.fileRegistrations) {
-      if (reg.mode !== mode) {
-        continue
-      }
-      if (path.resolve(registeredPath) === normalizedTarget) {
-        continue
-      }
-      if (reg.groupId.trim().toLowerCase() === key) {
-        throw new Error(
-          `The ${mode} cue file ${path.basename(registeredPath)} already uses group id '${groupId}'. Choose a different group ID.`,
-        )
+      if (
+        reg.mode === mode &&
+        path.resolve(registeredPath) !== normalizedTarget &&
+        reg.groupId.trim().toLowerCase() === key
+      ) {
+        return registeredPath
       }
     }
+    return undefined
   }
 
   protected removeRegistration(filePath: string): void {
