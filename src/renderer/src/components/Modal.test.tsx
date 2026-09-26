@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { StrictMode, type KeyboardEvent, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ReactFlow, { ReactFlowProvider, type Node, type NodeChange } from 'reactflow'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
@@ -58,6 +58,23 @@ describe('Modal', () => {
   it('leaves focus on a control that took it as the dialog opened', () => {
     open({}, <input aria-label="Name" autoFocus />)
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+  })
+
+  it('leaves focus on a control that took it as the dialog opened, under StrictMode', () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+
+    render(
+      <StrictMode>
+        <Modal onClose={() => {}} panelClassName="panel">
+          <input aria-label="Name" autoFocus />
+        </Modal>
+      </StrictMode>,
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+    opener.remove()
   })
 
   it('takes focus back when a control inside blurs to the page body', async () => {

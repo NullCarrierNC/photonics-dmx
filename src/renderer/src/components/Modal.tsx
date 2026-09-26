@@ -58,13 +58,22 @@ const Modal: FC<ModalProps> = ({
   const panelRef = useRef<HTMLDivElement>(null)
   // Read during the first render, before an autoFocus control in the panel can take focus.
   const [opener] = useState(() => document.activeElement as HTMLElement | null)
+  // Where focus settled as the dialog opened, kept so a remount under StrictMode puts it back there.
+  const firstFocus = useRef<HTMLElement | null>(null)
   // Whether the press behind the current click began on the backdrop itself.
   const pressedOnBackdrop = useRef(false)
 
   useEffect(() => {
     const panel = panelRef.current
-    if (panel && !panel.contains(document.activeElement)) {
-      panel.focus()
+    if (!panel) {
+      return
+    }
+    if (firstFocus.current === null) {
+      const active = document.activeElement
+      firstFocus.current = active instanceof HTMLElement && panel.contains(active) ? active : panel
+    }
+    if (!panel.contains(document.activeElement)) {
+      firstFocus.current.focus()
     }
     return () => {
       opener?.focus?.()
