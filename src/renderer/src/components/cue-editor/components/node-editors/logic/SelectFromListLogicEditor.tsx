@@ -41,6 +41,7 @@ const SelectFromListLogicEditor: React.FC<SelectFromListLogicEditorProps> = ({
       value={node.assignTo}
       onChange={(name) => updateNode({ assignTo: name })}
       variables={availableVariables}
+      placeholder="-- select variable --"
       showType
     />
   </div>
