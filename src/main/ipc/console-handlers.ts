@@ -4,7 +4,10 @@ import { IpcMain, type WebContents } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { isPlainObject } from './inputValidation'
-import { bindConsoleModeToRenderer } from '../controllers/consoleRendererBinding'
+import {
+  bindConsoleModeToRenderer,
+  watchRendererPresence,
+} from '../controllers/consoleRendererBinding'
 import type { FixtureConfig } from '../../photonics-dmx/types'
 
 const log = createLogger('console-handlers')
@@ -22,9 +25,15 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
     if (!isPlainObject(data) || typeof data.rigId !== 'string' || data.rigId.trim() === '') {
       return { success: false as const, error: 'Invalid console enable payload' }
     }
-    const result = await controllerManager.enableConsoleMode(data.rigId)
-    if (result.success && boundSender !== event.sender) {
-      const sender = event.sender
+    const sender = event.sender
+    const presence = watchRendererPresence(sender)
+    const result = await controllerManager.enableConsoleMode(data.rigId).finally(presence.stop)
+    if (result.success && presence.hasGone()) {
+      // Nothing is left to release a console opened for a page that went while the entry waited.
+      await controllerManager.disableConsoleMode()
+      return { success: false as const, error: 'The page that opened the console has gone' }
+    }
+    if (result.success && boundSender !== sender) {
       boundSender = sender
       bindConsoleModeToRenderer(sender, () => {
         if (boundSender === sender) {

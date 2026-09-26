@@ -26,7 +26,7 @@ export interface CueAuthoringInvokeMap {
   // ---- Node cues ----
   [NODE_CUES.SET_DEBUG]: {
     request: boolean
-    response: { success: true; enabled: boolean }
+    response: { success: true; enabled: boolean } | IpcErrorResult
   }
   [NODE_CUES.LIST]: {
     request: void

@@ -3,6 +3,7 @@
  */
 import type { CueType } from '../../../shared/ipcTypes'
 import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
+import { orThrow } from './ipcResult'
 
 // ---------------------------------------------------------------------------
 // Cue consistency window
@@ -87,19 +88,19 @@ export const setRb3MotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChan
   window.api.invoke(LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE, mode)
 
 export const getYargMotionCueGroups = () =>
-  window.api.invoke(LIGHT.GET_YARG_MOTION_CUE_GROUPS, undefined)
+  window.api.invoke(LIGHT.GET_YARG_MOTION_CUE_GROUPS, undefined).then(orThrow)
 
 export const getAudioMotionCueGroups = () =>
-  window.api.invoke(LIGHT.GET_AUDIO_MOTION_CUE_GROUPS, undefined)
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_CUE_GROUPS, undefined).then(orThrow)
 
 export const getAvailableYargMotionCues = (groupId?: string) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_YARG_MOTION_CUES, groupId)
+  window.api.invoke(LIGHT.GET_AVAILABLE_YARG_MOTION_CUES, groupId).then(orThrow)
 
 export const getAvailableAudioMotionCues = (groupId?: string) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, groupId)
+  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, groupId).then(orThrow)
 
 export const getAvailableRb3MotionCues = (groupId?: string) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_MOTION_CUES, groupId)
+  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_MOTION_CUES, groupId).then(orThrow)
 
 export const startYargMotionCueSimulation = (groupId: string, cueId: string) =>
   window.api.invoke(LIGHT.START_YARG_MOTION_CUE_SIMULATION, { groupId, cueId })
@@ -119,9 +120,10 @@ export const getConsistencyStatus = () => window.api.invoke(LIGHT.GET_CONSISTENC
 // Cue groups
 // ---------------------------------------------------------------------------
 
-export const getCueGroups = () => window.api.invoke(LIGHT.GET_CUE_GROUPS, undefined)
+export const getCueGroups = () => window.api.invoke(LIGHT.GET_CUE_GROUPS, undefined).then(orThrow)
 
-export const getEnabledCueGroups = () => window.api.invoke(CONFIG.GET_ENABLED_CUE_GROUPS, undefined)
+export const getEnabledCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_CUE_GROUPS, undefined).then(orThrow)
 
 export const setEnabledCueGroups = (groupIds: string[]) =>
   window.api.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, groupIds)
@@ -130,12 +132,13 @@ export const getCueSourceGroup = (cueType: CueType) =>
   window.api.invoke(LIGHT.GET_CUE_SOURCE_GROUP, cueType)
 
 export const getAvailableCues = (groupId: string | undefined) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_CUES, groupId)
+  window.api.invoke(LIGHT.GET_AVAILABLE_CUES, groupId).then(orThrow)
 
-export const getAudioCueGroups = () => window.api.invoke(LIGHT.GET_AUDIO_CUE_GROUPS, undefined)
+export const getAudioCueGroups = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_CUE_GROUPS, undefined).then(orThrow)
 
 export const getAvailableAudioCues = (groupId?: string) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId)
+  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId).then(orThrow)
 
 export const getAvailableRb3Cues = (groupId?: string) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_CUES, groupId)
+  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_CUES, groupId).then(orThrow)

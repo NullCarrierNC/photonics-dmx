@@ -2,13 +2,16 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
-import { EffectMode, EffectFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateEffectFile } from '../../photonics-dmx/cues/node/schema/validation'
-import { validationRefusal } from './ipcResult'
+import { ipcError, validationRefusal } from './ipcResult'
 import { EFFECTS } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
-import { validateEffectSavePayload } from './inputValidation'
+import {
+  validateCueFileCheckPayload,
+  validateCueFilePath,
+  validateEffectSavePayload,
+} from './inputValidation'
 
 const log = createLogger('effect-handlers')
 
@@ -18,11 +21,6 @@ const ensureLoader = (controllerManager: ControllerManager) => {
     throw new Error('Effect loader is not initialized.')
   }
   return loader
-}
-
-interface ValidatePayload {
-  path?: string
-  content?: EffectFile
 }
 
 export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
@@ -36,9 +34,13 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     return loader.reload()
   })
 
-  handleInvoke(ipcMain, EFFECTS.READ, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, EFFECTS.READ, log, async (_event, data: unknown) => {
+    const filePath = validateCueFilePath(data)
+    if (!filePath.ok) {
+      return ipcError(filePath.error)
+    }
     const loader = ensureLoader(controllerManager)
-    return loader.readFile(filePath)
+    return loader.readFile(filePath.value)
   })
 
   handleInvoke(ipcMain, EFFECTS.SAVE, log, async (_event, data: unknown) => {
@@ -51,32 +53,34 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     return loader.saveFile(mode, filename, content)
   })
 
-  handleInvoke(ipcMain, EFFECTS.DELETE, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, EFFECTS.DELETE, log, async (_event, data: unknown) => {
+    const filePath = validateCueFilePath(data)
+    if (!filePath.ok) {
+      return ipcError(filePath.error)
+    }
     const loader = ensureLoader(controllerManager)
-    return loader.deleteFile(filePath)
+    return loader.deleteFile(filePath.value)
   })
 
-  handleInvoke(ipcMain, EFFECTS.VALIDATE, log, async (_event, payload: ValidatePayload) => {
+  handleInvoke(ipcMain, EFFECTS.VALIDATE, log, async (_event, data: unknown) => {
     try {
+      const request = validateCueFileCheckPayload(data)
+      if (!request.ok) {
+        return validationRefusal(request.error)
+      }
+      if ('content' in request.value) {
+        return validateEffectFile(request.value.content)
+      }
+      // readFile rejects invalid JSON or schema, and the canonical validator runs on both
+      // branches.
       const loader = ensureLoader(controllerManager)
-
-      if (payload.content) {
-        return validateEffectFile(payload.content)
-      }
-
-      if (payload.path) {
-        // readFile rejects invalid JSON or schema, and the canonical validator runs on both
-        // branches.
-        return validateEffectFile(await loader.readFile(payload.path))
-      }
-
-      throw new Error('Validation payload must include either content or path.')
+      return validateEffectFile(await loader.readFile(request.value.path))
     } catch (error) {
       return validationRefusal(error)
     }
   })
 
-  handleInvoke(ipcMain, EFFECTS.IMPORT_PICK, log, async (_event, preferredMode?: EffectMode) => {
+  handleInvoke(ipcMain, EFFECTS.IMPORT_PICK, log, async (_event, preferredMode?: unknown) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
@@ -112,11 +116,15 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   })
 
-  handleInvoke(ipcMain, EFFECTS.EXPORT, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, EFFECTS.EXPORT, log, async (_event, data: unknown) => {
+    const filePath = validateCueFilePath(data)
+    if (!filePath.ok) {
+      return ipcError(filePath.error)
+    }
     const loader = ensureLoader(controllerManager)
     // Resolve through the loader so the source path used for fs.copyFile is the same
     // rooted path the loader vetted; never copy from the raw IPC string.
-    const resolvedSource = loader.resolveEffectFilePathForIpc(filePath)
+    const resolvedSource = loader.resolveEffectFilePathForIpc(filePath.value)
     await loader.readFile(resolvedSource) // ensure file is valid/exists
 
     const result = await dialog.showSaveDialog({

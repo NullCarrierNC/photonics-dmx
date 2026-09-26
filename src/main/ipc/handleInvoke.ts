@@ -11,16 +11,18 @@ import { ipcError } from './ipcResult'
  *
  * Expected failures still return `{ success: false, error }` from the body. This covers the
  * unexpected ones.
+ *
+ * The arguments come from the page, so a handler receives them as `unknown` and validates them.
  */
 export function handleInvoke(
   ipcMain: IpcMain,
   channel: string,
   log: Logger,
-  handler: (event: IpcMainInvokeEvent, ...args: never[]) => unknown,
+  handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown,
 ): void {
   ipcMain.handle(channel, async (event, ...args) => {
     try {
-      return await handler(event, ...(args as never[]))
+      return await handler(event, ...args)
     } catch (error) {
       log.error(`${channel} failed:`, error)
       return ipcError(error)

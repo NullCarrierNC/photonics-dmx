@@ -157,36 +157,29 @@ export function setupSimulationHandlers(
     }
   })
 
-  handleInvoke(
-    ipcMain,
-    LIGHT.SET_RB3_SIM_LED_STATE,
-    log,
-    async (
-      _,
-      data: { red?: unknown; green?: unknown; blue?: unknown; yellow?: unknown; fog?: unknown },
-    ) => {
-      try {
-        const refused = simulationRefusal()
-        if (refused) return refused
-        // Clamp each bank to a valid 8-bit mask; ignore non-numeric input rather than throw.
-        const mask = (v: unknown): number => {
-          const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : 0
-          return Math.max(0, Math.min(255, n))
-        }
-        controllerManager.getTestEffectRunner('rb3').setRb3LedState({
-          red: mask(data?.red),
-          green: mask(data?.green),
-          blue: mask(data?.blue),
-          yellow: mask(data?.yellow),
-          fog: data?.fog === true,
-        })
-        return { success: true }
-      } catch (error) {
-        log.error('Error setting RB3 simulation LED state:', error)
-        return ipcError(error)
+  handleInvoke(ipcMain, LIGHT.SET_RB3_SIM_LED_STATE, log, async (_, data: unknown) => {
+    try {
+      const refused = simulationRefusal()
+      if (refused) return refused
+      // Clamp each bank to a valid 8-bit mask, reading non-numeric input as 0.
+      const mask = (v: unknown): number => {
+        const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : 0
+        return Math.max(0, Math.min(255, n))
       }
-    },
-  )
+      const banks = isPlainObject(data) ? data : {}
+      controllerManager.getTestEffectRunner('rb3').setRb3LedState({
+        red: mask(banks.red),
+        green: mask(banks.green),
+        blue: mask(banks.blue),
+        yellow: mask(banks.yellow),
+        fog: banks.fog === true,
+      })
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting RB3 simulation LED state:', error)
+      return ipcError(error)
+    }
+  })
 
   handleInvoke(ipcMain, LIGHT.STOP_TEST_EFFECT, log, async () => {
     try {
@@ -199,22 +192,22 @@ export function setupSimulationHandlers(
   })
 
   // Drives the same publisher state the YARG listener feeds, so a real packet arriving later
-  // simply takes over.
-  handleInvoke(
-    ipcMain,
-    LIGHT.SIMULATE_POST_PROCESSING,
-    log,
-    async (_, data?: { state?: unknown }) => {
-      if (simulationRefusal() || !controllerManager.getIsInitialized()) return false
-      const state = data?.state
-      if (!isPostProcessingState(state)) {
-        log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
-        return false
-      }
+  // simply takes over. Answers false for a throw too, since the renderer reads a boolean.
+  handleInvoke(ipcMain, LIGHT.SIMULATE_POST_PROCESSING, log, async (_, data: unknown) => {
+    if (simulationRefusal() || !controllerManager.getIsInitialized()) return false
+    const state = isPlainObject(data) ? data.state : undefined
+    if (!isPostProcessingState(state)) {
+      log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
+      return false
+    }
+    try {
       controllerManager.getVenueFrameProcessor().setVenuePostProcessing(state)
       return true
-    },
-  )
+    } catch (error) {
+      log.error('Error simulating post-processing:', error)
+      return false
+    }
+  })
 
   /** The timing events the simulate buttons fire, and what each tells the chains. */
   const SIMULATED_TIMING = [

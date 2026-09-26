@@ -132,4 +132,33 @@ describe('copyDefaultData', () => {
     expect(kept).toHaveLength(1)
     expect(fs.readFileSync(path.join(appData, kept[0]), 'utf-8')).toContain('trunc')
   })
+
+  it('seeds a destination whose body is not an object again, keeping the old bytes', async () => {
+    seedSource({
+      'a-cue.json': JSON.stringify({ cueVersion: 2, marker: 'shipped' }),
+      'b-cue.json': JSON.stringify({ cueVersion: 1, marker: 'sibling' }),
+    })
+    fs.writeFileSync(path.join(appData, 'a-cue.json'), 'null')
+
+    await expect(copyDefaultData(appRoot, appData)).resolves.toBeUndefined()
+
+    const written = JSON.parse(fs.readFileSync(path.join(appData, 'a-cue.json'), 'utf-8'))
+    expect(written.marker).toBe('shipped')
+    const kept = fs.readdirSync(appData).filter((f) => f.startsWith('a-cue.json.corrupt-'))
+    expect(kept).toHaveLength(1)
+    expect(fs.readFileSync(path.join(appData, kept[0]), 'utf-8')).toBe('null')
+    expect(fs.existsSync(path.join(appData, 'b-cue.json'))).toBe(true)
+  })
+
+  it('carries on past a bundled file whose body is not an object', async () => {
+    seedSource({
+      'a-cue.json': 'null',
+      'b-cue.json': JSON.stringify({ cueVersion: 1, marker: 'sibling' }),
+    })
+
+    await expect(copyDefaultData(appRoot, appData)).resolves.toBeUndefined()
+
+    expect(fs.existsSync(path.join(appData, 'a-cue.json'))).toBe(false)
+    expect(fs.existsSync(path.join(appData, 'b-cue.json'))).toBe(true)
+  })
 })

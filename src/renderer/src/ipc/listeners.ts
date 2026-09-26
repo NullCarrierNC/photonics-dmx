@@ -2,14 +2,15 @@
  * RB3E and the game listeners.
  */
 import { CUE } from '../../../shared/ipcChannels'
+import { orThrow } from './ipcResult'
 
 // ---------------------------------------------------------------------------
 // RB3E
 // ---------------------------------------------------------------------------
 
-export const getRb3Mode = () => window.api.invoke(CUE.RB3E_GET_MODE, undefined)
+export const getRb3Mode = () => window.api.invoke(CUE.RB3E_GET_MODE, undefined).then(orThrow)
 
-export const getRb3Stats = () => window.api.invoke(CUE.RB3E_GET_STATS, undefined)
+export const getRb3Stats = () => window.api.invoke(CUE.RB3E_GET_STATS, undefined).then(orThrow)
 
 // ---------------------------------------------------------------------------
 // Listener management

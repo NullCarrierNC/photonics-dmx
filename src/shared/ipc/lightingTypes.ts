@@ -39,13 +39,16 @@ export interface LightingInvokeMap {
   }
   [LIGHT.GET_CUE_GROUPS]: {
     request: void
-    response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
+    response:
+      | Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
+      | IpcErrorResult
   }
   [LIGHT.GET_NETWORK_INTERFACES]: {
     request: void
     response:
       | { success: true; interfaces: Array<{ name: string; value: string; family: string }> }
       | (IpcErrorResult & { interfaces: [] })
+      | IpcErrorResult
   }
   [LIGHT.START_TEST_EFFECT]: {
     request: {
@@ -123,29 +126,33 @@ export interface LightingInvokeMap {
   }
   [LIGHT.GET_AVAILABLE_CUES]: {
     request: string | undefined
-    response: Array<{
-      id: string
-      yargDescription: string
-      rb3Description: string
-      groupName: string
-    }>
+    response:
+      | Array<{
+          id: string
+          yargDescription: string
+          rb3Description: string
+          groupName: string
+        }>
+      | IpcErrorResult
   }
   [LIGHT.GET_AVAILABLE_AUDIO_CUES]: {
     request: string | undefined
-    response: Array<{ id: string; description: string }>
+    response: Array<{ id: string; description: string }> | IpcErrorResult
   }
   [LIGHT.GET_AVAILABLE_RB3_CUES]: {
     request: string | undefined
-    response: Array<{
-      id: string
-      yargDescription: string
-      rb3Description: string
-      groupName: string
-    }>
+    response:
+      | Array<{
+          id: string
+          yargDescription: string
+          rb3Description: string
+          groupName: string
+        }>
+      | IpcErrorResult
   }
   [LIGHT.GET_AUDIO_CUE_GROUPS]: {
     request: void
-    response: Array<{ id: string; name: string; description: string }>
+    response: Array<{ id: string; name: string; description: string }> | IpcErrorResult
   }
   [LIGHT.GET_CUE_SOURCE_GROUP]: {
     request: CueType

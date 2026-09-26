@@ -76,3 +76,31 @@ export function validateCueTypesPayload(
   }
   return { ok: true, value: { mode: mode.value, kind: kind.value } }
 }
+
+/** A cue or effect file path from the page. The loader resolves it under its own root. */
+export function validateCueFilePath(value: unknown): ValidationResult<string> {
+  if (!isNonEmptyString(value)) {
+    return { ok: false, error: 'File path must be a non-empty string' }
+  }
+  return { ok: true, value }
+}
+
+/** A validate request: the content of a file to check, or the path of a file to read and check. */
+export function validateCueFileCheckPayload(
+  value: unknown,
+): ValidationResult<{ content: Record<string, unknown> } | { path: string }> {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: 'Validation payload must be an object' }
+  }
+  if (value.content !== undefined) {
+    if (!isPlainObject(value.content)) {
+      return { ok: false, error: 'content must be an object' }
+    }
+    return { ok: true, value: { content: value.content } }
+  }
+  if (value.path !== undefined) {
+    const filePath = validateCueFilePath(value.path)
+    return filePath.ok ? { ok: true, value: { path: filePath.value } } : filePath
+  }
+  return { ok: false, error: 'Validation payload must include either content or path.' }
+}

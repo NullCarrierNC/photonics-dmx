@@ -49,7 +49,7 @@ export interface SenderInvokeMap {
   }
   [LIGHT.GET_MASTER_OUTPUT]: {
     request: void
-    response: MasterOutputSnapshot
+    response: MasterOutputSnapshot | IpcErrorResult
   }
   /**
    * Partial update: omitted fields are left alone, so the fader and the two toggles can each

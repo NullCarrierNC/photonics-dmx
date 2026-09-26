@@ -150,7 +150,8 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   let currentDateKey: string | null = null
   let currentStream: fs.WriteStream | null = null
   let bytesThisDay = 0
-  let capReported = false
+  /** How far past the day's cap the console has been told the file is. */
+  let capReported: 'none' | 'errorsOnly' | 'full' = 'none'
   let closed = false
   /** Set after a stream error: no stream opens before this time. */
   let reopenAtMs: number | null = null
@@ -193,7 +194,7 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     } catch {
       bytesThisDay = 0
     }
-    capReported = false
+    capReported = 'none'
   }
 
   const sink: LogSink = (entry: LogEntry) => {
@@ -228,8 +229,8 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     // past it, since whatever filled the file is usually the thing being diagnosed. Everything
     // below error stops here.
     if (bytesThisDay >= maxBytesPerDay) {
-      reportCapOnce()
       const spent = bytesThisDay >= maxBytesPerDay + errorReserveBytes
+      reportCap(spent ? 'full' : 'errorsOnly')
       if (entry.level !== 'error' || spent) {
         return
       }
@@ -238,16 +239,21 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     currentStream.write(line)
   }
 
-  /** Say once, on the console, that the day's file is full. */
-  function reportCapOnce(): void {
-    if (capReported) {
+  /**
+   * Say once per stage, on the console, that the day's file has reached its cap and keeps only
+   * errors, and then that the error reserve is spent too.
+   */
+  function reportCap(stage: 'errorsOnly' | 'full'): void {
+    if (capReported === stage || capReported === 'full') {
       return
     }
-    capReported = true
+    capReported = stage
+    const message =
+      stage === 'errorsOnly'
+        ? `log reached ${maxBytesPerDay} bytes, keeping only errors for today, up to ${errorReserveBytes} more bytes.`
+        : `log used its ${errorReserveBytes}-byte error reserve, dropping every further line for today.`
     // eslint-disable-next-line no-console
-    console.error(
-      `[fileLogSink] ${currentDateKey} log reached ${maxBytesPerDay} bytes, dropping further lines for today.`,
-    )
+    console.error(`[fileLogSink] ${currentDateKey} ${message}`)
   }
 
   return {

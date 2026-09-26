@@ -29,12 +29,14 @@ export const reportUnsavedChanges = (unsaved: boolean) =>
 // App information
 // ---------------------------------------------------------------------------
 
-export const getAppVersion = () => window.api.invoke(CONFIG.GET_APP_VERSION, undefined)
+export const getAppVersion = () =>
+  window.api.invoke(CONFIG.GET_APP_VERSION, undefined).then(orThrow)
 
-export const getValidationErrors = () => window.api.invoke(CONFIG.GET_VALIDATION_ERRORS, undefined)
+export const getValidationErrors = () =>
+  window.api.invoke(CONFIG.GET_VALIDATION_ERRORS, undefined).then(orThrow)
 
 export const getCorruptRecoveryEvents = () =>
-  window.api.invoke(CONFIG.GET_CORRUPT_RECOVERY_EVENTS, undefined)
+  window.api.invoke(CONFIG.GET_CORRUPT_RECOVERY_EVENTS, undefined).then(orThrow)
 
 // ---------------------------------------------------------------------------
 // System status

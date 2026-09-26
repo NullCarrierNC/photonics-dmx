@@ -215,34 +215,114 @@ describe('ConsoleModeController', () => {
   })
 
   it('answers a saved fixture edit as saved when the restart after it fails', async () => {
-    const light = { id: 'mh-1', fixtureId: 'fixture-1', fixture: 'rgb/mh', config: {} }
-    const saveDmxRig = jest.fn(async () => {})
-    const updateUserLight = jest.fn(async () => {})
+    const store = fixtureEditStore()
     const c = new ConsoleModeController(
       baseDeps({
-        getConfig: () =>
-          ({
-            getDmxRig: () => ({
-              id: 'rig-1',
-              config: { frontLights: [light], backLights: [], strobeLights: [] },
-            }),
-            getUserLights: () => [{ id: 'fixture-1', fixture: 'rgb/mh', config: {} }],
-            saveDmxRig,
-            updateUserLight,
-          }) as never,
+        getConfig: store.getConfig,
         restartControllers: () => Promise.reject(new Error('rig chain would not dispose')),
       }),
     )
 
-    const result = await c.setConsoleFixtureConfig({
-      rigId: 'rig-1',
-      lightId: 'mh-1',
-      fixtureId: 'fixture-1',
-      config: { panHome: 50 },
-    })
+    const result = await c.setConsoleFixtureConfig(panHomeEdit)
 
     expect(result).toEqual({ success: true, restartError: 'rig chain would not dispose' })
-    expect(saveDmxRig).toHaveBeenCalledTimes(1)
-    expect(updateUserLight).toHaveBeenCalledTimes(1)
+    expect(store.rigPanHome()).toBe(50)
+    expect(store.templatePanHome()).toBe(50)
+  })
+
+  it('puts the rig back when the fixture template write fails', async () => {
+    const store = fixtureEditStore({ failTemplateWrites: 1 })
+    let restarts = 0
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: store.getConfig,
+        restartControllers: async () => {
+          restarts++
+        },
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig(panHomeEdit)
+
+    expect(result).toEqual({ success: false, error: 'lights.json is read-only' })
+    expect(store.rigPanHome()).toBeUndefined()
+    expect(store.templatePanHome()).toBeUndefined()
+    expect(restarts).toBe(0)
+  })
+
+  it('restarts onto the rig on disk when the rig cannot be put back', async () => {
+    const store = fixtureEditStore({ failTemplateWrites: 1, failRigWritesAfter: 1 })
+    let restarts = 0
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: store.getConfig,
+        restartControllers: async () => {
+          restarts++
+        },
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig(panHomeEdit)
+
+    expect(result).toEqual({ success: false, error: expect.stringContaining('lights.json') })
+    expect(store.rigPanHome()).toBe(50)
+    expect(restarts).toBe(1)
   })
 })
+
+const panHomeEdit = {
+  rigId: 'rig-1',
+  lightId: 'mh-1',
+  fixtureId: 'fixture-1',
+  config: { panHome: 50 },
+}
+
+type StoredLight = { id: string; fixtureId: string; fixture: string; config: { panHome?: number } }
+type StoredRig = {
+  id: string
+  config: { frontLights: StoredLight[]; backLights: []; strobeLights: [] }
+}
+type StoredTemplate = { id: string; fixture: string; config: { panHome?: number } }
+
+/**
+ * One moving head in one rig and its template, kept in memory. Template writes fail for the first
+ * `failTemplateWrites` calls, and rig writes fail once `failRigWritesAfter` of them have landed.
+ */
+function fixtureEditStore(
+  options: { failTemplateWrites?: number; failRigWritesAfter?: number } = {},
+) {
+  let rig: StoredRig = {
+    id: 'rig-1',
+    config: {
+      frontLights: [{ id: 'mh-1', fixtureId: 'fixture-1', fixture: 'rgb/mh', config: {} }],
+      backLights: [],
+      strobeLights: [],
+    },
+  }
+  let template: StoredTemplate = { id: 'fixture-1', fixture: 'rgb/mh', config: {} }
+  let templateFailures = options.failTemplateWrites ?? 0
+  let rigWrites = 0
+  const config = {
+    getDmxRig: () => rig,
+    getUserLights: () => [template],
+    saveDmxRig: async (next: StoredRig) => {
+      if (options.failRigWritesAfter !== undefined && rigWrites >= options.failRigWritesAfter) {
+        throw new Error('rigs.json is read-only')
+      }
+      rigWrites++
+      rig = next
+    },
+    updateUserLight: async (_id: string, change: (t: StoredTemplate) => StoredTemplate) => {
+      if (templateFailures > 0) {
+        templateFailures--
+        throw new Error('lights.json is read-only')
+      }
+      template = change(template)
+    },
+  }
+  return {
+    getConfig: () => config as never,
+    rigPanHome: () => rig.config.frontLights[0].config.panHome,
+    templatePanHome: () => template.config.panHome,
+  }
+}

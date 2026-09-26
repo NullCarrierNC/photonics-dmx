@@ -61,8 +61,11 @@ export function listenerStub() {
   }
 }
 
-/** A graph whose build/teardown steps are observable no-op mocks. */
-export function restartGraph(): ControllerGraph {
+/**
+ * A graph whose build/teardown steps are observable no-op mocks, handing out `publisher` as its
+ * DMX publisher.
+ */
+export function restartGraph(publisher: unknown = null): ControllerGraph {
   return {
     disposeChainsForRestart: jest.fn(),
     disposeChainsForShutdown: jest.fn(),
@@ -76,7 +79,7 @@ export function restartGraph(): ControllerGraph {
     buildChains: jest.fn(),
     buildPrimaryYargHandler: jest.fn(),
     getChains: jest.fn().mockReturnValue([]),
-    getDmxPublisher: jest.fn().mockReturnValue(null),
+    getDmxPublisher: jest.fn().mockReturnValue(publisher),
   } as unknown as ControllerGraph
 }
 
