@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useWriteQueue } from '../../hooks/useWriteQueue'
 
 /**
  * Serializes field edits for one sender's config (Enttec Pro, OpenDMX, ArtNet, sACN) so two commits
@@ -9,7 +10,7 @@ import { useCallback, useEffect, useRef } from 'react'
  * started before this render's state has landed) reads it rather than the render-time prop. Prefs
  * changing from elsewhere (load, another window) are only picked up while nothing local is
  * pending, so an in-flight edit is never clobbered by a read that started before it. Commits run
- * one at a time through a promise chain: persist, then the stored-config update, then the optional
+ * one at a time through a write queue: persist, then the stored-config update, then the optional
  * push to a running sender. A failed persist leaves the ref at the last committed config.
  */
 export function useSerializedConfigCommit<Config extends object>(options: {
@@ -25,19 +26,17 @@ export function useSerializedConfigCommit<Config extends object>(options: {
 }): (patch: Partial<Config>, what: string) => Promise<boolean> {
   const { stored, persist, setStored, applyToRunningSender } = options
   const configRef = useRef<Config>(stored)
-  const chainRef = useRef<Promise<void>>(Promise.resolve())
-  const pendingCountRef = useRef(0)
+  const { enqueue, isBusy } = useWriteQueue()
 
   useEffect(() => {
-    if (pendingCountRef.current === 0) {
+    if (!isBusy()) {
       configRef.current = stored
     }
-  }, [stored])
+  }, [stored, isBusy])
 
   return useCallback(
-    (patch: Partial<Config>, what: string): Promise<boolean> => {
-      pendingCountRef.current += 1
-      const run = chainRef.current.then(async (): Promise<boolean> => {
+    (patch: Partial<Config>, what: string): Promise<boolean> =>
+      enqueue(async (): Promise<boolean> => {
         const newConfig = { ...configRef.current, ...patch }
         const saved = await persist(newConfig, what)
         if (!saved) return false
@@ -47,15 +46,7 @@ export function useSerializedConfigCommit<Config extends object>(options: {
           await applyToRunningSender(newConfig, what)
         }
         return true
-      })
-      chainRef.current = run.then(
-        () => undefined,
-        () => undefined,
-      )
-      return run.finally(() => {
-        pendingCountRef.current -= 1
-      })
-    },
-    [persist, setStored, applyToRunningSender],
+      }),
+    [enqueue, persist, setStored, applyToRunningSender],
   )
 }

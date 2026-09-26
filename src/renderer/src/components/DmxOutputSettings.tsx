@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { useAtom, useStore } from 'jotai'
 import {
   senderArtNetEnabledAtom,
@@ -39,6 +39,7 @@ import {
   type DmxOutputFlag,
 } from './DmxOutputSettings/outputConfig'
 import { useSerializedConfigCommit } from './DmxOutputSettings/useSerializedConfigCommit'
+import { useWriteQueue } from '../hooks/useWriteQueue'
 import { applySenderRunState } from '../ipc/senderSwitch'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { wasRefused } from '../ipc/ipcResult'
@@ -64,7 +65,7 @@ const DmxOutputSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const store = useStore()
   // Flag saves run one at a time, each built from the config the one before it saved.
-  const flagSaves = useRef<Promise<unknown>>(Promise.resolve())
+  const { enqueue: queueFlagSave } = useWriteQueue()
   const enttecProSpeed = prefs.enttecProConfig?.dmxSpeed ?? ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
   const globalDmxPublishingRate = prefs.globalDmxPublishingRateHz ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
@@ -301,9 +302,7 @@ const DmxOutputSettings: React.FC = () => {
         return next
       })
     markSaving(true)
-    const saving = flagSaves.current.then(() => saveSenderFlag(name))
-    flagSaves.current = saving.catch(() => undefined)
-    await saving.finally(() => markSaving(false))
+    await queueFlagSave(() => saveSenderFlag(name)).finally(() => markSaving(false))
   }
 
   const handleArtNetConfigChange = (

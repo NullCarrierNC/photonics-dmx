@@ -12,6 +12,7 @@ import { addIpcListener, removeIpcListener } from '../../utils/ipcHelpers'
 import { CueGroupEnableList } from './CueGroupEnableList'
 import { CueGroupRow } from './CueGroupRow'
 import { useCueGroupRovingTabIndex } from './useCueGroupRovingTabIndex'
+import { useWriteQueue } from '../../hooks/useWriteQueue'
 
 /** The least a group row needs. Each domain's own group type carries more. */
 export interface CueGroupRowData {
@@ -78,7 +79,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
   // What the domain last accepted. Writes run one at a time, each built from this once the one
   // before it has landed, so a second tick carries the first.
   const saved = useRef<Selection>({ enabled: [], disabled: {} })
-  const writes = useRef<Promise<unknown>>(Promise.resolve())
+  const { enqueue: queueWrite } = useWriteQueue()
   const roving = useCueGroupRovingTabIndex(allGroups.map((g) => g.id))
 
   const fetchGroups = useCallback(async () => {
@@ -151,15 +152,14 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
     const onChanged = () => {
       if (refreshQueued.current) return
       refreshQueued.current = true
-      const run = writes.current.then(refreshSelection)
-      writes.current = run.catch((error: unknown) => {
+      void queueWrite(refreshSelection).catch((error: unknown) => {
         refreshQueued.current = false
         log.error(`Could not read the ${domain.label} cue groups again:`, error)
       })
     }
     addIpcListener(event, onChanged)
     return () => removeIpcListener(event, onChanged)
-  }, [domain, log, refreshSelection])
+  }, [domain, log, refreshSelection, queueWrite])
 
   const clearPersistError = useCallback((groupId: string) => {
     setPersistErrorByGroup((prev) => {
@@ -215,9 +215,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
   const persistEnabledAndDisabled = (
     build: (current: Selection) => Selection,
   ): Promise<{ ok: true } | { ok: false; error: string }> => {
-    const run = writes.current.then(() => writeSelection(build(saved.current)))
-    writes.current = run.catch(() => undefined)
-    return run
+    return queueWrite(() => writeSelection(build(saved.current)))
   }
 
   const getGroupCheckboxState = (group: Row): { checked: boolean; indeterminate: boolean } => {

@@ -32,6 +32,7 @@ import {
 } from './CueConsistencySettings/fields'
 import { useProbabilitySaver } from './CueConsistencySettings/useProbabilitySaver'
 import { DraftNumberField } from './controls/DraftField'
+import { useWriteQueue } from '../hooks/useWriteQueue'
 import { createLogger } from '../../../shared/logger'
 import {
   CUE_CONSISTENCY_WINDOW_MS_MAX,
@@ -71,18 +72,9 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   const [rb3MotionDurationMin, setRb3MotionDurationMin] = useState(5)
   const [rb3MotionDurationMax, setRb3MotionDurationMax] = useState(20)
   const [isLoading, setIsLoading] = useState(true)
-  // Writes run one at a time in the order they were asked for, so a change made while another
-  // field is saving still reaches main once that save lands.
-  const writes = useRef<Promise<unknown>>(Promise.resolve())
-  const [pendingWrites, setPendingWrites] = useState(0)
+  // A change made while another field is saving still reaches main once that save lands.
+  const { enqueue: queueWrite, pending: pendingWrites } = useWriteQueue()
   const isSaving = pendingWrites > 0
-
-  const queueWrite = useCallback((write: () => Promise<void>): Promise<void> => {
-    setPendingWrites((count) => count + 1)
-    const run = writes.current.then(write).finally(() => setPendingWrites((count) => count - 1))
-    writes.current = run.catch(() => undefined)
-    return run
-  }, [])
 
   const yargProbability = useProbabilitySaver(
     setMotionCueProbabilityPercent,
