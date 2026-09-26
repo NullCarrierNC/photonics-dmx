@@ -32,7 +32,7 @@ export class AudioEventRuns {
         this.pending.set(event.id, data)
         return
       }
-      engine.cancelContexts(event.id)
+      engine.cancelEventRuns(event.id)
     }
     this.run(engine, event, data)
   }

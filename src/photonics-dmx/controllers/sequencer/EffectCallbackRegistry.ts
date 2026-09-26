@@ -11,9 +11,9 @@ type CompletionCallback = (cancelled: boolean) => void
  * When effects are force-cleared the callbacks fire with `cancelled = true` rather than being
  * dropped, otherwise the waiting node is never told its action ended and strands its context.
  *
- * A name can hold more than one callback. A submission queued behind a running effect of the same
- * name registers alongside the waiter already there, and both fire, in registration order, once
- * the name has finished running.
+ * A name can hold more than one callback. A submission refused because the name is already running
+ * parks its waiter alongside the one already there, and both fire, in registration order, once the
+ * name has finished running.
  */
 export class EffectCallbackRegistry {
   private callbacks: Map<string, CompletionCallback[]> = new Map()

@@ -8,7 +8,10 @@ import { CueType, type CueData } from '../../../../cues/types/cueTypes'
 import type { NetNodeCueDefinition } from '../../../../cues/types/nodeCueTypes'
 import { createSequencerHarness, type SequencerHarness } from '../../../helpers/sequencerHarness'
 
-/** A cue-called graph that paints and then waits for a keyframe the frames never carry. */
+/**
+ * A cue-called graph that paints and then waits for a keyframe the frames never carry. The first
+ * run paints red and every later run paints blue.
+ */
 function waitsForKeyframe(): NetNodeCueDefinition {
   return {
     id: 'waits',
@@ -16,6 +19,10 @@ function waitsForKeyframe(): NetNodeCueDefinition {
     kind: 'lighting',
     cueType: CueType.Default,
     style: 'secondary',
+    variables: [
+      { name: 'shade', type: 'color', scope: 'cue', initialValue: 'red' },
+      { name: 'nextShade', type: 'color', scope: 'cue', initialValue: 'red' },
+    ],
     nodes: {
       events: [{ id: 'called', type: 'event', eventType: 'cue-called' }],
       actions: [
@@ -28,7 +35,7 @@ function waitsForKeyframe(): NetNodeCueDefinition {
             filter: { source: 'literal', value: 'all' },
           },
           color: {
-            name: { source: 'literal', value: 'red' },
+            name: { source: 'variable', name: 'shade' },
             brightness: { source: 'literal', value: 'high' },
           },
           timing: {
@@ -40,9 +47,33 @@ function waitsForKeyframe(): NetNodeCueDefinition {
           },
         },
       ],
-      logic: [],
+      logic: [
+        {
+          id: 'pick',
+          type: 'logic',
+          logicType: 'variable',
+          mode: 'set',
+          varName: 'shade',
+          valueType: 'color',
+          assignments: [
+            {
+              varName: 'shade',
+              valueType: 'color',
+              value: { source: 'variable', name: 'nextShade' },
+            },
+            {
+              varName: 'nextShade',
+              valueType: 'color',
+              value: { source: 'literal', value: 'blue' },
+            },
+          ],
+        },
+      ],
     },
-    connections: [{ from: 'called', to: 'paint' }],
+    connections: [
+      { from: 'called', to: 'pick' },
+      { from: 'pick', to: 'paint' },
+    ],
   }
 }
 
@@ -60,7 +91,7 @@ describe('a lifecycle run that never completes', () => {
     jest.restoreAllMocks()
   })
 
-  it('holds later frames back until it expires, then gives way to the newest frame', () => {
+  it('holds later frames back until it expires, then paints the newest frame', () => {
     h = createSequencerHarness({ frontCount: 4, backCount: 0 })
     const harness = h
     cue = new LightingNodeCue(
@@ -69,17 +100,22 @@ describe('a lifecycle run that never completes', () => {
       new EffectRegistry(),
       { emit: () => {} },
     )
-    const paints = jest.spyOn(harness.sequencer, 'addEffectUnblockedNameWithCallback')
+    const front = (): { red: number; blue: number } => {
+      const state = harness.getLightState(harness.frontLightIds[0])
+      return { red: state?.red ?? 0, blue: state?.blue ?? 0 }
+    }
 
     cue.execute(frame, harness.sequencer, harness.lightManager)
     for (let elapsed = 0; elapsed < LIFECYCLE_RUN_EXPIRY_MS - 1000; elapsed += 1000) {
       harness.advanceBy(1000)
       cue.execute(frame, harness.sequencer, harness.lightManager)
     }
-    expect(paints).toHaveBeenCalledTimes(1)
+    harness.advanceBy(200)
+    expect(front()).toEqual({ red: 255, blue: 0 })
 
-    harness.advanceBy(2000)
+    harness.advanceBy(1800)
     cue.execute(frame, harness.sequencer, harness.lightManager)
-    expect(paints).toHaveBeenCalledTimes(2)
+    harness.advanceBy(200)
+    expect(front()).toEqual({ red: 0, blue: 255 })
   })
 })

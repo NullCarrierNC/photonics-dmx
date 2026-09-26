@@ -172,12 +172,6 @@ describe('NodeExecutionEngine', () => {
   beforeEach(() => {
     // Create mock sequencer
     mockSequencer = fakeLightingController({
-      addEffectWithCallback: (_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(false), 1)
-      },
-      setEffectWithCallback: (_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(false), 1)
-      },
       addEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
         if (callback) setTimeout(() => callback(false), 1)
         return true

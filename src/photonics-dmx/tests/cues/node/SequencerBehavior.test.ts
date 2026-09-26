@@ -38,14 +38,6 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
     removeEffect: (name: string, layer?: number) => {
       recorded.push({ method: 'removeEffect', name, layer })
     },
-    addEffectWithCallback: (name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
-      recorded.push({ method: 'addEffect', name })
-      cb(false)
-    },
-    setEffectWithCallback: (name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
-      recorded.push({ method: 'setEffect', name })
-      cb(false)
-    },
     addEffectUnblockedNameWithCallback: (
       name: string,
       _e: unknown,

@@ -420,7 +420,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
       const replacement = buildSingleLayerEffect(lights, 1, colorB, 20, 'linear')
 
       let resubmitted = false
-      harness.sequencer.addEffectWithCallback(
+      harness.sequencer.addEffectUnblockedNameWithCallback(
         'loop-test',
         first,
         () => {
@@ -489,7 +489,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
       const clearing = buildSingleLayerEffect(lights, 1, colorC, 20, 'linear')
 
       let resubmitted = false
-      harness.sequencer.addEffectWithCallback(
+      harness.sequencer.addEffectUnblockedNameWithCallback(
         'loop-test',
         buildSingleLayerEffect(lights, 1, colorA, 20, 'linear'),
         () => {
@@ -599,7 +599,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
       const fromCallback = buildSingleLayerEffect([queuedLight], 1, colorC, 20, 'linear')
 
       let resubmitted = false
-      harness.sequencer.addEffectWithCallback(
+      harness.sequencer.addEffectUnblockedNameWithCallback(
         'callback-effect',
         buildSingleLayerEffect([callbackLight], 1, colorA, 20, 'linear'),
         () => {
@@ -610,7 +610,9 @@ describe('Sequencer blending and queueing (real harness)', () => {
       )
       const queuedCompletions: boolean[] = []
       harness.sequencer.addEffect('queued-effect', running)
-      harness.sequencer.addEffectWithCallback('queued-effect', waiting, (cancelled) =>
+      harness.sequencer.addEffect('queued-effect', waiting)
+      // Refused while the name runs, so the waiter parks on the name until its queued entry ends.
+      harness.sequencer.addEffectUnblockedNameWithCallback('queued-effect', waiting, (cancelled) =>
         queuedCompletions.push(cancelled),
       )
       expect(queuedCount(harness)).toBe(1)
@@ -636,7 +638,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
     const effect = buildSingleLayerEffect(lights, 1, color, 30, 'linear')
 
     const onComplete = jest.fn()
-    harness.sequencer.addEffectWithCallback('callback-test', effect, onComplete)
+    harness.sequencer.addEffectUnblockedNameWithCallback('callback-test', effect, onComplete)
     harness.advanceBy(10)
     expect(onComplete).not.toHaveBeenCalled()
 
@@ -654,7 +656,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
     harness.cleanup()
   })
 
-  it('fires a queued run callback on the frame that run ends, not when the run ahead of it ends', () => {
+  it('fires waiters on the frame the last queued run of their name ends', () => {
     const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
     const lights = harness.lightManager.getLights(['front'], ['all'])
     const lightId = lights[0].id
@@ -673,8 +675,10 @@ describe('Sequencer blending and queueing (real harness)', () => {
 
     const firstWaiter = jest.fn()
     const queuedWaiter = jest.fn()
-    harness.sequencer.addEffectWithCallback('queue-callback', effectA, firstWaiter)
-    harness.sequencer.addEffectWithCallback('queue-callback', effectB, queuedWaiter)
+    harness.sequencer.addEffectUnblockedNameWithCallback('queue-callback', effectA, firstWaiter)
+    harness.sequencer.addEffect('queue-callback', effectB)
+    // Refused while the name runs, so this waiter parks beside the first one.
+    harness.sequencer.addEffectUnblockedNameWithCallback('queue-callback', effectB, queuedWaiter)
     expect(queued()).toBe(1)
 
     // Step to the frame where A finishes and hands the slot to the queued B.

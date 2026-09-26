@@ -139,4 +139,23 @@ describe('RigChain', () => {
       audioSpy.mockRestore()
     }
   })
+
+  it('dispose runs every step when the sequencer fails to shut down, then throws that failure', () => {
+    const [rigA] = makeTwoRigs({ frontPerRig: 4 })
+    const clock = new ManualTestClock()
+    const chain = new RigChain({ rigId: rigA.id, config: rigA.config, clock })
+    const failure = new Error('sequencer shutdown failed')
+    const shutdown = jest.spyOn(chain.sequencer, 'shutdown').mockImplementation(() => {
+      throw failure
+    })
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(() => chain.dispose()).toThrow(failure)
+      expect(chain.dmxLightManager.getLights(['front'], ['all'])).toEqual([])
+    } finally {
+      shutdown.mockRestore()
+      chain.sequencer.shutdown()
+      jest.restoreAllMocks()
+    }
+  })
 })

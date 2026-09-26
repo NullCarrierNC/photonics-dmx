@@ -39,8 +39,6 @@ const accepting: ILightingController = {
   getMotionPattern: () => undefined,
   updateMotionPatternConfig: () => {},
   onMotionPatternsCleared: () => () => {},
-  addEffectWithCallback: () => {},
-  setEffectWithCallback: () => {},
   removeEffectCallback: () => {},
   onBeat: () => {},
   onMeasure: () => {},
@@ -149,11 +147,6 @@ export function completingLightingController(
       settleBlackouts()
       cancelAll()
       start(name, effect)
-    },
-    addEffectWithCallback: (name, effect, onComplete) => start(name, effect, onComplete),
-    setEffectWithCallback: (name, effect, onComplete) => {
-      cancelAll()
-      start(name, effect, onComplete)
     },
     replaceEffectWithCallback: (name, effect, onComplete) => {
       cancelFadeBelowSystemLayer(effect)

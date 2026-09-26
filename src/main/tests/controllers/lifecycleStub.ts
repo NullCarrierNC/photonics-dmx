@@ -90,6 +90,7 @@ export function stubConfig(prefs: Record<string, unknown> = {}): ConfigurationMa
     getAllPreferences: () => prefs,
     getCueGroupSelectionMode: () => 'withinSong',
     getDmxRig: (id: string) => ({ id }),
+    getActiveRigs: () => [],
   } as unknown as ConfigurationManager
 }
 

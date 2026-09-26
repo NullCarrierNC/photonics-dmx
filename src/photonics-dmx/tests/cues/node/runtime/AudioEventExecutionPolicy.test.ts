@@ -8,12 +8,13 @@ import type {
   AudioEventNodeUnion,
   AudioLightingNodeCueDefinition,
   LogicNode,
+  ValueSource,
 } from '../../../../cues/types/nodeCueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import { createSequencerHarness, type SequencerHarness } from '../../../helpers/sequencerHarness'
 
-function setColor(id: string, color: string, waitUntil: 'beat' | 'none'): ActionNode {
+function setColor(id: string, color: ValueSource, waitUntil: 'beat' | 'none'): ActionNode {
   return {
     id,
     type: 'action',
@@ -23,7 +24,7 @@ function setColor(id: string, color: string, waitUntil: 'beat' | 'none'): Action
       filter: { source: 'literal', value: 'all' },
     },
     color: {
-      name: { source: 'literal', value: color },
+      name: color,
       brightness: { source: 'literal', value: 'high' },
     },
     timing: {
@@ -40,6 +41,7 @@ function setColor(id: string, color: string, waitUntil: 'beat' | 'none'): Action
 /**
  * A cue-called graph that holds on a beat-gated set-color, then counts through a logic node into a
  * set-color that submits without waiting, so each run that gets past the beat submits `after` once.
+ * The first run holds on red and every later run holds on green.
  */
 function beatHeldCue(policy: AudioEventExecutionPolicy | undefined): AudioNodeCue {
   const counter: LogicNode = {
@@ -51,13 +53,29 @@ function beatHeldCue(policy: AudioEventExecutionPolicy | undefined): AudioNodeCu
     valueType: 'number',
     value: { source: 'literal', value: 1 },
   }
+  const pick: LogicNode = {
+    id: 'pick',
+    type: 'logic',
+    logicType: 'variable',
+    mode: 'set',
+    varName: 'shade',
+    valueType: 'color',
+    assignments: [
+      { varName: 'shade', valueType: 'color', value: { source: 'variable', name: 'nextShade' } },
+      { varName: 'nextShade', valueType: 'color', value: { source: 'literal', value: 'green' } },
+    ],
+  }
   const definition: AudioLightingNodeCueDefinition = {
     kind: 'lighting',
     id: 'held',
     cueTypeId: 'held',
     name: 'Beat held',
     style: 'secondary',
-    variables: [{ name: 'runs', type: 'number', scope: 'cue', initialValue: 0 }],
+    variables: [
+      { name: 'runs', type: 'number', scope: 'cue', initialValue: 0 },
+      { name: 'shade', type: 'color', scope: 'cue', initialValue: 'red' },
+      { name: 'nextShade', type: 'color', scope: 'cue', initialValue: 'red' },
+    ],
     nodes: {
       events: [
         {
@@ -69,11 +87,15 @@ function beatHeldCue(policy: AudioEventExecutionPolicy | undefined): AudioNodeCu
           ...(policy && { executionPolicy: policy }),
         },
       ],
-      actions: [setColor('hold', 'red', 'beat'), setColor('after', 'blue', 'none')],
-      logic: [counter],
+      actions: [
+        setColor('hold', { source: 'variable', name: 'shade' }, 'beat'),
+        setColor('after', { source: 'literal', value: 'blue' }, 'none'),
+      ],
+      logic: [pick, counter],
     },
     connections: [
-      { from: 'called', to: 'hold' },
+      { from: 'called', to: 'pick' },
+      { from: 'pick', to: 'hold' },
       { from: 'hold', to: 'count' },
       { from: 'count', to: 'after' },
     ],
@@ -102,7 +124,10 @@ describe('audio cue-called execution policy', () => {
     jest.restoreAllMocks()
   })
 
-  /** Run 60 frames with no beat, then a beat, and count the submissions of each action. */
+  /**
+   * Run 60 frames with no beat, let the newest fade finish, then a beat, and count the submissions of
+   * each action.
+   */
   async function sixtyFramesThenABeat(
     policy: AudioEventExecutionPolicy | undefined,
   ): Promise<{ holdBeforeBeat: number; afterOnBeat: number; holdOnBeat: number }> {
@@ -119,6 +144,7 @@ describe('audio cue-called execution policy', () => {
       harness.advanceBy(10)
       harness.advanceBy(10)
     }
+    harness.advanceBy(200)
     const holdBeforeBeat = count(held, 'hold')
     harness.sequencer.onBeat()
     harness.advanceBy(10)
@@ -154,5 +180,24 @@ describe('audio cue-called execution policy', () => {
     const result = await sixtyFramesThenABeat('restart')
     expect(result.holdBeforeBeat).toBe(60)
     expect(result.afterOnBeat).toBe(1)
+  })
+
+  it('restart replaces the held effect with the one the newest run submits', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    cue = beatHeldCue('restart')
+    h = createSequencerHarness({ frontCount: 4, backCount: 0 })
+    const harness = h
+    const front = (): { red: number; green: number } => {
+      const state = harness.getLightState(harness.frontLightIds[0])
+      return { red: state?.red ?? 0, green: state?.green ?? 0 }
+    }
+
+    await cue.execute(frameData(), harness.sequencer, harness.lightManager)
+    harness.advanceBy(200)
+    expect(front()).toEqual({ red: 255, green: 0 })
+
+    await cue.execute(frameData(), harness.sequencer, harness.lightManager)
+    harness.advanceBy(200)
+    expect(front()).toEqual({ red: 0, green: 255 })
   })
 })

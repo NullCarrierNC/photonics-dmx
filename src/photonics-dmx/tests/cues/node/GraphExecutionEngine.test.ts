@@ -205,12 +205,6 @@ describe('GraphExecutionEngine', () => {
   beforeEach(() => {
     lightManager = new DmxLightManager(createMockLightingConfig())
     sequencer = fakeLightingController({
-      addEffectWithCallback: (_name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
-        if (cb) setTimeout(() => cb(false), 0)
-      },
-      setEffectWithCallback: (_name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
-        if (cb) setTimeout(() => cb(false), 0)
-      },
       addEffectUnblockedNameWithCallback: (
         _name: string,
         _e: unknown,

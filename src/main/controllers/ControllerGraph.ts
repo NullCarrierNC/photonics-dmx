@@ -371,14 +371,23 @@ export class ControllerGraph {
   }
 
   /**
-   * Dispose every rig chain for a restart. Unlike the shutdown flavour this propagates the first
-   * failure, so the restart can refuse to rebuild on top of a partially torn-down graph.
+   * Dispose every rig chain for a restart, each one even when an earlier one fails, then throw the
+   * first failure so the restart can refuse to rebuild on top of a partially torn-down graph.
    */
   public disposeChainsForRestart(): void {
+    const failures: unknown[] = []
     for (const chain of this.rigChains) {
-      chain.dispose()
+      try {
+        chain.dispose()
+      } catch (err) {
+        log.error(`Error disposing rig chain ${chain.rigId} for a restart:`, err)
+        failures.push(err)
+      }
     }
     this.rigChains = []
+    if (failures.length > 0) {
+      throw failures[0]
+    }
   }
 
   /** Shut down the publisher, tolerating failure. Used by the shutdown path. */

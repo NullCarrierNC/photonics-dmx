@@ -28,8 +28,6 @@ const SUBMISSIONS = [
   'replaceEffectWithCallback',
   'addEffectUnblockedName',
   'setEffectUnblockedName',
-  'addEffectWithCallback',
-  'setEffectWithCallback',
   'addEffectUnblockedNameWithCallback',
   'setEffectUnblockedNameWithCallback',
 ] as const

@@ -8,7 +8,33 @@ jest.mock('../../utils/windowUtils', () => ({
 }))
 
 import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
-import { restartGraph, stubbedManager } from './lifecycleStub'
+import { ControllerGraph } from '../../controllers/ControllerGraph'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import { VenueFrameProcessor } from '../../../photonics-dmx/controllers/VenueFrameProcessor'
+import { MasterOutputState } from '../../../photonics-dmx/controllers/MasterOutputState'
+import { SenderManager } from '../../../photonics-dmx/controllers/SenderManager'
+import { stubbedManager, stubConfig } from './lifecycleStub'
+
+/** A graph built over no active rigs, which leaves it one real rig chain. */
+function builtGraph(): ControllerGraph {
+  const config = stubConfig()
+  const senderManager = new SenderManager({
+    broadcaster: { emit: () => {} },
+    hasReceivers: () => false,
+  })
+  const graph = new ControllerGraph({
+    getConfig: () => config,
+    isRb3Enabled: () => false,
+    isYargEnabled: () => false,
+    isAudioEnabled: () => false,
+    getSenderManager: () => senderManager,
+    chainFanout: new ChainFanout(),
+    venueFrameProcessor: new VenueFrameProcessor(),
+    masterOutput: new MasterOutputState(),
+  })
+  graph.buildChains()
+  return graph
+}
 
 /**
  * When tearing controllers down during a restart fails and no shutdown is concurrently running,
@@ -16,8 +42,14 @@ import { restartGraph, stubbedManager } from './lifecycleStub'
  * torn-down graph, which would leave dangling listeners/timers publishing alongside the new ones.
  */
 describe('ControllerManager restart when teardown fails', () => {
+  let graph: ControllerGraph | null = null
+
   afterEach(() => {
+    graph?.shutdownPublisherSafe()
+    graph?.destroyClock()
+    graph = null
     resetLogConfiguration()
+    jest.restoreAllMocks()
   })
 
   it('aborts reinitialization and enters the failed phase when a rig chain fails to dispose', async () => {
@@ -25,21 +57,30 @@ describe('ControllerManager restart when teardown fails', () => {
     setLogSink((entry) => {
       entries.push(entry)
     })
-    const disposeFailure = new Error('dispose failed')
-    const graph = restartGraph()
-    jest.mocked(graph.disposeChainsForRestart).mockImplementation(() => {
+    graph = builtGraph()
+    const [chain] = graph.getChains()
+    const disposeFailure = new Error('sequencer shutdown failed')
+    const sequencerShutdown = jest.spyOn(chain.sequencer, 'shutdown').mockImplementation(() => {
       throw disposeFailure
     })
+    const shutdownPublisher = jest.spyOn(graph, 'shutdownPublisher')
     const { manager, lifecycle, listeners, init } = stubbedManager({ graph })
 
     await expect(manager.restartControllers()).rejects.toThrow(/teardown failed/i)
     expect(listeners.yargRb3.disableRb3).toHaveBeenCalled()
-    expect(graph.shutdownPublisher).not.toHaveBeenCalled()
+    expect(shutdownPublisher).not.toHaveBeenCalled()
     expect(entries).toContainEqual(
-      expect.objectContaining({ level: 'error', data: [disposeFailure] }),
+      expect.objectContaining({
+        level: 'error',
+        message: 'Error shutting down controllers:',
+        data: [disposeFailure],
+      }),
     )
     expect(init).not.toHaveBeenCalled()
     expect(lifecycle.phase).toBe('failed')
     expect(manager.getIsInitialized()).toBe(false)
+
+    sequencerShutdown.mockRestore()
+    chain.sequencer.shutdown()
   })
 })

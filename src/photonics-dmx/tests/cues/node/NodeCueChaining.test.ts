@@ -95,22 +95,6 @@ describe('Node cue chaining', () => {
         callOrder.push(name)
       },
       setEffect: () => {},
-      addEffectWithCallback: (
-        name: string,
-        _effect: Effect,
-        callback: (cancelled: boolean) => void,
-      ) => {
-        callOrder.push(name)
-        callback(false)
-      },
-      setEffectWithCallback: (
-        name: string,
-        _effect: Effect,
-        callback: (cancelled: boolean) => void,
-      ) => {
-        callOrder.push(name)
-        callback(false)
-      },
       addEffectUnblockedName: (name: string) => {
         callOrder.push(name)
         return true

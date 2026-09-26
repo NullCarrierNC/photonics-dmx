@@ -87,66 +87,54 @@ export class RigChain {
    * before it's torn down. The `Clock` passed in at construction is **not** stopped — its
    * lifecycle belongs to the caller so multiple chains can share one tick source without
    * one chain's teardown stopping ticks for the others.
+   *
+   * Every step runs even when an earlier one fails. Each failure is logged, and the first is
+   * thrown once all steps have run, so a restart can refuse to rebuild over a chain that did not
+   * tear down.
    */
   public dispose(): void {
+    const failures: unknown[] = []
+    const step = (what: string, run: () => void): void => {
+      try {
+        run()
+      } catch (err) {
+        log.error(`Error ${what} for rig ${this.rigId}:`, err)
+        failures.push(err)
+      }
+    }
     for (const domain of Object.keys(this.cueHandlers) as NetCueMode[]) {
       const handler = this.cueHandlers[domain]
       if (!handler) continue
-      try {
-        handler.shutdown()
-      } catch (err) {
-        log.error(`Error shutting down ${domain} cue handler for rig ${this.rigId}:`, err)
-      }
+      step(`shutting down ${domain} cue handler`, () => handler.shutdown())
       this.cueHandlers[domain] = null
     }
-    if (this.audioCueHandler) {
-      try {
-        this.audioCueHandler.destroy()
-      } catch (err) {
-        log.error(`Error shutting down audio cue handler for rig ${this.rigId}:`, err)
-      }
+    const audioCueHandler = this.audioCueHandler
+    if (audioCueHandler) {
+      step('shutting down audio cue handler', () => audioCueHandler.destroy())
       this.audioCueHandler = null
     }
-    if (this.rb3MenuCueHandler) {
-      try {
-        this.rb3MenuCueHandler.shutdown()
-      } catch (err) {
-        log.error(`Error shutting down RB3 menu cue handler for rig ${this.rigId}:`, err)
-      }
+    const rb3MenuCueHandler = this.rb3MenuCueHandler
+    if (rb3MenuCueHandler) {
+      step('shutting down RB3 menu cue handler', () => rb3MenuCueHandler.shutdown())
       this.rb3MenuCueHandler = null
     }
     // Notify every registered cue that this chain's sequencer is going away so cue impls
     // can drop their per-sequencer runtime state. Without this the cue singletons would
     // hold one stale state entry per disposed chain after every `restartControllers` cycle.
-    try {
-      CueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer)
-    } catch (err) {
-      log.error(`Error releasing sequencer from YARG cues for rig ${this.rigId}:`, err)
-    }
-    try {
-      AudioCueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer)
-    } catch (err) {
-      log.error(`Error releasing sequencer from audio cues for rig ${this.rigId}:`, err)
-    }
-    try {
-      getCueRegistry('rb3').releaseSequencerFromAllCues(this.sequencer)
-    } catch (err) {
-      log.error(`Error releasing sequencer from RB3 cues for rig ${this.rigId}:`, err)
-    }
-    try {
-      this.sequencer.shutdown()
-    } catch (err) {
-      log.error(`Error shutting down sequencer for rig ${this.rigId}:`, err)
-    }
-    try {
-      this.lightStateManager.shutdown()
-    } catch (err) {
-      log.error(`Error shutting down light state manager for rig ${this.rigId}:`, err)
-    }
-    try {
-      this.dmxLightManager.shutdown()
-    } catch (err) {
-      log.error(`Error shutting down dmx light manager for rig ${this.rigId}:`, err)
+    step('releasing sequencer from YARG cues', () =>
+      CueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer),
+    )
+    step('releasing sequencer from audio cues', () =>
+      AudioCueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer),
+    )
+    step('releasing sequencer from RB3 cues', () =>
+      getCueRegistry('rb3').releaseSequencerFromAllCues(this.sequencer),
+    )
+    step('shutting down sequencer', () => this.sequencer.shutdown())
+    step('shutting down light state manager', () => this.lightStateManager.shutdown())
+    step('shutting down dmx light manager', () => this.dmxLightManager.shutdown())
+    if (failures.length > 0) {
+      throw failures[0]
     }
   }
 }
