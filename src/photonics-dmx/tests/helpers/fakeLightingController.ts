@@ -20,6 +20,8 @@ const accepting: ILightingController = {
   setEffect: () => {},
   replaceEffect: () => {},
   replaceEffectWithCallback: () => true,
+  updateEffect: () => {},
+  updateEffectWithCallback: () => true,
   addEffectUnblockedName: () => true,
   setEffectUnblockedName: () => true,
   addEffectUnblockedNameWithCallback: () => true,
@@ -150,6 +152,12 @@ export function completingLightingController(
     },
     replaceEffectWithCallback: (name, effect, onComplete) => {
       cancelFadeBelowSystemLayer(effect)
+      end(named(name), true)
+      start(name, effect, onComplete)
+      return true
+    },
+    updateEffectWithCallback: (name, effect, onComplete) => {
+      if (blackoutPending()) return false
       end(named(name), true)
       start(name, effect, onComplete)
       return true

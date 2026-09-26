@@ -5,6 +5,7 @@ import { AudioNodeCue } from '../../../../cues/node/runtime/AudioNodeCue'
 import type {
   ActionNode,
   AudioEventExecutionPolicy,
+  AudioEventNode,
   AudioEventNodeUnion,
   AudioLightingNodeCueDefinition,
   LogicNode,
@@ -104,10 +105,29 @@ function beatHeldCue(policy: AudioEventExecutionPolicy | undefined): AudioNodeCu
   return new AudioNodeCue('g', NodeCueCompiler.compileCue<AudioEventNodeUnion>(definition, 'audio'))
 }
 
-const frameData = (): AudioCueData => ({
+/** A graph that fades the front lights to red on layer 1 and holds until a beat. */
+function heldRedCue(event: AudioEventNode): AudioNodeCue {
+  const definition: AudioLightingNodeCueDefinition = {
+    kind: 'lighting',
+    id: 'held-red',
+    cueTypeId: 'held-red',
+    name: 'Held red',
+    style: 'secondary',
+    nodes: {
+      events: [event],
+      actions: [setColor('hold', { source: 'literal', value: 'red' }, 'beat')],
+      logic: [],
+    },
+    connections: [{ from: event.id, to: 'hold' }],
+    layout: { nodePositions: {} },
+  }
+  return new AudioNodeCue('g', NodeCueCompiler.compileCue<AudioEventNodeUnion>(definition, 'audio'))
+}
+
+const frameData = (energy = 0.5): AudioCueData => ({
   timestamp: 0,
   executionCount: 1,
-  audioData: { timestamp: 0, overallLevel: 0.5, bpm: 120, beatDetected: false, energy: 0.5 },
+  audioData: { timestamp: 0, overallLevel: 0.5, bpm: 120, beatDetected: false, energy },
   config: DEFAULT_AUDIO_CONFIG,
   enabledBandCount: 8,
 })
@@ -124,10 +144,7 @@ describe('audio cue-called execution policy', () => {
     jest.restoreAllMocks()
   })
 
-  /**
-   * Run 60 frames with no beat, let the newest fade finish, then a beat, and count the submissions of
-   * each action.
-   */
+  /** Run 60 frames with no beat, then a beat, and count the submissions of each action. */
   async function sixtyFramesThenABeat(
     policy: AudioEventExecutionPolicy | undefined,
   ): Promise<{ holdBeforeBeat: number; afterOnBeat: number; holdOnBeat: number }> {
@@ -136,23 +153,24 @@ describe('audio cue-called execution policy', () => {
     h = createSequencerHarness({ frontCount: 4, backCount: 0 })
     const harness = h
     const held = jest.spyOn(harness.sequencer, 'addEffectUnblockedNameWithCallback')
+    const takenOver = jest.spyOn(harness.sequencer, 'updateEffectWithCallback')
     const plain = jest.spyOn(harness.sequencer, 'addEffect')
-    const count = (spy: typeof held | typeof plain, node: string): number =>
+    const count = (spy: typeof held | typeof takenOver | typeof plain, node: string): number =>
       spy.mock.calls.filter((call) => String(call[0]).endsWith(`:${node}`)).length
+    const holds = (): number => count(held, 'hold') + count(takenOver, 'hold')
     for (let i = 0; i < 60; i++) {
       await cue.execute(frameData(), harness.sequencer, harness.lightManager)
       harness.advanceBy(10)
       harness.advanceBy(10)
     }
-    harness.advanceBy(200)
-    const holdBeforeBeat = count(held, 'hold')
+    const holdBeforeBeat = holds()
     harness.sequencer.onBeat()
     harness.advanceBy(10)
     harness.advanceBy(10)
     return {
       holdBeforeBeat,
       afterOnBeat: count(plain, 'after'),
-      holdOnBeat: count(held, 'hold') - holdBeforeBeat,
+      holdOnBeat: holds() - holdBeforeBeat,
     }
   }
 
@@ -193,11 +211,66 @@ describe('audio cue-called execution policy', () => {
     }
 
     await cue.execute(frameData(), harness.sequencer, harness.lightManager)
-    harness.advanceBy(200)
+    harness.advanceBy(120)
     expect(front()).toEqual({ red: 255, green: 0 })
 
     await cue.execute(frameData(), harness.sequencer, harness.lightManager)
-    harness.advanceBy(200)
+    const crossfade: number[] = []
+    for (let tick = 0; tick < 12; tick++) {
+      harness.advanceBy(10)
+      crossfade.push(front().red + front().green)
+    }
+    expect(Math.min(...crossfade)).toBeGreaterThanOrEqual(250)
     expect(front()).toEqual({ red: 0, green: 255 })
+  })
+
+  /** The front light's red after each 20 ms audio frame, one frame per entry of `energies`. */
+  async function redPerFrame(held: AudioNodeCue, energies: number[]): Promise<number[]> {
+    cue = held
+    h = createSequencerHarness({ frontCount: 4, backCount: 0 })
+    const reds: number[] = []
+    for (const energy of energies) {
+      await held.execute(frameData(energy), h.sequencer, h.lightManager)
+      h.advanceBy(10)
+      h.advanceBy(10)
+      reds.push(h.getLightState(h.frontLightIds[0])?.red ?? 0)
+    }
+    return reds
+  }
+
+  const risesWithoutFalling = (reds: number[]): boolean =>
+    reds.every((red, index) => index === 0 || red >= reds[index - 1])
+
+  it('restart on every frame carries the fade in flight up to full', async () => {
+    const reds = await redPerFrame(
+      heldRedCue({
+        id: 'called',
+        type: 'event',
+        eventType: 'cue-called',
+        triggerMode: 'edge',
+        executionPolicy: 'restart',
+      }),
+      Array.from({ length: 20 }, () => 0.5),
+    )
+
+    expect(reds[6]).toBe(255)
+    expect(risesWithoutFalling(reds)).toBe(true)
+  })
+
+  it('restart on an edge every third frame never drops the look it is showing', async () => {
+    const reds = await redPerFrame(
+      heldRedCue({
+        id: 'loud',
+        type: 'event',
+        eventType: 'audio-energy',
+        triggerMode: 'edge',
+        threshold: 0.5,
+        executionPolicy: 'restart',
+      }),
+      Array.from({ length: 20 }, (_, frame) => (frame % 3 === 0 ? 0.8 : 0)),
+    )
+
+    expect(reds[6]).toBe(255)
+    expect(risesWithoutFalling(reds)).toBe(true)
   })
 })

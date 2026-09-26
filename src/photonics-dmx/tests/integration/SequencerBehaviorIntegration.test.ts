@@ -703,4 +703,38 @@ describe('Sequencer blending and queueing (real harness)', () => {
 
     harness.cleanup()
   })
+
+  describe('an update of a running effect', () => {
+    const red = { ...getColor('red', 'high', 'replace'), opacity: 1 }
+    const blue = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
+
+    it('lets an unchanged fade in flight finish on its own clock', () => {
+      const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
+      const lights = harness.lightManager.getLights(['front'], ['all'])
+      const fade = (): Effect => buildSingleLayerEffect(lights, 1, red, 100, 'linear')
+
+      harness.sequencer.addEffect('fade', fade())
+      for (let tick = 0; tick < 5; tick += 1) harness.advanceBy(10)
+      harness.sequencer.updateEffect('fade', fade())
+      for (let tick = 0; tick < 6; tick += 1) harness.advanceBy(10)
+
+      expect(harness.getLightState(lights[0].id)?.red).toBe(255)
+      harness.cleanup()
+    })
+
+    it('turns a fade in flight toward the new colour, landing on its own clock', () => {
+      const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
+      const lights = harness.lightManager.getLights(['front'], ['all'])
+
+      harness.sequencer.addEffect('fade', buildSingleLayerEffect(lights, 1, red, 100, 'linear'))
+      for (let tick = 0; tick < 5; tick += 1) harness.advanceBy(10)
+      harness.sequencer.updateEffect('fade', buildSingleLayerEffect(lights, 1, blue, 100, 'linear'))
+      for (let tick = 0; tick < 6; tick += 1) harness.advanceBy(10)
+
+      const state = harness.getLightState(lights[0].id)
+      expect(state?.red).toBe(0)
+      expect(state?.blue).toBe(255)
+      harness.cleanup()
+    })
+  })
 })

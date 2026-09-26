@@ -32,7 +32,8 @@ export class AudioEventRuns {
         this.pending.set(event.id, data)
         return
       }
-      engine.cancelEventRuns(event.id)
+      engine.restartEventRuns([event.id], () => this.run(engine, event, data))
+      return
     }
     this.run(engine, event, data)
   }

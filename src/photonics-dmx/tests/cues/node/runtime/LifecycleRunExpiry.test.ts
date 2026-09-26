@@ -9,10 +9,10 @@ import type { NetNodeCueDefinition } from '../../../../cues/types/nodeCueTypes'
 import { createSequencerHarness, type SequencerHarness } from '../../../helpers/sequencerHarness'
 
 /**
- * A cue-called graph that paints and then waits for a keyframe the frames never carry. The first
- * run paints red and every later run paints blue.
+ * A cue-called graph that paints on `layer` and then waits for a keyframe the frames never carry.
+ * The first run paints red and every later run paints blue.
  */
-function waitsForKeyframe(): NetNodeCueDefinition {
+function waitsForKeyframe(layer = 0): NetNodeCueDefinition {
   return {
     id: 'waits',
     name: 'Waits for a keyframe',
@@ -45,6 +45,7 @@ function waitsForKeyframe(): NetNodeCueDefinition {
             waitUntilCondition: { source: 'literal', value: 'keyframe' },
             waitUntilTime: { source: 'literal', value: 0 },
           },
+          layer: { source: 'literal', value: layer },
         },
       ],
       logic: [
@@ -117,5 +118,34 @@ describe('a lifecycle run that never completes', () => {
     cue.execute(frame, harness.sequencer, harness.lightManager)
     harness.advanceBy(200)
     expect(front()).toEqual({ red: 0, blue: 255 })
+  })
+
+  it('fades the newest frame in from the look the expired run left showing', () => {
+    h = createSequencerHarness({ frontCount: 4, backCount: 0 })
+    const harness = h
+    cue = new LightingNodeCue(
+      'g',
+      NodeCueCompiler.compileCue(waitsForKeyframe(1), 'yarg'),
+      new EffectRegistry(),
+      { emit: () => {} },
+    )
+    const shown = (): number => {
+      const state = harness.getLightState(harness.frontLightIds[0])
+      return (state?.red ?? 0) + (state?.blue ?? 0)
+    }
+
+    cue.execute(frame, harness.sequencer, harness.lightManager)
+    harness.advanceBy(200)
+    harness.advanceBy(LIFECYCLE_RUN_EXPIRY_MS)
+    expect(shown()).toBe(255)
+
+    cue.execute(frame, harness.sequencer, harness.lightManager)
+    const crossfade: number[] = []
+    for (let tick = 0; tick < 12; tick++) {
+      harness.advanceBy(10)
+      crossfade.push(shown())
+    }
+    expect(Math.min(...crossfade)).toBeGreaterThanOrEqual(250)
+    expect(harness.getLightState(harness.frontLightIds[0])?.blue).toBe(255)
   })
 })

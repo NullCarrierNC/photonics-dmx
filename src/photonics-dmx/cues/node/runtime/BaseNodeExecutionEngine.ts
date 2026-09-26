@@ -706,15 +706,19 @@ export abstract class BaseNodeExecutionEngine {
   }
 
   /**
-   * Cancel the runs started from `eventNodeId` and remove the effects they wait on, so a new run of
-   * the event can submit under the same names. Waiters on those names are released with
-   * `cancelled = true`. Effects the runs submitted without waiting stay up.
+   * Cancel the runs started from these events and call `startAgain`. A new run that submits an
+   * effect the old ones waited on takes it over through the sequencer's update, going on from the
+   * look it shows. The waited-on effects no new run submitted are then removed, releasing their
+   * waiters with `cancelled = true`. Effects the runs submitted without waiting stay up.
    */
-  public cancelEventRuns(eventNodeId: string): void {
-    const runs = [...this.activeContexts.values()].filter((c) => c.eventNode.id === eventNodeId)
-    const awaited = this.awaitedEffects.take(runs.map((c) => c.id))
-    this.cancelContexts(eventNodeId)
-    for (const [name, layer] of awaited) {
+  public restartEventRuns(eventNodeIds: string[], startAgain: () => void): void {
+    const runs = [...this.activeContexts.values()].filter((c) =>
+      eventNodeIds.includes(c.eventNode.id),
+    )
+    this.awaitedEffects.handOver(runs.map((c) => c.id))
+    for (const eventNodeId of eventNodeIds) this.cancelContexts(eventNodeId)
+    startAgain()
+    for (const [name, layer] of this.awaitedEffects.takeUnclaimed()) {
       this.sequencer.removeEffect(name, layer)
     }
   }
@@ -1153,9 +1157,14 @@ export abstract class BaseNodeExecutionEngine {
       this.awaitedEffects.settle(context.id, name)
       settle(cancelled)
     }
-    const accepted = useSetEffect
-      ? this.sequencer.setEffectUnblockedNameWithCallback(name, effect, onComplete)
-      : this.sequencer.addEffectUnblockedNameWithCallback(name, effect, onComplete)
+    let accepted: boolean
+    if (useSetEffect) {
+      accepted = this.sequencer.setEffectUnblockedNameWithCallback(name, effect, onComplete)
+    } else if (this.awaitedEffects.claim(name)) {
+      accepted = this.sequencer.updateEffectWithCallback(name, effect, onComplete)
+    } else {
+      accepted = this.sequencer.addEffectUnblockedNameWithCallback(name, effect, onComplete)
+    }
     if (!accepted) {
       context.startTimer(() => settle(false), 0)
       return

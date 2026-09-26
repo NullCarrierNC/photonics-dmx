@@ -186,6 +186,24 @@ export interface IEffectManager {
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): boolean
+  /**
+   * Resubmits an effect that may still be running. A light running this name carries on where it
+   * can: with unchanged steps it runs on as it is, and partway through a first fade of the same
+   * length and easing it heads for the new colour on its own clock. Every other light is replaced
+   * as `replaceEffect` does, easing from its current state.
+   */
+  updateEffect(name: string, effect: Effect): void
+  /**
+   * `updateEffect` for a caller that parks on completion, refused while a blackout runs. The waiter
+   * held for `name` hears `cancelled = true` before `onComplete` takes its place.
+   *
+   * @returns True when the effect was applied, false when a gate refused it.
+   */
+  updateEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+  ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
@@ -334,6 +352,17 @@ export interface ILightingController {
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
+  ): boolean
+  /** Resubmits an effect that may still be running. See {@link IEffectManager.updateEffect}. */
+  updateEffect(name: string, effect: Effect): void
+  /**
+   * `updateEffect` for a caller that parks on completion.
+   * See {@link IEffectManager.updateEffectWithCallback}.
+   */
+  updateEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
   ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean

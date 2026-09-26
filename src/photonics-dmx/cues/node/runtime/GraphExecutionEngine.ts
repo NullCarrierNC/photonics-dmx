@@ -179,13 +179,15 @@ export class GraphExecutionEngine {
     const { cueStartedNodes, cueCalledNodes, nonLifecycleNodes } =
       this.splitLifecycleEntryNodes(entryNodes)
     const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
-    if (hasCueEvent) this.expireStuckLifecycleRun()
-    const lifecycleWouldQueue = this.policy.queuing && hasCueEvent && this.isExecutingCueStarted
-    if (!lifecycleWouldQueue) {
-      this.applyActivationSetup(cueStartedNodes, cueCalledNodes)
+    const dispatch = (): void => {
+      const lifecycleWouldQueue = this.policy.queuing && hasCueEvent && this.isExecutingCueStarted
+      if (!lifecycleWouldQueue) {
+        this.applyActivationSetup(cueStartedNodes, cueCalledNodes)
+      }
+      this.dispatchNonLifecycleEvents(nonLifecycleNodes, parameters)
+      this.dispatchLifecycleEvents(cueStartedNodes, cueCalledNodes, parameters)
     }
-    this.dispatchNonLifecycleEvents(nonLifecycleNodes, parameters)
-    this.dispatchLifecycleEvents(cueStartedNodes, cueCalledNodes, parameters)
+    if (!hasCueEvent || !this.expireStuckLifecycleRun(dispatch)) dispatch()
   }
 
   private splitLifecycleEntryNodes(entryNodes: BaseEventNode[]): {
@@ -331,21 +333,25 @@ export class GraphExecutionEngine {
   }
 
   /**
-   * Cancel a lifecycle run that has held the slot past {@link LIFECYCLE_RUN_EXPIRY_MS} and remove
-   * the effects it waits on, so the arriving frame runs in its place and can submit under the same
-   * names. The frame waiting behind the stuck run is dropped.
+   * Restart a lifecycle run that has held the slot past {@link LIFECYCLE_RUN_EXPIRY_MS} with the
+   * arriving frame, which `dispatch` starts, and report whether it did. An effect the stuck run
+   * waits on is taken over by the new run when it submits it again, and removed when it does not.
+   * The frame waiting behind the stuck run is dropped.
    */
-  private expireStuckLifecycleRun(): void {
-    if (!this.isExecutingCueStarted || !this.nodeEngine) return
-    if (monotonicNowMs() - this.lifecycleRunStartedAt < LIFECYCLE_RUN_EXPIRY_MS) return
+  private expireStuckLifecycleRun(dispatch: () => void): boolean {
+    const engine = this.nodeEngine
+    if (!this.isExecutingCueStarted || !engine) return false
+    if (monotonicNowMs() - this.lifecycleRunStartedAt < LIFECYCLE_RUN_EXPIRY_MS) return false
     const { cueStartedNodes, cueCalledNodes } = this.splitLifecycleEntryNodes([
       ...this.compiled.eventMap.values(),
     ])
-    for (const event of [...cueStartedNodes, ...cueCalledNodes]) {
-      this.nodeEngine.cancelEventRuns(event.id)
-    }
-    this.isExecutingCueStarted = false
-    this.pendingParameters = null
+    const eventIds = [...cueStartedNodes, ...cueCalledNodes].map((event) => event.id)
+    engine.restartEventRuns(eventIds, () => {
+      this.isExecutingCueStarted = false
+      this.pendingParameters = null
+      dispatch()
+    })
+    return true
   }
 
   private onCueEventComplete(): void {

@@ -168,6 +168,18 @@ export class LightTransitionController {
   }
 
   /**
+   * Points the transition in flight on a light's layer at a new end colour, keeping its start
+   * colour and clock. Returns false when nothing is in flight there.
+   */
+  public retargetTransition(lightId: string, layer: number, endState: RGBIO): boolean {
+    const data = this._transitionsByLight.get(lightId)?.get(layer)
+    if (!data) return false
+    data.endState = { ...endState }
+    data.transition.transform.color = endState
+    return true
+  }
+
+  /**
    * Removes all transitions for the specified layer from all lights.
    * This stops any animations on that layer.
    */
