@@ -160,4 +160,19 @@ describe('CuePreviewRb3e game-mode display', () => {
     await act(async () => {}) // let loadMotionLabels resolve
     expect(screen.queryByText('Motion Cue Group:')).toBeNull()
   })
+
+  it('hides the motion block when the motion setting cannot be read', async () => {
+    jest.mocked(ipcApi.getMotionEnabled).mockRejectedValue(new Error('offline'))
+    renderEnabled()
+    await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
+    await act(async () => {})
+    expect(screen.queryByText('Motion Cue Group:')).toBeNull()
+  })
+
+  it('hides the motion block until the motion setting is read', async () => {
+    jest.mocked(ipcApi.getMotionEnabled).mockReturnValue(new Promise(() => {}))
+    renderEnabled()
+    await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
+    expect(screen.queryByText('Motion Cue Group:')).toBeNull()
+  })
 })
