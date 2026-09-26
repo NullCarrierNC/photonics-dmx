@@ -85,7 +85,7 @@ describe('ControllerGraph teardown steps', () => {
     expect(graph.getEffectsController()).toBeNull()
   })
 
-  it('disposeChainsForRestart propagates the first failing chain', () => {
+  it('disposeChainsForRestart disposes every chain and propagates the first failure', () => {
     const graph = makeGraph()
     const disposeAfter = jest.fn()
     seed(graph, {
@@ -101,7 +101,7 @@ describe('ControllerGraph teardown steps', () => {
     })
 
     expect(() => graph.disposeChainsForRestart()).toThrow('boom')
-    expect(disposeAfter).not.toHaveBeenCalled()
+    expect(disposeAfter).toHaveBeenCalledTimes(1)
   })
 
   it('disposeLoaders tolerates each failure and nulls the refs', async () => {

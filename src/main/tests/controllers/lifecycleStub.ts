@@ -62,7 +62,7 @@ export function listenerStub() {
 }
 
 /** A graph whose build/teardown steps are observable no-op mocks. */
-export function restartGraph(): ControllerGraph {
+function restartGraph(): ControllerGraph {
   return {
     disposeChainsForRestart: jest.fn(),
     disposeChainsForShutdown: jest.fn(),
@@ -87,6 +87,7 @@ export function stubConfig(prefs: Record<string, unknown> = {}): ConfigurationMa
     getAllPreferences: () => prefs,
     getCueGroupSelectionMode: () => 'withinSong',
     getDmxRig: (id: string) => ({ id }),
+    getActiveRigs: () => [],
   } as unknown as ConfigurationManager
 }
 
