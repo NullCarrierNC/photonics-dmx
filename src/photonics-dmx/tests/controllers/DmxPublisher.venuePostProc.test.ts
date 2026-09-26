@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, jest } from '@jest/globals'
 import { DmxPublisher, type PublisherTiming } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { VenueFrameProcessor } from '../../controllers/VenueFrameProcessor'
@@ -94,16 +94,12 @@ function setup(
 ): Ctx {
   const ipcPayloads: DmxValuesPayload[] = []
   let nowMs = 0
-  const sender = {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    getEnabledWireSenders: () => ['sacn'],
+  const sender = fakeSenderManager({
     isIpcEnabled: () => options.ipc === true,
-    sendIpc: (payload: DmxValuesPayload) => {
+    sendIpc: (payload) => {
       ipcPayloads.push(payload)
     },
-  }
+  })
   const timing: PublisherTiming = {
     now: () => nowMs,
     setTimer: (cb, ms) => setTimeout(cb, ms),
@@ -115,12 +111,10 @@ function setup(
       ? {}
       : { enabled: options.venuePostProcessingEnabled },
   )
-  const publisher = new DmxPublisher(
-    sender as unknown as SenderManager,
-    new LightStateManager(),
-    strobe,
-    { timing, frameProcessor: venue },
-  )
+  const publisher = new DmxPublisher(sender, new LightStateManager(), strobe, {
+    timing,
+    frameProcessor: venue,
+  })
   publisher.updateActiveRigs([makeRig(lights)])
   return {
     publisher,
@@ -556,16 +550,11 @@ describe('DmxPublisher bloom bleed', () => {
 
   it('prepares each rig through the injected frame processor', () => {
     const ipcPayloads: DmxValuesPayload[] = []
-    const sender = {
-      send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-        Promise.resolve(true),
-      ),
-      getEnabledWireSenders: () => ['sacn'],
-      isIpcEnabled: () => false,
-      sendIpc: (payload: DmxValuesPayload) => {
+    const sender = fakeSenderManager({
+      sendIpc: (payload) => {
         ipcPayloads.push(payload)
       },
-    }
+    })
     const prepareRigFrame = jest.fn<PublisherFrameProcessor['prepareRigFrame']>(() => ({
       isActive: () => true,
       colorFor: (_lightId, _input, out) => {
@@ -579,12 +568,9 @@ describe('DmxPublisher bloom bleed', () => {
       isFrameProcessingActive: () => true,
       prepareRigFrame,
     }
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-      { frameProcessor },
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager(), {
+      frameProcessor,
+    })
     publisher.updateActiveRigs([makeRig(ROW)])
     publisher.publish(new Map([['f2', RED]]))
 
@@ -599,21 +585,13 @@ describe('DmxPublisher bloom bleed', () => {
   })
 
   it('skips the frame processor entirely while it reports inactive', () => {
-    const sender = {
-      send: jest.fn(() => Promise.resolve(true)),
-      getEnabledWireSenders: () => ['sacn'],
-      isIpcEnabled: () => false,
-      sendIpc: jest.fn(),
-    }
+    const sender = fakeSenderManager()
     const prepareRigFrame = jest.fn<PublisherFrameProcessor['prepareRigFrame']>(
       () => PASSTHROUGH_FRAME_RIG_VIEW,
     )
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-      { frameProcessor: { isFrameProcessingActive: () => false, prepareRigFrame } },
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager(), {
+      frameProcessor: { isFrameProcessingActive: () => false, prepareRigFrame },
+    })
     publisher.updateActiveRigs([makeRig(ROW)])
     publisher.publish(new Map([['f2', RED]]))
 

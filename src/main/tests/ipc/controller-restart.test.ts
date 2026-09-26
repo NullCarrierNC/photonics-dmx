@@ -429,6 +429,26 @@ describe('ControllerManager console mode', () => {
     expect(lifecycle.phase).toBe('consoleMode')
   })
 
+  it('brings the controllers up before entering console mode from a failed phase', async () => {
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async (_rigId: string) => ({ success: true as const })),
+    }
+    const { manager, lifecycle, init } = stubbedManager({
+      lifecycle: lifecycleAt('failed'),
+      consoleMode,
+    })
+
+    const result = await manager.enableConsoleMode('rig-1')
+
+    expect(result).toEqual({ success: true })
+    expect(lifecycle.phase).toBe('consoleMode')
+    expect(init).toHaveBeenCalledTimes(1)
+    expect(init.mock.invocationCallOrder[0]).toBeLessThan(
+      consoleMode.enableConsoleMode.mock.invocationCallOrder[0]!,
+    )
+  })
+
   it('waits for a restart in flight and then enters console mode', async () => {
     const teardown = barrier()
     const listeners = listenerStub()

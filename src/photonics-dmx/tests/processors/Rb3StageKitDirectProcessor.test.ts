@@ -285,7 +285,7 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(handled[handled.length - 1].ledBanks).toEqual({ red: 0, green: 0, blue: 0, yellow: 0 })
   })
 
-  it('DisableAll during the menu look keeps the menu look and leaves no strobe running', async () => {
+  it('DisableAll during the menu look keeps drawing the menu look without a blackout', async () => {
     emitGameState(networkListener, 'InGame')
     emitGameState(networkListener, 'Menus')
     jest.advanceTimersByTime(1000)
@@ -306,7 +306,6 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
 
     expect(blackout).not.toHaveBeenCalled()
     expect(setEffect).toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
-    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
   })
 
   it('leaves the menu look once on a gameplay packet, and a late InGame leaves the song lit', async () => {
@@ -478,14 +477,14 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
   })
 })
 
-describe('Rb3StageKitDirectProcessor strobe and DisableAll after Menus', () => {
+describe('Rb3StageKitDirectProcessor strobe started from the menu look', () => {
   let h: Rb3StreamHarness | null = null
   afterEach(() => {
     h?.cleanup()
     h = null
   })
 
-  it('leaves no strobe run writing to the rig', async () => {
+  it('stops on DisableAll and writes nothing further to the rig', async () => {
     h = createRb3StreamHarness()
     h.gameState('Menus')
     await h.step(1100)

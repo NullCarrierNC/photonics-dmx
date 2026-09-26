@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { rgbLight, createMockRGBIP, createMockLightingConfig } from '../helpers/testFixtures'
 import { createRecordingPublisher, type RecordingPublisher } from '../helpers/recordingPublisher'
@@ -12,36 +12,15 @@ import type { DmxRig, FixtureConfig, LightingConfiguration, RGBIO } from '../../
 import { ConfigStrobeType, DEFAULT_STROBE_CHANNEL_VALUES, FixtureTypes } from '../../types'
 import { mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHelpers'
 
-/**
- * Minimal SenderManager stub: one wire sender ('sacn'), no IPC. With routing in place the
- * publisher dispatches per slot, so tests assert against the single 'sacn' send call.
- */
-function makeMockSenderManager(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  getEnabledWireSenders: jest.Mock<() => string[]>
-  isIpcEnabled: jest.Mock<() => boolean>
-} {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    getEnabledWireSenders: jest.fn(() => ['sacn']),
-    isIpcEnabled: jest.fn(() => false),
-  }
-}
-
 describe('DmxPublisher', () => {
-  let mockSenderManager: ReturnType<typeof makeMockSenderManager>
+  let mockSenderManager: FakeSenderManager
   let mockLightStateManager: LightStateManager
   let publisher: DmxPublisher
 
   beforeEach(() => {
-    mockSenderManager = makeMockSenderManager()
+    mockSenderManager = fakeSenderManager()
     mockLightStateManager = new LightStateManager()
-    publisher = new DmxPublisher(
-      mockSenderManager as unknown as SenderManager,
-      mockLightStateManager,
-    )
+    publisher = new DmxPublisher(mockSenderManager, mockLightStateManager)
   })
 
   it('publish calls sender send with merged buffer when rigs are active', () => {
@@ -145,10 +124,7 @@ describe('DmxPublisher', () => {
     }
 
     function publishWithNoPanTilt(rig: DmxRig): Record<number, number> {
-      const pub = new DmxPublisher(
-        mockSenderManager as unknown as SenderManager,
-        mockLightStateManager,
-      )
+      const pub = new DmxPublisher(mockSenderManager, mockLightStateManager)
       pub.updateActiveRigs([rig])
       const lights = new Map<string, RGBIO>()
       lights.set('mh-1', {
@@ -190,10 +166,8 @@ describe('DmxPublisher', () => {
       const rig = makeMhRig({ invertPan: true, invertTilt: true, panHome, tiltHome })
       const bufFallback = publishWithNoPanTilt(rig)
 
-      const pubLive = new DmxPublisher(
-        makeMockSenderManager() as unknown as SenderManager,
-        new LightStateManager(),
-      )
+      const liveSender = fakeSenderManager()
+      const pubLive = new DmxPublisher(liveSender, new LightStateManager())
       pubLive.updateActiveRigs([rig])
       const lightsLive = new Map<string, RGBIO>()
       lightsLive.set('mh-1', {
@@ -207,9 +181,7 @@ describe('DmxPublisher', () => {
         tilt: tiltHome,
       })
       pubLive.publish(lightsLive)
-      const [, liveBuf] = jest.mocked(
-        (pubLive as unknown as { _sender: { send: jest.Mock } })._sender.send,
-      ).mock.calls[0]
+      const [, liveBuf] = liveSender.send.mock.calls[0]
 
       expect(bufFallback[5]).toBe((liveBuf as Record<number, number>)[5])
       expect(bufFallback[6]).toBe((liveBuf as Record<number, number>)[6])
@@ -256,10 +228,8 @@ describe('DmxPublisher', () => {
       const rig = makeMhRig({ invertPan: true, invertTilt: false, panHome, tiltHome })
       const bufFallback = publishWithNoPanTilt(rig)
 
-      const pubLive = new DmxPublisher(
-        makeMockSenderManager() as unknown as SenderManager,
-        new LightStateManager(),
-      )
+      const liveSender = fakeSenderManager()
+      const pubLive = new DmxPublisher(liveSender, new LightStateManager())
       pubLive.updateActiveRigs([rig])
       const lightsLive = new Map<string, RGBIO>()
       lightsLive.set('mh-1', {
@@ -273,9 +243,7 @@ describe('DmxPublisher', () => {
         tilt: tiltHome,
       })
       pubLive.publish(lightsLive)
-      const [, liveBuf] = jest.mocked(
-        (pubLive as unknown as { _sender: { send: jest.Mock } })._sender.send,
-      ).mock.calls[0]
+      const [, liveBuf] = liveSender.send.mock.calls[0]
 
       expect(bufFallback[5]).toBe((liveBuf as Record<number, number>)[5])
       expect(bufFallback[6]).toBe((liveBuf as Record<number, number>)[6])

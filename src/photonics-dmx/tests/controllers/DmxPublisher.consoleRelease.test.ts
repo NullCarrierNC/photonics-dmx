@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
+import { fakeSenderManager } from '../helpers/fakeSenderManager'
 import { MasterOutputState } from '../../controllers/MasterOutputState'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { Sequencer } from '../../controllers/sequencer/Sequencer'
@@ -48,17 +49,15 @@ describe('console channels on a retaining wire sender', () => {
     const lightStateManager = new LightStateManager()
     sequencer = new Sequencer(new LightTransitionController(lightStateManager), clock)
     universe = {}
-    const sender = {
+    const sender = fakeSenderManager({
       getEnabledWireSenders: () => ['artnet'],
-      isIpcEnabled: () => false,
-      sendIpc: () => {},
-      send: (_wireId: string, buffer: Record<number, number>) => {
+      send: (_wireId, buffer) => {
         for (const [channel, value] of Object.entries(buffer)) universe[Number(channel)] = value
         return Promise.resolve(true)
       },
-    }
+    })
     master = new MasterOutputState()
-    publisher = new DmxPublisher(sender as never, null, new StrobeStateManager(), {
+    publisher = new DmxPublisher(sender, null, new StrobeStateManager(), {
       masterOutput: master,
     })
     publisher.setRigChains([{ rigId: 'A', lightStateManager }])

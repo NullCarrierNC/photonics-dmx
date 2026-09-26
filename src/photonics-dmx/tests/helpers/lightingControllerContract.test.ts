@@ -13,6 +13,8 @@ const RED: RGBIO = { red: 255, green: 0, blue: 0, intensity: 255, opacity: 1, bl
 interface Subject {
   controller: ILightingController
   frame(): void
+  /** Runs frames until a 500 ms blackout fade has ended. */
+  settle(): void
   effect(): Effect
   cleanup(): void
 }
@@ -22,6 +24,7 @@ function realSequencer(): Subject {
   return {
     controller: h.sequencer,
     frame: () => h.advanceBy(10),
+    settle: () => h.advanceBy(800),
     effect: () =>
       getEffectSingleColor({
         color: RED,
@@ -34,9 +37,11 @@ function realSequencer(): Subject {
 }
 
 function completingFake(): Subject {
+  const fake = completingLightingController()
   return {
-    controller: completingLightingController(),
+    controller: fake,
     frame: () => {},
+    settle: () => fake.tick(),
     effect: () => ({ id: 'held', description: '', transitions: [] }) as unknown as Effect,
     cleanup: () => {},
   }
@@ -50,6 +55,14 @@ describe.each([
     const s = subject()
     try {
       run(s)
+    } finally {
+      s.cleanup()
+    }
+  }
+  const withSubjectAsync = async (run: (s: Subject) => Promise<void>): Promise<void> => {
+    const s = subject()
+    try {
+      await run(s)
     } finally {
       s.cleanup()
     }
@@ -177,6 +190,85 @@ describe.each([
       s.frame()
 
       expect(s.controller.addEffectUnblockedName('plain', s.effect())).toBe(false)
+    })
+  })
+
+  it('parks an unblocked-name set on a name already running', () => {
+    withSubject((s) => {
+      const firstWaiter = jest.fn()
+      s.controller.setEffectUnblockedNameWithCallback('held', s.effect(), firstWaiter)
+      s.frame()
+
+      expect(s.controller.setEffectUnblockedNameWithCallback('held', s.effect(), jest.fn())).toBe(
+        true,
+      )
+      s.frame()
+
+      expect(firstWaiter).not.toHaveBeenCalled()
+    })
+  })
+
+  it('refuses a callback-less unblocked-name set of a name already running', () => {
+    withSubject((s) => {
+      s.controller.addEffectUnblockedNameWithCallback('held', s.effect(), jest.fn())
+      s.frame()
+
+      expect(s.controller.setEffectUnblockedName('held', s.effect())).toBe(false)
+    })
+  })
+
+  it('cancels a fading blackout when an effect is added', () => {
+    withSubject((s) => {
+      void s.controller.blackout(500)
+      s.frame()
+
+      s.controller.addEffect('later', s.effect())
+      s.frame()
+
+      expect(s.controller.isBlackoutActive()).toBe(false)
+    })
+  })
+
+  it('settles a second blackout at once while the first still fades', async () => {
+    await withSubjectAsync(async (s) => {
+      void s.controller.blackout(500)
+      s.frame()
+
+      let settled = false
+      void s.controller.blackout(500).then(() => {
+        settled = true
+      })
+      const stillFading = s.controller.isBlackoutActive()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+
+      expect(settled).toBe(true)
+      expect(stillFading).toBe(true)
+    })
+  })
+
+  it('ends a fading blackout on a zero-length blackout', () => {
+    withSubject((s) => {
+      void s.controller.blackout(500)
+      s.frame()
+
+      void s.controller.blackout(0)
+
+      expect(s.controller.isBlackoutActive()).toBe(false)
+    })
+  })
+
+  it('cancels a held waiter when a blackout fade ends', async () => {
+    await withSubjectAsync(async (s) => {
+      const waiter = jest.fn()
+      s.controller.addEffectUnblockedNameWithCallback('held', s.effect(), waiter)
+      s.frame()
+
+      const done = s.controller.blackout(500)
+      s.settle()
+      await done
+
+      expect(waiter).toHaveBeenCalledWith(true)
+      expect(s.controller.isBlackoutActive()).toBe(false)
     })
   })
 })

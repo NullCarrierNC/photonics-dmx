@@ -4,9 +4,9 @@
  * The rig visualiser is fed from `sendIpc`, which goes out in the frame it was computed in while
  * the fixtures wait. See {@link WireOutputDelay} for why the hold sits at that fork.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import { DmxPublisher, type PublisherTiming } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { MasterOutputState } from '../../controllers/MasterOutputState'
@@ -53,8 +53,8 @@ const LAG_MS = 200
 
 interface Ctx {
   publisher: DmxPublisher
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  sendIpc: jest.Mock<(payload: unknown) => void>
+  send: FakeSenderManager['send']
+  sendIpc: FakeSenderManager['sendIpc']
   timing: FakeTiming
   masterOutput: MasterOutputState
   publish: (light: RGBIO) => void
@@ -62,21 +62,16 @@ interface Ctx {
 }
 
 function setup(options: { sendResult?: boolean } = {}): Ctx {
-  const send = jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-    Promise.resolve(options.sendResult ?? true),
-  )
-  const sendIpc = jest.fn<(payload: unknown) => void>()
-  const mockSenderManager = {
-    send,
-    sendIpc,
-    getEnabledWireSenders: () => ['sacn'],
+  const mockSenderManager = fakeSenderManager({
+    send: () => Promise.resolve(options.sendResult ?? true),
     isIpcEnabled: () => true,
-  }
+  })
+  const { send, sendIpc } = mockSenderManager
   const timing = new FakeTiming()
   const masterOutput = new MasterOutputState()
   let lagMs = 0
   const publisher = new DmxPublisher(
-    mockSenderManager as unknown as SenderManager,
+    mockSenderManager,
     new LightStateManager(),
     new StrobeStateManager(),
     { timing, masterOutput, getLagCompensationMs: () => lagMs },

@@ -6,9 +6,9 @@
  *  - `updateActiveRigs` removing a rig stops its channels from being published, even if
  *    its chain subscription is still attached (e.g. transient state during a config update).
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import {
@@ -19,27 +19,21 @@ import {
   type RGBIO,
   type WireSenderId,
 } from '../../types'
-import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 
-interface MockSender {
-  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>
-  sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
-  getEnabledWireSenders: jest.Mock<() => WireSenderId[]>
-  isIpcEnabled: jest.Mock<() => boolean>
+function makeMockSender(opts: {
+  wireSenders: WireSenderId[]
+  ipcEnabled?: boolean
+}): FakeSenderManager {
+  return fakeSenderManager({
+    getEnabledWireSenders: () => [...opts.wireSenders],
+    isIpcEnabled: () => opts.ipcEnabled === true,
+  })
 }
 
-function makeMockSender(opts: { wireSenders: WireSenderId[]; ipcEnabled?: boolean }): MockSender {
-  return {
-    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
-    getEnabledWireSenders: jest.fn<() => WireSenderId[]>(() => [...opts.wireSenders]),
-    isIpcEnabled: jest.fn<() => boolean>(() => opts.ipcEnabled === true),
-  }
-}
-
-function lastBufferFor(sender: MockSender, slotId: WireSenderId): Record<number, number> | null {
+function lastBufferFor(
+  sender: FakeSenderManager,
+  slotId: WireSenderId,
+): Record<number, number> | null {
   const calls = sender.send.mock.calls.filter((c) => (c[0] as WireSenderId) === slotId)
   return calls.length === 0 ? null : (calls[calls.length - 1]![1] as Record<number, number>)
 }
@@ -87,11 +81,7 @@ async function flushMicrotasks(): Promise<void> {
 describe('DmxPublisher mid-flight rig add/remove', () => {
   it('adding a rig: new chain subscription drives publish after setRigChains', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1)
     const lsmA = new LightStateManager()
     publisher.updateActiveRigs([rigA])
@@ -124,11 +114,7 @@ describe('DmxPublisher mid-flight rig add/remove', () => {
 
   it('removing a rig: chain unsubscribed, aggregated state cleared, no further publishes from old LSM', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1)
     const rigB = makeRig('B', 'lb', 10)
     const lsmA = new LightStateManager()
@@ -174,11 +160,7 @@ describe('DmxPublisher mid-flight rig add/remove', () => {
     // chain may still emit (e.g. mid-tick), but its channels must not land on the wire
     // because its DmxLightManager is no longer in `_rigManagers`.
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1)
     const rigB = makeRig('B', 'lb', 10)
     const lsmA = new LightStateManager()
@@ -208,11 +190,7 @@ describe('DmxPublisher mid-flight rig add/remove', () => {
 
   it('shutdown drops all chain subscriptions and clears aggregated state', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const lsmA = new LightStateManager()
     publisher.updateActiveRigs([makeRig('A', 'la', 1)])
     publisher.setRigChains([{ rigId: 'A', lightStateManager: lsmA }])

@@ -3,9 +3,9 @@
  * stay on substitution while a strobe runs elsewhere in the rig. The mixing itself is covered by
  * the vectors in colorChannelMixer.test.ts.
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import {
@@ -22,20 +22,6 @@ import {
 
 function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
   return { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace', ...overrides }
-}
-
-function makeMockSender(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  getEnabledWireSenders: () => string[]
-  isIpcEnabled: () => boolean
-} {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => false,
-  }
 }
 
 interface LightSpec {
@@ -99,16 +85,13 @@ function setup(
   strobe: StrobeStateManager
   publish(states: Record<string, RGBIO>): Record<number, number>
 } {
-  const sender = makeMockSender()
+  const sender = fakeSenderManager()
   const strobe = new StrobeStateManager()
   // Pinned rather than left to the shipped default, since these cases are about what
   // `strobe-rgbw` does either side of the strobe gate.
-  const publisher = new DmxPublisher(
-    sender as unknown as SenderManager,
-    new LightStateManager(),
-    strobe,
-    { whiteChannelMixMode: 'strobe-rgbw' },
-  )
+  const publisher = new DmxPublisher(sender, new LightStateManager(), strobe, {
+    whiteChannelMixMode: 'strobe-rgbw',
+  })
   publisher.updateActiveRigs([makeRig(lights, strobeType)])
   return {
     publisher,
@@ -308,12 +291,8 @@ describe('DmxPublisher — White Channel Mix Mode', () => {
   })
 
   it('ships always-rgbw, so an unconfigured rig mixes additively', () => {
-    const sender = makeMockSender()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const sender = fakeSenderManager()
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     publisher.updateActiveRigs([makeRig([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])])
     publisher.publish(new Map([['f1', WHITE_FLASH]]))
     const buf = sender.send.mock.calls.at(-1)![1] as Record<number, number>
@@ -321,13 +300,10 @@ describe('DmxPublisher — White Channel Mix Mode', () => {
   })
 
   it('honours the constructor option', () => {
-    const sender = makeMockSender()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-      { whiteChannelMixMode: 'always-rgbw' },
-    )
+    const sender = fakeSenderManager()
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager(), {
+      whiteChannelMixMode: 'always-rgbw',
+    })
     publisher.updateActiveRigs([makeRig([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])])
     publisher.publish(new Map([['f1', WHITE_FLASH]]))
     const buf = sender.send.mock.calls.at(-1)![1] as Record<number, number>

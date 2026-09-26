@@ -15,7 +15,7 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import type { DmxRig, FixtureConfig, LightingConfiguration, RGBIO } from '../../types'
 import { FixtureTypes } from '../../types'
@@ -24,20 +24,6 @@ import {
   mirrorPercentAroundHome,
   percentToDmx,
 } from '../../helpers/dmxHelpers'
-
-function makeMockSenderManager(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  getEnabledWireSenders: jest.Mock<() => string[]>
-  isIpcEnabled: jest.Mock<() => boolean>
-} {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    getEnabledWireSenders: jest.fn(() => ['sacn']),
-    isIpcEnabled: jest.fn(() => false),
-  }
-}
 
 function makeMhRig(
   rigId: string,
@@ -106,9 +92,9 @@ function rgbio(values: Partial<RGBIO>): RGBIO {
 }
 
 function publishOne(rig: DmxRig, lightId: string, value: RGBIO): Record<number, number> {
-  const sender = makeMockSenderManager()
+  const sender = fakeSenderManager()
   const lsm = new LightStateManager()
-  const pub = new DmxPublisher(sender as unknown as SenderManager, lsm)
+  const pub = new DmxPublisher(sender, lsm)
   pub.updateActiveRigs([rig])
   const lights = new Map<string, RGBIO>()
   lights.set(lightId, value)
@@ -202,9 +188,9 @@ describe('DmxPublisher — mirror is per-rig isolated', () => {
   it('two rigs with the same cue pan emit different DMX when only one is Horiz-mirrored', () => {
     // Channel-base offsets keep the two rigs' fixtures on non-overlapping wire channels so we
     // can assert each rig's pan independently in the merged sACN buffer.
-    const sender = makeMockSenderManager()
+    const sender = fakeSenderManager()
     const lsm = new LightStateManager()
-    const pub = new DmxPublisher(sender as unknown as SenderManager, lsm)
+    const pub = new DmxPublisher(sender, lsm)
 
     const mirroredRig = makeMhRig('rig-mirrored', { panHome: 50 }, { mirrorHoriz: true }, 0)
     const plainRig = makeMhRig('rig-plain', { panHome: 50 }, {}, 100)
@@ -229,9 +215,9 @@ describe('DmxPublisher — mirror does not affect non-moving-head fixtures', () 
   })
 
   it('plain RGB fixture in a Horiz-mirrored rig produces unmirrored channel output', () => {
-    const sender = makeMockSenderManager()
+    const sender = fakeSenderManager()
     const lsm = new LightStateManager()
-    const pub = new DmxPublisher(sender as unknown as SenderManager, lsm)
+    const pub = new DmxPublisher(sender, lsm)
 
     const lightingConfig: LightingConfiguration = {
       numLights: 1,

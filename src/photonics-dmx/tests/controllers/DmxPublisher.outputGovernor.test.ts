@@ -10,9 +10,9 @@
  *  - Dirty-skip: a frame byte-identical to the last sent frame is not re-sent.
  *  - Manual console mode resets the governor (cancels any in-flight trailing frame).
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import { DmxPublisher, type PublisherTiming } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { ConfigStrobeType, FixtureTypes, type DmxRig, type RGBIO } from '../../types'
@@ -54,7 +54,7 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 
 interface Ctx {
   publisher: DmxPublisher
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
+  send: FakeSenderManager['send']
   timing: FakeTiming
   publish: (light: RGBIO) => void
   lastBuffer: () => Record<number, number>
@@ -66,17 +66,11 @@ interface Ctx {
  * which exercises the same code paths as the legacy single-buffer pipeline.
  */
 function setup(outputRateHz?: number): Ctx {
-  const send = jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-    Promise.resolve(true),
-  )
-  const mockSenderManager = {
-    send,
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => false,
-  }
+  const mockSenderManager = fakeSenderManager()
+  const { send } = mockSenderManager
   const timing = new FakeTiming()
   const publisher = new DmxPublisher(
-    mockSenderManager as unknown as SenderManager,
+    mockSenderManager,
     new LightStateManager(),
     new StrobeStateManager(),
     { outputRateHz, timing },

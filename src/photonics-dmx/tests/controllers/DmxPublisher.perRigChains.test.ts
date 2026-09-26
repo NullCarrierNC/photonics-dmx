@@ -3,9 +3,9 @@
  * `LightStateManager`s aggregates their per-rig emissions and produces correct per-rig wire
  * and IPC buffers. Covers the production wiring used by `ControllerManager.initializeRigChains`.
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { VenueFrameProcessor } from '../../controllers/VenueFrameProcessor'
@@ -19,30 +19,27 @@ import {
 } from '../../types'
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 
-interface MockSender {
-  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>
-  sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
-  getEnabledWireSenders: jest.Mock<() => WireSenderId[]>
-  isIpcEnabled: jest.Mock<() => boolean>
+function makeMockSender(opts: {
+  wireSenders: WireSenderId[]
+  ipcEnabled?: boolean
+}): FakeSenderManager {
+  return fakeSenderManager({
+    getEnabledWireSenders: () => [...opts.wireSenders],
+    isIpcEnabled: () => opts.ipcEnabled === true,
+  })
 }
 
-function makeMockSender(opts: { wireSenders: WireSenderId[]; ipcEnabled?: boolean }): MockSender {
-  return {
-    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
-    getEnabledWireSenders: jest.fn<() => WireSenderId[]>(() => [...opts.wireSenders]),
-    isIpcEnabled: jest.fn<() => boolean>(() => opts.ipcEnabled === true),
-  }
-}
-
-function lastBufferFor(sender: MockSender, slotId: WireSenderId): Record<number, number> | null {
+function lastBufferFor(
+  sender: FakeSenderManager,
+  slotId: WireSenderId,
+): Record<number, number> | null {
   const calls = sender.send.mock.calls.filter((c) => (c[0] as WireSenderId) === slotId)
   return calls.length === 0 ? null : (calls[calls.length - 1]![1] as Record<number, number>)
 }
 
-function lastIpcRigBuffers(sender: MockSender): Record<string, Record<number, number>> | null {
+function lastIpcRigBuffers(
+  sender: FakeSenderManager,
+): Record<string, Record<number, number>> | null {
   const calls = sender.sendIpc.mock.calls
   for (let i = calls.length - 1; i >= 0; i--) {
     const payload = calls[i]![0] as DmxValuesPayload
@@ -158,11 +155,7 @@ function makeTwoLightRig(id: string, channelBase: number): DmxRig {
 describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
   it('aggregates per-chain emissions into one publish per tick', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1)
     const rigB = makeRig('B', 'lb', 10)
     const lsmA = new LightStateManager()
@@ -195,11 +188,7 @@ describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
 
   it('per-rig outputs routing still applies under chain subscriptions', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1, ['sacn'])
     const rigB = makeRig('B', 'lb', 10, ['opendmx'])
     const lsmA = new LightStateManager()
@@ -223,11 +212,7 @@ describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
 
   it('tearing down chain subscriptions on second setRigChains stops the prior chains', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1)
     const lsmA1 = new LightStateManager()
     publisher.updateActiveRigs([rigA])
@@ -254,11 +239,7 @@ describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
   it('legacy single-source LightStateManager works as before when setRigChains is never called', () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
     const lsm = new LightStateManager()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      lsm,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, lsm, new StrobeStateManager())
     publisher.updateActiveRigs([makeRig('A', 'la', 1)])
     lsm.setLightState('la', rgbio({ red: 200, intensity: 255 }))
     lsm.publishLightStates()
@@ -269,11 +250,7 @@ describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
   it('calling setRigChains tears down a prior single-source subscription', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
     const legacyLsm = new LightStateManager()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      legacyLsm,
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, legacyLsm, new StrobeStateManager())
     publisher.updateActiveRigs([makeRig('A', 'la', 1)])
 
     const chainLsm = new LightStateManager()
@@ -290,12 +267,9 @@ describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
   it('keeps bloom spill isolated per rig under chain subscriptions', async () => {
     const sender = makeMockSender({ wireSenders: ['sacn'] })
     const venue = new VenueFrameProcessor()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      null,
-      new StrobeStateManager(),
-      { frameProcessor: venue },
-    )
+    const publisher = new DmxPublisher(sender, null, new StrobeStateManager(), {
+      frameProcessor: venue,
+    })
     venue.setVenuePostProcessing('Bloom')
     const rigA = makeTwoLightRig('A', 1)
     const rigB = makeTwoLightRig('B', 20)
