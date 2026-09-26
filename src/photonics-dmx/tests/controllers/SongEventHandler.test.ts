@@ -147,7 +147,7 @@ describe('a transition that waits for and until the same event', () => {
   })
 })
 
-describe('a step held until the beat', () => {
+describe('a chase step held until a tempo event', () => {
   const RED: RGBIO = {
     red: 255,
     green: 0,
@@ -157,36 +157,41 @@ describe('a step held until the beat', () => {
     blendMode: 'replace',
   }
   const GREEN: RGBIO = { ...RED, red: 0, green: 255 }
+  const BLUE: RGBIO = { ...RED, red: 0, blue: 255 }
 
-  /** A red step held for one beat, then green. The red step starts on `startOn`. */
-  const redForABeat = (lights: EffectTransition['lights'], startOn: WaitCondition): Effect => {
-    const step = (color: RGBIO): EffectTransition => ({
-      lights,
-      layer: 1,
-      waitForCondition: 'none',
-      waitForTime: 0,
-      transform: { color, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'none',
-      waitUntilTime: 0,
-    })
-    return {
-      id: 'chase-step',
-      description: 'red for a beat, then green',
-      transitions: [
-        {
-          ...step(RED),
-          waitForCondition: startOn,
-          waitUntilCondition: 'beat',
-          waitUntilConditionCount: 1,
-        },
-        step(GREEN),
-      ],
-    }
+  type Harness = ReturnType<typeof createSequencerHarness>
+
+  interface Step {
+    color: RGBIO
+    startOn?: WaitCondition
+    holdUntil?: WaitCondition
   }
 
-  const colourOf = (h: ReturnType<typeof createSequencerHarness>): [number, number] => {
+  /** A chase on the front light. Each step snaps to its colour and holds for one event. */
+  const chase = (h: Harness, steps: Step[]): Effect => ({
+    id: 'chase-step',
+    description: 'a chase of held steps',
+    transitions: steps.map(({ color, startOn = 'none', holdUntil = 'none' }) => ({
+      lights: h.lightManager.getLights(['front'], 'all'),
+      layer: 1,
+      waitForCondition: startOn,
+      waitForTime: 0,
+      transform: { color, easing: 'linear', duration: 0 },
+      waitUntilCondition: holdUntil,
+      waitUntilTime: 0,
+      ...(holdUntil === 'none' ? {} : { waitUntilConditionCount: 1 }),
+    })),
+  })
+
+  const colourOf = (h: Harness): [number, number, number] => {
     const state = h.getLightState(h.frontLightIds[0])
-    return [state?.red ?? 0, state?.green ?? 0]
+    return [state?.red ?? 0, state?.green ?? 0, state?.blue ?? 0]
+  }
+
+  /** A measure frame raises the beat and then the measure, as the cue handler does. */
+  const measureFrame = (h: Harness): void => {
+    h.sequencer.onBeat()
+    h.sequencer.onMeasure()
   }
 
   it('shows a step submitted in the frame of a beat until the next beat', () => {
@@ -194,37 +199,43 @@ describe('a step held until the beat', () => {
     try {
       h.sequencer.addEffect(
         'chase',
-        redForABeat(h.lightManager.getLights(['front'], 'all'), 'none'),
+        chase(h, [{ color: RED, holdUntil: 'beat' }, { color: GREEN }]),
       )
       h.sequencer.onBeat()
       h.advanceBy(10)
-      expect(colourOf(h)).toEqual([255, 0])
+      expect(colourOf(h)).toEqual([255, 0, 0])
 
       h.advanceBy(490)
-      expect(colourOf(h)).toEqual([255, 0])
+      expect(colourOf(h)).toEqual([255, 0, 0])
 
       h.sequencer.onBeat()
       h.advanceBy(10)
-      expect(colourOf(h)).toEqual([0, 255])
+      expect(colourOf(h)).toEqual([0, 255, 0])
     } finally {
       h.cleanup()
     }
   })
 
-  it('starts a step waiting for a beat on the beat of its own frame and holds it to the next', () => {
+  it('starts a step waiting for a beat on the beat of a measure and holds it to the next measure', () => {
     const h = createSequencerHarness({ frontCount: 1, backCount: 0 })
     try {
       h.sequencer.addEffect(
         'chase',
-        redForABeat(h.lightManager.getLights(['front'], 'all'), 'beat'),
+        chase(h, [{ color: RED, startOn: 'beat', holdUntil: 'measure' }, { color: GREEN }]),
       )
-      h.sequencer.onBeat()
+      measureFrame(h)
       h.advanceBy(10)
-      expect(colourOf(h)).toEqual([255, 0])
+      expect(colourOf(h)).toEqual([255, 0, 0])
 
+      h.advanceBy(490)
       h.sequencer.onBeat()
       h.advanceBy(10)
-      expect(colourOf(h)).toEqual([0, 255])
+      expect(colourOf(h)).toEqual([255, 0, 0])
+
+      h.advanceBy(490)
+      measureFrame(h)
+      h.advanceBy(10)
+      expect(colourOf(h)).toEqual([0, 255, 0])
     } finally {
       h.cleanup()
     }
@@ -235,14 +246,25 @@ describe('a step held until the beat', () => {
     try {
       h.sequencer.addEffect(
         'chase',
-        redForABeat(h.lightManager.getLights(['front'], 'all'), 'none'),
+        chase(h, [
+          { color: RED, holdUntil: 'beat' },
+          { color: GREEN, holdUntil: 'beat' },
+          { color: BLUE },
+        ]),
       )
-      h.advanceBy(10)
-      expect(colourOf(h)).toEqual([255, 0])
-
       h.sequencer.onBeat()
       h.advanceBy(10)
-      expect(colourOf(h)).toEqual([0, 255])
+      expect(colourOf(h)).toEqual([255, 0, 0])
+
+      h.advanceBy(490)
+      h.sequencer.onBeat()
+      h.advanceBy(10)
+      expect(colourOf(h)).toEqual([0, 255, 0])
+
+      h.advanceBy(490)
+      h.sequencer.onBeat()
+      h.advanceBy(10)
+      expect(colourOf(h)).toEqual([0, 0, 255])
     } finally {
       h.cleanup()
     }
