@@ -20,21 +20,26 @@ function fakeControllerManager() {
   }
   const venue = { setVenuePostProcessingEnabled: jest.fn() }
   const getAllPreferences = jest.fn(() => DEFAULT_PREFERENCES)
+  const applyRb3ProcessingMode = jest.fn(async () => {})
   const controllerManager: LiveApplyTargets = {
     getMasterOutput: () => master,
     getDmxPublisher: () => publisher,
     getVenueFrameProcessor: () => venue,
     getConfig: () => ({ getAllPreferences }),
+    applyRb3ProcessingMode,
   }
   const touched = (): number =>
     [...Object.values(master), ...Object.values(publisher), ...Object.values(venue)].reduce(
       (n, fn) => n + fn.mock.calls.length,
       0,
-    ) + getAllPreferences.mock.calls.length
+    ) +
+    getAllPreferences.mock.calls.length +
+    applyRb3ProcessingMode.mock.calls.length
   return {
     controllerManager,
     master,
     publisher,
+    applyRb3ProcessingMode,
     touched,
   }
 }
@@ -74,6 +79,17 @@ describe('preference live apply', () => {
     )
 
     expect(onBlackoutShortcutChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies an RB3 processing mode save to the running session', () => {
+    const { controllerManager, applyRb3ProcessingMode } = fakeControllerManager()
+
+    applySavedPreferences(
+      { rb3Prefs: { processingMode: 'cue' } },
+      { controllerManager, onBlackoutShortcutChanged: jest.fn() },
+    )
+
+    expect(applyRb3ProcessingMode).toHaveBeenCalledTimes(1)
   })
 
   it('applies nothing for a save of persist-only preferences', () => {

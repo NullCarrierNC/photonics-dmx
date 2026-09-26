@@ -6,11 +6,11 @@ describe('normalizeRb3ProcessingMode', () => {
     expect(normalizeRb3ProcessingMode('cue')).toBe('cue')
   })
 
-  it('normalizes anything else to direct', () => {
-    expect(normalizeRb3ProcessingMode('Cue')).toBe('direct')
-    expect(normalizeRb3ProcessingMode('')).toBe('direct')
-    expect(normalizeRb3ProcessingMode(undefined)).toBe('direct')
-    expect(normalizeRb3ProcessingMode(null)).toBe('direct')
-    expect(normalizeRb3ProcessingMode(42)).toBe('direct')
+  it('normalizes anything else to cue', () => {
+    expect(normalizeRb3ProcessingMode('Direct')).toBe('cue')
+    expect(normalizeRb3ProcessingMode('')).toBe('cue')
+    expect(normalizeRb3ProcessingMode(undefined)).toBe('cue')
+    expect(normalizeRb3ProcessingMode(null)).toBe('cue')
+    expect(normalizeRb3ProcessingMode(42)).toBe('cue')
   })
 })

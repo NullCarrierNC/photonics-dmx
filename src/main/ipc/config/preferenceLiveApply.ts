@@ -10,7 +10,10 @@ import {
 import type { BlackoutShortcutBinding } from '../../../shared/blackoutShortcut'
 import { setGlobalBrightnessConfig } from '../../../photonics-dmx/helpers/dmxHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { createLogger } from '../../../shared/logger'
 import { sendToAllWindows } from '../../utils/windowUtils'
+
+const log = createLogger('preferenceLiveApply')
 
 /** The parts of ControllerManager a live apply reaches. */
 export interface LiveApplyTargets {
@@ -21,6 +24,8 @@ export interface LiveApplyTargets {
   > | null
   getVenueFrameProcessor(): Pick<VenueFrameProcessor, 'setVenuePostProcessingEnabled'>
   getMasterOutput(): Pick<MasterOutputState, 'setDimmerPercent' | 'setStrobeOutputEnabled'>
+  /** Cycles a running RB3 session onto the saved processing mode. */
+  applyRb3ProcessingMode(): Promise<void>
 }
 
 export interface LiveApplyContext {
@@ -99,6 +104,17 @@ const applyBlackoutShortcut: LiveApply = (
   sendToAllWindows(RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED, binding)
 }
 
+// The coordinator reads the mode when RB3 is enabled, so the running session is cycled on the
+// lifecycle queue. Fire and forget, as the RB3 toggle itself is (cue-handlers.ts): the save answers
+// once the write has landed, and a start failure on the way back up reaches every window through
+// RB3_ERROR, which un-toggles the listener.
+const applyRb3ProcessingMode: LiveApply = (saved, { controllerManager }) => {
+  if (typeof saved.rb3Prefs?.processingMode !== 'string') return
+  controllerManager.applyRb3ProcessingMode().catch((error) => {
+    log.error('Could not apply the RB3 processing mode:', error)
+  })
+}
+
 /**
  * What a SAVE_PREFS write of each preference does to the running app. `Record` over the full key
  * union makes every preference declare one or the other, so one added without an entry fails the
@@ -114,12 +130,12 @@ export const PREFERENCE_LIVE_APPLY: Record<keyof AppPreferences, LiveApply | typ
     strobeOutputEnabled: applyMasterOutput,
     blackoutShortcutKey: applyBlackoutShortcut,
     blackoutShortcutScope: applyBlackoutShortcut,
+    rb3Prefs: applyRb3ProcessingMode,
 
     // Read where they are used.
     effectDebounce: PERSIST_ONLY,
     complex: PERSIST_ONLY,
     stageKitPrefs: PERSIST_ONLY,
-    rb3Prefs: PERSIST_ONLY,
     allowMultipleActiveRigs: PERSIST_ONLY,
     advancedModeEnabled: PERSIST_ONLY,
     videoLagCompensationMs: PERSIST_ONLY,

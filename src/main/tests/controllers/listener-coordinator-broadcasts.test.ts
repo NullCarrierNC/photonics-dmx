@@ -8,6 +8,7 @@ import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 import type { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
+import type { ProcessingMode } from '../../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { fakeLightingController } from '../../../photonics-dmx/tests/helpers/fakeLightingController'
 
@@ -24,7 +25,9 @@ jest.mock('dgram', () => ({
   createSocket: jest.fn(() => new FakeUdpSocket()),
 }))
 
-function makeDeps(): ListenerCoordinatorDeps & { sendToAllWindows: jest.Mock } {
+function makeDeps(
+  getRb3ProcessingMode: () => ProcessingMode = () => 'direct',
+): ListenerCoordinatorDeps & { sendToAllWindows: jest.Mock; setRb3CueHandlerRef: jest.Mock } {
   const sequencer = fakeLightingController()
   const chains = [
     {
@@ -60,7 +63,7 @@ function makeDeps(): ListenerCoordinatorDeps & { sendToAllWindows: jest.Mock } {
     runtimeBroadcaster: noopRuntimeBroadcaster(),
     setCueHandlerRef: jest.fn(),
     setRb3CueHandlerRef: jest.fn(),
-    getRb3ProcessingMode: () => 'direct',
+    getRb3ProcessingMode,
   }
 }
 
@@ -155,5 +158,40 @@ describe('ListenerCoordinator handled-cue events', () => {
     lc.getCueHandler()!.emit('cueHandled', { lightingCue: 'after' })
 
     expect(heard).not.toHaveBeenCalled()
+  })
+})
+
+describe('ListenerCoordinator RB3 processing mode across a cycle', () => {
+  it('builds the RB3 cue handler in cue mode and shuts it down on the way back to direct', async () => {
+    let mode: ProcessingMode = 'direct'
+    const deps = makeDeps(() => mode)
+    const lc = new ListenerCoordinator(deps)
+    coordinators.push(lc)
+    const chain = deps.getRigChains()[0]
+
+    await lc.enableRb3(true, async () => {})
+    expect(lc.getRb3Mode()).toBe('direct')
+    expect(chain.cueHandlers.rb3).toBeNull()
+
+    mode = 'cue'
+    await lc.disableRb3()
+    await lc.enableRb3(true, async () => {})
+    const handler = chain.cueHandlers.rb3
+    expect(lc.getRb3Mode()).toBe('cue')
+    expect(handler).not.toBeNull()
+    expect(deps.setRb3CueHandlerRef).toHaveBeenLastCalledWith(handler)
+    expect(announcements(deps)).toEqual([
+      { listener: 'rb3', enabled: true },
+      { listener: 'rb3', enabled: false },
+      { listener: 'rb3', enabled: true },
+    ])
+
+    const shutdown = jest.spyOn(handler!, 'shutdown')
+    mode = 'direct'
+    await lc.disableRb3()
+    await lc.enableRb3(true, async () => {})
+    expect(shutdown).toHaveBeenCalled()
+    expect(chain.cueHandlers.rb3).toBeNull()
+    expect(lc.getRb3Mode()).toBe('direct')
   })
 })

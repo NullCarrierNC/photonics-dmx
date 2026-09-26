@@ -47,6 +47,7 @@ export function listenerStub() {
     yargRb3: {
       getIsYargEnabled: jest.fn().mockReturnValue(false),
       getIsRb3Enabled: jest.fn().mockReturnValue(false),
+      getRb3Mode: jest.fn().mockReturnValue('none'),
       disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
       disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
       enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -128,6 +129,8 @@ export interface StubbedManagerOptions {
    * Stands in for the graph build. Brings the lifecycle to running unless a suite says otherwise.
    */
   init?: (lifecycle: ControllerLifecycle) => Promise<void>
+  /** The preferences the manager reads, when a suite needs particular ones. */
+  config?: ConfigurationManager
   /** The registry loaders and `config` for the manager's own graph build over the stubs. */
   ownInit?: { registryInit: Record<string, unknown>; config: ConfigurationManager }
 }
@@ -154,7 +157,7 @@ export function stubbedManager(options: StubbedManagerOptions = {}): StubbedMana
   const consoleMode = options.consoleMode ?? consoleModeStub()
   const testEffects = () => ({ cancel: jest.fn(), stopTestEffect: jest.fn(async () => {}) })
   const manager = new ControllerManager({
-    config: options.ownInit?.config ?? stubConfig(),
+    config: options.config ?? options.ownInit?.config ?? stubConfig(),
     lifecycle,
     graph,
     collaborators: {
