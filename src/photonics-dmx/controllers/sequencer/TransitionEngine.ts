@@ -1,4 +1,4 @@
-import { applyWaitUntil, delayWaitMs } from './waitUntil'
+import { applyWaitUntil } from './waitUntil'
 import { performance } from 'perf_hooks'
 import { EffectTransition, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
@@ -67,16 +67,19 @@ export class TransitionEngine implements ITransitionEngine {
     this.effectManager = effectManager
   }
 
-  /**
-   * Computes total delay (ms) for delay-based waitUntil. When waitUntilConditionCount
-   * is set (e.g. from rotation effect phases), wait time is count * waitUntilTime so
-   * staggered per-light timing works. When undefined, treat as 1 step; when 0, advance immediately.
-   */
-  /** Prepare whatever transition the effect has just advanced to, if any. */
-  private prepareNextTransition = (effect: LightEffectState, currentTime: number): void => {
-    if (effect.currentTransitionIndex < effect.transitions.length) {
-      this.prepareTransition(effect, effect.transitions[effect.currentTransitionIndex], currentTime)
-    }
+  /** Applies a transition's `waitUntil` clause, preparing the next transition if it advances. */
+  private holdUntil(
+    activeEffect: LightEffectState,
+    transition: EffectTransition,
+    currentTime: number,
+  ): void {
+    applyWaitUntil(
+      activeEffect,
+      transition,
+      currentTime,
+      this.lightTransitionController.getPublishedFrameCount(),
+      (effect, next, time) => this.prepareTransition(effect, next, time),
+    )
   }
 
   /**
@@ -351,17 +354,6 @@ export class TransitionEngine implements ITransitionEngine {
     transition: EffectTransition,
     currentTime: number,
   ): void {
-    if (transition.timingOnly) {
-      activeEffect.state = 'waitingUntil'
-      activeEffect.transitionStartTime = currentTime
-      if (transition.waitUntilCondition === 'delay') {
-        activeEffect.waitEndTime = currentTime + delayWaitMs(transition)
-      } else {
-        activeEffect.waitEndTime = currentTime
-      }
-      return
-    }
-
     this.ensureLastEndState(activeEffect)
 
     // Since this is a per-light effect, we work with the single light in the transition
@@ -420,7 +412,7 @@ export class TransitionEngine implements ITransitionEngine {
         // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
         // next updateTransitions call, after the current frame's blend pass has run.
       } else {
-        applyWaitUntil(activeEffect, transition, currentTime, this.prepareNextTransition)
+        this.holdUntil(activeEffect, transition, currentTime)
       }
     }
   }
@@ -447,7 +439,7 @@ export class TransitionEngine implements ITransitionEngine {
         activeEffect.currentTransitionIndex += 1
         activeEffect.state = 'idle'
       } else {
-        applyWaitUntil(activeEffect, transition, currentTime, this.prepareNextTransition)
+        this.holdUntil(activeEffect, transition, currentTime)
       }
     }
   }

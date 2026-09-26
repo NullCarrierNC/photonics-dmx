@@ -6,6 +6,7 @@ import {
   SongEventCondition,
 } from './interfaces'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
+import { countHoldEvent, type PrepareTransition } from './waitUntil'
 
 /**
  * @class EventHandler
@@ -210,89 +211,37 @@ export class SongEventHandler implements ISongEventHandler {
     // decides what actually finished rather than each landing site here.
     let released = false
 
+    const publishedFrames = ltc.getPublishedFrameCount()
+    const prepare: PrepareTransition = (effect, next, time) =>
+      this.transitionEngine.prepareTransition(effect, next, time)
+
+    // One event starts a transition or ends its hold, never both, so a hold on the event it
+    // waited for lasts until the next one.
     this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
       layerMap.forEach((activeEffect, _lightId) => {
         const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
         if (!currentTransition) return
 
-        // Handle waitForCondition with count-based logic
         if (
           activeEffect.state === 'waitingFor' &&
           currentTransition.waitForCondition === eventType
         ) {
-          // Check if we need to decrement the count
-          if (
-            currentTransition.waitForConditionCount !== undefined &&
-            currentTransition.waitForConditionCount > 0
-          ) {
-            currentTransition.waitForConditionCount--
-
-            // If count reaches 0, start the transition
-            if (currentTransition.waitForConditionCount === 0) {
-              this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
-              released = true
-            }
-          } else if (currentTransition.waitForConditionCount === 0) {
-            // Count is explicitly 0: start transition immediately (no event like beat or keyframe consumed)
-            this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
-            released = true
-          } else {
-            // No count specified, start transition immediately
-            this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
-            released = true
+          // A positive count starts the transition on the occurrence that brings it to exactly
+          // zero. An uncounted, zero or negative one starts on the first.
+          const count = currentTransition.waitForConditionCount
+          if (count !== undefined && count > 0) {
+            currentTransition.waitForConditionCount = count - 1
+            if (count - 1 !== 0) return
           }
+          this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+          released = true
         } else if (
-          // Handle waitUntilCondition with count-based logic. One event starts a transition or ends
-          // its hold, never both, so a hold on the event it waited for lasts until the next one.
           activeEffect.state === 'waitingUntil' &&
           currentTransition.waitUntilCondition === eventType
         ) {
-          // Check if we need to decrement the count
           if (
-            currentTransition.waitUntilConditionCount !== undefined &&
-            currentTransition.waitUntilConditionCount > 0
+            countHoldEvent(activeEffect, currentTransition, currentTime, publishedFrames, prepare)
           ) {
-            currentTransition.waitUntilConditionCount--
-
-            // If count reaches 0, move to next transition
-            if (currentTransition.waitUntilConditionCount === 0) {
-              // Move to the next transition and immediately prepare it
-              activeEffect.currentTransitionIndex += 1
-
-              // Check if there's another transition and prepare it immediately
-              if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-                const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
-                activeEffect.state = 'idle'
-                this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
-              } else {
-                // If no more transitions, just set to idle
-                activeEffect.state = 'idle'
-              }
-              released = true
-            }
-          } else if (currentTransition.waitUntilConditionCount === 0) {
-            // Count is explicitly 0: advance immediately (no beat consumed)
-            activeEffect.currentTransitionIndex += 1
-
-            if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-              const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
-              activeEffect.state = 'idle'
-              this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
-            } else {
-              activeEffect.state = 'idle'
-            }
-            released = true
-          } else {
-            // No count specified, move to next transition immediately
-            activeEffect.currentTransitionIndex += 1
-
-            if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-              const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
-              activeEffect.state = 'idle'
-              this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
-            } else {
-              activeEffect.state = 'idle'
-            }
             released = true
           }
         }

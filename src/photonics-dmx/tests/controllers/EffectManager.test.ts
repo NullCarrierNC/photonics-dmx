@@ -147,6 +147,7 @@ describe('EffectManager', () => {
       clearAllTransitions: jest.fn(),
       beginClearingSequence: jest.fn(),
       endClearingSequence: jest.fn(),
+      getPublishedFrameCount: jest.fn().mockReturnValue(0),
     } as unknown as jest.Mocked<LightTransitionController>
 
     transitionEngine.getLightTransitionController.mockReturnValue(lightTransitionController)

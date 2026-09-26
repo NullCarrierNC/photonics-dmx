@@ -464,6 +464,17 @@ describe('AudioCueProcessor', () => {
     })
   })
 
+  it("dispatches a beat frame's cues before its beat", () => {
+    const handleDataSpy = jest.spyOn(AudioCueHandler.prototype, 'handleAudioData')
+    handleDataSpy.mockClear()
+
+    processor.processAudioData({ ...minimalLightingData(0.9), beatDetected: true })
+
+    const cueAt = handleDataSpy.mock.invocationCallOrder[0]
+    const beatAt = (sequencer.onBeat as jest.Mock).mock.invocationCallOrder[0]
+    expect(cueAt).toBeLessThan(beatAt)
+  })
+
   it('tees each frame to the secondary runtime with the lighting cue types', async () => {
     const runtime = makeSecondaryRuntime()
     processor.setSecondaryRuntime(runtime)

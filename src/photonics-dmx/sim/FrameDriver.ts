@@ -56,8 +56,8 @@ const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
 /**
  * Synthesises one {@link CueData} frame from the live {@link FrameState} plus a per-frame
  * {@link FrameTransient}, then dispatches it to the {@link CueHandler} in the same order
- * as {@link YargNetworkListener.processCueData}: beat/measure -> keyframe -> primary cue ->
- * strobe slot -> instrument notes -> vocal note edge.
+ * as {@link YargNetworkListener.processCueData}: primary cue or strobe slot -> beat/measure ->
+ * keyframe -> instrument notes -> vocal note edge.
  *
  * Frames carry `trackMode: 'simulated'` + `simulationCueGroup`, pinning cue resolution to the
  * library under test (see {@link CueRegistry.getCueImplementationFromGroup}).

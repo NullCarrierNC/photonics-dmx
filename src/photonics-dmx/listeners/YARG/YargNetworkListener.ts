@@ -353,8 +353,9 @@ export class YargNetworkListener extends EventEmitter {
   }
 
   /**
-   * Process one frame of cue data: beat/keyframe, lighting cue, strobe (including passive strobe-off),
-   * and instrument notes. Used by deserializePacket and by tests for passive strobe behaviour.
+   * Process one frame of cue data: lighting cue, strobe (including passive strobe-off), beat or
+   * measure, keyframe, instrument notes and the vocal note edge. Used by deserializePacket and by
+   * tests for passive strobe behaviour.
    * Forwards on pulse packets, instrument/vocal/level changes, or a 30 Hz keepalive.
    */
   public processCueData(YargCueData: CueData): void {

@@ -22,8 +22,9 @@ const CONFIG: AudioConfig = { ...DEFAULT_AUDIO_CONFIG, enabled: true }
 /**
  * Synthesises one audio analysis frame from the live {@link AudioFrameState} and hands it to the
  * {@link AudioCueHandler}, as the audio processor does for each captured frame. A beat transient
- * marks its frame as a detected beat and raises the beat on the sequencer first. The spectrum is
- * flat at the live level, so every band and the overall energy read the same value.
+ * marks its frame as a detected beat and raises the beat on the sequencer once the frame's cues
+ * are dispatched, without waiting on them. The spectrum is flat at the live level, so every band
+ * and the overall energy read the same value.
  */
 export class AudioFrameDriver implements SimDriver {
   constructor(
@@ -34,10 +35,7 @@ export class AudioFrameDriver implements SimDriver {
 
   public async dispatch(transient: FrameTransient = {}): Promise<void> {
     const state = this.getState()
-    if (transient.beat !== undefined) {
-      this.onBeat()
-    }
-    await this.handler.handleAudioData(
+    const dispatched = this.handler.handleAudioData(
       this.buildFrame(state, transient.beat !== undefined),
       CONFIG,
       state.cue,
@@ -46,6 +44,10 @@ export class AudioFrameDriver implements SimDriver {
       CONFIG.bands.length,
       false,
     )
+    if (transient.beat !== undefined) {
+      this.onBeat()
+    }
+    await dispatched
   }
 
   public stopCues(): void {

@@ -196,6 +196,32 @@ describe('CueSimulator', () => {
     }
   })
 
+  it('opens Warm_Automatic on its first step, held for the beat it starts on', async () => {
+    const sim = await CueSimulator.create({
+      library: LIBRARY,
+      frontCount: 4,
+      backCount: 4,
+      bpm: 120,
+      sampleIntervalMs: 10,
+    })
+    try {
+      sim.setCue('Warm_Automatic')
+      const timeline = await sim.run(700)
+
+      const firstFront = timeline.lightOrder.front[0]
+      // The timeline keeps a row only when something changes, so the last row at or before a
+      // time is what the rig showed then.
+      const lit = (timeMs: number): boolean => {
+        const shown = timeline.samples.filter((s) => s.timeMs <= timeMs).at(-1)
+        const light = shown?.lights[firstFront]
+        return light !== null && light !== undefined && light.intensity > 0
+      }
+      expect([lit(10), lit(250), lit(490), lit(650)]).toEqual([true, true, true, false])
+    } finally {
+      sim.dispose()
+    }
+  })
+
   describe('Stomp', () => {
     /** Runs Stomp with keyframes at `keyframesAt` and reads whether the rig is lit at each time. */
     async function stompLit(keyframesAt: number[], timesMs: number[]): Promise<boolean[]> {

@@ -186,22 +186,22 @@ export class AudioCueProcessor {
     log.info('AudioCueProcessor: Configuration updated')
   }
 
-  /**
-   * Process audio data received from renderer via IPC
-   * This is called by ControllerManager when it receives audio:data from renderer
-   */
   private lastBeatTimestamp = 0
 
+  /** Runs one audio frame from the renderer and raises its beat once its cues are dispatched. */
   public processAudioData(data: AudioLightingData): void {
     if (!this.isActive) return
     this.strobeWatchdog.packetSeen()
 
     const now = monotonicNowMs()
-    if (data.beatDetected && now - this.lastBeatTimestamp >= 100) {
-      this.lastBeatTimestamp = now
-      this.chainFanout.audioOnBeat()
-    }
+    const beat = data.beatDetected && now - this.lastBeatTimestamp >= 100
+    if (beat) this.lastBeatTimestamp = now
+    this.dispatchFrame(data, now)
+    // After the cues, so a transition they submit to wait for this frame's beat starts on it.
+    if (beat) this.chainFanout.audioOnBeat()
+  }
 
+  private dispatchFrame(data: AudioLightingData, now: number): void {
     const processedData =
       this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data
 

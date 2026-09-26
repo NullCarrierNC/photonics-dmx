@@ -175,7 +175,12 @@ export class EffectScheduler {
             // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
             // next updateTransitions call, after the current frame's blend pass has run.
           } else {
-            applyWaitUntil(lightEffect, firstTransition, currentTime)
+            applyWaitUntil(
+              lightEffect,
+              firstTransition,
+              currentTime,
+              this.lightTransitionController.getPublishedFrameCount(),
+            )
           }
         }
       } else if (firstTransition.waitForCondition === 'delay') {
