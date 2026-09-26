@@ -345,7 +345,7 @@ describe('ConfigurationManager', () => {
       const lastWriteCall = writeCalls[writeCalls.length - 1]
       const content = lastWriteCall[1]
       const savedData = JSON.parse(content)
-      expect(savedData).toHaveProperty('version', 6)
+      expect(savedData).toHaveProperty('version', 7)
       expect(savedData).toHaveProperty('data')
       expect(savedData.data).toHaveProperty('effectDebounce', 100)
     })

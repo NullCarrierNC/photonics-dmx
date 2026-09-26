@@ -60,7 +60,7 @@ const itWhenRenameCanBeRefused =
 
 /** Launches over a prefs.json that does not parse, in a directory that refuses the move-aside. */
 function launchOverCorruptPrefsLeftInPlace(dir: string): ConfigurationManager {
-  fs.writeFileSync(path.join(dir, 'prefs.json'), '{ "version": 6, "data": { not json')
+  fs.writeFileSync(path.join(dir, 'prefs.json'), '{ "version": 7, "data": { not json')
   const mode = fs.statSync(dir).mode
   fs.chmodSync(dir, 0o555)
   try {
@@ -99,7 +99,7 @@ describe('startup migrations on a real config directory', () => {
     const prefs: Record<string, unknown> = structuredClone(DEFAULT_PREFERENCES) as never
     delete prefs.enttecProConfig
     prefs.enttecProPort = '/dev/tty.usbserial-STRAY'
-    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 6, data: prefs }))
+    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 7, data: prefs }))
 
     const cm = new ConfigurationManager()
     await cm.setPreference('complex', true)
@@ -132,7 +132,7 @@ describe('a corrupt prefs.json left in place at launch', () => {
     const dir = freshConfigDir()
     const cm = launchOverCorruptPrefsLeftInPlace(dir)
     const repaired = { ...structuredClone(DEFAULT_PREFERENCES), clockRate: 33 }
-    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 6, data: repaired }))
+    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 7, data: repaired }))
 
     await cm.setPreference('complex', false)
 
@@ -170,7 +170,7 @@ describe('a prefs.json written by a newer version', () => {
   it('uses its settings and saves nothing over it', async () => {
     const dir = freshConfigDir()
     const newer = { ...structuredClone(DEFAULT_PREFERENCES), clockRate: 25, fromNewer: true }
-    const content = JSON.stringify({ version: 7, data: newer })
+    const content = JSON.stringify({ version: 8, data: newer })
     fs.writeFileSync(path.join(dir, 'prefs.json'), content)
 
     const cm = new ConfigurationManager()
@@ -189,7 +189,7 @@ describe('a prefs.json written by a newer version', () => {
 describe('a prefs.json whose data is null', () => {
   it('moves it aside and starts from the defaults', async () => {
     const dir = freshConfigDir()
-    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 6, data: null }))
+    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 7, data: null }))
 
     const cm = new ConfigurationManager()
     await cm.setPreference('complex', false)

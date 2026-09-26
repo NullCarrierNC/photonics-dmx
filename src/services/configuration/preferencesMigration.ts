@@ -1,4 +1,5 @@
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
+import { isPlainObject } from '../../shared/plainObject'
 import {
   CUE_DOMAINS,
   type CueDomain,
@@ -290,6 +291,19 @@ export function migratePrefsV5ToV6(legacy: unknown, defaults: AppPreferences): A
   // normalizeCueDomains defaults any missing domain (including rb3 / rb3Motion) via its
   // `?? createDefaultCueDomainPrefs(d)` fallback, so no separate seeding pass is needed here.
   return normalizeCueDomains({ ...base, cueDomains: currentDomains })
+}
+
+/**
+ * Moves every existing install onto RB3 cue mode, the default from v7. A one-time overwrite,
+ * including a direct mode the user chose. Every other field is preserved, and data that is not an
+ * object is left for validation to reject. New installs never run this, as they start at the
+ * current version with the full DEFAULT_PREFERENCES.
+ */
+export function migratePrefsV6ToV7(prefs: AppPreferences): AppPreferences {
+  if (!isPlainObject(prefs)) {
+    return prefs
+  }
+  return { ...prefs, rb3Prefs: { ...prefs.rb3Prefs, processingMode: 'cue' } }
 }
 
 function pickNonLegacyTopLevel(src: Record<string, unknown>): Partial<AppPreferences> {

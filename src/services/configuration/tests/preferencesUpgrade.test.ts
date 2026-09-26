@@ -36,7 +36,7 @@ afterAll(() => {
 describe('PreferencesConfigFile upgrade path', () => {
   it('resets one wrong-typed value, keeps the rest of the file and reports the repair', () => {
     const appData = freshAppData()
-    seedPrefs(appData, 6, { ...DEFAULT_PREFERENCES, effectDebounce: 77, clockRate: 'fast' })
+    seedPrefs(appData, 7, { ...DEFAULT_PREFERENCES, effectDebounce: 77, clockRate: 'fast' })
 
     const onCorruptRecovery = jest.fn()
     const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -75,7 +75,7 @@ describe('PreferencesConfigFile upgrade path', () => {
 
   it('loads a stored clock rate slower than the window as the slowest in it', () => {
     const appData = freshAppData()
-    seedPrefs(appData, 6, { ...DEFAULT_PREFERENCES, clockRate: 100, effectDebounce: 12 })
+    seedPrefs(appData, 7, { ...DEFAULT_PREFERENCES, clockRate: 100, effectDebounce: 12 })
 
     const onCorruptRecovery = jest.fn()
     const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -87,7 +87,7 @@ describe('PreferencesConfigFile upgrade path', () => {
 
   it('loads a stored sACN universe the protocol does not define as the lowest one it does', () => {
     const appData = freshAppData()
-    seedPrefs(appData, 6, {
+    seedPrefs(appData, 7, {
       ...DEFAULT_PREFERENCES,
       effectDebounce: 33,
       sacnConfig: { ...DEFAULT_PREFERENCES.sacnConfig, universe: 0 },
@@ -101,12 +101,13 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.effectDebounce).toBe(33)
   })
 
-  it('seeds cue domains missing from a same-version v6 file instead of wiping it', () => {
+  it('seeds cue domains missing from a same-version file instead of wiping it', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()
-    // A v6 file written before a domain was added to CUE_DOMAINS: rb3/rb3Motion absent. Without
-    // load-time seeding the AJV required-check would fail and corrupt-recovery would wipe prefs.
-    seedPrefs(appData, 6, {
+    // A current-version file written before a domain was added to CUE_DOMAINS: rb3/rb3Motion
+    // absent. Without load-time seeding the AJV required-check would fail and corrupt-recovery
+    // would wipe prefs.
+    seedPrefs(appData, 7, {
       ...DEFAULT_PREFERENCES,
       effectDebounce: 55,
       cueDomains: {
@@ -133,7 +134,7 @@ describe('PreferencesConfigFile upgrade path', () => {
     // A domain present but short of knownGroups and disabledCues, which a write interrupted part
     // way or a hand edit leaves behind. The AJV required-check runs per domain, so without
     // load-time repair this one domain costs the user every setting in the file.
-    seedPrefs(appData, 6, {
+    seedPrefs(appData, 7, {
       ...DEFAULT_PREFERENCES,
       clockRate: 42,
       cueDomains: { ...all, rb3Motion: { enabledGroups: ['mine'] } },
@@ -149,10 +150,10 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion.disabledCues).toEqual({})
   })
 
-  it('loads a same-version v6 file that predates whiteChannelMixMode without wiping it', () => {
+  it('loads a same-version file that predates whiteChannelMixMode without wiping it', () => {
     const appData = freshAppData()
     const { whiteChannelMixMode: _omitted, ...withoutKey } = DEFAULT_PREFERENCES
-    seedPrefs(appData, 6, { ...withoutKey, effectDebounce: 77 })
+    seedPrefs(appData, 7, { ...withoutKey, effectDebounce: 77 })
 
     const onCorruptRecovery = jest.fn()
     const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -162,10 +163,10 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.whiteChannelMixMode).toBeUndefined()
   })
 
-  it('loads a same-version v6 file that predates venuePostProcessingEnabled without wiping it', () => {
+  it('loads a same-version file that predates venuePostProcessingEnabled without wiping it', () => {
     const appData = freshAppData()
     const { venuePostProcessingEnabled: _omitted, ...withoutKey } = DEFAULT_PREFERENCES
-    seedPrefs(appData, 6, { ...withoutKey, effectDebounce: 88 })
+    seedPrefs(appData, 7, { ...withoutKey, effectDebounce: 88 })
 
     const onCorruptRecovery = jest.fn()
     const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -175,14 +176,14 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.venuePostProcessingEnabled).toBeUndefined()
   })
 
-  it('loads a same-version v6 file that predates the blackout shortcut without wiping it', () => {
+  it('loads a same-version file that predates the blackout shortcut without wiping it', () => {
     const appData = freshAppData()
     const {
       blackoutShortcutKey: _omittedKey,
       blackoutShortcutScope: _omittedScope,
       ...withoutKeys
     } = DEFAULT_PREFERENCES
-    seedPrefs(appData, 6, { ...withoutKeys, effectDebounce: 99 })
+    seedPrefs(appData, 7, { ...withoutKeys, effectDebounce: 99 })
 
     const onCorruptRecovery = jest.fn()
     const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -194,14 +195,14 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.blackoutShortcutScope).toBeUndefined()
   })
 
-  it('loads a same-version v6 file that predates lag compensation without wiping it', () => {
+  it('loads a same-version file that predates lag compensation without wiping it', () => {
     const appData = freshAppData()
     const {
       videoLagCompensationMs: _omittedVideo,
       audioLagCompensationMs: _omittedAudio,
       ...withoutKey
     } = DEFAULT_PREFERENCES
-    seedPrefs(appData, 6, { ...withoutKey, effectDebounce: 97 })
+    seedPrefs(appData, 7, { ...withoutKey, effectDebounce: 97 })
 
     const onCorruptRecovery = jest.fn()
     const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -217,7 +218,7 @@ describe('PreferencesConfigFile upgrade path', () => {
     // The key is deliberately not declared to the schema, so a hand-edited value cannot send the
     // whole file to corrupt-recovery. Readers normalize it instead.
     const appData = freshAppData()
-    seedPrefs(appData, 6, {
+    seedPrefs(appData, 7, {
       ...DEFAULT_PREFERENCES,
       effectDebounce: 96,
       videoLagCompensationMs: 'fast' as unknown as number,
@@ -229,6 +230,22 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(onCorruptRecovery).not.toHaveBeenCalled()
     expect(prefs.effectDebounce).toBe(96)
     expect(normalizeLagCompensationMs(prefs.videoLagCompensationMs)).toBe(0)
+  })
+
+  it('moves a stored v6 direct-mode file onto RB3 cue mode and keeps the rest', () => {
+    const appData = freshAppData()
+    seedPrefs(appData, 6, {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 64,
+      rb3Prefs: { processingMode: 'direct' },
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.rb3Prefs?.processingMode).toBe('cue')
+    expect(prefs.effectDebounce).toBe(64)
   })
 
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {
@@ -257,7 +274,7 @@ describe('PreferencesConfigFile upgrade path', () => {
 
 describe('PreferencesConfigFile required-key seeding', () => {
   it.each(['clockRate', 'effectDebounce', 'complex', 'cueConsistencyWindow'] as const)(
-    'seeds a same-version v6 file missing %s instead of wiping it',
+    'seeds a same-version file missing %s instead of wiping it',
     (missingKey) => {
       const appData = freshAppData()
       const stored: Record<string, unknown> = {
@@ -266,7 +283,7 @@ describe('PreferencesConfigFile required-key seeding', () => {
         cueDomains: createDefaultCueDomains(),
       }
       delete stored[missingKey]
-      seedPrefs(appData, 6, stored)
+      seedPrefs(appData, 7, stored)
 
       const onCorruptRecovery = jest.fn()
       const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
@@ -282,7 +299,7 @@ describe('PreferencesConfigFile required-key seeding', () => {
 
   it('keeps a stored value that happens to match nothing in the defaults', () => {
     const appData = freshAppData()
-    seedPrefs(appData, 6, {
+    seedPrefs(appData, 7, {
       ...DEFAULT_PREFERENCES,
       clockRate: 7,
       cueDomains: createDefaultCueDomains(),

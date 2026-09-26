@@ -4,6 +4,7 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
+  migratePrefsV6ToV7,
 } from '../preferencesMigration'
 import {
   healStoredClockRate,
@@ -241,6 +242,32 @@ describe('migratePrefsV5ToV6', () => {
   it('is idempotent once already at v6', () => {
     const once = migratePrefsV5ToV6(DEFAULT_PREFERENCES, DEFAULT_PREFERENCES)
     const again = migratePrefsV5ToV6(once, DEFAULT_PREFERENCES)
+    expect(again).toEqual(once)
+  })
+})
+
+describe('migratePrefsV6ToV7', () => {
+  it('moves a direct-mode install onto cue mode, preserving everything else', () => {
+    const v6 = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 44,
+      rb3Prefs: { processingMode: 'direct' as const },
+    }
+    const out = migratePrefsV6ToV7(v6)
+    expect(out.rb3Prefs).toEqual({ processingMode: 'cue' })
+    expect(out.effectDebounce).toBe(44)
+    expect(out.cueDomains).toEqual(v6.cueDomains)
+  })
+
+  it('sets cue mode on a file with no RB3 preferences', () => {
+    const { rb3Prefs: _omitted, ...v6 } = DEFAULT_PREFERENCES
+    const out = migratePrefsV6ToV7(v6)
+    expect(out.rb3Prefs).toEqual({ processingMode: 'cue' })
+  })
+
+  it('is idempotent once already at v7', () => {
+    const once = migratePrefsV6ToV7(DEFAULT_PREFERENCES)
+    const again = migratePrefsV6ToV7(once)
     expect(again).toEqual(once)
   })
 })
