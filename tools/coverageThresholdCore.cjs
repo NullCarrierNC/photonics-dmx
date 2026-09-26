@@ -1,9 +1,10 @@
 /**
- * The coverage ratchet's pure core: reading the settings that decide what coverage measures and
- * how much of it has to pass out of an evaluated Jest config, naming each one a config loosens
- * against a base, reading the refs the pre-push hook is given, and finding coverage options on a
- * command line and coverage ignore hints in source. The CLI in coverage-threshold-check.mjs owns
- * git, reading the files, evaluating jest.config.js and the exit code.
+ * The coverage ratchet's pure core: reading the settings that decide what coverage measures, how
+ * much of it has to pass and which tests run out of an evaluated Jest config, naming each one a
+ * config loosens against a base, reading the refs the pre-push hook is given, and finding coverage
+ * options on a command line and coverage ignore hints in source. The CLI in
+ * coverage-threshold-check.mjs owns git, reading the files, evaluating jest.config.js and the exit
+ * code.
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- the tests require this core
 const { posix } = require('node:path')
@@ -12,6 +13,13 @@ const ts = require('typescript')
 
 /** What Jest leaves out of coverage when a config names nothing. */
 const DEFAULT_IGNORE_PATTERNS = ['/node_modules/']
+/** The test files Jest runs when a config sets neither testMatch nor testRegex. */
+const DEFAULT_TEST_MATCH = [
+  '**/__tests__/**/*.?([mc])[jt]s?(x)',
+  '**/?(*.)+(spec|test).?([mc])[jt]s?(x)',
+]
+/** Where Jest looks for tests when a config names no roots. */
+const DEFAULT_ROOTS = ['<rootDir>']
 
 /**
  * @typedef {{
@@ -78,7 +86,8 @@ function coverageSettings(config) {
  * @param {Record<string, unknown> | null | undefined} base the evaluated config it may not loosen,
  *   or null when there is nothing to compare with
  * @returns {string[]} one line per threshold set lower or dropped, per collectCoverageFrom entry
- *   dropped, per exclusion added to collectCoverageFrom and per ignore pattern added
+ *   dropped, per exclusion added to collectCoverageFrom, per ignore pattern added and per change
+ *   that stops a test running
  */
 function loosenedCoverage(current, base) {
   if (!base) return []
@@ -114,7 +123,107 @@ function loosenedCoverage(current, base) {
     }
   }
 
-  return loosened
+  return [...loosened, ...narrowedTests(current ?? {}, base)]
+}
+
+/**
+ * @param {unknown} value a string or a list of strings, as testRegex takes
+ * @returns {string[]}
+ */
+function stringOrStrings(value) {
+  return typeof value === 'string' ? [value] : stringsIn(value)
+}
+
+/**
+ * @param {Record<string, unknown>} project an inline project or the config itself
+ * @param {number} index its place in the projects list
+ * @returns {string} the name a project is reported under
+ */
+function projectName(project, index) {
+  const name = project.displayName
+  if (typeof name === 'string') return name
+  if (name !== null && typeof name === 'object' && typeof name.name === 'string') return name.name
+  return `project ${index + 1}`
+}
+
+/**
+ * @param {Record<string, unknown>} config an evaluated Jest config
+ * @returns {Map<string, Record<string, unknown>>} the config under '' and each project by name, a
+ *   project given as a path under that path
+ */
+function testScopesOf(config) {
+  /** @type {Map<string, Record<string, unknown>>} */
+  const scopes = new Map([['', config]])
+  const projects = Array.isArray(config.projects) ? config.projects : []
+  projects.forEach((project, index) => {
+    if (typeof project === 'string') scopes.set(project, {})
+    else if (project !== null && typeof project === 'object') {
+      scopes.set(projectName(project, index), project)
+    }
+  })
+  return scopes
+}
+
+/**
+ * @param {Record<string, unknown>} scope
+ * @returns {{ ignore: string[], regex: string[], match: string[], roots: string[] }} which test
+ *   files the scope runs, with Jest's defaults filled in
+ */
+function testSelection(scope) {
+  const regex = stringOrStrings(scope.testRegex)
+  const match = stringOrStrings(scope.testMatch)
+  return {
+    ignore: Array.isArray(scope.testPathIgnorePatterns)
+      ? stringsIn(scope.testPathIgnorePatterns)
+      : DEFAULT_IGNORE_PATTERNS,
+    regex,
+    match: match.length > 0 || regex.length > 0 ? match : DEFAULT_TEST_MATCH,
+    roots: Array.isArray(scope.roots) ? stringsIn(scope.roots) : DEFAULT_ROOTS,
+  }
+}
+
+/**
+ * The settings that decide which tests run, since a test that stops running stops counting toward
+ * coverage. A root is kept when a root that holds it remains.
+ * @param {Record<string, unknown>} current
+ * @param {Record<string, unknown>} base
+ * @returns {string[]} one line per project dropped, test path ignore pattern added, testRegex or
+ *   testMatch entry dropped and root dropped
+ */
+function narrowedTests(current, base) {
+  const now = testScopesOf(current)
+  const then = testScopesOf(base)
+  /** @type {string[]} */
+  const lines = []
+  for (const name of then.keys()) {
+    if (!now.has(name)) lines.push(`projects drops '${name}'`)
+  }
+  for (const [name, baseScope] of then) {
+    const currentScope = now.get(name)
+    if (currentScope === undefined) continue
+    const prefix = name === '' ? '' : `${name}: `
+    const was = testSelection(baseScope)
+    const is = testSelection(currentScope)
+    for (const pattern of is.ignore) {
+      if (!was.ignore.includes(pattern)) {
+        lines.push(`${prefix}testPathIgnorePatterns adds '${pattern}'`)
+      }
+    }
+    for (const [key, field] of [
+      ['testRegex', 'regex'],
+      ['testMatch', 'match'],
+    ]) {
+      for (const entry of was[field]) {
+        if (!is[field].includes(entry)) lines.push(`${prefix}${key} drops '${entry}'`)
+      }
+    }
+    for (const root of was.roots) {
+      if (!is.roots.some((kept) => root === kept || root.startsWith(`${kept}/`))) {
+        lines.push(`${prefix}roots drops '${root}'`)
+      }
+    }
+  }
+  return lines
 }
 
 /**

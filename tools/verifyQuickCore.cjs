@@ -1,6 +1,7 @@
 /**
- * verify:quick's plan: which checks the changed files need, and whether they need the full set.
- * The CLI in verify-quick.mjs reads git and runs the plan.
+ * verify:quick's plan: which checks the changed files need, whether they need the full set, and
+ * the push gate's checks as the pre-push hook chains them. The CLI in verify-quick.mjs reads git
+ * and the hook and runs the plan.
  */
 
 /** @typedef {{ status: string, path: string }} Change */
@@ -56,12 +57,10 @@ function projectsFor(path) {
 
 /**
  * @param {Change[]} changes git name-status rows, status first letter as git prints it
- * @param {{ forceFull?: boolean }} [options]
  * @returns {Plan}
  */
-function planChecks(changes, options = {}) {
+function planChecks(changes) {
   const reasons = []
-  if (options.forceFull) reasons.push('asked for the full set')
   for (const { status, path } of changes) {
     for (const [pattern, reason] of FULL_RUN_PATHS) {
       if (pattern.test(path)) reasons.push(`${reason} (${path})`)
@@ -105,4 +104,47 @@ function parseNameStatus(text) {
   return changes
 }
 
-module.exports = { planChecks, parseNameStatus, projectsFor }
+/** @typedef {{ name: string, command: string, args: string[], note?: string }} Step */
+
+/** The hook's feed of the refs being pushed, which a check outside a push does not have. */
+const PUSHED_FEED = /^printf\s+'%s\\n'\s+"\$pushed"\s*\|\s*/
+
+/**
+ * The checks a push runs, read from the pre-push hook's `&&` chain. A check fed the refs being
+ * pushed either runs without them or, when they are all it reads, is skipped with the reason.
+ * @param {string} hookText the pre-push hook
+ * @returns {{ steps: Step[], skipped: Array<{ name: string, reason: string }> }}
+ */
+function pushGateSteps(hookText) {
+  const chain = hookText
+    .split('\n')
+    .filter((line) => line.includes('&&') && !line.trim().startsWith('#'))
+    .join(' && ')
+  /** @type {Step[]} */
+  const steps = []
+  /** @type {Array<{ name: string, reason: string }>} */
+  const skipped = []
+  for (const segment of chain.split('&&')) {
+    const fed = PUSHED_FEED.test(segment.trim())
+    const [command, ...args] = segment.trim().replace(PUSHED_FEED, '').split(/\s+/)
+    if (!command) continue
+    const name = [command, ...args].join(' ')
+    if (!fed) {
+      steps.push({ name, command, args })
+    } else if (args.includes('--pushed')) {
+      const kept = args.filter((arg) => arg !== '--pushed')
+      const trimmed = kept[kept.length - 1] === '--' ? kept.slice(0, -1) : kept
+      steps.push({
+        name: [command, ...trimmed].join(' '),
+        command,
+        args: trimmed,
+        note: 'held to HEAD and the branch base, without the refs of a push',
+      })
+    } else {
+      skipped.push({ name, reason: 'it reads the refs of a push from stdin' })
+    }
+  }
+  return { steps, skipped }
+}
+
+module.exports = { planChecks, parseNameStatus, projectsFor, pushGateSteps }

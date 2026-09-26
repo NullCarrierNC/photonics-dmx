@@ -1,6 +1,7 @@
 /**
  * Reading knip's JSON report for the knip budget: how many unused files, unused exports, unused
- * exported types and duplicate exports it names.
+ * exported types and duplicate exports it names, in the budgeted default mode and in the
+ * reported-only production mode, which leaves tests out and so sees exports only tests reach.
  */
 
 /** The issue types the budget holds, by the key knip's JSON report gives each. */
@@ -22,4 +23,30 @@ function tallyKnipReport(report) {
   return counts
 }
 
-module.exports = { KNIP_ISSUE_TYPES, tallyKnipReport }
+/**
+ * @param {{ production: boolean }} options
+ * @returns {string[]} the arguments knip runs with, `--production` leaving out tests and the
+ *   development entries
+ */
+function knipArgs({ production }) {
+  return [
+    ...(production ? ['--production'] : []),
+    '--reporter',
+    'json',
+    '--no-progress',
+    '--no-exit-code',
+    '--include',
+    KNIP_ISSUE_TYPES.join(','),
+  ]
+}
+
+/**
+ * @param {Map<string, number>} counts production-mode counts by issue type
+ * @returns {string}
+ */
+function productionReportLine(counts) {
+  const listed = [...counts].map(([type, count]) => `${type} ${count}`).join(', ')
+  return `Knip in production mode, reported only: ${listed}`
+}
+
+module.exports = { tallyKnipReport, knipArgs, productionReportLine }
