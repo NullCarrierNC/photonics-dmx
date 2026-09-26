@@ -12,6 +12,7 @@ import {
   FixtureConfigNumberField,
   fixtureConfigFieldBounds,
   isFixtureConfigFlagField,
+  isValidDmxChannel,
   normalizeFixtureConfig,
   LightingConfiguration,
   SavedFixture,
@@ -301,6 +302,11 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   // A saved moving head in a rig is what the calibration wizard opens for.
   const calibration =
     light?.fixture === FixtureTypes.RGBMH && light.id && rigId ? { light, rigId } : null
+  // The wizard aims the head through its pan and tilt channels, so it needs both.
+  const canCalibrate =
+    calibration !== null &&
+    isValidDmxChannel(calibration.light.channels.pan) &&
+    isValidDmxChannel(calibration.light.channels.tilt)
 
   let dragHandleButton: React.ReactNode = null
   if (dragHandle) {
@@ -497,9 +503,15 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
               e.stopPropagation()
               setCalibrationOpen(true)
             }}
-            className="text-sm px-2 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 w-full">
+            disabled={!canCalibrate}
+            className="text-sm px-2 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 w-full disabled:bg-gray-400">
             Calibrate (live DMX)
           </button>
+          {!canCalibrate && (
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              Calibration needs a DMX channel for Pan and Tilt.
+            </p>
+          )}
         </div>
       )}
 
