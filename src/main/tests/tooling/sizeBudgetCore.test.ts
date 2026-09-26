@@ -23,7 +23,7 @@ const baselineText = (limit: number, entries: Array<[number, string]>): string =
   [
     `limit ${limit}`,
     'Auto-generated: non-test sources under src/ that exceed the line limit.',
-    'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in a commit of its own.',
+    'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in the commit whose code needs it.',
     ...entries.map(([lines, path]) => `${lines} ${path}`),
   ].join('\n') + '\n'
 
@@ -206,7 +206,7 @@ describe('renderBaseline', () => {
     ])
   })
 
-  it('renders a header that says --write only lowers entries and a raise is its own commit', () => {
+  it('renders a header that says --write only lowers entries and a raise lands with its code', () => {
     const header = renderBaseline(sizesOf({ 'src/a.ts': 900 }), 600)
       .split('\n')
       .slice(0, 3)
@@ -214,7 +214,7 @@ describe('renderBaseline', () => {
     expect(header).toEqual([
       'limit 600',
       'Auto-generated: non-test sources under src/ that exceed the line limit.',
-      'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in a commit of its own.',
+      'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in the commit whose code needs it.',
     ])
   })
 
