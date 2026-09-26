@@ -113,6 +113,38 @@ describe('syncDmxLightWithTemplate', () => {
     expect(light.strobeValues).toBeUndefined()
   })
 
+  it('drops strobe speed values when the template is a dedicated strobe', () => {
+    const rgbStrobeLight: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 11, red: 12, green: 13, blue: 14, strobeChannel: 15 },
+      strobeValues: { slow: 30, medium: 90, fast: 180, fastest: 240 },
+    }
+    const strobeTemplate: DmxFixture = {
+      ...baseRgbTemplate,
+      fixture: FixtureTypes.STROBE,
+      channels: { masterDimmer: 1, strobeChannel: 2 },
+    }
+    const { light } = syncDmxLightWithTemplate(rgbStrobeLight, strobeTemplate)
+    expect(light.fixture).toBe(FixtureTypes.STROBE)
+    expect(light.strobeValues).toBeUndefined()
+  })
+
+  it('gives a dedicated strobe none of its template strobe speed values', () => {
+    const strobeLight: DmxLight = {
+      ...baseRgbLight,
+      fixture: FixtureTypes.STROBE,
+      channels: { masterDimmer: 11, strobeChannel: 12 },
+    }
+    const strobeTemplate: DmxFixture = {
+      ...baseRgbTemplate,
+      fixture: FixtureTypes.STROBE,
+      channels: { masterDimmer: 1, strobeChannel: 2 },
+      strobeValues: { slow: 10, medium: 100, fast: 200, fastest: 250 },
+    }
+    const { light } = syncDmxLightWithTemplate(strobeLight, strobeTemplate)
+    expect(light.strobeValues).toBeUndefined()
+  })
+
   it('preserves a per-light strobeValues override; never overwrites with template defaults', () => {
     const template: DmxFixture = {
       ...baseRgbTemplate,

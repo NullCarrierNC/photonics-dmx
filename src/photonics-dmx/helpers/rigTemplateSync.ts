@@ -1,5 +1,6 @@
 import equal from 'fast-deep-equal'
 import { clampDerivedDmxChannel, DMX_CHANNEL_MAX, FixtureTypes } from '../types'
+import { isRgbFamilyWithStrobeChannel } from './strobeChannelRigInspection'
 import type {
   DmxFixture,
   DmxLight,
@@ -194,10 +195,9 @@ export function syncDmxLightWithTemplate(
   // one address (see {@link clampDerivedDmxChannel}).
   const layout = deriveChannelLayoutForMaster(template, rigMaster)
 
-  // Track whether `strobeChannel` was dropped, so we can clear `strobeValues` accordingly. The
-  // template either has a strobeChannel (RGB+S model) or doesn't; the rig's previous state may have
-  // had one. If the template no longer has it, any rig-side strobeValues are now meaningless.
-  const templateHasStrobeChannel = typeof templateChannels.strobeChannel === 'number'
+  // Strobe speed values belong to an RGB-family fixture with its own strobe channel. A template
+  // without one, or a dedicated strobe, gives the rig light none.
+  const templateHasStrobeChannel = isRgbFamilyWithStrobeChannel(template)
 
   // strobeValues: per-light override is preserved when present; otherwise materialize the template's
   // defaults onto the rig light so the publisher reads a self-contained snapshot.
