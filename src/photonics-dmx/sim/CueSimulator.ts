@@ -555,8 +555,12 @@ export class CueSimulator {
     this.samples.push({ timeMs: Math.round(timeMs), lights, events })
   }
 
+  /**
+   * The cue from the library under test only. The registry's default-group fallback is skipped,
+   * since the simulator runs one library.
+   */
   private audioCue(cue: string): IAudioCue {
-    const found = AudioCueRegistry.getInstance().getCueImplementationFromGroup(cue, this.groupId)
+    const found = AudioCueRegistry.getInstance().getGroup(this.groupId)?.cues.get(cue)
     if (!found) {
       throw new Error(`Unknown audio cue '${cue}' in '${this.groupId}'.`)
     }
