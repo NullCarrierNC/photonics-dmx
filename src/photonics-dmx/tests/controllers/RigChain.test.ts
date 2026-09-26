@@ -7,6 +7,7 @@ import { describe, expect, it, jest } from '@jest/globals'
 import { RigChain } from '../../controllers/RigChain'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { makeAsymmetricTwoRigs, makeTwoRigs } from '../helpers/multiRigFixtures'
+import { playCueThatFailsToStop } from '../helpers/cueThatFailsToStop'
 
 describe('RigChain', () => {
   it('builds a DmxLightManager scoped to that rig only', () => {
@@ -140,21 +141,18 @@ describe('RigChain', () => {
     }
   })
 
-  it('dispose runs every step when the sequencer fails to shut down, then throws that failure', () => {
+  it('dispose runs every step when a cue fails to stop, then throws that failure', async () => {
     const [rigA] = makeTwoRigs({ frontPerRig: 4 })
     const clock = new ManualTestClock()
     const chain = new RigChain({ rigId: rigA.id, config: rigA.config, clock })
-    const failure = new Error('sequencer shutdown failed')
-    const shutdown = jest.spyOn(chain.sequencer, 'shutdown').mockImplementation(() => {
-      throw failure
-    })
+    const failure = new Error('cue failed to stop')
+    await playCueThatFailsToStop(chain, failure)
     jest.spyOn(console, 'error').mockImplementation(() => {})
     try {
       expect(() => chain.dispose()).toThrow(failure)
+      expect(chain.cueHandlers.yarg).toBeNull()
       expect(chain.dmxLightManager.getLights(['front'], ['all'])).toEqual([])
     } finally {
-      shutdown.mockRestore()
-      chain.sequencer.shutdown()
       jest.restoreAllMocks()
     }
   })
