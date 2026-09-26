@@ -14,6 +14,9 @@ jest.mock('electron', () => ({
 
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import type { ConfigCorruptInfo } from '../../services/configuration/configCorruptTypes'
+import { DEFAULT_PREFERENCES } from '../../services/configuration/configurationDefaults'
+import type { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types'
+import { isPlainObject } from '../../shared/plainObject'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -45,8 +48,15 @@ const { sets } = JSON.parse(fs.readFileSync(path.join(HISTORICAL, 'manifest.json
 
 const isNodeData = (file: CorpusFile): boolean => file.to.startsWith('node-data/')
 
-/** What loading a set reports, keyed by set id. A set with no entry reports nothing. */
+/** What loading a set reports and holds, keyed by set id. A set with no entry reports nothing. */
 interface Expected {
+  /**
+   * Settings the load does not keep as the file stores them, by their path in {@link SETTINGS}.
+   * Every other setting is the stored one, or its default where the file has none.
+   */
+  settings?: Record<string, unknown>
+  /** The fixture templates, layout and rigs as loaded, one line per fixture. */
+  fixtures?: LoadedFixtures
   /** Settings file repairs, as `<file>: <reason>: <message>`. */
   config?: string[]
   /** Migration notes from the cue files, as `<file>: <note>`. */
@@ -57,6 +67,66 @@ interface Expected {
   refused?: string[]
   /** Seeded files this build does not ship, which startup sets aside. */
   retired?: string[]
+}
+
+/** The settings a user sets, by their path in prefs.json. */
+const SETTINGS = [
+  'dmxOutputConfig',
+  'sacnConfig',
+  'artNetConfig',
+  'enttecProConfig',
+  'openDmxConfig',
+  'brightness',
+  'clockRate',
+  'globalDmxPublishingRateHz',
+  'cueConsistencyWindow',
+  'stageKitPrefs.yargPriority',
+  'rb3Prefs.processingMode',
+  'cueDomains.yarg.enabledGroups',
+  'cueDomains.yarg.selectionMode',
+  'cueDomains.audio.enabledGroups',
+  'cueDomains.yargMotion.enabledGroups',
+  'cueDomains.yargMotion.probabilityPercent',
+  'cueDomains.audioMotion.probabilityPercent',
+] as const
+
+const valueAt = (data: unknown, path: string): unknown =>
+  path
+    .split('.')
+    .reduce<unknown>((value, key) => (isPlainObject(value) ? value[key] : undefined), data)
+
+/** Where the prefs of builds before v4 stored a setting. */
+const STORED_BEFORE_V4: Record<string, string> = {
+  'cueDomains.yarg.enabledGroups': 'enabledCueGroups',
+  'cueDomains.yarg.selectionMode': 'cueGroupSelectionMode',
+  'cueDomains.audio.enabledGroups': 'enabledAudioCueGroups',
+}
+
+/** The settings a prefs file holds, with a field it lacks at its default. */
+function settingsOf(prefs: unknown): Record<string, unknown> {
+  return Object.fromEntries(
+    SETTINGS.map((path) => {
+      const older = STORED_BEFORE_V4[path]
+      const value = valueAt(prefs, path) ?? (older ? valueAt(prefs, older) : undefined)
+      const fallback = valueAt(DEFAULT_PREFERENCES, path)
+      if (isPlainObject(value) && isPlainObject(fallback)) return [path, { ...fallback, ...value }]
+      return [path, value ?? fallback]
+    }),
+  )
+}
+
+/** A settings file's content, inside the version envelope when it has one. */
+function storedData(file: CorpusFile): unknown {
+  const stored: unknown = JSON.parse(fs.readFileSync(path.join(HISTORICAL, file.file), 'utf-8'))
+  return isPlainObject(stored) && 'data' in stored ? stored.data : stored
+}
+
+/** Settings whose defaults changed in v5, which the load of an older prefs file puts at them. */
+const v5Defaults = {
+  'cueConsistencyWindow': 10000,
+  'stageKitPrefs.yargPriority': 'random',
+  'cueDomains.yargMotion.probabilityPercent': 50,
+  'cueDomains.audioMotion.probabilityPercent': 50,
 }
 
 const noKind = (file: string): string =>
@@ -76,11 +146,83 @@ const inLayout = (reports: string[]): string[] =>
   reports.map((report) => `lightsLayout.json: ${report}`)
 const inRigs = (reports: string[]): string[] => reports.map((report) => `dmxRigs.json: ${report}`)
 
+const PAR = 'PAR: rgb masterDimmer=1 red=2 green=3 blue=4'
+const STROBE = 'Strobe: strobe masterDimmer=1 strobeChannel=2'
+const templatesToV055 = [
+  PAR,
+  'Spot: rgb/mh masterDimmer=1 red=2 green=3 blue=4 pan=6 tilt=7 +white=5',
+  STROBE,
+]
+const templatesFromV062 = [
+  PAR,
+  'Spot: rgb/mh masterDimmer=1 red=2 green=3 blue=4 pan=5 tilt=6',
+  STROBE,
+  'PAR S: rgb masterDimmer=1 red=2 green=3 blue=4 strobeChannel=5',
+]
+
+/**
+ * The layout editor of builds up to v0.4.2 gave each light its template's channels, whatever its
+ * master. The layout keeps them, and the rig places them from the master.
+ */
+const layoutToV042 = [
+  'front[0] rgb masterDimmer=1 red=2 green=3 blue=4',
+  'front[1] rgb/mh masterDimmer=11 red=2 green=3 blue=4 pan=6 tilt=7 +white=5',
+  'back[0] rgb masterDimmer=21 red=2 green=3 blue=4',
+]
+const rigToV042 = [
+  'front[0] rgb masterDimmer=1 red=2 green=3 blue=4',
+  'front[1] rgb/mh masterDimmer=11 red=12 green=13 blue=14 pan=16 tilt=17 +white=15',
+  'back[0] rgb masterDimmer=21 red=22 green=23 blue=24',
+]
+const lightsFromV062 = [
+  'front[0] rgb masterDimmer=1 red=2 green=3 blue=4',
+  'front[1] rgb/mh masterDimmer=11 red=12 green=13 blue=14 pan=15 tilt=16',
+  'back[0] strobe masterDimmer=21 strobeChannel=22',
+]
+
+/**
+ * A dedicated strobe row the layout editor gave an RGB template. The layout reads it as a strobe
+ * light, and the rig as its template's RGB light on the channels its master places.
+ */
+const strobeRow = {
+  layout: 'strobe[0] strobe masterDimmer=31 strobeChannel=0',
+  rig: 'strobe[0] rgb masterDimmer=31 red=32 green=33 blue=34',
+}
+
+const NO_FIXTURES: LoadedFixtures = { templates: [], layout: [], rigs: {} }
+
 const EXPECTED: Record<string, Expected> = {
+  'v0.0.22-alpha.1-fix': {
+    fixtures: {
+      templates: templatesToV055,
+      layout: layoutToV042,
+      rigs: { 'Default Rig': rigToV042 },
+    },
+  },
   'v0.0.33-Alpha2': {
+    settings: v5Defaults,
+    fixtures: {
+      templates: templatesToV055,
+      layout: [...layoutToV042, strobeRow.layout],
+      rigs: { 'Default Rig': [...rigToV042, strobeRow.rig] },
+    },
     config: inLayout(strobeRowRepairs('strobeLights[0]', true)),
   },
+  'v0.0.35-Alpha3': {
+    settings: v5Defaults,
+    fixtures: {
+      templates: templatesToV055,
+      layout: layoutToV042,
+      rigs: { 'Default Rig': rigToV042 },
+    },
+  },
   'v0.4.2': {
+    settings: v5Defaults,
+    fixtures: {
+      templates: templatesToV055,
+      layout: [...layoutToV042, strobeRow.layout],
+      rigs: { Stage: [...rigToV042, strobeRow.rig] },
+    },
     config: [
       ...inLayout(strobeRowRepairs('strobeLights[0]', true)),
       ...inRigs(strobeRowRepairs('rigs[0].config.strobeLights[0]', true)),
@@ -97,6 +239,22 @@ const EXPECTED: Record<string, Expected> = {
     ],
   },
   'v0.5.5-alpha.5': {
+    settings: v5Defaults,
+    fixtures: {
+      templates: templatesToV055,
+      layout: [
+        'front[0] rgb masterDimmer=1 red=2 green=3 blue=4',
+        'front[1] rgb/mh masterDimmer=11 red=12 green=13 blue=14 pan=16 tilt=17 +white=15',
+        'back[0] strobe masterDimmer=21 strobeChannel=22',
+      ],
+      rigs: {
+        Stage: [
+          'front[0] rgb masterDimmer=1 red=2 green=3 blue=4',
+          'front[1] rgb/mh masterDimmer=11 red=12 green=13 blue=14 pan=16 tilt=17 +white=15',
+          'back[0] strobe masterDimmer=21 strobeChannel=22',
+        ],
+      },
+    },
     cues: [harmonyEasing],
     retired: ['audio-motion-fast.json', 'yarg-motion-fast.json'],
   },
@@ -110,6 +268,11 @@ const EXPECTED: Record<string, Expected> = {
     retired: ['audio-motion-fast.json', 'tests.json'],
   },
   'v0.6.2-alpha.6': {
+    fixtures: {
+      templates: templatesFromV062,
+      layout: [...lightsFromV062, 'strobe[0] strobe masterDimmer=31 strobeChannel=35'],
+      rigs: { Stage: [...lightsFromV062, `${strobeRow.rig} strobeChannel=35`] },
+    },
     retired: ['audio-motion-fast.json'],
     config: [
       ...inLayout(strobeRowRepairs('strobeLights[0]', false)),
@@ -117,12 +280,63 @@ const EXPECTED: Record<string, Expected> = {
     ],
     cues: [harmonyEasing],
   },
-  'v0.7.0-alpha.7': { cues: [harmonyEasing] },
+  'v0.7.0-alpha.7': {
+    // The v7 prefs upgrade moves every install onto RB3 cue mode.
+    settings: { 'rb3Prefs.processingMode': 'cue' },
+    fixtures: {
+      templates: templatesFromV062,
+      layout: lightsFromV062,
+      rigs: { Stage: lightsFromV062 },
+    },
+    cues: [harmonyEasing],
+  },
   'f3f851db': {
+    fixtures: {
+      ...NO_FIXTURES,
+      rigs: {
+        Main: [1, 11, 21, 31, 41, 51].map(
+          (master, i) =>
+            `front[${i}] rgb masterDimmer=${master} red=${master + 1} green=${master + 2} blue=${master + 3}`,
+        ),
+      },
+    },
     effects: [
       "my-effects.json: Variable names must use letters, digits and underscores: 'beat-count' is now 'beat_count'.",
     ],
   },
+}
+
+interface LoadedFixtures {
+  templates: string[]
+  layout: string[]
+  /** Keyed by rig name. */
+  rigs: Record<string, string[]>
+}
+
+const CHANNEL_ORDER = ['masterDimmer', 'red', 'green', 'blue', 'pan', 'tilt', 'strobeChannel']
+
+/** A fixture as `<type> <channel>=<n> ...`, then its added channels as `+<type>=<n>`. */
+function describeFixture(fixture: DmxFixture): string {
+  const channels = Object.entries(fixture.channels)
+    .sort(([a], [b]) => CHANNEL_ORDER.indexOf(a) - CHANNEL_ORDER.indexOf(b))
+    .map(([name, channel]) => `${name}=${channel}`)
+  const extras = (fixture.extraChannels ?? []).map((extra) => `+${extra.type}=${extra.channel}`)
+  return [fixture.fixture, ...channels, ...extras].join(' ')
+}
+
+const describeRows = (config: LightingConfiguration): string[] =>
+  (['front', 'back', 'strobe'] as const).flatMap((row) =>
+    config[`${row}Lights`].map((light, i) => `${row}[${i}] ${describeFixture(light)}`),
+  )
+
+function loadedFixtures(manager: ConfigurationManager): LoadedFixtures {
+  return {
+    templates: manager.getUserLights().map((t) => `${t.name}: ${describeFixture(t)}`),
+    layout: describeRows(manager.getLightingLayout()),
+    rigs: Object.fromEntries(
+      manager.getDmxRigs().map((rig) => [rig.name, describeRows(rig.config)]),
+    ),
+  }
 }
 
 /** Writes a set's files where the build that wrote them left them. */
@@ -174,7 +388,8 @@ interface LoadOutcome {
   migrations: { cues: string[]; effects: string[] }
   /** Compile errors in files that loaded, keyed by file name. */
   fileErrors: Record<string, string[]>
-  cueCount: number
+  /** Each cue file that loaded, as `<file>: <group id>, <n> cues`. */
+  cueFiles: string[]
 }
 
 async function loadNodeFiles(baseDir: string): Promise<LoadOutcome> {
@@ -204,14 +419,14 @@ async function loadNodeFiles(baseDir: string): Promise<LoadOutcome> {
       const name = path.basename(summary.path)
       if (summary.errors && !refused.has(name)) fileErrors[name] = summary.errors
     }
-    const cueCount = Object.values(loader.getSummary())
+    const cueFiles = Object.values(loader.getSummary())
       .flat()
-      .reduce((n, s) => n + s.cueCount, 0)
+      .map((s) => `${path.basename(s.path)}: ${s.groupId}, ${s.cueCount} cues`)
     return {
       errors,
       migrations: { cues: cues.migrations, effects: effects.migrations },
       fileErrors,
-      cueCount,
+      cueFiles: cueFiles.sort(),
     }
   } finally {
     await loader.dispose()
@@ -220,17 +435,20 @@ async function loadNodeFiles(baseDir: string): Promise<LoadOutcome> {
   }
 }
 
-/** Cues in the set's cue files that load, as the build that wrote them stored them. */
-const storedCueCount = (set: CorpusSet, refused: string[]): number =>
+/** The set's cue files as the build that wrote them stored them, with no cue from a refused one. */
+const storedCueFiles = (set: CorpusSet, refused: string[]): string[] =>
   set.files
     .filter((file) => file.to.startsWith('node-data/cues/'))
-    .filter((file) => !refused.some((error) => error.startsWith(`${path.basename(file.to)}: `)))
-    .reduce((n, file) => {
+    .map((file) => {
+      const name = path.basename(file.to)
       const data = JSON.parse(fs.readFileSync(path.join(HISTORICAL, file.file), 'utf-8')) as {
+        group: { id: string }
         cues: unknown[]
       }
-      return n + data.cues.length
-    }, 0)
+      const loads = !refused.some((error) => error.startsWith(`${name}: `))
+      return `${name}: ${data.group.id}, ${loads ? data.cues.length : 0} cues`
+    })
+    .sort()
 
 describe.each(sets.map((set) => [set.id, set] as const))('files the %s build wrote', (_id, set) => {
   const expected = EXPECTED[set.id] ?? {}
@@ -266,6 +484,24 @@ describe.each(sets.map((set) => [set.id, set] as const))('files the %s build wro
     expect(setAside(baseDir)).toEqual([])
   })
 
+  it('loads the settings and fixtures its files hold, and the same again once saved', async () => {
+    seed(baseDir, set, (file) => !isNodeData(file))
+    const prefsFile = set.files.find((file) => file.to === 'prefs.json')
+
+    const manager = new ConfigurationManager()
+    await settledWrites(baseDir)
+    const reloaded = new ConfigurationManager()
+
+    const settings = {
+      ...settingsOf(prefsFile ? storedData(prefsFile) : {}),
+      ...expected.settings,
+    }
+    expect(settingsOf(manager.getAllPreferences())).toEqual(settings)
+    expect(loadedFixtures(manager)).toEqual(expected.fixtures ?? NO_FIXTURES)
+    expect(settingsOf(reloaded.getAllPreferences())).toEqual(settings)
+    expect(loadedFixtures(reloaded)).toEqual(expected.fixtures ?? NO_FIXTURES)
+  })
+
   it('loads every cue and effect file it left, with every cue compiling', async () => {
     seed(baseDir, set, isNodeData)
 
@@ -273,7 +509,7 @@ describe.each(sets.map((set) => [set.id, set] as const))('files the %s build wro
 
     expect(outcome.errors).toEqual(expected.refused ?? [])
     expect(outcome.fileErrors).toEqual({})
-    expect(outcome.cueCount).toBe(storedCueCount(set, expected.refused ?? []))
+    expect(outcome.cueFiles).toEqual(storedCueFiles(set, expected.refused ?? []))
     expect(outcome.migrations.cues).toEqual(expected.cues ?? [])
     expect(outcome.migrations.effects).toEqual(expected.effects ?? [])
     expect(setAside(baseDir)).toEqual([])
