@@ -86,35 +86,20 @@ export function migrateLegacyBearingToken(raw: string): string | null {
 }
 
 /**
- * Maps a cue literal (degrees or canonical stage direction) to a canonical dropdown value from {@link STAGE_DIRECTION_OPTIONS}.
+ * The dropdown value from {@link STAGE_DIRECTION_OPTIONS} that a cue literal names exactly, by
+ * direction name or by its degrees, or null for any other literal.
  */
-export function bearingLiteralToCanonicalSelectValue(literal: unknown): string {
-  if (typeof literal === 'number') {
-    if (!Number.isFinite(literal)) {
-      return 'downstage'
-    }
-    const deg = normalizeBearingDegrees(literal)
-    return CANONICAL_BEARING_BY_DEG.get(deg) ?? 'downstage'
-  }
-  const trimmed = String(literal ?? '')
-    .trim()
-    .toLowerCase()
-  if (trimmed === '') {
-    return 'downstage'
-  }
-  if (STAGE_DIRECTION_OPTIONS.some((o) => o.value === trimmed)) {
-    return trimmed
-  }
-  if (Object.prototype.hasOwnProperty.call(STAGE_DIRECTION_BEARING_DEG, trimmed)) {
-    const deg = STAGE_DIRECTION_BEARING_DEG[trimmed]!
-    return CANONICAL_BEARING_BY_DEG.get(deg) ?? 'downstage'
-  }
-  const parsed = Number.parseFloat(trimmed)
-  if (Number.isFinite(parsed)) {
-    const deg = normalizeBearingDegrees(parsed)
-    return CANONICAL_BEARING_BY_DEG.get(deg) ?? 'downstage'
-  }
-  return 'downstage'
+export function exactBearingSelectValue(literal: unknown): string | null {
+  const deg =
+    typeof literal === 'number'
+      ? literal
+      : STAGE_DIRECTION_BEARING_DEG[
+          String(literal ?? '')
+            .trim()
+            .toLowerCase()
+        ] ?? (String(literal ?? '').trim() === '' ? NaN : Number(String(literal).trim()))
+  if (!Number.isFinite(deg)) return null
+  return CANONICAL_BEARING_BY_DEG.get(normalizeBearingDegrees(deg)) ?? null
 }
 
 /**

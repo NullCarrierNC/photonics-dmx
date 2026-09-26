@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals'
 import {
   backLightBearingIsFlipped,
-  bearingLiteralToCanonicalSelectValue,
+  exactBearingSelectValue,
   parseBearingFromResolvedValue,
   reflectBearingUsDs,
 } from './stageDirections'
@@ -46,10 +46,17 @@ describe('parseBearingFromResolvedValue', () => {
   })
 })
 
-describe('bearingLiteralToCanonicalSelectValue', () => {
+describe('exactBearingSelectValue', () => {
   it('maps degrees to hyphenated canonical direction', () => {
-    expect(bearingLiteralToCanonicalSelectValue(45)).toBe('upstage-right')
-    expect(bearingLiteralToCanonicalSelectValue(135)).toBe('downstage-right')
-    expect(bearingLiteralToCanonicalSelectValue(315)).toBe('upstage-left')
+    expect(exactBearingSelectValue(45)).toBe('upstage-right')
+    expect(exactBearingSelectValue(135)).toBe('downstage-right')
+    expect(exactBearingSelectValue(315)).toBe('upstage-left')
+    expect(exactBearingSelectValue('Stage-Left')).toBe('stage-left')
+  })
+
+  it('names no direction for degrees between them or a word it does not know', () => {
+    expect(exactBearingSelectValue(30)).toBeNull()
+    expect(exactBearingSelectValue('sideways')).toBeNull()
+    expect(exactBearingSelectValue('')).toBeNull()
   })
 })

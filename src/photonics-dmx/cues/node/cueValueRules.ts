@@ -19,6 +19,7 @@ import {
 } from '../../types'
 import type { WaitCondition } from '../../types'
 import { EasingType, isEasingType } from '../../easing'
+import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
 import type { ActionNode, NodeCueMode, ValueSource, VariableType } from '../types/nodeCueTypes'
 
 export interface ValueIssue {
@@ -377,4 +378,23 @@ export function compareOperandIssue(
   return warning(
     `'${source.name}' is a ${type} variable, which a compare reads as 0. An array-length node gives its size`,
   )
+}
+
+/**
+ * Whether a value is one of a field's fixed choices, for a field the runtime reads with a fallback.
+ * The file still loads, so a value off the list is a warning.
+ */
+export function unlistedIssue(value: string, choices: readonly string[]): ValueIssue | null {
+  return choices.includes(value) ? null : warning(`'${value}' is not one of this field's choices`)
+}
+
+/** Whether a bearing literal names a stage direction or a number of degrees. */
+export function bearingIssue(value: unknown): ValueIssue | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? null : warning('Not a bearing')
+  const text = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (Object.prototype.hasOwnProperty.call(STAGE_DIRECTION_BEARING_DEG, text)) return null
+  if (Number.isFinite(Number.parseFloat(text))) return null
+  return warning(`'${String(value)}' is not a stage direction or a number of degrees`)
 }

@@ -10,6 +10,7 @@ import {
   raiserParameterIssue,
 } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
+import KnownValueSelect from '../shared/KnownValueSelect'
 
 interface EffectRaiserEditorProps {
   node: EffectRaiserNode
@@ -33,20 +34,13 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
 
   return (
     <div className="space-y-2 text-xs">
-      <label className="flex flex-col font-medium">
-        Select Effect
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.effectId || ''}
-          onChange={(event) => updateNode({ effectId: event.target.value })}>
-          <option value="">-- Choose an effect --</option>
-          {availableEffects.map((effect) => (
-            <option key={effect.id} value={effect.id}>
-              {effect.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <KnownValueSelect
+        label="Select Effect"
+        value={node.effectId || ''}
+        options={availableEffects.map((effect) => ({ value: effect.id, label: effect.name }))}
+        onChange={(effectId) => updateNode({ effectId })}
+        placeholder="-- Choose an effect --"
+      />
       {availableEffects.length === 0 && (
         <p className="text-[10px] text-amber-600 dark:text-amber-400">
           No effects imported. Go to the Effects tab to import effects.

@@ -10,13 +10,32 @@ import type {
 import { getEffectTypesForCueKind } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
+import KnownValueSelect from '../shared/KnownValueSelect'
+import { bearingIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ActionTargetSection from './action-editors/ActionTargetSection'
 import ActionColorFields from './action-editors/ActionColorFields'
 import ActionTimingSection from './action-editors/ActionTimingSection'
 import {
   STAGE_DIRECTION_OPTIONS,
-  bearingLiteralToCanonicalSelectValue,
+  exactBearingSelectValue,
 } from '../../../../../../photonics-dmx/helpers/stageDirections'
+import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+
+const listOf = (values: readonly string[]) => values.map((value) => ({ value, label: value }))
+
+/**
+ * A bearing as the direction dropdown shows it: a literal naming one of the directions shows as that
+ * direction, and any other literal shows as it is stored.
+ */
+function bearingShown(bearing: ValueSource): ValueSource {
+  if (bearing.source !== 'literal') return bearing
+  return { source: 'literal', value: exactBearingSelectValue(bearing.value) ?? bearing.value }
+}
+
+/** A motion literal's stored text, or `fallback` when the field holds none or a variable. */
+function motionLiteral(source: ValueSource | undefined, fallback: string): string {
+  return source?.source === 'literal' ? String(source.value) : fallback
+}
 
 import {
   LINEAR_SWEEP_AXES,
@@ -84,11 +103,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
     updateNode({ effectType: v, motionPattern: undefined, position: undefined })
   }
 
-  const motionPatternLiteral =
-    node.motionPattern?.pattern?.source === 'literal' &&
-    typeof node.motionPattern.pattern.value === 'string'
-      ? node.motionPattern.pattern.value
-      : 'circle'
+  const motionPatternLiteral = motionLiteral(node.motionPattern?.pattern, 'circle')
 
   const positionMode: PositionMode = node.position?.mode ?? 'absolute'
 
@@ -153,54 +168,34 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
 
       {node.effectType === 'motion-pattern' && node.motionPattern && (
         <>
-          <label className="flex flex-col font-medium">
-            Pattern preset
-            <select
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={motionPatternLiteral}
-              onChange={(e) => {
-                const v = e.target.value
+          <KnownValueSelect
+            label="Pattern preset"
+            value={motionPatternLiteral}
+            options={listOf(MOTION_PATTERN_TYPES)}
+            onChange={(v) =>
+              updateNode({
+                motionPattern: {
+                  ...node.motionPattern!,
+                  pattern: { source: 'literal', value: v },
+                },
+              })
+            }
+          />
+
+          {motionPatternLiteral === 'linear-sweep' && (
+            <KnownValueSelect
+              label="Linear sweep axis"
+              value={motionLiteral(node.motionPattern.linearSweepAxis, 'horizontal')}
+              options={listOf(LINEAR_SWEEP_AXES)}
+              onChange={(v) =>
                 updateNode({
                   motionPattern: {
                     ...node.motionPattern!,
-                    pattern: { source: 'literal', value: v },
+                    linearSweepAxis: { source: 'literal', value: v },
                   },
                 })
-              }}>
-              {MOTION_PATTERN_TYPES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {motionPatternLiteral === 'linear-sweep' && (
-            <label className="flex flex-col font-medium">
-              Linear sweep axis
-              <select
-                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={
-                  node.motionPattern.linearSweepAxis?.source === 'literal' &&
-                  typeof node.motionPattern.linearSweepAxis.value === 'string'
-                    ? node.motionPattern.linearSweepAxis.value
-                    : 'horizontal'
-                }
-                onChange={(e) =>
-                  updateNode({
-                    motionPattern: {
-                      ...node.motionPattern!,
-                      linearSweepAxis: { source: 'literal', value: e.target.value },
-                    },
-                  })
-                }>
-                {LINEAR_SWEEP_AXES.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </label>
+              }
+            />
           )}
 
           <ValueSourceEditor
@@ -251,15 +246,14 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           {motionPatternLiteral === 'circle' && (
             <ValueSourceEditor
               label="Circle bearing (near vertical home)"
-              value={(() => {
-                const b = node.motionPattern.bearing ?? { source: 'literal', value: 'downstage' }
-                return b.source === 'literal'
-                  ? {
-                      source: 'literal' as const,
-                      value: bearingLiteralToCanonicalSelectValue(b.value),
-                    }
-                  : b
-              })()}
+              value={bearingShown(
+                node.motionPattern.bearing ?? { source: 'literal', value: 'downstage' },
+              )}
+              issue={
+                node.motionPattern.bearing?.source === 'literal'
+                  ? bearingIssue(node.motionPattern.bearing.value)
+                  : undefined
+              }
               onChange={(next) =>
                 updateNode({
                   motionPattern: { ...node.motionPattern!, bearing: next },
@@ -273,56 +267,32 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
 
           {motionPatternLiteral === 'custom' && (
             <>
-              <label className="flex flex-col font-medium">
-                Pan waveform
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={
-                    node.motionPattern.panWaveform?.source === 'literal' &&
-                    typeof node.motionPattern.panWaveform.value === 'string'
-                      ? node.motionPattern.panWaveform.value
-                      : 'sine'
-                  }
-                  onChange={(e) =>
-                    updateNode({
-                      motionPattern: {
-                        ...node.motionPattern!,
-                        panWaveform: { source: 'literal', value: e.target.value },
-                      },
-                    })
-                  }>
-                  {WAVEFORM_TYPES.map((w) => (
-                    <option key={w} value={w}>
-                      {w}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col font-medium">
-                Tilt waveform
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={
-                    node.motionPattern.tiltWaveform?.source === 'literal' &&
-                    typeof node.motionPattern.tiltWaveform.value === 'string'
-                      ? node.motionPattern.tiltWaveform.value
-                      : 'cosine'
-                  }
-                  onChange={(e) =>
-                    updateNode({
-                      motionPattern: {
-                        ...node.motionPattern!,
-                        tiltWaveform: { source: 'literal', value: e.target.value },
-                      },
-                    })
-                  }>
-                  {WAVEFORM_TYPES.map((w) => (
-                    <option key={w} value={w}>
-                      {w}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <KnownValueSelect
+                label="Pan waveform"
+                value={motionLiteral(node.motionPattern.panWaveform, 'sine')}
+                options={listOf(WAVEFORM_TYPES)}
+                onChange={(v) =>
+                  updateNode({
+                    motionPattern: {
+                      ...node.motionPattern!,
+                      panWaveform: { source: 'literal', value: v },
+                    },
+                  })
+                }
+              />
+              <KnownValueSelect
+                label="Tilt waveform"
+                value={motionLiteral(node.motionPattern.tiltWaveform, 'cosine')}
+                options={listOf(WAVEFORM_TYPES)}
+                onChange={(v) =>
+                  updateNode({
+                    motionPattern: {
+                      ...node.motionPattern!,
+                      tiltWaveform: { source: 'literal', value: v },
+                    },
+                  })
+                }
+              />
               <ValueSourceEditor
                 label="Pan amplitude (deg)"
                 value={node.motionPattern.panAmplitude ?? node.motionPattern.size}
@@ -379,15 +349,14 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             <>
               <ValueSourceEditor
                 label="Bearing"
-                value={(() => {
-                  const b = node.position?.bearing ?? { source: 'literal', value: 'downstage' }
-                  return b.source === 'literal'
-                    ? {
-                        source: 'literal' as const,
-                        value: bearingLiteralToCanonicalSelectValue(b.value),
-                      }
-                    : b
-                })()}
+                value={bearingShown(
+                  node.position?.bearing ?? { source: 'literal', value: 'downstage' },
+                )}
+                issue={
+                  node.position?.bearing?.source === 'literal'
+                    ? bearingIssue(node.position.bearing.value)
+                    : undefined
+                }
                 onChange={(next) =>
                   updateNode({
                     position: {
