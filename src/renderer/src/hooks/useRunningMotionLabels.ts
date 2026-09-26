@@ -20,6 +20,8 @@ type MotionRef = NonNullable<MotionCueChangePayload['ref']>
 interface MotionLabelSource {
   getGroups: () => Promise<Array<{ id: string; name: string }> | undefined>
   getCues: (groupId: string) => Promise<Array<{ id: string; name: string }>>
+  /** Whether motion counts as on before main answers, and when the read fails. */
+  motionAssumed: boolean
   /** Main names the new running cue on this channel. */
   cueChanged:
     | typeof RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
@@ -40,6 +42,7 @@ const SOURCES: Record<MotionRuntimeDomain, MotionLabelSource> = {
   yarg: {
     getGroups: getYargMotionCueGroups,
     getCues: getAvailableYargMotionCues,
+    motionAssumed: true,
     cueChanged: RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
     reloadOn: [
       RENDERER_RECEIVE.MOTION_ENABLED_CHANGED,
@@ -49,6 +52,8 @@ const SOURCES: Record<MotionRuntimeDomain, MotionLabelSource> = {
   rb3: {
     getGroups: getRb3MotionCueGroups,
     getCues: getAvailableRb3MotionCues,
+    // The RB3 preview keeps its motion block hidden until main says motion is on.
+    motionAssumed: false,
     cueChanged: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE,
     reloadOn: [
       RENDERER_RECEIVE.MOTION_ENABLED_CHANGED,
@@ -58,6 +63,7 @@ const SOURCES: Record<MotionRuntimeDomain, MotionLabelSource> = {
   audio: {
     getGroups: getAudioMotionCueGroups,
     getCues: getAvailableAudioMotionCues,
+    motionAssumed: true,
     cueChanged: RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE,
     reloadOn: [
       RENDERER_RECEIVE.MOTION_ENABLED_CHANGED,
@@ -69,7 +75,10 @@ const SOURCES: Record<MotionRuntimeDomain, MotionLabelSource> = {
 }
 
 export interface RunningMotionLabels {
-  /** Whether motion is on, true until main says otherwise. The labels are null while it is off. */
+  /**
+   * Whether motion is on, the platform's assumed value until main answers. The labels are null
+   * while it is off.
+   */
   motionEnabled: boolean
   groupLabel: string | null
   cueLabel: string | null
@@ -100,12 +109,12 @@ async function resolveLabels(
  * latest answer is shown, so two changes close together never mix one's group with the other's cue.
  */
 export function useRunningMotionLabels(platform: MotionRuntimeDomain): RunningMotionLabels {
+  const source = SOURCES[platform]
   const [labels, setLabels] = useState<RunningMotionLabels>({
-    motionEnabled: true,
+    motionEnabled: source.motionAssumed,
     ...NOTHING_RUNNING,
   })
   const { nextGeneration, isCurrentGeneration } = useLatestGenerationGate()
-  const source = SOURCES[platform]
 
   const showRef = useCallback(
     async (ref: MotionRef | null): Promise<void> => {
@@ -118,10 +127,9 @@ export function useRunningMotionLabels(platform: MotionRuntimeDomain): RunningMo
 
   const reload = useCallback(async (): Promise<void> => {
     const token = nextGeneration()
-    // Motion is on by default, so a failed read counts as on.
     const motionEnabled = await getMotionEnabled().then(
       (enabled) => enabled === true,
-      () => true,
+      () => source.motionAssumed,
     )
     const running = motionEnabled ? await getRunningMotionCue(platform).catch(() => null) : null
     const resolved = await resolveLabels(source, running && 'ref' in running ? running.ref : null)

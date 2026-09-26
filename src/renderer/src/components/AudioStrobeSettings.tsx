@@ -1,6 +1,6 @@
 import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
-import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { LevelRow } from './controls/LevelRow'
 import { SaveErrorAlert } from './controls/SaveErrorAlert'
 
 const AudioStrobeSettings: React.FC = () => {
@@ -10,17 +10,6 @@ const AudioStrobeSettings: React.FC = () => {
     strobeProbability: 100,
   })
   const { strobeEnabled, strobeTriggerThreshold, strobeProbability } = audio.values
-  const commit = (): void => void audio.commit()
-  const thresholdRelease = useCommitOnRelease(commit)
-  const probabilityRelease = useCommitOnRelease(commit)
-
-  const thresholdRangeStyle = {
-    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeTriggerThreshold * 100}%, #e5e7eb ${strobeTriggerThreshold * 100}%, #e5e7eb 100%)`,
-  } as const
-
-  const probabilityRangeStyle = {
-    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeProbability}%, #e5e7eb ${strobeProbability}%, #e5e7eb 100%)`,
-  } as const
 
   // The controls stay live while a save is in flight, so keyboard focus stays on a slider.
   const busy = !audio.loaded
@@ -48,94 +37,36 @@ const AudioStrobeSettings: React.FC = () => {
       </div>
 
       <div className={strobeControlsDisabled ? 'opacity-60' : undefined}>
-        <div className="space-y-1">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Strobe trigger threshold
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Normalised total energy (0-1) above which the strobe can activate. (Higher is louder)
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-              style={thresholdRangeStyle}
-              value={strobeTriggerThreshold}
-              disabled={strobeControlsDisabled}
-              onChange={(e) => {
-                audio.set({ strobeTriggerThreshold: Number(e.target.value) })
-                thresholdRelease.changed()
-              }}
-              {...thresholdRelease.props}
-            />
-            <input
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={strobeTriggerThreshold}
-              disabled={strobeControlsDisabled}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value)
-                if (Number.isFinite(value)) {
-                  audio.set({ strobeTriggerThreshold: Math.max(0, Math.min(1, value)) })
-                }
-              }}
-              onBlur={commit}
-              className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
-              aria-label="Strobe trigger threshold numeric"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1 mt-3">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Strobe probability
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              When the threshold is exceeded, this is the chance the strobe actually fires.
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-              style={probabilityRangeStyle}
-              value={strobeProbability}
-              disabled={strobeControlsDisabled}
-              onChange={(e) => {
-                audio.set({ strobeProbability: Number(e.target.value) })
-                probabilityRelease.changed()
-              }}
-              {...probabilityRelease.props}
-            />
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={strobeProbability}
-              disabled={strobeControlsDisabled}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value)
-                if (Number.isFinite(value)) {
-                  audio.set({ strobeProbability: Math.max(0, Math.min(100, Math.round(value))) })
-                }
-              }}
-              onBlur={commit}
-              className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
-              aria-label="Strobe probability percent"
-            />
-          </div>
+        <LevelRow
+          label="Strobe trigger threshold"
+          help="Normalised total energy (0-1) above which the strobe can activate. (Higher is louder)"
+          numberLabel="Strobe trigger threshold numeric"
+          min={0}
+          max={1}
+          step={0.01}
+          decimals={2}
+          value={strobeTriggerThreshold}
+          fillPercent={strobeTriggerThreshold * 100}
+          disabled={strobeControlsDisabled}
+          compact={false}
+          onSlide={(value) => audio.set({ strobeTriggerThreshold: value })}
+          onCommit={(value) => void audio.save({ strobeTriggerThreshold: value })}
+        />
+        <div className="mt-3">
+          <LevelRow
+            label="Strobe probability"
+            help="When the threshold is exceeded, this is the chance the strobe actually fires."
+            numberLabel="Strobe probability percent"
+            min={0}
+            max={100}
+            step={1}
+            value={strobeProbability}
+            fillPercent={strobeProbability}
+            disabled={strobeControlsDisabled}
+            compact={false}
+            onSlide={(value) => audio.set({ strobeProbability: value })}
+            onCommit={(value) => void audio.save({ strobeProbability: value })}
+          />
         </div>
       </div>
       <SaveErrorAlert message={audio.saveError} />

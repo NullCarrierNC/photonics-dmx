@@ -8,6 +8,8 @@
  */
 import { useCallback, useEffect, useRef } from 'react'
 import { useDebouncedSave } from '../../hooks/useDebouncedSave'
+import { useToast } from '../../hooks/useToast'
+import { saveFailureMessage } from '../../ipc/persistPrefs'
 import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('CueConsistencySettings')
@@ -37,36 +39,43 @@ export function useProbabilitySaver(
   // The panel may be gone by the time a write answers, so the value is applied through whatever
   // the flush was given rather than straight to state.
   const applyAnswer = useRef(apply)
+  const { showToast } = useToast()
   useEffect(() => {
     applyAnswer.current = apply
   }, [apply])
 
+  /**
+   * Resolves true once main has stored the percent. A refusal re-reads what main holds, and when
+   * that read fails too the stored value is unknown, so the percent counts as unwritten and the
+   * user is told.
+   */
   const write = useCallback(
-    async (percent: number): Promise<void> => {
-      const take = (result: PercentResult): void => {
+    async (percent: number): Promise<boolean> => {
+      const take = (result: PercentResult): boolean => {
         if (result.success && typeof result.percent === 'number') {
           recordStored.current(result.percent)
           applyAnswer.current(result.percent)
+          return true
         }
+        return false
       }
       try {
         const result = await save(percent)
-        if (result.success) {
-          take(result)
-        } else {
-          log.error(`Failed to save ${label}`)
-          take(await reload())
-        }
+        if (take(result)) return true
+        log.error(`Failed to save ${label}`)
       } catch (error) {
         log.error(`Failed to save ${label}:`, error)
-        try {
-          take(await reload())
-        } catch (reloadError) {
-          log.error(`Failed to reload ${label}:`, reloadError)
-        }
       }
+      let reread = false
+      try {
+        reread = take(await reload())
+      } catch (reloadError) {
+        log.error(`Failed to reload ${label}:`, reloadError)
+      }
+      if (!reread) showToast(saveFailureMessage(`the ${label}`), 'error', 5000)
+      return false
     },
-    [save, reload, label],
+    [save, reload, label, showToast],
   )
 
   const saver = useDebouncedSave(write, {

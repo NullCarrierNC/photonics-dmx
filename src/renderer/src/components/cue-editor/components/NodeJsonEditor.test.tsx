@@ -95,6 +95,36 @@ describe('NodeJsonEditor', () => {
     expect(validate).not.toHaveBeenCalled()
   })
 
+  it.each([['null'], ['[]'], ['"Alpha"']])(
+    'reports a definition of %s as not an object without validating it',
+    async (text) => {
+      const { editor, validate } = open()
+      setText(editor, text)
+
+      await act(async () => {
+        fireEvent.click(validateButton())
+      })
+
+      expect(screen.getByText(/must be a JSON object/)).toBeInTheDocument()
+      expect(validate).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull()
+    },
+  )
+
+  it('reports a definition the reconcile step cannot read', async () => {
+    const { editor, validate } = open({
+      reconcile: (item) => ({ definition: { ...item, name: item.name.trim() }, notices: [] }),
+    })
+    setText(editor, JSON.stringify({ id: 'a', name: 7 }))
+
+    await act(async () => {
+      fireEvent.click(validateButton())
+    })
+
+    expect(screen.getByText(/^Validation failed:/)).toBeInTheDocument()
+    expect(validate).not.toHaveBeenCalled()
+  })
+
   it('lists schema errors and marks where each points in the text', async () => {
     const { editor } = open({
       validate: () =>

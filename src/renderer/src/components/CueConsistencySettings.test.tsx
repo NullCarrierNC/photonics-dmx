@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { render, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
+import { Provider, createStore } from 'jotai'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 
@@ -54,6 +55,7 @@ function armDefaults(): void {
 }
 
 import CueConsistencySettings from './CueConsistencySettings'
+import { ToastStack } from './Toast'
 
 /** The debounce the three probability sliders share. */
 const DEBOUNCE_MS = 300
@@ -179,6 +181,18 @@ describe('CueConsistencySettings consistency window', () => {
     })
 
     expect(mocks.setCueConsistencyWindow).toHaveBeenCalledWith(25000)
+  })
+
+  it('keeps the saved window when the field is cleared', async () => {
+    await renderPanel()
+
+    fireEvent.change(control('consistency-window'), { target: { value: '' } })
+    await act(async () => {
+      fireEvent.blur(control('consistency-window'))
+    })
+
+    expect(mocks.setCueConsistencyWindow).not.toHaveBeenCalled()
+    expect(control<HTMLInputElement>('consistency-window').value).toBe('10000')
   })
 
   it.each([
@@ -328,6 +342,51 @@ describe('CueConsistencySettings probability debounce', () => {
     await waitFor(() =>
       expect(control<HTMLInputElement>('yarg-motion-probability').value).toBe('33'),
     )
+  })
+
+  it('writes a refused probability again when the re-read also fails', async () => {
+    await renderPanel()
+    mocks.setMotionCueProbabilityPercent.mockReturnValueOnce(fail({ percent: 0 }))
+    mocks.getMotionCueProbabilityPercent.mockImplementation(() =>
+      Promise.reject(new Error('offline')),
+    )
+
+    fireEvent.change(control('yarg-motion-probability'), { target: { value: '70' } })
+    await act(async () => {
+      jest.advanceTimersByTime(DEBOUNCE_MS)
+    })
+    await act(async () => {})
+    fireEvent.change(control('yarg-motion-probability'), { target: { value: '65' } })
+    fireEvent.change(control('yarg-motion-probability'), { target: { value: '70' } })
+    await act(async () => {
+      jest.advanceTimersByTime(DEBOUNCE_MS)
+    })
+
+    expect(mocks.setMotionCueProbabilityPercent).toHaveBeenCalledTimes(2)
+    expect(mocks.setMotionCueProbabilityPercent).toHaveBeenLastCalledWith(70)
+  })
+
+  it('says so on screen when a refused probability cannot be re-read', async () => {
+    const view = render(
+      <Provider store={createStore()}>
+        <CueConsistencySettings />
+        <ToastStack />
+      </Provider>,
+    )
+    await waitFor(() =>
+      expect(control<HTMLSelectElement>('cue-group-selection-mode').disabled).toBe(false),
+    )
+    mocks.setMotionCueProbabilityPercent.mockReturnValueOnce(fail({ percent: 0 }))
+    mocks.getMotionCueProbabilityPercent.mockImplementation(() =>
+      Promise.reject(new Error('offline')),
+    )
+
+    fireEvent.change(control('yarg-motion-probability'), { target: { value: '70' } })
+    await act(async () => {
+      jest.advanceTimersByTime(DEBOUNCE_MS)
+    })
+
+    expect(await view.findByText('Could not save the YARG motion probability.')).toBeTruthy()
   })
 })
 

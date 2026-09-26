@@ -20,6 +20,8 @@ const EnttecProToggle = ({ disabled = false, compact = false }: EnttecProToggleP
       label="Enttec Pro Out"
       runningAtom={senderEnttecProEnabledAtom}
       prefsFlag="enttecProEnabled"
+      // Nothing to open until a COM port or device path is set.
+      notReady={comPort.length < 3}
       disabled={disabled}
       compact={compact}
       enable={() => enableSender({ sender: 'enttecpro', devicePath: comPort, dmxSpeed })}

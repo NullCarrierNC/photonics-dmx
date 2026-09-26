@@ -1,10 +1,11 @@
 /** @jest-environment jsdom */
 import * as React from 'react'
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { useToast } from '../hooks/useToast'
 import ToastContainer, { ToastStack } from './Toast'
+import Modal from './Modal'
 
 describe('ToastContainer', () => {
   it('announces toasts through a live region that is there before they arrive', () => {
@@ -64,6 +65,32 @@ describe('ToastStack', () => {
     expect(regions).toHaveLength(1)
     expect(regions[0].contains(screen.getByText('App failed'))).toBe(true)
     expect(regions[0].contains(screen.getByText('Page failed'))).toBe(true)
+  })
+
+  it('shows toasts inside an open dialog, and on the page once it closes', async () => {
+    const Page = ({ dialogOpen }: { dialogOpen: boolean }) => (
+      <>
+        {dialogOpen && (
+          <Modal onClose={jest.fn()} labelledBy="t" panelClassName="">
+            <h2 id="t">Delete rig</h2>
+          </Modal>
+        )}
+        <Toaster message="Could not delete" duration={0} />
+        <ToastStack />
+      </>
+    )
+    const { rerender } = renderWithProviders(<Page dialogOpen />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Delete rig' })).toContainElement(
+        screen.getByText('Could not delete'),
+      ),
+    )
+
+    rerender(<Page dialogOpen={false} />)
+
+    await waitFor(() => expect(screen.getByText('Could not delete')).toBeInTheDocument())
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('keeps the newest few toasts when a burst arrives', () => {

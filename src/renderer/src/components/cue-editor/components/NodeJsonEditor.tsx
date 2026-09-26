@@ -73,6 +73,7 @@ export type JsonValidationResult = {
   valid: boolean
   errors?: string[]
   structuredErrors?: { instancePath: string; message: string }[]
+  /** Cue validation reports these. Effect validation has none, so an effect shows no warnings. */
   warnings?: string[]
 }
 
@@ -178,9 +179,9 @@ function DefinitionTextEditor<
     setNotices([])
     view.dispatch(setDiagnostics(view.state, []))
 
-    let parsed: D
+    let parsed: unknown
     try {
-      parsed = JSON.parse(raw) as D
+      parsed = JSON.parse(raw)
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Invalid JSON'
       setValidationErrors([`Parse error: ${message}`])
@@ -188,34 +189,51 @@ function DefinitionTextEditor<
       return
     }
 
-    if (reconcile) {
-      const reconciled = reconcile(parsed)
-      if (reconciled.notices.length > 0) {
-        // Rewrite the editor text with the reconciled definition before validation passes, so the
-        // doc-change listener does not flip contentChangedAfterValidation.
-        view.dispatch({
-          changes: {
-            from: 0,
-            to: view.state.doc.length,
-            insert: JSON.stringify(reconciled.definition, null, 2),
-          },
-        })
-        setNotices(reconciled.notices)
-      }
-      parsed = reconciled.definition
+    const fail = (message: string): void => {
+      setValidating(false)
+      setValidationErrors([`Validation failed: ${message}`])
+      setValidationPassed(false)
     }
 
-    const fileWithDefinition = buildFile(parsed)
+    // The schema judges the fields. A definition that is not an object never reaches it, since
+    // the reconcile step and the file builder read fields off it.
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      fail('the definition must be a JSON object')
+      return
+    }
+
+    let fileWithDefinition: F
+    try {
+      let definition = parsed as D
+      if (reconcile) {
+        const reconciled = reconcile(definition)
+        if (reconciled.notices.length > 0) {
+          // Rewrite the editor text with the reconciled definition before validation passes, so
+          // the doc-change listener does not flip contentChangedAfterValidation.
+          view.dispatch({
+            changes: {
+              from: 0,
+              to: view.state.doc.length,
+              insert: JSON.stringify(reconciled.definition, null, 2),
+            },
+          })
+          setNotices(reconciled.notices)
+        }
+        definition = reconciled.definition
+      }
+      fileWithDefinition = buildFile(definition)
+    } catch (e) {
+      fail(e instanceof Error ? e.message : String(e))
+      return
+    }
+
     const validatedText = view.state.doc.toString()
     setValidating(true)
     let result: JsonValidationResult
     try {
       result = await validate(fileWithDefinition)
     } catch (e) {
-      setValidating(false)
-      const message = e instanceof Error ? e.message : String(e)
-      setValidationErrors([`Validation failed: ${message}`])
-      setValidationPassed(false)
+      fail(e instanceof Error ? e.message : String(e))
       return
     }
     setValidating(false)
