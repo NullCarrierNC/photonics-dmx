@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import {
   LightingConfiguration,
@@ -195,15 +196,13 @@ export class ConsoleModeController {
       }))
     } catch (error) {
       const failed = ipcError(error)
-      if (await this.restoreFixtureEdit(config, rig, fixtureId, fixture)) {
+      const kept = await this.restoreFixtureEdit(config, rig, fixtureId, fixture)
+      if (!kept.rig && !kept.template) {
         return failed
       }
       // Part of the edit stayed on disk, and the running graph has to follow what is there.
       await restartAfterSave(() => this.deps.restartControllers())
-      return {
-        success: false,
-        error: `${failed.error}. The rig change could not be undone and is still saved.`,
-      }
+      return { success: false, error: `${failed.error}. ${keptEditMessage(kept)}` }
     }
 
     return restartAfterSave(() => this.deps.restartControllers())
@@ -211,28 +210,30 @@ export class ConsoleModeController {
 
   /**
    * Puts the template and then the rig back as they were before an edit, trying the rig whatever
-   * the template write does. False when either write fails.
+   * the template write does. A template the failed edit never wrote is left alone. Answers which
+   * halves still hold the edit.
    */
   private async restoreFixtureEdit(
     config: ConfigurationManager,
     rig: DmxRig,
     fixtureId: string,
     fixture: DmxFixture,
-  ): Promise<boolean> {
-    let restored = true
-    try {
-      await config.updateUserLight(fixtureId, () => fixture)
-    } catch (error) {
-      log.error('Could not put the fixture template back after a failed edit:', error)
-      restored = false
+  ): Promise<KeptFixtureEdit> {
+    if (!storedTemplateMatches(config, fixtureId, fixture)) {
+      try {
+        await config.updateUserLight(fixtureId, () => fixture)
+      } catch (error) {
+        log.error('Could not put the fixture template back after a failed edit:', error)
+      }
     }
+    let rigKept = false
     try {
       await config.saveDmxRig(rig)
     } catch (error) {
       log.error('Could not put the rig back after a failed fixture edit:', error)
-      restored = false
+      rigKept = true
     }
-    return restored
+    return { rig: rigKept, template: !storedTemplateMatches(config, fixtureId, fixture) }
   }
 
   private findLightInRig(rig: DmxRig, lightId: string): DmxLight | null {
@@ -253,4 +254,26 @@ export class ConsoleModeController {
       strobeLights: config.strobeLights.map((l) => (l.id === lightId ? replacement : l)),
     }
   }
+}
+
+/** Which halves of a failed console fixture edit are still on disk after the put back. */
+type KeptFixtureEdit = { rig: boolean; template: boolean }
+
+function keptEditMessage(kept: KeptFixtureEdit): string {
+  if (kept.rig && kept.template) {
+    return 'The rig and fixture template changes could not be undone and are still saved.'
+  }
+  return kept.rig
+    ? 'The rig change could not be undone and is still saved.'
+    : 'The fixture template change could not be undone and is still saved.'
+}
+
+/** True when the stored template is the snapshot, or is gone and so holds nothing of an edit. */
+function storedTemplateMatches(
+  config: ConfigurationManager,
+  fixtureId: string,
+  snapshot: DmxFixture,
+): boolean {
+  const stored = config.getUserLights().find((f) => f.id === fixtureId)
+  return stored === undefined || isDeepStrictEqual(stored, snapshot)
 }
