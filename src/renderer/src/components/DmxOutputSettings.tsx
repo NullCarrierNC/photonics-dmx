@@ -141,23 +141,33 @@ const DmxOutputSettings: React.FC = () => {
     },
   })
 
-  /** Persists the whole resolved ArtNet config and hands it to the sender if it runs. */
+  /**
+   * Persists the whole resolved ArtNet config and hands it to the sender if it runs once the write
+   * lands. The running state is read then, since the sender may have started during the write.
+   */
   const commitArtNetConfig = useSerializedConfigCommit({
     stored: artNetConfig,
     persist: (config, what) => persist({ artNetConfig: config }, what),
     setStored: (config) => setPrefs((prev) => ({ ...prev, artNetConfig: config })),
     applyToRunningSender: async (config, what) => {
-      if (isArtNetEnabled) await applyToRunningSender(() => updateArtNetConfig(config), what)
+      if (store.get(senderArtNetEnabledAtom)) {
+        await applyToRunningSender(() => updateArtNetConfig(config), what)
+      }
     },
   })
 
-  /** Persists the whole resolved sACN config and hands it to the sender if it runs. */
+  /**
+   * Persists the whole resolved sACN config and hands it to the sender if it runs once the write
+   * lands, reading the running state then.
+   */
   const commitSacnConfig = useSerializedConfigCommit({
     stored: sacnConfig,
     persist: (config, what) => persist({ sacnConfig: config }, what),
     setStored: (config) => setPrefs((prev) => ({ ...prev, sacnConfig: config })),
     applyToRunningSender: async (config, what) => {
-      if (isSacnEnabled) await applyToRunningSender(() => updateSacnConfig(config), what)
+      if (store.get(senderSacnEnabledAtom)) {
+        await applyToRunningSender(() => updateSacnConfig(config), what)
+      }
     },
   })
 

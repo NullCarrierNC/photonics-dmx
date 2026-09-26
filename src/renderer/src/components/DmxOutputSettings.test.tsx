@@ -755,6 +755,19 @@ describe('DmxOutputSettings sACN configuration', () => {
     expect(await screen.findByText(/could not apply the sACN configuration/i)).toBeInTheDocument()
   })
 
+  it('pushes the change to a sender started while it saved', async () => {
+    const releaseFirst = holdFirstPrefsWrite()
+    const store = await renderPanel(sacnOpen())
+
+    commit(universeInput(), '9')
+    act(() => store.set(senderSacnEnabledAtom, true))
+    await releaseFirst()
+
+    await waitFor(() =>
+      expect(updateSacnConfigMock).toHaveBeenCalledWith(expect.objectContaining({ universe: 9 })),
+    )
+  })
+
   it('saves without pushing when the sender is not running', async () => {
     await renderPanel(sacnOpen())
 
@@ -839,6 +852,21 @@ describe('DmxOutputSettings ArtNet configuration', () => {
     await renderPanel(artNetOpen(), { artnet: true })
 
     commit(screen.getByPlaceholderText('127.0.0.1'), '10.0.0.9')
+
+    await waitFor(() =>
+      expect(updateArtNetConfigMock).toHaveBeenCalledWith(
+        expect.objectContaining({ host: '10.0.0.9' }),
+      ),
+    )
+  })
+
+  it('pushes the change to a sender started while it saved', async () => {
+    const releaseFirst = holdFirstPrefsWrite()
+    const store = await renderPanel(artNetOpen())
+
+    commit(screen.getByPlaceholderText('127.0.0.1'), '10.0.0.9')
+    act(() => store.set(senderArtNetEnabledAtom, true))
+    await releaseFirst()
 
     await waitFor(() =>
       expect(updateArtNetConfigMock).toHaveBeenCalledWith(
