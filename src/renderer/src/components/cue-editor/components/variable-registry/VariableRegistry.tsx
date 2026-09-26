@@ -110,6 +110,10 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
       return
     }
 
+    // The form does not show a variable's valid values. An edit keeps them while the type stays,
+    // since they name values of that type.
+    const keptValidValues =
+      editingVar?.validValues && editingVar.type === formData.type ? editingVar.validValues : null
     const newVar: VariableDefinition = {
       name: formData.name,
       type: formData.type as VariableType,
@@ -117,6 +121,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
       initialValue: formData.initialValue,
       description: formData.description,
       isParameter: formData.isParameter,
+      ...(keptValidValues && { validValues: keptValidValues }),
     }
 
     if (showDialog === 'group') {
