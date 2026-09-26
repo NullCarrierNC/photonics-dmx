@@ -109,55 +109,6 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Adds a new effect with a completion callback.
-   * The callback fires once no light is running or queued under the name, so a submission queued
-   * behind a running effect of the same name is told when its own run ends, together with any
-   * waiter the earlier submission registered.
-   *
-   * @param name The name of the effect
-   * @param effect The effect configuration
-   * @param onComplete Callback to fire when effect completes
-   * @param isPersistent If true, the effect re-queues itself after completing, until a later
-   *   submission of the same name is accepted
-   */
-  public addEffectWithCallback(
-    name: string,
-    effect: Effect,
-    onComplete: (cancelled: boolean) => void,
-    isPersistent: boolean = false,
-  ): void {
-    // Register the callback
-    this.effectCallbacks.add(name, onComplete)
-
-    // Add the effect normally
-    this.addEffect(name, effect, isPersistent)
-  }
-
-  /**
-   * Clears all effects and starts the given effect, with a completion callback.
-   * Same as setEffect but registers a callback that fires when the effect completes.
-   * Used by node cues when the first submission is blocking to avoid a visible black frame
-   * (clear and add happen in one tick via setEffect).
-   *
-   * @param name The name of the effect
-   * @param effect The effect configuration
-   * @param onComplete Callback to fire when effect completes
-   * @param isPersistent If true, the effect re-queues itself after completing, until a later
-   *   submission of the same name is accepted
-   */
-  public setEffectWithCallback(
-    name: string,
-    effect: Effect,
-    onComplete: (cancelled: boolean) => void,
-    isPersistent: boolean = false,
-  ): void {
-    // setEffect clears all effects (and their callbacks) first, so register AFTER it — registering
-    // before would immediately erase this callback and the completion would never fire.
-    this.setEffect(name, effect, isPersistent)
-    this.effectCallbacks.add(name, onComplete)
-  }
-
-  /**
    * Remove a completion callback for an effect.
    *
    * @param name The name of the effect

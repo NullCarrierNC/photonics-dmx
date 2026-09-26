@@ -80,8 +80,6 @@ const makeMockSequencer = (): jest.Mocked<ILightingController> =>
     addEffect: jest.fn(),
     replaceEffect: jest.fn(),
     setEffect: jest.fn(),
-    addEffectWithCallback: jest.fn(),
-    setEffectWithCallback: jest.fn(),
     addEffectUnblockedName: jest.fn().mockReturnValue(true),
     setEffectUnblockedName: jest.fn().mockReturnValue(true),
     addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),

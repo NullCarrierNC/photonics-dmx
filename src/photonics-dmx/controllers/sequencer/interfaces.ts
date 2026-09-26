@@ -410,30 +410,6 @@ export interface ILightingController {
   onMotionPatternsCleared(listener: () => void): () => void
 
   /**
-   * Add an effect with a completion callback.
-   * Callback is fired when the effect fully completes (including waitUntilTime) and no light is
-   * running or queued under the name, so a submission queued behind a running effect of the same
-   * name is told when its own run ends.
-   */
-  addEffectWithCallback(
-    name: string,
-    effect: Effect,
-    onComplete: (cancelled: boolean) => void,
-    isPersistent?: boolean,
-  ): void
-
-  /**
-   * Clears all effects and starts the given effect, with a completion callback.
-   * Same as setEffect but registers a callback that fires when the effect completes.
-   */
-  setEffectWithCallback(
-    name: string,
-    effect: Effect,
-    onComplete: (cancelled: boolean) => void,
-    isPersistent?: boolean,
-  ): void
-
-  /**
    * Remove a completion callback for an effect.
    */
   removeEffectCallback(name: string): void

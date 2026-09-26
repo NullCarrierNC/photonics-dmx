@@ -58,10 +58,10 @@ describe.each([
   it('cancels the waiter an effect holds when a set replaces the look', () => {
     withSubject((s) => {
       const first = jest.fn()
-      s.controller.addEffectWithCallback('first', s.effect(), first)
+      s.controller.addEffectUnblockedNameWithCallback('first', s.effect(), first)
       s.frame()
 
-      s.controller.setEffectWithCallback('second', s.effect(), jest.fn())
+      s.controller.setEffectUnblockedNameWithCallback('second', s.effect(), jest.fn())
       s.frame()
 
       expect(first).toHaveBeenCalledWith(true)
@@ -128,7 +128,7 @@ describe.each([
   it('cancels the waiter of an effect removed by name', () => {
     withSubject((s) => {
       const waiter = jest.fn()
-      s.controller.addEffectWithCallback('removed', s.effect(), waiter)
+      s.controller.addEffectUnblockedNameWithCallback('removed', s.effect(), waiter)
       s.frame()
 
       s.controller.removeEffect('removed', 0)
@@ -149,7 +149,7 @@ describe.each([
   it('cancels a held waiter on a zero-length blackout', () => {
     withSubject((s) => {
       const waiter = jest.fn()
-      s.controller.addEffectWithCallback('held', s.effect(), waiter)
+      s.controller.addEffectUnblockedNameWithCallback('held', s.effect(), waiter)
       s.frame()
 
       void s.controller.blackout(0)
@@ -162,7 +162,7 @@ describe.each([
   it('leaves an effect running when it is removed by name from another layer', () => {
     withSubject((s) => {
       const waiter = jest.fn()
-      s.controller.addEffectWithCallback('layered', s.effect(), waiter)
+      s.controller.addEffectUnblockedNameWithCallback('layered', s.effect(), waiter)
       s.frame()
 
       s.controller.removeEffect('layered', 7)

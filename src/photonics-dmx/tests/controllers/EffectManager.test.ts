@@ -1372,7 +1372,7 @@ describe('EffectManager', () => {
       expect(callbacks.size).toBe(0)
     })
 
-    it('setEffectWithCallback keeps the callback registered after the internal clear', () => {
+    it('setEffectUnblockedNameWithCallback keeps the callback registered after the internal clear', () => {
       const effect: Effect = {
         id: 'cb-effect',
         description: 'callback effect',
@@ -1391,11 +1391,10 @@ describe('EffectManager', () => {
         ],
       }
       const onComplete = jest.fn()
-      effectManager.setEffectWithCallback('cb-effect', effect, onComplete)
+      effectManager.setEffectUnblockedNameWithCallback('cb-effect', effect, onComplete)
 
       const callbacks = (effectManager as any).effectCallbacks as EffectCallbackRegistry
-      // setEffect clears callbacks internally, so registering before it (the old order) would have
-      // left this empty; the callback must survive to fire on completion.
+      // The set clears held callbacks as it runs, and this one is registered after that clear.
       expect(callbacks.get('cb-effect')).toEqual([onComplete])
     })
   })

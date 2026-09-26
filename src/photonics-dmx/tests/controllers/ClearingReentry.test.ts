@@ -46,7 +46,7 @@ describe('a cue submitted from a cancelled callback', () => {
     })
 
   it('reaches the rig', () => {
-    harness.sequencer.addEffectWithCallback(
+    harness.sequencer.addEffectUnblockedNameWithCallback(
       'blocking',
       look(RED, 1, 5000),
       (cancelled) => {

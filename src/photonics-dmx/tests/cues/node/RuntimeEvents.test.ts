@@ -55,15 +55,8 @@ describe('Runtime Event System', () => {
   beforeEach(() => {
     mockSequencer = {
       addEffect: jest.fn(),
-      addEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        // Simulate immediate completion for testing
-        setTimeout(() => callback(), 0)
-      }),
       removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
-      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        setTimeout(() => callback(), 0)
-      }),
       addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
         return true
@@ -1026,12 +1019,6 @@ describe('Runtime Event System', () => {
       // Mock that never calls the effect completion callback so the effect engine keeps activeContexts
       const neverCallMockSequencer = {
         ...mockSequencer,
-        addEffectWithCallback: jest.fn(
-          (_name: string, _effect: unknown, _callback: () => void) => {},
-        ),
-        setEffectWithCallback: jest.fn(
-          (_name: string, _effect: unknown, _callback: () => void) => {},
-        ),
         addEffectUnblockedNameWithCallback: jest.fn(
           (_name: string, _effect: unknown, _callback: () => void) => {
             return true

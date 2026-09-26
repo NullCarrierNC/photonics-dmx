@@ -33,22 +33,6 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
       recorded.push({ method: 'setEffect', name })
       return true
     },
-    addEffectWithCallback: (
-      name: string,
-      _effect: unknown,
-      callback: (cancelled: boolean) => void,
-    ) => {
-      recorded.push({ method: 'addEffect', name })
-      callback(false)
-    },
-    setEffectWithCallback: (
-      name: string,
-      _effect: unknown,
-      callback: (cancelled: boolean) => void,
-    ) => {
-      recorded.push({ method: 'setEffect', name })
-      callback(false)
-    },
     addEffectUnblockedNameWithCallback: (
       name: string,
       _effect: unknown,

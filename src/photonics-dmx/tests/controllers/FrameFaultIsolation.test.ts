@@ -39,11 +39,11 @@ describe('a completion callback that throws', () => {
   it('leaves the other callbacks on that frame to fire', () => {
     const fired: string[] = []
 
-    harness.sequencer.addEffectWithCallback('throws', lookOn(0, RED), () => {
+    harness.sequencer.addEffectUnblockedNameWithCallback('throws', lookOn(0, RED), () => {
       fired.push('throws')
       throw new Error('a waiter that faults')
     })
-    harness.sequencer.addEffectWithCallback('settles', lookOn(1, GREEN), () => {
+    harness.sequencer.addEffectUnblockedNameWithCallback('settles', lookOn(1, GREEN), () => {
       fired.push('settles')
     })
     harness.advanceBy(10)
@@ -54,7 +54,7 @@ describe('a completion callback that throws', () => {
   })
 
   it('keeps publishing on the frames that follow', () => {
-    harness.sequencer.addEffectWithCallback('throws', lookOn(0, RED), () => {
+    harness.sequencer.addEffectUnblockedNameWithCallback('throws', lookOn(0, RED), () => {
       throw new Error('a waiter that faults')
     })
     harness.advanceBy(10)

@@ -122,7 +122,7 @@ describe('a transition that waits for and until the same event', () => {
   it('takes one event to start and another to finish', () => {
     const h = createSequencerHarness({ frontCount: 1, backCount: 0 })
     const done = jest.fn()
-    h.sequencer.addEffectWithCallback(
+    h.sequencer.addEffectUnblockedNameWithCallback(
       'on-beats',
       getEffectSingleColor({
         color: { red: 255, green: 0, blue: 0, intensity: 255, opacity: 1, blendMode: 'replace' },
