@@ -441,6 +441,15 @@ export function unlistedIssue(value: string, choices: readonly string[]): ValueI
   return choices.includes(value) ? null : warning(`'${value}' is not one of this field's choices`)
 }
 
+/**
+ * Whether a raiser names one of the effects in `effectIds`. The schema refuses a raiser that names
+ * none, and one naming an effect the cue does not hold still loads.
+ */
+export function effectIdIssue(effectId: string, effectIds: readonly string[]): ValueIssue | null {
+  if (effectId === '') return error('Select an effect')
+  return unlistedIssue(effectId, effectIds)
+}
+
 /** Whether a bearing literal names a stage direction or a number of degrees. */
 export function bearingIssue(value: unknown): ValueIssue | null {
   if (typeof value === 'number') return Number.isFinite(value) ? null : warning('Not a bearing')

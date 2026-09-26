@@ -1,5 +1,6 @@
 import React, { useId } from 'react'
 import { unlistedIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import type { ValueIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import FieldIssue, { issueAttributes } from './FieldIssue'
 
 interface KnownValueSelectProps {
@@ -9,6 +10,8 @@ interface KnownValueSelectProps {
   onChange: (value: string) => void
   /** A first entry standing for no value, such as "-- Select Event --". */
   placeholder?: string
+  /** An issue the caller judged from the cue value rules, shown in place of the select's own. */
+  issue?: ValueIssue | null
 }
 
 /**
@@ -21,16 +24,19 @@ const KnownValueSelect: React.FC<KnownValueSelectProps> = ({
   options,
   onChange,
   placeholder,
+  issue: callerIssue,
 }) => {
   const issueId = useId()
   const listed = options.some((option) => option.value === value)
   const issue =
-    placeholder !== undefined && value === ''
-      ? null
-      : unlistedIssue(
-          value,
-          options.map((option) => option.value),
-        )
+    callerIssue !== undefined
+      ? callerIssue
+      : placeholder !== undefined && value === ''
+        ? null
+        : unlistedIssue(
+            value,
+            options.map((option) => option.value),
+          )
   return (
     <label className="flex flex-col font-medium">
       {label}
