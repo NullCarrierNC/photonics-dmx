@@ -59,15 +59,15 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_APP_VERSION]: {
     request: void
-    response: string
+    response: string | IpcErrorResult
   }
   [CONFIG.GET_VALIDATION_ERRORS]: {
     request: void
-    response: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>
+    response: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> | IpcErrorResult
   }
   [CONFIG.GET_CORRUPT_RECOVERY_EVENTS]: {
     request: void
-    response: { files: ConfigCorruptInfo[] }
+    response: { files: ConfigCorruptInfo[] } | IpcErrorResult
   }
   [CONFIG.GET_PREFS]: {
     request: void
@@ -79,7 +79,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ENABLED_CUE_GROUPS]: {
     request: void
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [CONFIG.SET_ENABLED_CUE_GROUPS]: {
     request: string[]
@@ -95,7 +95,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_AUDIO_CONFIG]: {
     request: void
-    response: AudioConfig | undefined
+    response: AudioConfig | undefined | IpcErrorResult
   }
   [CONFIG.SAVE_AUDIO_CONFIG]: {
     request: Partial<AudioConfig>
@@ -105,7 +105,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_AUDIO_ENABLED]: {
     request: void
-    response: boolean
+    response: boolean | IpcErrorResult
   }
   [CONFIG.SET_AUDIO_ENABLED]: {
     request: boolean
@@ -113,7 +113,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ENABLED_AUDIO_CUE_GROUPS]: {
     request: void
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS]: {
     request: string[]
@@ -121,7 +121,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DISABLED_YARG_CUES]: {
     request: void
-    response: Record<string, string[]>
+    response: Record<string, string[]> | IpcErrorResult
   }
   [CONFIG.SET_DISABLED_YARG_CUES]: {
     request: Record<string, string[]>
@@ -129,7 +129,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DISABLED_AUDIO_CUES]: {
     request: void
-    response: Record<string, string[]>
+    response: Record<string, string[]> | IpcErrorResult
   }
   [CONFIG.SET_DISABLED_AUDIO_CUES]: {
     request: Record<string, string[]>
@@ -137,7 +137,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ENABLED_YARG_MOTION_CUE_GROUPS]: {
     request: void
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS]: {
     request: string[]
@@ -145,7 +145,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DISABLED_YARG_MOTION_CUES]: {
     request: void
-    response: Record<string, string[]>
+    response: Record<string, string[]> | IpcErrorResult
   }
   [CONFIG.SET_DISABLED_YARG_MOTION_CUES]: {
     request: Record<string, string[]>
@@ -153,7 +153,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ENABLED_AUDIO_MOTION_CUE_GROUPS]: {
     request: void
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS]: {
     request: string[]
@@ -161,7 +161,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DISABLED_AUDIO_MOTION_CUES]: {
     request: void
-    response: Record<string, string[]>
+    response: Record<string, string[]> | IpcErrorResult
   }
   [CONFIG.SET_DISABLED_AUDIO_MOTION_CUES]: {
     request: Record<string, string[]>
@@ -169,7 +169,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ENABLED_RB3_CUE_GROUPS]: {
     request: void
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [CONFIG.SET_ENABLED_RB3_CUE_GROUPS]: {
     request: string[]
@@ -177,7 +177,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DISABLED_RB3_CUES]: {
     request: void
-    response: Record<string, string[]>
+    response: Record<string, string[]> | IpcErrorResult
   }
   [CONFIG.SET_DISABLED_RB3_CUES]: {
     request: Record<string, string[]>
@@ -185,7 +185,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ENABLED_RB3_MOTION_CUE_GROUPS]: {
     request: void
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [CONFIG.SET_ENABLED_RB3_MOTION_CUE_GROUPS]: {
     request: string[]
@@ -193,7 +193,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_DISABLED_RB3_MOTION_CUES]: {
     request: void
-    response: Record<string, string[]>
+    response: Record<string, string[]> | IpcErrorResult
   }
   [CONFIG.SET_DISABLED_RB3_MOTION_CUES]: {
     request: Record<string, string[]>
@@ -216,6 +216,7 @@ export interface ConfigInvokeMap {
           }>
         }
       | (IpcErrorResult & { activeCueType: null; secondaryCueType: null; cues: [] })
+      | IpcErrorResult
   }
   [CONFIG.SET_ACTIVE_AUDIO_CUE]: {
     request: AudioCueType
@@ -223,7 +224,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_AUDIO_GAME_MODE]: {
     request: void
-    response: AudioGameModeConfig
+    response: AudioGameModeConfig | IpcErrorResult
   }
   [CONFIG.SET_AUDIO_GAME_MODE]: {
     request: Partial<AudioGameModeConfig>
@@ -231,7 +232,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_MOTION_ENABLED]: {
     request: void
-    response: boolean
+    response: boolean | IpcErrorResult
   }
   [CONFIG.SET_MOTION_ENABLED]: {
     request: boolean
@@ -239,7 +240,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE]: {
     request: void
-    response: { groupId: string; cueId: string } | null
+    response: { groupId: string; cueId: string } | null | IpcErrorResult
   }
   [CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE]: {
     request: { groupId: string; cueId: string } | null
@@ -247,7 +248,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ACTIVE_YARG_MOTION_CUE]: {
     request: void
-    response: { groupId: string; cueId: string } | null
+    response: { groupId: string; cueId: string } | null | IpcErrorResult
   }
   [CONFIG.SET_ACTIVE_YARG_MOTION_CUE]: {
     request: { groupId: string; cueId: string } | null
@@ -255,7 +256,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_ACTIVE_RB3_MOTION_CUE]: {
     request: void
-    response: { groupId: string; cueId: string } | null
+    response: { groupId: string; cueId: string } | null | IpcErrorResult
   }
   [CONFIG.SET_ACTIVE_RB3_MOTION_CUE]: {
     request: { groupId: string; cueId: string } | null
@@ -263,7 +264,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_STAGE_KIT_PRIORITY]: {
     request: void
-    response: 'prefer-for-tracked' | 'random' | 'never'
+    response: 'prefer-for-tracked' | 'random' | 'never' | IpcErrorResult
   }
   [CONFIG.SET_STAGE_KIT_PRIORITY]: {
     request: 'prefer-for-tracked' | 'random' | 'never'

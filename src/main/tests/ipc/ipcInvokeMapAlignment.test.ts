@@ -5,7 +5,8 @@
  * The runtime `expect(true)` keeps Jest happy.
  *
  * If you change a request type in `ipcTypes.ts`, update the matching validator (and the tuple
- * here) so the contract stays narrow.
+ * here) so the contract stays narrow. A second assertion holds every response type that can carry
+ * a failure to the `IpcErrorResult` arm.
  */
 
 import { describe, expect, it } from '@jest/globals'
@@ -33,7 +34,7 @@ import {
   validateStageKitPriority,
   validateTestEffectPayload,
 } from '../../ipc/inputValidation'
-import type { IpcInvokeMap } from '../../../shared/ipcTypes'
+import type { IpcErrorResult, IpcInvokeMap } from '../../../shared/ipcTypes'
 import { CONFIG, EFFECTS, LIGHT, NODE_CUES, SHELL } from '../../../shared/ipcChannels'
 
 type ValidatorOk<F> = F extends (
@@ -44,6 +45,27 @@ type ValidatorOk<F> = F extends (
 
 type Assignable<A, B> = [A] extends [B] ? true : false
 type AssertTrue<T extends true> = T
+
+/** Invoke channels whose response type has no room for the failure `handleInvoke` can answer. */
+type MissingErrorArm = {
+  [K in keyof IpcInvokeMap]: IpcErrorResult extends IpcInvokeMap[K]['response'] ? never : K
+}[keyof IpcInvokeMap]
+
+/**
+ * The channels that answer every call with a value of their own, a throw included: the validate
+ * channels with a verdict and the simulation buttons with false.
+ */
+type AnswersEveryCall =
+  | typeof NODE_CUES.VALIDATE
+  | typeof EFFECTS.VALIDATE
+  | typeof LIGHT.STOP_TEST_EFFECT
+  | typeof LIGHT.SIMULATE_BEAT
+  | typeof LIGHT.SIMULATE_KEYFRAME
+  | typeof LIGHT.SIMULATE_MEASURE
+  | typeof LIGHT.SIMULATE_POST_PROCESSING
+
+// Every other invoke response admits the error arm, so a caller typed against it has to handle it.
+type ErrorArmAlignment = AssertTrue<Assignable<MissingErrorArm, AnswersEveryCall>>
 
 // Each tuple entry asserts that the validator's success value is assignable to the corresponding
 // `IpcInvokeMap[Channel]['request']`. A new mismatch will fail typecheck (not just lint).
@@ -281,5 +303,10 @@ describe('IpcInvokeMap ↔ inputValidation contract', () => {
       true,
     ]
     expect(_alignmentProof).toHaveLength(32)
+  })
+
+  it('types every other invoke response with the failure handleInvoke can answer', () => {
+    const errorArmProof: ErrorArmAlignment = true
+    expect(errorArmProof).toBe(true)
   })
 })

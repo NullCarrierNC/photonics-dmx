@@ -82,6 +82,14 @@ describe('SIMULATE_POST_PROCESSING', () => {
     expect(ctx.setVenuePostProcessing).toHaveBeenCalledWith('BlackAndWhite')
   })
 
+  it('answers false when the publisher throws applying the effect', async () => {
+    const ctx = setup()
+    ctx.setVenuePostProcessing.mockImplementation(() => {
+      throw new Error('publisher gone')
+    })
+    await expect(ctx.invoke({ state: 'BlackAndWhite' })).resolves.toBe(false)
+  })
+
   it('clears back to Default', async () => {
     const ctx = setup()
     await expect(ctx.invoke({ state: 'Default' })).resolves.toBe(true)

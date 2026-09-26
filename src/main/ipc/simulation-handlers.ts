@@ -192,7 +192,7 @@ export function setupSimulationHandlers(
   })
 
   // Drives the same publisher state the YARG listener feeds, so a real packet arriving later
-  // simply takes over.
+  // simply takes over. Answers false for a throw too, since the renderer reads a boolean.
   handleInvoke(ipcMain, LIGHT.SIMULATE_POST_PROCESSING, log, async (_, data: unknown) => {
     if (simulationRefusal() || !controllerManager.getIsInitialized()) return false
     const state = isPlainObject(data) ? data.state : undefined
@@ -200,8 +200,13 @@ export function setupSimulationHandlers(
       log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
       return false
     }
-    controllerManager.getVenueFrameProcessor().setVenuePostProcessing(state)
-    return true
+    try {
+      controllerManager.getVenueFrameProcessor().setVenuePostProcessing(state)
+      return true
+    } catch (error) {
+      log.error('Error simulating post-processing:', error)
+      return false
+    }
   })
 
   /** The timing events the simulate buttons fire, and what each tells the chains. */

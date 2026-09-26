@@ -3,6 +3,7 @@
  */
 import type { FixtureConfig } from '../../../photonics-dmx/types'
 import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
+import { orThrow } from './ipcResult'
 import type { MotionRuntimeDomain } from '../../../shared/ipc/common'
 
 // ---------------------------------------------------------------------------
@@ -17,7 +18,8 @@ export const getRunningMotionCue = (domain: MotionRuntimeDomain) =>
 // Stage kit
 // ---------------------------------------------------------------------------
 
-export const getStageKitPriority = () => window.api.invoke(CONFIG.GET_STAGE_KIT_PRIORITY, undefined)
+export const getStageKitPriority = () =>
+  window.api.invoke(CONFIG.GET_STAGE_KIT_PRIORITY, undefined).then(orThrow)
 
 export const setStageKitPriority = (priority: 'prefer-for-tracked' | 'random' | 'never') =>
   window.api.invoke(CONFIG.SET_STAGE_KIT_PRIORITY, priority)
@@ -35,7 +37,8 @@ export const setClockRate = (clockRate: number) =>
 // Master output (dimmer / blackout / strobe gate)
 // ---------------------------------------------------------------------------
 
-export const getMasterOutput = () => window.api.invoke(LIGHT.GET_MASTER_OUTPUT, undefined)
+export const getMasterOutput = () =>
+  window.api.invoke(LIGHT.GET_MASTER_OUTPUT, undefined).then(orThrow)
 
 /** Partial update: omitted fields are left as they are. Returns the resulting state. */
 export const setMasterOutput = (update: {

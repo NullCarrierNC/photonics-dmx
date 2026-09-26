@@ -19,10 +19,10 @@ export interface ListenerInvokeMap {
   }
   [CUE.RB3E_GET_MODE]: {
     request: void
-    response: 'direct' | 'cue' | 'none'
+    response: 'direct' | 'cue' | 'none' | IpcErrorResult
   }
   [CUE.RB3E_GET_STATS]: {
     request: void
-    response: Record<string, unknown> | null
+    response: Record<string, unknown> | null | IpcErrorResult
   }
 }

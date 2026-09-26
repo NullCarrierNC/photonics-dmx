@@ -95,31 +95,39 @@ export interface CueSelectionInvokeMap {
   }
   [LIGHT.GET_YARG_MOTION_CUE_GROUPS]: {
     request: void
-    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+    response:
+      | Array<{ id: string; name: string; description?: string; cueCount: number }>
+      | IpcErrorResult
   }
   [LIGHT.GET_AUDIO_MOTION_CUE_GROUPS]: {
     request: void
-    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+    response:
+      | Array<{ id: string; name: string; description?: string; cueCount: number }>
+      | IpcErrorResult
   }
   [LIGHT.GET_RB3_CUE_GROUPS]: {
     request: void
-    response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
+    response:
+      | Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
+      | IpcErrorResult
   }
   [LIGHT.GET_RB3_MOTION_CUE_GROUPS]: {
     request: void
-    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+    response:
+      | Array<{ id: string; name: string; description?: string; cueCount: number }>
+      | IpcErrorResult
   }
   [LIGHT.GET_AVAILABLE_YARG_MOTION_CUES]: {
     request: string | undefined
-    response: Array<{ id: string; name: string; description: string }>
+    response: Array<{ id: string; name: string; description: string }> | IpcErrorResult
   }
   [LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES]: {
     request: string | undefined
-    response: Array<{ id: string; name: string; description: string }>
+    response: Array<{ id: string; name: string; description: string }> | IpcErrorResult
   }
   [LIGHT.GET_AVAILABLE_RB3_MOTION_CUES]: {
     request: string | undefined
-    response: Array<{ id: string; name: string; description: string }>
+    response: Array<{ id: string; name: string; description: string }> | IpcErrorResult
   }
   [LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE]: {
     request: void
