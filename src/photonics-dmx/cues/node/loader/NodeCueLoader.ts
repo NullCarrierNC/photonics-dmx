@@ -12,13 +12,12 @@ import {
 import { CueRegistry } from '../../registries/CueRegistry'
 import { AudioCueRegistry, type AudioCueGroup } from '../../registries/AudioCueRegistry'
 import { AudioCueType } from '../../types/audioCueTypes'
-import { EffectRegistry } from '../runtime/EffectRegistry'
-import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
 import { migrateOlderNodeFile } from './migrateOlderNodeFile'
 import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
-import type { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import type { EffectReference } from '../../types/nodeCueTypes'
+import { buildEffectRegistry, type EffectFilesByMode } from './effectRegistryBuilder'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { BaseNodeFileLoader, BaseListSummary, BaseLoadResult } from './BaseNodeFileLoader'
@@ -79,11 +78,6 @@ interface FileRegistration {
   /** The effect files the file's cues reference, so a change to one loads the file again. */
   effectFileIds: string[]
 }
-
-/**
- * Effect files by group id per effect mode, read once and shared by every cue file built from it.
- */
-type EffectFilesByMode = Map<EffectMode, Promise<Map<string, EffectFile>>>
 
 const effectFileIdsOf = (file: NodeCueFile): string[] => [
   ...new Set(
@@ -211,10 +205,15 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     return this.resolveExistingCueFilePath(filePath)
   }
 
+  /**
+   * Write a file into a mode's folder and load it. A create-only save refuses a filename that is
+   * already taken, and any other save replaces the file at that path.
+   */
   public async saveFile(
     mode: NodeCueMode,
     filename: string,
     content: NodeCueFile,
+    options: { createOnly?: boolean } = {},
   ): Promise<{ success: boolean; path: string }> {
     if (content.mode !== mode) {
       throw new Error('File mode does not match payload mode.')
@@ -229,9 +228,13 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
-    this.assertNoConflictingGroupIdForPath(filePath, mode, content.group.id)
+    this.assertGroupIdFree(filePath, mode, content.group.id, 'Choose a different group ID.')
 
-    await this.writeSavedFile(filePath, JSON.stringify(content, null, 2))
+    await this.writeSavedFile(
+      filePath,
+      JSON.stringify(content, null, 2),
+      options.createOnly ?? false,
+    )
     await this.loadFile(mode, filePath)
 
     this.emit('changed', this.getSummary())
@@ -285,6 +288,13 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     const file = validation.data
+    // The file already holding the group id keeps it. A full load goes in name order.
+    this.assertGroupIdFree(
+      filePath,
+      mode,
+      file.group.id,
+      'Import this file to give it a group ID of its own.',
+    )
     // Per-cue compile failures go on the file's summary, where the cue editor lists them.
     const compileErrors: string[] = []
     await this.registerFile(filePath, mode, file, compileErrors)
@@ -461,33 +471,45 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.fileRegistrations.delete(filePath)
   }
 
+  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
+  private assertGroupIdFree(
+    filePath: string,
+    mode: NodeCueMode,
+    groupId: string,
+    advice: string,
+  ): void {
+    const holder = this.groupIdHolder(filePath, mode, groupId)
+    if (holder) {
+      throw new Error(
+        `The ${mode} cue file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
+      )
+    }
+  }
+
   /**
-   * Prevents two cue files in the same domain (yarg vs audio) from sharing one `group.id`,
-   * which would overwrite the other in the registry (see registerFile / unregisterGroup).
+   * The path of another registered file in the mode that holds this group id, if one does. Two
+   * files sharing one would overwrite each other in the registry (see registerFile).
    */
-  private assertNoConflictingGroupIdForPath(
+  private groupIdHolder(
     targetPath: string,
     mode: NodeCueMode,
     groupId: string,
-  ): void {
+  ): string | undefined {
     const normalizedTarget = path.resolve(targetPath)
     const key = groupId.trim().toLowerCase()
     if (!key) {
-      return
+      return undefined
     }
     for (const [registeredPath, reg] of this.fileRegistrations) {
-      if (reg.mode !== mode) {
-        continue
-      }
-      if (path.resolve(registeredPath) === normalizedTarget) {
-        continue
-      }
-      if (reg.groupId.trim().toLowerCase() === key) {
-        throw new Error(
-          `Another ${mode} cue file already uses group id '${groupId}'. Choose a different group ID.`,
-        )
+      if (
+        reg.mode === mode &&
+        path.resolve(registeredPath) !== normalizedTarget &&
+        reg.groupId.trim().toLowerCase() === key
+      ) {
+        return registeredPath
       }
     }
+    return undefined
   }
 
   protected removeRegistration(filePath: string): void {
@@ -539,58 +561,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       runtimeBroadcaster: this.options.runtimeBroadcaster,
       nodeCueDebug: this.nodeCueDebug,
       getNodeRuntimeCallbacks: this.options.getNodeRuntimeCallbacks,
-      buildEffectRegistry: (effects, mode) => this.buildEffectRegistry(effects, mode, effectFiles),
+      buildEffectRegistry: (effects, mode) =>
+        buildEffectRegistry(this.options.effectLoader, effects, mode, effectFiles),
     }
-  }
-
-  private async buildEffectRegistry(
-    effectReferences: EffectReference[],
-    mode: NodeCueMode,
-    effectFiles: EffectFilesByMode,
-  ): Promise<EffectRegistry> {
-    const registry = new EffectRegistry()
-
-    if (!this.options.effectLoader || effectReferences.length === 0) {
-      return registry
-    }
-
-    // Which effect tree this mode raises from is the domain's to say, not the loader's: RB3 folds
-    // onto the yarg tree, and a mode added later brings its own answer with its descriptor.
-    const effectLoaderMode: EffectMode = getCueDomain(mode).effectMode
-    let filesForMode = effectFiles.get(effectLoaderMode)
-    if (!filesForMode) {
-      filesForMode = this.options.effectLoader.readEffectFilesByGroupId(effectLoaderMode)
-      effectFiles.set(effectLoaderMode, filesForMode)
-    }
-    const effectFilesById = await filesForMode
-
-    for (const effectRef of effectReferences) {
-      try {
-        const effectFile = effectFilesById.get(effectRef.effectFileId)
-
-        if (!effectFile) {
-          log.warn(
-            `Effect file ${effectRef.effectFileId} not found, skipping effect ${effectRef.effectId}`,
-          )
-          continue
-        }
-
-        const effect = effectFile.effects.find((e) => e.id === effectRef.effectId)
-
-        if (!effect) {
-          log.warn(
-            `Effect ${effectRef.effectId} not found in file ${effectRef.effectFileId}, skipping`,
-          )
-          continue
-        }
-
-        const compiledEffect = EffectCompiler.compile(effect)
-        registry.registerEffect(effectRef.effectId, compiledEffect)
-      } catch (error) {
-        log.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)
-      }
-    }
-
-    return registry
   }
 }

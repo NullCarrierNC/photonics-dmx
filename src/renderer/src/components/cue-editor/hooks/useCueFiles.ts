@@ -45,7 +45,12 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
 import { useCueMetadata } from './useCueMetadata'
-import { isCueTypeSelectable, suggestNonConflictingGroupId } from '../lib/cueUtils'
+import {
+  basenamesLower,
+  groupIdsLower,
+  isCueTypeSelectable,
+  suggestNonConflictingGroupId,
+} from '../lib/cueUtils'
 import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('useCueFiles')
 
@@ -177,6 +182,7 @@ const useCueFiles = ({
     setSelectedCueId,
     setFilename,
     mode,
+    editorMode,
     cueKind,
     files,
     effectFiles,
@@ -190,44 +196,38 @@ const useCueFiles = ({
     onError,
   })
 
-  const existingGroupIdsForNewFileModal = useMemo(() => {
-    const list =
+  // The files already in the folder a new or imported file saves into.
+  const newFileFolder = useMemo(
+    () =>
       editorMode === 'effect'
         ? effectFiles.filter((f) => f.mode === mode)
-        : files.filter((f) => f.mode === mode)
-    return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
-  }, [editorMode, effectFiles, files, mode])
-
-  const existingGroupIdsForImportModal = useMemo(() => {
-    if (!pendingImport) {
-      return new Set<string>()
-    }
-    const list =
-      pendingImport.kind === 'effect'
-        ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
-        : files.filter((f) => f.mode === pendingImport.saveMode)
-    return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
+        : files.filter((f) => f.mode === mode),
+    [editorMode, effectFiles, files, mode],
+  )
+  const importFolder = useMemo(() => {
+    if (!pendingImport) return []
+    return pendingImport.kind === 'effect'
+      ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
+      : files.filter((f) => f.mode === pendingImport.saveMode)
   }, [pendingImport, effectFiles, files])
 
-  const existingFilenamesLowerForImportModal = useMemo(() => {
-    if (!pendingImport) {
-      return new Set<string>()
-    }
-    const list =
-      pendingImport.kind === 'effect'
-        ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
-        : files.filter((f) => f.mode === pendingImport.saveMode)
-    return new Set(
-      list.map((f) => {
-        const base = f.path.split(/[/\\]/).pop() ?? ''
-        return base.toLowerCase()
-      }),
-    )
-  }, [pendingImport, effectFiles, files])
+  const existingGroupIdsForNewFileModal = useMemo(
+    () => groupIdsLower(newFileFolder),
+    [newFileFolder],
+  )
+  const existingFilenamesLowerForNewFileModal = useMemo(
+    () => basenamesLower(newFileFolder),
+    [newFileFolder],
+  )
+  const existingGroupIdsForImportModal = useMemo(() => groupIdsLower(importFolder), [importFolder])
+  const existingFilenamesLowerForImportModal = useMemo(
+    () => basenamesLower(importFolder),
+    [importFolder],
+  )
 
   const handleImport = useCallback(async () => {
     try {
-      if (editorDoc?.mode === 'effect') {
+      if (editorMode === 'effect') {
         const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
         const result = await pickEffectImportFile(effectMode)
         if (!result.success) {
@@ -273,7 +273,7 @@ const useCueFiles = ({
       log.error('Failed to import a cue file', error)
       onError?.(`Failed to import: ${error instanceof Error ? error.message : String(error)}`)
     }
-  }, [editorDoc?.mode, mode, effectFiles, files, onError])
+  }, [editorMode, mode, effectFiles, files, onError])
 
   const clearPendingImport = useCallback(() => {
     setPendingImport(null)
@@ -306,9 +306,10 @@ const useCueFiles = ({
             mode: cuePayload.mode,
             filename: saveFilename,
             content: cuePayload,
+            createOnly: true,
           })
           if (!response.success) {
-            onError?.(`Failed to save imported cue: ${saveFilename}`)
+            onError?.(`Failed to save imported cue: ${response.error}`)
             return
           }
           await refreshFiles()
@@ -330,9 +331,10 @@ const useCueFiles = ({
             mode: effectPayload.mode,
             filename: saveFilename,
             content: effectPayload,
+            createOnly: true,
           })
           if (!response.success) {
-            onError?.(`Failed to save imported effect: ${saveFilename}`)
+            onError?.(`Failed to save imported effect: ${response.error}`)
             return
           }
           await refreshEffectFiles()
@@ -586,6 +588,7 @@ const useCueFiles = ({
     handleReload: fileIO.handleReload,
     revertCurrentFileToDisk: fileIO.revertCurrentFileToDisk,
     existingGroupIdsForNewFileModal,
+    existingFilenamesLowerForNewFileModal,
     pendingImport,
     clearPendingImport,
     commitPendingImport,

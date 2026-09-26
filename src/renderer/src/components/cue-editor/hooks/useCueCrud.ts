@@ -14,14 +14,14 @@ import type {
   AudioEffectFile,
   EffectMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { EditorDocument } from '../lib/types'
+import type { EditorDocument, EditorMode } from '../lib/types'
 import {
   createBlankCue,
   createDefaultFile,
   createDefaultEffectFile,
   createDefaultEffect,
 } from '../lib/cueDefaults'
-import { firstByName } from '../lib/cueUtils'
+import { fileBasename, firstByName } from '../lib/cueUtils'
 import {
   modeKeyFor,
   setLastActiveMode,
@@ -39,6 +39,8 @@ export type UseCueCrudParams = {
   setSelectedCueId: (id: string | null) => void
   setFilename: React.Dispatch<React.SetStateAction<string>>
   mode: NodeCueMode
+  /** The tab showing, which decides whether a new file holds cues or effects. */
+  editorMode: EditorMode
   /** Lighting vs motion for new cues and blank files (both YARG and Audio). */
   cueKind: NodeCueKind
   files: NodeCueFileSummary[]
@@ -67,6 +69,7 @@ export function useCueCrud({
   setSelectedCueId,
   setFilename,
   mode,
+  editorMode,
   cueKind,
   files,
   effectFiles,
@@ -97,21 +100,24 @@ export function useCueCrud({
       itemName: string
       itemDescription: string
     }) => {
-      const isInEffectMode = editorDoc?.mode === 'effect'
+      const isInEffectMode = editorMode === 'effect'
+      const kindLabel = isInEffectMode ? 'Effect' : 'Cue'
+      const summaries = isInEffectMode
+        ? effectFiles.filter((f) => f.mode === mode)
+        : files.filter((f) => f.mode === mode)
       const newIdKey = metadata.groupId.trim().toLowerCase()
-      if (newIdKey) {
-        const summaries = isInEffectMode
-          ? effectFiles.filter((f) => f.mode === mode)
-          : files.filter((f) => f.mode === mode)
-        const taken = summaries.some((s) => s.groupId.trim().toLowerCase() === newIdKey)
-        if (taken) {
-          onError?.(
-            isInEffectMode
-              ? `Effect group ID "${metadata.groupId.trim()}" is already in use. Choose a different ID.`
-              : `Cue group ID "${metadata.groupId.trim()}" is already in use. Choose a different ID.`,
-          )
-          return
-        }
+      if (newIdKey && summaries.some((s) => s.groupId.trim().toLowerCase() === newIdKey)) {
+        onError?.(
+          `${kindLabel} group ID "${metadata.groupId.trim()}" is already in use. Choose a different ID.`,
+        )
+        return
+      }
+      const newFilenameKey = `${metadata.groupId}.json`.toLowerCase()
+      if (summaries.some((s) => fileBasename(s.path).toLowerCase() === newFilenameKey)) {
+        onError?.(
+          `A ${kindLabel.toLowerCase()} file named "${metadata.groupId}.json" already exists. Choose a different ID.`,
+        )
+        return
       }
 
       if (isInEffectMode) {
@@ -132,7 +138,12 @@ export function useCueCrud({
             return
           }
 
-          const response = await saveEffectFile({ mode: file.mode, filename, content: file })
+          const response = await saveEffectFile({
+            mode: file.mode,
+            filename,
+            content: file,
+            createOnly: true,
+          })
           if (!response.success) {
             onError?.('Failed to save: ' + response.error)
             return
@@ -167,7 +178,12 @@ export function useCueCrud({
             return
           }
 
-          const response = await saveNodeCueFile({ mode: file.mode, filename, content: file })
+          const response = await saveNodeCueFile({
+            mode: file.mode,
+            filename,
+            content: file,
+            createOnly: true,
+          })
           if (!response.success) {
             onError?.('Failed to save: ' + response.error)
             return
@@ -187,7 +203,7 @@ export function useCueCrud({
       }
     },
     [
-      editorDoc?.mode,
+      editorMode,
       mode,
       cueKind,
       files,
@@ -206,26 +222,31 @@ export function useCueCrud({
   )
 
   const handleAddCue = useCallback(() => {
-    if (!editorDoc) setFilename('untitled.json')
-    const baseDoc = editorDoc ?? {
-      mode: 'cue' as const,
-      file: createDefaultFile(mode, cueKind),
-      path: null,
+    if (!editorDoc) {
+      // A new document holds the one blank cue the default file carries, and is named after its
+      // group until the first save creates the file.
+      const file = createDefaultFile(mode, cueKind)
+      const newCue = file.cues[0]
+      setFilename(`${file.group.id}.json`)
+      setEditorDoc({ mode: 'cue', file, path: null })
+      setSelectedCueId(newCue?.id ?? null)
+      loadCueIntoFlow(newCue ?? null)
+      setIsDirty(true)
+      return
     }
 
-    if (baseDoc.mode === 'effect') {
+    if (editorDoc.mode === 'effect') {
       log.warn('Cannot add cue in effect mode')
       return
     }
 
     const newCue = createBlankCue(mode, cueKind)
-    const baseCueFile = baseDoc.file
-    const updatedCues = [...baseCueFile.cues, newCue]
+    const updatedCues = [...editorDoc.file.cues, newCue]
     const updatedFile =
       mode === 'yarg'
-        ? ({ ...baseDoc.file, cues: updatedCues as NetNodeCueDefinition[] } as NetNodeCueFile)
-        : ({ ...baseDoc.file, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
-    const updatedDoc: EditorDocument = { ...baseDoc, file: updatedFile }
+        ? ({ ...editorDoc.file, cues: updatedCues as NetNodeCueDefinition[] } as NetNodeCueFile)
+        : ({ ...editorDoc.file, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
+    const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
     setEditorDoc(updatedDoc)
     setSelectedCueId(newCue.id)
     loadCueIntoFlow(newCue as NetNodeCueDefinition | AudioNodeCueDefinition)
@@ -242,32 +263,35 @@ export function useCueCrud({
   ])
 
   const handleAddEffect = useCallback(() => {
-    if (!editorDoc) setFilename('untitled.json')
-    const baseDoc = editorDoc ?? {
-      mode: 'effect' as const,
-      file: createDefaultEffectFile(mode as EffectMode),
-      path: null,
+    if (!editorDoc) {
+      const file = createDefaultEffectFile(mode as EffectMode)
+      const newEffect = file.effects[0]
+      setFilename(`${file.group.id}.json`)
+      setEditorDoc({ mode: 'effect', file, path: null })
+      setSelectedCueId(newEffect?.id ?? null)
+      loadCueIntoFlow(newEffect ?? null)
+      setIsDirty(true)
+      return
     }
 
-    if (baseDoc.mode === 'cue') {
+    if (editorDoc.mode === 'cue') {
       log.warn('Cannot add effect in cue mode')
       return
     }
 
     const newEffect = createDefaultEffect(mode as EffectMode)
-    const baseEffectFile = baseDoc.file
-    const updatedEffects = [...baseEffectFile.effects, newEffect]
+    const updatedEffects = [...editorDoc.file.effects, newEffect]
     const updatedFile =
       mode === 'yarg'
         ? ({
-            ...baseDoc.file,
+            ...editorDoc.file,
             effects: updatedEffects as YargEffectDefinition[],
           } as YargEffectFile)
         : ({
-            ...baseDoc.file,
+            ...editorDoc.file,
             effects: updatedEffects as AudioEffectDefinition[],
           } as AudioEffectFile)
-    const updatedDoc: EditorDocument = { ...baseDoc, file: updatedFile }
+    const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
     setEditorDoc(updatedDoc)
     setSelectedCueId(newEffect.id)
     loadCueIntoFlow(newEffect as YargEffectDefinition | AudioEffectDefinition)

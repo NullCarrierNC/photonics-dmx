@@ -41,7 +41,8 @@ export interface CueAuthoringInvokeMap {
     response: NodeCueFile | IpcErrorResult
   }
   [NODE_CUES.SAVE]: {
-    request: { mode: NodeCueMode; filename: string; content: NodeCueFile }
+    /** `createOnly` refuses a filename already taken in the mode's folder. */
+    request: { mode: NodeCueMode; filename: string; content: NodeCueFile; createOnly?: boolean }
     /** `groupEnableError` says the file saved but opting its group in failed. */
     response: { success: true; path: string; groupEnableError?: string } | IpcErrorResult
   }
@@ -60,6 +61,7 @@ export interface CueAuthoringInvokeMap {
     response: string[] | IpcErrorResult
   }
   [NODE_CUES.IMPORT_PICK]: {
+    /** The tab the import is picked from. The response's `mode` is the folder it saves into. */
     request: NodeCueMode | undefined
     response:
       | { success: true; sourceBasename: string; mode: NodeCueMode; content: NodeCueFile }
@@ -84,7 +86,8 @@ export interface CueAuthoringInvokeMap {
     response: EffectFile | IpcErrorResult
   }
   [EFFECTS.SAVE]: {
-    request: { mode: EffectMode; filename: string; content: EffectFile }
+    /** `createOnly` refuses a filename already taken in the mode's folder. */
+    request: { mode: EffectMode; filename: string; content: EffectFile; createOnly?: boolean }
     response: { success: true; path: string } | IpcErrorResult
   }
   [EFFECTS.DELETE]: {
@@ -98,6 +101,7 @@ export interface CueAuthoringInvokeMap {
       | { valid: false; errors: string[] }
   }
   [EFFECTS.IMPORT_PICK]: {
+    /** The tab the import is picked from. The response's `mode` is the folder it saves into. */
     request: EffectMode | undefined
     response:
       | { success: true; sourceBasename: string; mode: EffectMode; content: EffectFile }

@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import { validateEffectFile } from '../schema/validation'
+import { validateEffectFile, validateEffectFileInFolder } from '../schema/validation'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import { migrateOlderNodeFile } from './migrateOlderNodeFile'
 import { EffectFile, EffectMode } from '../../types/nodeCueTypes'
@@ -35,6 +35,9 @@ interface EffectLoaderOptions {
 }
 
 export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSummary> {
+  /** The group id each loaded effect file holds, by path. A file refused at load holds none. */
+  private readonly groupHolders = new Map<string, { mode: EffectMode; groupId: string }>()
+
   constructor(options: EffectLoaderOptions) {
     super(options.baseDir, 'effects', ['yarg', 'audio'])
   }
@@ -49,7 +52,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed: unknown = JSON.parse(data)
     migrateOlderNodeFile(parsed)
-    const validation = validateEffectFile(parsed)
+    const validation = validateEffectFileInFolder(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(`Invalid effect file: ${validation.errors.join(', ')}`)
@@ -71,10 +74,15 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return this.resolveExistingEffectFilePath(filePath)
   }
 
+  /**
+   * Write a file into a mode's folder and load it. A create-only save refuses a filename that is
+   * already taken, and any other save replaces the file at that path.
+   */
   public async saveFile(
     mode: EffectMode,
     filename: string,
     content: EffectFile,
+    options: { createOnly?: boolean } = {},
   ): Promise<{ success: boolean; path: string }> {
     if (content.mode !== mode) {
       throw new Error('File mode does not match payload mode.')
@@ -89,9 +97,13 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
-    this.assertNoConflictingEffectGroupIdForPath(filePath, mode, content.group.id)
+    this.assertGroupIdFree(filePath, mode, content.group.id, 'Choose a different group ID.')
 
-    await this.writeSavedFile(filePath, JSON.stringify(content, null, 2))
+    await this.writeSavedFile(
+      filePath,
+      JSON.stringify(content, null, 2),
+      options.createOnly ?? false,
+    )
     await this.loadFile(mode, filePath)
 
     this.emit('changed', this.getSummary())
@@ -106,14 +118,15 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     }
 
     await fs.rm(resolvedPath, { force: true })
-    this.removeSummary(resolvedPath)
+    this.removeRegistration(resolvedPath)
     this.emit('changed', this.getSummary())
     return { success: true }
   }
 
   /**
    * Every valid effect file of a mode by group id, read from disk in one pass. Invalid files are
-   * skipped, and the first file in name order keeps a group id two files share.
+   * skipped. A group id two files share goes to the file the loader let hold it, or else to the
+   * first in name order.
    */
   public async readEffectFilesByGroupId(mode: EffectMode): Promise<Map<string, EffectFile>> {
     const dir = this.dirs[mode]
@@ -125,7 +138,11 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
         continue
       }
       try {
-        const effectFile = await this.readFile(path.join(dir, file))
+        const filePath = path.join(dir, file)
+        const effectFile = await this.readFile(filePath)
+        if (this.groupIdHolder(filePath, mode, effectFile.group.id)) {
+          continue
+        }
         if (!byGroupId.has(effectFile.group.id)) {
           byGroupId.set(effectFile.group.id, effectFile)
         }
@@ -138,10 +155,11 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   }
 
   protected async loadFile(mode: EffectMode, filePath: string): Promise<EffectFileSummary | null> {
+    this.groupHolders.delete(path.resolve(filePath))
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
     const migrations = migrateOlderNodeFile(parsed)
-    const validation = validateEffectFile(parsed)
+    const validation = validateEffectFileInFolder(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(validation.errors.join(', '))
@@ -157,6 +175,15 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
         updatedAt: Date.now(),
       } as EffectFileSummary
     }
+
+    // The file already holding the group id keeps it. A full load goes in name order.
+    this.assertGroupIdFree(
+      filePath,
+      mode,
+      file.group.id,
+      'Import this file to give it a group ID of its own.',
+    )
+    this.groupHolders.set(path.resolve(filePath), { mode, groupId: file.group.id })
 
     // Compile each effect at load (and so at save, which calls loadFile) so invalid action
     // payloads surface on the file summary for the editor rather than only at runtime when a
@@ -191,31 +218,42 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return summary
   }
 
-  /** Two effect JSON files in the same mode must not share the same `group.id`. */
-  private assertNoConflictingEffectGroupIdForPath(
-    targetPath: string,
+  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
+  private assertGroupIdFree(
+    filePath: string,
     mode: EffectMode,
     groupId: string,
+    advice: string,
   ): void {
-    const normalizedTarget = path.resolve(targetPath)
-    const key = groupId.trim().toLowerCase()
-    if (!key) {
-      return
-    }
-    const summaries = this.summaries[mode]
-    for (const s of summaries) {
-      if (path.resolve(s.path) === normalizedTarget) {
-        continue
-      }
-      if (s.groupId.trim().toLowerCase() === key) {
-        throw new Error(
-          `Another ${mode} effect file already uses group id '${groupId}'. Choose a different group ID.`,
-        )
-      }
+    const holder = this.groupIdHolder(filePath, mode, groupId)
+    if (holder) {
+      throw new Error(
+        `The ${mode} effect file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
+      )
     }
   }
 
+  /** The path of another loaded file in the mode that holds this group id, if one does. */
+  private groupIdHolder(targetPath: string, mode: EffectMode, groupId: string): string | undefined {
+    const normalizedTarget = path.resolve(targetPath)
+    const key = groupId.trim().toLowerCase()
+    if (!key) {
+      return undefined
+    }
+    for (const [holderPath, holder] of this.groupHolders) {
+      if (
+        holder.mode === mode &&
+        holderPath !== normalizedTarget &&
+        holder.groupId.trim().toLowerCase() === key
+      ) {
+        return holderPath
+      }
+    }
+    return undefined
+  }
+
   protected removeRegistration(filePath: string): void {
+    this.groupHolders.delete(path.resolve(filePath))
     this.removeSummary(filePath)
   }
 

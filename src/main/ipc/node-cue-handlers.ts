@@ -18,6 +18,7 @@ import {
   validateCueFileCheckPayload,
   validateCueFilePath,
   validateCueTypesPayload,
+  validateImportPickMode,
   validateNodeCueSavePayload,
 } from './inputValidation'
 
@@ -88,7 +89,9 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: validation.error }
     }
     const payload = validation.value
-    const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
+    const result = await loader.saveFile(payload.mode, payload.filename, payload.content, {
+      createOnly: payload.createOnly,
+    })
     try {
       await persistGroupEnableAfterNodeCueSave(
         controllerManager,
@@ -141,6 +144,10 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
   })
 
   handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: unknown) => {
+    const tab = validateImportPickMode(preferredMode, ensureLoader(controllerManager).getModes())
+    if (!tab.ok) {
+      return { success: false, error: tab.error }
+    }
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
@@ -163,7 +170,8 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: validation.errors.join(', ') }
     }
 
-    const mode = preferredMode ?? validation.mode
+    // The file lands in its own mode's folder, except on the rb3 tab, which re-stamps it as rb3.
+    const mode: NodeCueMode = tab.value === 'rb3' ? 'rb3' : validation.mode
     return {
       success: true,
       sourceBasename: path.basename(sourcePath),

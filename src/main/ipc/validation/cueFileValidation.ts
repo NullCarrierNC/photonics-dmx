@@ -17,7 +17,13 @@ import { isNonEmptyString, isPlainObject, validateStringUnion } from './primitiv
 
 const NODE_CUE_KINDS: readonly NodeCueKind[] = ['lighting', 'motion']
 
-type FileSavePayload<Mode, File> = { mode: Mode; filename: string; content: File }
+/** A save that is `createOnly` refuses a filename already taken in the mode's folder. */
+type FileSavePayload<Mode, File> = {
+  mode: Mode
+  filename: string
+  content: File
+  createOnly: boolean
+}
 
 function validateFileSavePayload<Mode extends string, File>(
   value: unknown,
@@ -36,9 +42,17 @@ function validateFileSavePayload<Mode extends string, File>(
   if (!isPlainObject(value.content)) {
     return { ok: false, error: 'content must be an object' }
   }
+  if (value.createOnly !== undefined && typeof value.createOnly !== 'boolean') {
+    return { ok: false, error: 'createOnly must be a boolean' }
+  }
   return {
     ok: true,
-    value: { mode: mode.value, filename: value.filename, content: value.content as File },
+    value: {
+      mode: mode.value,
+      filename: value.filename,
+      content: value.content as File,
+      createOnly: value.createOnly ?? false,
+    },
   }
 }
 
@@ -103,4 +117,15 @@ export function validateCueFileCheckPayload(
     return filePath.ok ? { ok: true, value: { path: filePath.value } } : filePath
   }
   return { ok: false, error: 'Validation payload must include either content or path.' }
+}
+
+/** The tab an import is picked from: absent, or one of the modes the loader offers. */
+export function validateImportPickMode<Mode extends string>(
+  value: unknown,
+  modes: readonly Mode[],
+): ValidationResult<Mode | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined }
+  }
+  return validateStringUnion(value, modes, 'mode')
 }

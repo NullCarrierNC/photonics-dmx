@@ -148,7 +148,7 @@ describe('EffectLoader.saveFile group id uniqueness', () => {
     const minimal = minimalYargEffectFixture('dup-effect-group')
     await loader.saveFile('yarg', 'a.json', minimal)
     await expect(loader.saveFile('yarg', 'b.json', minimal)).rejects.toThrow(
-      /already uses group id/,
+      "The yarg effect file a.json already uses group id 'dup-effect-group'.",
     )
   })
 
@@ -158,6 +158,53 @@ describe('EffectLoader.saveFile group id uniqueness', () => {
     await expect(loader.saveFile('yarg', 'only.json', minimal)).resolves.toMatchObject({
       success: true,
     })
+  })
+
+  it('refuses a create-only save over an existing file and leaves it as it was', async () => {
+    await loader.saveFile('yarg', 'show.json', minimalYargEffectFixture('friday-show'))
+    const target = path.join(tmpDir, 'node-data', 'effects', 'yarg', 'show.json')
+    const before = fs.readFileSync(target, 'utf-8')
+
+    await expect(
+      loader.saveFile('yarg', 'show.json', minimalYargEffectFixture('show'), { createOnly: true }),
+    ).rejects.toThrow(/already exists/)
+    expect(fs.readFileSync(target, 'utf-8')).toBe(before)
+  })
+})
+
+describe('EffectLoader folder mode', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+  let yargDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-folder-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+    yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    const audioFile = {
+      ...minimalYargEffectFixture('misplaced'),
+      mode: 'audio',
+      effects: [{ ...minimalYargEffectFixture('misplaced').effects[0]!, mode: 'audio' }],
+    }
+    fs.writeFileSync(path.join(yargDir, 'pulse.json'), JSON.stringify(audioFile), 'utf-8')
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('refuses to read a file whose mode is not its folder', async () => {
+    await expect(loader.readFile(path.join(yargDir, 'pulse.json'))).rejects.toThrow(
+      /Invalid effect file/,
+    )
+  })
+
+  it('lists a file whose mode is not its folder with its errors', async () => {
+    await loader.loadAll()
+
+    const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('pulse.json'))
+    expect(summary?.errors?.join(' ')).toMatch(/mode/)
   })
 })
 
@@ -225,5 +272,56 @@ describe('EffectLoader watcher reports', () => {
 
     expect(changes).toHaveBeenCalledTimes(2)
     expect(loader.getSummary().yarg[0].groupName).toBe('Edited')
+  })
+})
+
+describe('EffectLoader with a group id two files on disk share', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+  let yargDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-shared-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+    yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  /** An effect file in the shared group whose one effect has the given name. */
+  function writeEffectFile(name: string, effectName: string): void {
+    const file = minimalYargEffectFixture('shared-effects')
+    file.effects = file.effects.map((effect) => ({ ...effect, name: effectName }))
+    fs.writeFileSync(path.join(yargDir, name), JSON.stringify(file), 'utf-8')
+  }
+
+  it('loads the first in name order and refuses the other, naming the file that holds it', async () => {
+    writeEffectFile('a.json', 'From a')
+    writeEffectFile('b.json', 'From b')
+
+    const result = await loader.loadAll()
+
+    expect(result.errors).toEqual([
+      "b.json: The yarg effect file a.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+    ])
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+    expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From a')
+  })
+
+  it('hands cue builds the file holding the id when an earlier-named file arrives', async () => {
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    writeEffectFile('a.json', 'From a')
+    const result = await loader.reload()
+
+    expect(result.errors).toEqual([
+      "a.json: The yarg effect file b.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+    ])
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+    expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From b')
   })
 })

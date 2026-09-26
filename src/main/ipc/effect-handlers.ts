@@ -11,6 +11,7 @@ import {
   validateCueFileCheckPayload,
   validateCueFilePath,
   validateEffectSavePayload,
+  validateImportPickMode,
 } from './inputValidation'
 
 const log = createLogger('effect-handlers')
@@ -49,8 +50,8 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     if (!validation.ok) {
       return { success: false, error: validation.error }
     }
-    const { mode, filename, content } = validation.value
-    return loader.saveFile(mode, filename, content)
+    const { mode, filename, content, createOnly } = validation.value
+    return loader.saveFile(mode, filename, content, { createOnly })
   })
 
   handleInvoke(ipcMain, EFFECTS.DELETE, log, async (_event, data: unknown) => {
@@ -81,6 +82,10 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
   })
 
   handleInvoke(ipcMain, EFFECTS.IMPORT_PICK, log, async (_event, preferredMode?: unknown) => {
+    const tab = validateImportPickMode(preferredMode, ensureLoader(controllerManager).getModes())
+    if (!tab.ok) {
+      return { success: false, error: tab.error }
+    }
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
@@ -107,11 +112,11 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: false, error: 'Effect file has no mode specified.' }
     }
 
-    const mode = preferredMode ?? validation.mode
+    // An effect file always lands in the folder of its own mode, whichever tab picked it.
     return {
       success: true,
       sourceBasename: path.basename(sourcePath),
-      mode,
+      mode: validation.mode,
       content: validation.data,
     }
   })

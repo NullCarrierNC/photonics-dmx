@@ -256,10 +256,26 @@ export abstract class BaseNodeFileLoader<
     }
   }
 
-  /** Write a file a save produced, noting what was written for {@link isOwnSave}. */
-  protected async writeSavedFile(filePath: string, contents: string): Promise<void> {
+  /**
+   * Write a file a save produced, noting what was written for {@link isOwnSave}. A create-only
+   * write refuses a path that already holds a file.
+   */
+  protected async writeSavedFile(
+    filePath: string,
+    contents: string,
+    createOnly: boolean,
+  ): Promise<void> {
     await fs.mkdir(path.dirname(filePath), { recursive: true })
-    await fs.writeFile(filePath, contents, 'utf-8')
+    try {
+      await fs.writeFile(filePath, contents, { encoding: 'utf-8', flag: createOnly ? 'wx' : 'w' })
+    } catch (error) {
+      if (createOnly && error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+        throw new Error(
+          `A file named '${path.basename(filePath)}' already exists. Choose a different name.`,
+        )
+      }
+      throw error
+    }
     this.savedContents.set(path.resolve(filePath), contents)
   }
 
@@ -269,7 +285,7 @@ export abstract class BaseNodeFileLoader<
    */
   protected async writeMigratedFile(filePath: string, data: unknown): Promise<void> {
     try {
-      await this.writeSavedFile(filePath, JSON.stringify(data, null, 2))
+      await this.writeSavedFile(filePath, JSON.stringify(data, null, 2), false)
     } catch (error) {
       log.warn('Could not save the brought-forward file', filePath, error)
     }

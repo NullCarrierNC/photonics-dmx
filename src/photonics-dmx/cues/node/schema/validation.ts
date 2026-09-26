@@ -403,6 +403,22 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
 export const validateAudioEffectFile = (value: unknown): EffectValidationResult<AudioEffectFile> =>
   validateEffectFileForMode<AudioEffectFile>('audio', validateAudioEffectSchema, value)
 
+/**
+ * Validate against one effect tree's rules, for the loader, which takes the mode from the file's
+ * folder. A file declaring the other mode fails that tree's envelope.
+ */
+export const validateEffectFileInFolder = (
+  mode: EffectMode,
+  value: unknown,
+): EffectValidationResult => {
+  switch (mode) {
+    case 'yarg':
+      return validateYargEffectFile(value)
+    case 'audio':
+      return validateAudioEffectFile(value)
+  }
+}
+
 export const validateEffectFile = (value: unknown): EffectValidationResult => {
   if (!value || typeof value !== 'object') {
     return {

@@ -64,6 +64,19 @@ export function replaceEffectInFile<F extends EffectFile>(
   return updateEffectInFile(file, effectId, () => updated)
 }
 
+/** The last segment of a file path, on either separator. */
+export function fileBasename(filePath: string): string {
+  return filePath.split(/[/\\]/).pop() ?? filePath
+}
+
+/** The group ids of some files, compared the way the files store them. */
+export const groupIdsLower = (summaries: readonly { groupId: string }[]): Set<string> =>
+  new Set(summaries.map((f) => f.groupId.trim().toLowerCase()))
+
+/** The basenames of some files, lowercased for a case-insensitive name check. */
+export const basenamesLower = (summaries: readonly { path: string }[]): Set<string> =>
+  new Set(summaries.map((f) => fileBasename(f.path).toLowerCase()))
+
 /** The document as the user's own file at `path`, which a newer shipped version never replaces. */
 export function savedAsUserFile(doc: EditorDocument, path: string): EditorDocument {
   return doc.mode === 'cue'
