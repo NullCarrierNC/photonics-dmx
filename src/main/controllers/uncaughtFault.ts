@@ -55,13 +55,21 @@ export async function holdFailedAfterFault(
   log.error('Holding the lighting controllers failed and dark until they are restarted')
 
   const listeners = host.getListenerLifecycle()
+  const stopInputs = async (): Promise<void> => {
+    await boundedStep('Disabling YARG', () => listeners.yargRb3.disableYarg())
+    await boundedStep('Disabling RB3', () => listeners.yargRb3.disableRb3())
+    await boundedStep('Disabling audio', () => listeners.audio.disableAudio())
+  }
   await boundedStep('Leaving the console', async () => {
     await host.disableConsoleMode()
   })
   await boundedStep('Blackout', () => host.getChainFanout().blackout(0))
   await boundedStep('Waiting for the running toggle', () => lifecycle.awaitActiveOp())
   await boundedStep('Stopping the simulations', () => host.preemptSimulation())
-  await boundedStep('Disabling YARG', () => listeners.yargRb3.disableYarg())
-  await boundedStep('Disabling RB3', () => listeners.yargRb3.disableRb3())
-  await boundedStep('Disabling audio', () => listeners.audio.disableAudio())
+  await stopInputs()
+
+  // An enable or restart that outlasted its wait binds its input as it lands, so the inputs are
+  // stopped again once it settles, unless a restart has cleared the fault by then.
+  await lifecycle.awaitActiveOp()
+  if (lifecycle.isFaulted()) await stopInputs()
 }

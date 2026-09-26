@@ -172,10 +172,10 @@ describe('ControllerLifecycle', () => {
     })
   })
 
-  describe('setPhaseUnlessShuttingDown', () => {
+  describe('settlePhase', () => {
     it('moves the phase on while no shutdown has begun', () => {
       const lifecycle = new ControllerLifecycle(() => {})
-      lifecycle.setPhaseUnlessShuttingDown('running')
+      expect(lifecycle.settlePhase('running', lifecycle.faultMark())).toBe(true)
       expect(lifecycle.phase).toBe('running')
     })
 
@@ -183,8 +183,28 @@ describe('ControllerLifecycle', () => {
       const lifecycle = new ControllerLifecycle(() => {})
       lifecycle.setPhase('running')
       lifecycle.setPhase('shuttingDown')
-      lifecycle.setPhaseUnlessShuttingDown('running')
+      expect(lifecycle.settlePhase('running', lifecycle.faultMark())).toBe(false)
       expect(lifecycle.phase).toBe('shuttingDown')
+    })
+
+    it('holds a fault that arose after the work started', () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('restarting')
+      const mark = lifecycle.faultMark()
+      lifecycle.markFaulted()
+
+      expect(lifecycle.settlePhase('running', mark)).toBe(false)
+      expect(lifecycle.phase).toBe('failed')
+    })
+
+    it('clears a fault held before the work started', () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      lifecycle.markFaulted()
+      const mark = lifecycle.faultMark()
+
+      expect(lifecycle.settlePhase('running', mark)).toBe(true)
+      expect(lifecycle.faultedSince(mark)).toBe(false)
     })
   })
 

@@ -11,6 +11,7 @@ import {
 import { createLogger } from '../../shared/logger'
 import { restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
+import { FAULT_HELD_MESSAGE } from './ControllerLifecycle'
 
 const log = createLogger('ConsoleModeController')
 
@@ -80,15 +81,23 @@ export class ConsoleModeController {
       return { success: true }
     }
     const s = this.deps.getListenerSnapshot()
-    this.consoleRestore = { yarg: s.yarg, rb3: s.rb3, audio: this.deps.getIsAudioEnabled() }
-    if (this.consoleRestore.yarg) {
+    const restore = { yarg: s.yarg, rb3: s.rb3, audio: this.deps.getIsAudioEnabled() }
+    this.consoleRestore = restore
+    if (restore.yarg) {
       await this.deps.pauseYarg()
     }
-    if (this.consoleRestore.rb3) {
+    if (restore.rb3) {
       await this.deps.pauseRb3()
     }
-    if (this.consoleRestore.audio) {
+    if (restore.audio) {
       await this.deps.pauseAudio()
+    }
+    // Entry is admitted only while the controllers run, so `failed` here means an uncaught fault
+    // arose during it and the fault response has left the console. The entry stays closed, so the
+    // wire keeps the fault's blackout.
+    if (this.deps.getLifecyclePhase() === 'failed') {
+      this.consoleRestore = null
+      return { success: false, error: FAULT_HELD_MESSAGE }
     }
     this.deps.getDmxPublisher()?.setManualBuffer({})
     return { success: true }

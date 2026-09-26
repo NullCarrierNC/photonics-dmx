@@ -214,6 +214,7 @@ export class ControllerManager {
       )
     }
     this.lifecycle.assertPhase(['initializing', 'restarting', 'failed'], 'init')
+    const faultMark = this.lifecycle.faultMark()
 
     try {
       this.senderLifecycle.ensureSenderManager()
@@ -251,7 +252,7 @@ export class ControllerManager {
     }
 
     this.isInitialized = true
-    this.lifecycle.setPhaseUnlessShuttingDown('running')
+    this.lifecycle.settlePhase('running', faultMark)
   }
 
   /**
@@ -572,10 +573,9 @@ export class ControllerManager {
       if (this.lifecycle.phase !== 'running' && this.lifecycle.phase !== 'consoleMode') {
         return { success: false as const, error: CONSOLE_UNAVAILABLE_MESSAGE }
       }
+      const faultMark = this.lifecycle.faultMark()
       const r = await this.consoleMode.enableConsoleMode(rigId)
-      if (r.success) {
-        this.lifecycle.setPhaseUnlessShuttingDown('consoleMode')
-      }
+      if (r.success) this.lifecycle.settlePhase('consoleMode', faultMark)
       return r
     })
   }

@@ -46,6 +46,7 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
   abortIfShuttingDown(ctx.lifecycle, 'before the restart ran')
   ctx.lifecycle.assertPhase(['running', 'consoleMode', 'failed'], 'restartControllers')
   ctx.lifecycle.setPhase('restarting')
+  const faultMark = ctx.lifecycle.faultMark()
   log.info('Restarting controllers to apply configuration changes')
 
   // The lifecycle queue guarantees no listener toggle is mid-flight here, so the was-enabled
@@ -132,22 +133,26 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
     abortIfShuttingDown(ctx.lifecycle, 'during reinitialization')
     // The console page can close while the controllers restart, so its state is read here.
     const consoleOpen = ctx.consoleMode.getConsoleRestore() !== null
-    ctx.lifecycle.setPhaseUnlessShuttingDown(consoleOpen ? 'consoleMode' : 'running')
+    ctx.lifecycle.settlePhase(consoleOpen ? 'consoleMode' : 'running', faultMark)
     ctx.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
-    if (wasYargEnabled) {
-      // Drive the listener directly: the public toggles are queued lifecycle ops and would
-      // deadlock behind this restart's own queue slot.
-      await ctx.listenerLifecycle.yargRb3.enableYarg(ctx.isInitialized(), () => ctx.init())
-    } else if (wasRb3Enabled) {
-      await ctx.listenerLifecycle.yargRb3.enableRb3(ctx.isInitialized(), () => ctx.init())
-    }
+    // A fault that arose during this restart holds the graph failed, so the inputs it snapshotted
+    // stay off.
+    if (!ctx.lifecycle.faultedSince(faultMark)) {
+      if (wasYargEnabled) {
+        // Drive the listener directly: the public toggles are queued lifecycle ops and would
+        // deadlock behind this restart's own queue slot.
+        await ctx.listenerLifecycle.yargRb3.enableYarg(ctx.isInitialized(), () => ctx.init())
+      } else if (wasRb3Enabled) {
+        await ctx.listenerLifecycle.yargRb3.enableRb3(ctx.isInitialized(), () => ctx.init())
+      }
 
-    // One input drives the rig at a time, so a snapshot holding audio beside a network listener
-    // comes back as the listener alone rather than as both.
-    abortIfShuttingDown(ctx.lifecycle, 'while listeners were restored')
-    if (wasAudioEnabled && !wasYargEnabled && !wasRb3Enabled) {
-      await ctx.listenerLifecycle.audio.enableAudio(ctx.isInitialized(), () => ctx.init())
+      // One input drives the rig at a time, so a snapshot holding audio beside a network listener
+      // comes back as the listener alone.
+      abortIfShuttingDown(ctx.lifecycle, 'while listeners were restored')
+      if (wasAudioEnabled && !wasYargEnabled && !wasRb3Enabled) {
+        await ctx.listenerLifecycle.audio.enableAudio(ctx.isInitialized(), () => ctx.init())
+      }
     }
 
     abortIfShuttingDown(ctx.lifecycle, 'before senders were restored')
