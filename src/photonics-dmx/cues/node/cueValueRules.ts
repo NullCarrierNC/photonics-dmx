@@ -269,12 +269,12 @@ export function variableIssue(
   return warning(`'${name}' is a ${variable.type} variable, and this field takes ${expected}`)
 }
 
-/** The ruled text fields of an action each variable of a graph feeds directly, by variable name. */
-function variableRules(actions: readonly ActionNode[]): Map<string, LiteralRule[]> {
-  const rules = new Map<string, LiteralRule[]>()
+/** The ruled action fields each variable of a graph feeds directly, by variable name. */
+function variableRules(actions: readonly ActionNode[]): Map<string, ValueRule[]> {
+  const rules = new Map<string, ValueRule[]>()
   for (const action of actions) {
     for (const { rule, source } of actionLiteralFields(action)) {
-      if (source?.source !== 'variable' || isNumberRule(rule)) continue
+      if (source?.source !== 'variable') continue
       const fed = rules.get(source.name) ?? []
       if (!fed.includes(rule)) fed.push(rule)
       rules.set(source.name, fed)
@@ -309,7 +309,7 @@ export interface EffectParameter {
 export function parameterRules(
   parameter: EffectParameter,
   effectActions: readonly ActionNode[],
-): LiteralRule[] {
+): ValueRule[] {
   const rules = [...(variableRules(effectActions).get(parameter.name) ?? [])]
   const named = PARAMETER_NAME_RULES[parameter.name]
   if (named && !rules.includes(named)) rules.push(named)

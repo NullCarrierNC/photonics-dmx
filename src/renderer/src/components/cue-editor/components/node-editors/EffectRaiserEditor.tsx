@@ -5,10 +5,12 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
+  isNumberRule,
   literalChoices,
   parameterRules,
   raiserParameterIssue,
 } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import type { LiteralRule } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
 import KnownValueSelect from '../shared/KnownValueSelect'
 
@@ -76,7 +78,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
             const integerOnly = param.type === 'number' && param.name === 'paramLayer'
             // The choices of the first rule the parameter meets that has a list of its own.
             const listedRule = parameterRules(param, effectActions).find(
-              (rule) => rule !== 'groups',
+              (rule): rule is LiteralRule => !isNumberRule(rule) && rule !== 'groups',
             )
             const validLiterals =
               param.validValues ?? (listedRule ? literalChoices(listedRule, activeMode) : undefined)

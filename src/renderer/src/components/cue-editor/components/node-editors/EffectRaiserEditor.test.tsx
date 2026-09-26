@@ -29,7 +29,11 @@ const effect: EffectDefinition = {
           name: { source: 'literal', value: 'red' },
           brightness: { source: 'literal', value: 'high' },
         },
-        timing: { ...createDefaultActionTiming(), waitUntilCondition: variable('holdUntil') },
+        timing: {
+          ...createDefaultActionTiming(),
+          duration: variable('fadeMs'),
+          waitUntilCondition: variable('holdUntil'),
+        },
       },
     ],
     effectListeners: [{ id: 'l1', type: 'effect-listener' }],
@@ -38,6 +42,7 @@ const effect: EffectDefinition = {
   variables: [
     { name: 'sweepGroups', type: 'string', scope: 'cue', initialValue: 'front', isParameter: true },
     { name: 'holdUntil', type: 'string', scope: 'cue', initialValue: 'none', isParameter: true },
+    { name: 'fadeMs', type: 'number', scope: 'cue', initialValue: 200, isParameter: true },
   ],
 } as EffectDefinition
 
@@ -84,5 +89,21 @@ describe('EffectRaiserEditor parameters', () => {
     expect(
       screen.getByRole('combobox', { name: 'holdUntil (string)' }),
     ).toHaveAccessibleDescription("'beat' never fires in rb3 mode, so this wait does not end on it")
+  })
+
+  it('warns about a number the effect feeds into a field that refuses it', () => {
+    renderRaiser({ fadeMs: { source: 'literal', value: -5 } }, 'yarg')
+
+    expect(screen.getByRole('spinbutton', { name: 'fadeMs (number)' })).toHaveAccessibleDescription(
+      'must be a non-negative finite number',
+    )
+  })
+
+  it('accepts a number the effect field takes', () => {
+    renderRaiser({ fadeMs: { source: 'literal', value: 250 } }, 'yarg')
+
+    expect(
+      screen.getByRole('spinbutton', { name: 'fadeMs (number)' }),
+    ).not.toHaveAccessibleDescription()
   })
 })
