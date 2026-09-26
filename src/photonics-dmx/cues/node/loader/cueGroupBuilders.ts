@@ -96,33 +96,34 @@ function assertHasCues(
 }
 
 /**
- * What the cue value rules warn about in the parameters each effect raiser passes, checked against
- * the parameters the raised effect declares and the action fields each one feeds.
+ * Collects what the cue value rules find in the parameters each effect raiser passes, checked
+ * against the parameters the raised effect declares and the action fields each one feeds.
+ * @throws NodeCueCompilationError for the first finding the rules call an error
  */
-function raiserWarnings(
+function checkRaiserParameters(
   label: string,
   raisers: readonly EffectRaiserNode[],
   effects: EffectRegistry,
   variables: readonly VariableDefinition[],
   mode: NodeCueMode,
-): string[] {
-  return raisers.flatMap((raiser) => {
+  warnings: string[],
+): void {
+  for (const raiser of raisers) {
     const effect = effects.getEffect(raiser.effectId)
-    if (!effect) return []
+    if (!effect) continue
     const effectActions = effect.definition.nodes.actions ?? []
-    return [...effect.parameters.values()].flatMap((parameter) => {
+    for (const parameter of effect.parameters.values()) {
       const issue = raiserParameterIssue(parameter, raiser.parameterValues?.[parameter.name], {
         effectActions,
         variables,
         mode,
       })
-      return issue
-        ? [
-            `${label}: effect raiser '${raiser.label ?? raiser.id}' parameter '${parameter.name}': ${issue.message}.`,
-          ]
-        : []
-    })
-  })
+      if (!issue) continue
+      const finding = `effect raiser '${raiser.label ?? raiser.id}' parameter '${parameter.name}': ${issue.message}.`
+      if (issue.severity === 'error') throw new NodeCueCompilationError(finding)
+      warnings.push(`${label}: ${finding}`)
+    }
+  }
 }
 
 /** Build the YARG or RB3 group a net cue file describes. */
@@ -143,14 +144,13 @@ export async function buildNetGroup(
       const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
       compiled.groupVariables = file.group.variables ?? []
       const effects = await ctx.buildEffectRegistry(cue.effects ?? [], file.mode)
-      compileWarnings.push(
-        ...raiserWarnings(
-          `cue '${cue.kind === 'lighting' ? cue.cueType : cue.id}'`,
-          cue.nodes.effectRaisers ?? [],
-          effects,
-          [...compiled.groupVariables, ...(cue.variables ?? [])],
-          file.mode,
-        ),
+      checkRaiserParameters(
+        `cue '${cue.kind === 'lighting' ? cue.cueType : cue.id}'`,
+        cue.nodes.effectRaisers ?? [],
+        effects,
+        [...(cue.variables ?? []), ...compiled.groupVariables],
+        file.mode,
+        compileWarnings,
       )
       return { compiled, effects }
     }
@@ -230,14 +230,13 @@ export async function buildAudioGroup(
       const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')
       compiled.groupVariables = file.group.variables ?? []
       const effects = await ctx.buildEffectRegistry(cue.effects ?? [], 'audio')
-      compileWarnings.push(
-        ...raiserWarnings(
-          `audio cue '${cue.kind === 'lighting' ? cue.cueTypeId : cue.id}'`,
-          cue.nodes.effectRaisers ?? [],
-          effects,
-          [...compiled.groupVariables, ...(cue.variables ?? [])],
-          'audio',
-        ),
+      checkRaiserParameters(
+        `audio cue '${cue.kind === 'lighting' ? cue.cueTypeId : cue.id}'`,
+        cue.nodes.effectRaisers ?? [],
+        effects,
+        [...(cue.variables ?? []), ...compiled.groupVariables],
+        'audio',
+        compileWarnings,
       )
       return { compiled, effects }
     }

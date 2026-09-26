@@ -32,6 +32,7 @@ interface GraphJson {
   cueType?: string
   nodes: {
     effectRaisers?: Array<{ id: string; parameterValues: Record<string, ValueSourceJson> }>
+    logic?: unknown[]
     actions: Array<{
       id: string
       color: { name: ValueSourceJson; blendMode: ValueSourceJson }
@@ -249,6 +250,37 @@ describe('loading cue and effect files older builds wrote', () => {
       const stored = dischordOf(readJson(path.join(cuesDir, 'user-alt1.json')))
       const blue = stored.nodes.effectRaisers?.find((r) => r.id === 'y1-dischord-blue')
       expect(blue?.parameterValues.lights).toEqual({ source: 'literal', value: 'front,back' })
+    })
+
+    it('refuses the cue when the light array holds lights no group list names', async () => {
+      const file = userCopyOfAlt1('user-alt1')
+      const dischord = dischordOf(file)
+      dischord.nodes.logic = [
+        ...(dischord.nodes.logic ?? []),
+        {
+          id: 'pick',
+          type: 'logic',
+          logicType: 'lights-from-index',
+          sourceVariable: 'allLights',
+          index: { source: 'literal', value: 0 },
+          assignTo: 'allLights',
+        },
+      ]
+      writeJson(path.join(cuesDir, 'user-alt1.json'), file)
+      fs.mkdirSync(effectsDir, { recursive: true })
+      fs.copyFileSync(
+        path.join(BUNDLED_EFFECTS, 'yarg-core-effects.json'),
+        path.join(effectsDir, 'yarg-core-effects.json'),
+      )
+
+      await effectLoader.loadAll()
+      await loader.loadAll()
+
+      expect(yarg.getGroup('user-alt1')?.cues.has(CueType.Dischord)).toBe(false)
+      const [summary] = loader.getSummary().yarg
+      expect(summary.errors).toEqual([
+        "cue 'Dischord': effect raiser 'y1-dischord-blue' parameter 'lights': 'allLights' is a light-array variable, and this parameter takes group names, so it lights nothing.",
+      ])
     })
   })
 
