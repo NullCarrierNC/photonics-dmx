@@ -15,6 +15,16 @@ import type {
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { IpcErrorResult, IpcSavedResult, IpcSuccessResult } from './common'
 
+/**
+ * What a startup load of the cue or effect files has to tell the user: files it refused, and
+ * changes it made to files an older build wrote.
+ */
+export interface CueFileLoadReport {
+  source: 'node-cue' | 'effect'
+  errors: string[]
+  migrations: string[]
+}
+
 export interface ConfigInvokeMap {
   // ---- Config ----
   [CONFIG.GET_LIGHT_LIBRARY]: {
@@ -63,7 +73,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.GET_VALIDATION_ERRORS]: {
     request: void
-    response: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>
+    response: CueFileLoadReport[]
   }
   [CONFIG.GET_CORRUPT_RECOVERY_EVENTS]: {
     request: void

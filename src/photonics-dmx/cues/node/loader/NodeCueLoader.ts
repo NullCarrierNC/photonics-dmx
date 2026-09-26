@@ -16,6 +16,7 @@ import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
+import { migrateOlderNodeFile } from './migrateOlderNodeFile'
 import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
 import type { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
@@ -37,6 +38,8 @@ export interface NodeCueFileSummary {
   errors?: string[]
   /** Non-fatal findings from validation: the file loaded, but something in it will not do what it looks like it does. */
   warnings?: string[]
+  /** What the load changed in a file an older build wrote, which it then saved. */
+  migrations?: string[]
   bundled?: boolean
 }
 
@@ -187,7 +190,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     const data = await fs.readFile(resolvedPath, 'utf-8')
-    const parsed = JSON.parse(data)
+    const parsed: unknown = JSON.parse(data)
+    migrateOlderNodeFile(parsed)
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -271,7 +275,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     filePath: string,
   ): Promise<NodeCueFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
-    const parsed = JSON.parse(contents)
+    const parsed: unknown = JSON.parse(contents)
+    const migrations = migrateOlderNodeFile(parsed)
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -280,10 +285,12 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     const file = validation.data
-    // Per-cue compile failures are collected here rather than only logged, so the editor
-    // can surface them on the file's summary instead of the file appearing to load cleanly.
+    // Per-cue compile failures go on the file's summary, where the cue editor lists them.
     const compileErrors: string[] = []
     await this.registerFile(filePath, mode, file, compileErrors)
+    if (migrations.length > 0) {
+      await this.writeMigratedFile(filePath, parsed)
+    }
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
     const motionCueCount = file.cues.filter((c) => c.kind === 'motion').length
@@ -310,6 +317,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
       warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+      migrations: migrations.length > 0 ? migrations : undefined,
     }
 
     this.updateSummary(summary)

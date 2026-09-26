@@ -40,7 +40,11 @@ import { useToast } from './hooks/useToast'
 import { useYargErrorHandler } from './hooks/useYargErrorHandler'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
-import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
+import type {
+  CueFileLoadReport,
+  CueStateUpdatePayload,
+  NodeCueRuntimeErrorPayload,
+} from '../../shared/ipcTypes'
 import { persistPrefs } from './ipc/persistPrefs'
 import {
   setAudioEnabled,
@@ -131,14 +135,23 @@ export const App = (): JSX.Element => {
   )
 
   const handleCueValidationErrors = useCallback(
-    (errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>): void => {
-      for (const { source, errors: messages } of errors) {
+    (reports: CueFileLoadReport[]): void => {
+      for (const { source, errors: messages, migrations } of reports) {
         const label = source === 'node-cue' ? 'Cue file' : 'Effect file'
-        const message =
-          messages.length === 1
-            ? `${label} validation failed: ${messages[0]}`
-            : `${label} validation failed (${messages.length} files): ${messages.join('; ')}`
-        showToast(message, 'error', 7000)
+        if (messages.length > 0) {
+          const message =
+            messages.length === 1
+              ? `${label} validation failed: ${messages[0]}`
+              : `${label} validation failed (${messages.length} files): ${messages.join('; ')}`
+          showToast(message, 'error', 7000)
+        }
+        if (migrations.length > 0) {
+          showToast(
+            `${label}s saved by an older version were updated to load in this one: ${migrations.join('; ')}`,
+            'warning',
+            10000,
+          )
+        }
       }
     },
     [showToast],

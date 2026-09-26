@@ -16,6 +16,7 @@ import {
 import { cueDomainBinding } from './cueDomainBindings'
 import type { CueDomain } from '../../services/configuration/cueDomainTypes'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import type { CueFileLoadReport } from '../../shared/ipcTypes'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('RegistryInitializer')
 
@@ -23,7 +24,7 @@ export interface RegistryInitializerContext {
   getConfig: () => ConfigurationManager
   runtimeBroadcaster: RuntimeBroadcaster
   sendToAllWindows: (channel: string, ...args: unknown[]) => void
-  pushValidationError: (err: { source: 'node-cue' | 'effect'; errors: string[] }) => void
+  pushValidationError: (report: CueFileLoadReport) => void
   refreshAudioCueSelection: () => void
   getNodeCueLoader: () => NodeCueLoader | null
   setNodeCueLoader: (loader: NodeCueLoader | null) => void
@@ -57,9 +58,14 @@ export class RegistryInitializer {
 
     const summary = await effectLoader.loadAll()
     log.info(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
-    if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => log.error('[EffectLoader]', err))
-      this.ctx.pushValidationError({ source: 'effect', errors: summary.errors })
+    summary.errors.forEach((err) => log.error('[EffectLoader]', err))
+    summary.migrations.forEach((note) => log.info('[EffectLoader]', note))
+    if (summary.errors.length > 0 || summary.migrations.length > 0) {
+      this.ctx.pushValidationError({
+        source: 'effect',
+        errors: summary.errors,
+        migrations: summary.migrations,
+      })
     }
     await effectLoader.startWatching()
 
@@ -105,9 +111,14 @@ export class RegistryInitializer {
 
     const summary = await nodeCueLoader.loadAll()
     log.info(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
-    if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => log.error('[NodeCueLoader]', err))
-      this.ctx.pushValidationError({ source: 'node-cue', errors: summary.errors })
+    summary.errors.forEach((err) => log.error('[NodeCueLoader]', err))
+    summary.migrations.forEach((note) => log.info('[NodeCueLoader]', note))
+    if (summary.errors.length > 0 || summary.migrations.length > 0) {
+      this.ctx.pushValidationError({
+        source: 'node-cue',
+        errors: summary.errors,
+        migrations: summary.migrations,
+      })
     }
     await nodeCueLoader.startWatching()
 

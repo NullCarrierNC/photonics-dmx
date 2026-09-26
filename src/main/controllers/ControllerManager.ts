@@ -33,7 +33,12 @@ import {
   type ControllerHost,
 } from './controllerWiring'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import type { IpcErrorResult, IpcSuccessResult, LifecyclePhase } from '../../shared/ipcTypes'
+import type {
+  CueFileLoadReport,
+  IpcErrorResult,
+  IpcSuccessResult,
+  LifecyclePhase,
+} from '../../shared/ipcTypes'
 import { CUE_DOMAIN_BINDINGS, applyAllEnabledGroupsFromConfig } from './cueDomainBindings'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
@@ -103,7 +108,7 @@ export class ControllerManager {
   /** The built controller-object graph: chains, clock, publisher, cue handlers, loaders. */
   private readonly graph: ControllerGraph
 
-  private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
+  private pendingValidationErrors: CueFileLoadReport[] = []
   private onSimulationPreempt: (() => void) | null = null
 
   private readonly testEffectRunner: TestEffectRunner
@@ -456,7 +461,7 @@ export class ControllerManager {
     return this.isInitialized
   }
 
-  public flushValidationErrors(): Array<{ source: 'node-cue' | 'effect'; errors: string[] }> {
+  public flushValidationErrors(): CueFileLoadReport[] {
     const errors = this.pendingValidationErrors
     this.pendingValidationErrors = []
     return errors

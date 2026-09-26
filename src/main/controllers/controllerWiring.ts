@@ -10,6 +10,7 @@ import type { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCue
 import type { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 import { sendToAllWindows, mainRuntimeBroadcaster, hasBrowserWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import type { CueFileLoadReport } from '../../shared/ipcTypes'
 import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
@@ -43,7 +44,7 @@ export interface ControllerHost {
   setNodeCueLoader(loader: NodeCueLoader | null): void
   getEffectLoader(): EffectLoader | null
   setEffectLoader(loader: EffectLoader | null): void
-  pushValidationError(error: { source: 'node-cue' | 'effect'; errors: string[] }): void
+  pushValidationError(report: CueFileLoadReport): void
   refreshAudioCueSelection(): void
   getIsAudioEnabled(): boolean
   pauseYarg(): Promise<void>

@@ -34,8 +34,10 @@ export function isColor(value: unknown): value is Color {
 }
 
 /**
- * The supported layer blend modes. A cue blendMode outside this set is coerced to 'replace' at
- * runtime (valueResolver / LightTransitionController).
+ * The supported layer blend modes. A stored cue or effect file that names the retired multiply or
+ * overlay is rewritten to 'replace' when it loads, and the compiler refuses any other literal. A
+ * blend mode read from a variable at runtime is coerced to 'replace' when it is outside this set
+ * (valueResolver / LightTransitionController).
  */
 export const BLEND_MODE_OPTIONS = ['mix', 'add', 'replace'] as const
 
