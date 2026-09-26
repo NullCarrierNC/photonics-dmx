@@ -56,6 +56,8 @@ const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
  * - A restart is judged from the fault count at its latest request, so one asked for before a
  *   fault that is still held refuses to start. A request after the fault joins a restart only
  *   while that restart waits its turn, or tears down with no fault held since its own request.
+ * - A restart takes its turn only once the fault response in progress has settled, so its
+ *   teardown never runs beside the response's input stops.
  */
 export class ControllerLifecycle {
   private phaseValue: LifecyclePhase = 'initializing'
@@ -67,6 +69,8 @@ export class ControllerLifecycle {
   private shutdownCompleted = false
   /** The restart in flight and its follow-up, so overlapping callers share one attempt. */
   private readonly restart = new RestartState()
+  /** Set while the response to an uncaught fault runs, and kept until it settles. */
+  private faultResponse: Promise<void> | null = null
   /** Set while an initialisation is in flight so overlapping callers share the one attempt. */
   private initInFlight: Promise<void> | null = null
   /** The queued op or restart running now, past any wait on a shutdown. */
@@ -111,6 +115,18 @@ export class ControllerLifecycle {
     this.faulted = true
     this.faultCount += 1
     return true
+  }
+
+  /**
+   * Run the response to the fault just marked. A restart waits it out before it starts, so it
+   * reads the inputs once the response has stopped them.
+   */
+  public runFaultResponse(response: () => Promise<void>): Promise<void> {
+    const run = (async () => response())()
+    this.faultResponse = run
+    return run.finally(() => {
+      if (this.faultResponse === run) this.faultResponse = null
+    })
   }
 
   /**
@@ -272,12 +288,14 @@ export class ControllerLifecycle {
     const served = this.restart.request(mark, (since) => this.faultedSince(since))
     if (served.kind === 'share') return served.run
     if (served.kind === 'followUp') return this.queueFollowUpRestart(work, mark)
-    const start = (): Promise<void> => {
+    const begin = (): Promise<void> => {
       if (this.faultedSince(this.restart.start())) {
         return Promise.reject(new Error(FAULT_HELD_MESSAGE))
       }
       return this.runActive(work)
     }
+    const start = (): Promise<void> =>
+      this.faultResponse ? this.awaitFaultResponse().then(begin) : begin()
     const run = this.runOp(start).finally(() => this.restart.settle())
     this.restart.queue(run, mark)
     return run
@@ -312,6 +330,17 @@ export class ControllerLifecycle {
       await this.shutdownPromise
     } catch {
       // The owner already logged / rethrew; we just needed to wait.
+    }
+  }
+
+  /** Wait for the fault response in progress to settle, and for any started while it ran. */
+  private async awaitFaultResponse(): Promise<void> {
+    while (this.faultResponse) {
+      try {
+        await this.faultResponse
+      } catch {
+        // The response logs each step that fails.
+      }
     }
   }
 

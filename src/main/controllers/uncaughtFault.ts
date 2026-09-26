@@ -44,8 +44,9 @@ async function boundedStep(name: string, step: () => Promise<void>): Promise<voi
  * the graph. The console is left first, since the publisher ignores cue frames while it holds a
  * manual buffer. The simulations run off the queue, so they stop before the blackout and the rig
  * stays dark while the inputs wait on a running toggle. Each step is bounded so a wedged one
- * cannot hold up the rest. The process carries on, since DMX receivers hold the last frame they
- * got and an exit would leave the rig lit.
+ * cannot hold up the rest. A restart asked for meanwhile starts once the response has settled.
+ * The process carries on, since DMX receivers hold the last frame they got and an exit would
+ * leave the rig lit.
  */
 export async function holdFailedAfterFault(
   error: unknown,
@@ -61,16 +62,18 @@ export async function holdFailedAfterFault(
     await boundedStep('Disabling RB3', () => listeners.yargRb3.disableRb3())
     await boundedStep('Disabling audio', () => listeners.audio.disableAudio())
   }
-  await boundedStep('Leaving the console', async () => {
-    await host.disableConsoleMode()
-  })
-  await boundedStep('Stopping the simulations', () => host.preemptSimulation())
-  await boundedStep('Blackout', () => host.getChainFanout().blackout(0))
-  await boundedStep('Waiting for the running toggle', () => lifecycle.awaitActiveOp())
-  await stopInputs()
+  await lifecycle.runFaultResponse(async () => {
+    await boundedStep('Leaving the console', async () => {
+      await host.disableConsoleMode()
+    })
+    await boundedStep('Stopping the simulations', () => host.preemptSimulation())
+    await boundedStep('Blackout', () => host.getChainFanout().blackout(0))
+    await boundedStep('Waiting for the running toggle', () => lifecycle.awaitActiveOp())
+    await stopInputs()
 
-  // An enable or restart that outlasted its wait binds its input as it lands, so the inputs are
-  // stopped again once it settles, unless a restart has cleared the fault by then.
-  await lifecycle.awaitActiveOp()
-  if (lifecycle.isFaulted()) await stopInputs()
+    // An enable or restart that outlasted its wait binds its input as it lands, so the inputs
+    // are stopped again once it settles, unless a restart has cleared the fault by then.
+    await lifecycle.awaitActiveOp()
+    if (lifecycle.isFaulted()) await stopInputs()
+  })
 }
