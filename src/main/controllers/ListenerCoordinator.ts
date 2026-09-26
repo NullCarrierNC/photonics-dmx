@@ -18,6 +18,9 @@ import { buildDomainChainHandlers } from './cueRuntimeDomains'
 import type { RigChain } from './RigChain'
 import { clearAndBlackOutChains } from './chainBlackout'
 import type { ChainFanout } from './ChainFanout'
+import type { ControllerLifecycle } from './ControllerLifecycle'
+import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import { normalizeRb3ProcessingMode } from '../../services/configuration/configurationDefaults'
 const log = createLogger('ListenerCoordinator')
 
 export interface ListenerCoordinatorDeps {
@@ -470,4 +473,31 @@ export class ListenerCoordinator {
   public getProcessorManager(): ProcessorManager | null {
     return this.processorManager
   }
+}
+
+/**
+ * Bring a running RB3 session onto the saved processing mode. The coordinator reads the mode
+ * when RB3 is enabled, so a change while it runs is applied by ending the session and starting
+ * it again, as one queued op so no toggle or restart interleaves. A session already on the
+ * saved mode, no session, or a graph held failed (its fault response is switching RB3 off, and
+ * the saved mode applies at the next enable) is left alone. It is refused once a shutdown has
+ * begun.
+ */
+export async function cycleRb3OntoSavedMode(
+  rb3: Pick<ListenerCoordinator, 'getIsRb3Enabled' | 'getRb3Mode' | 'disableRb3' | 'enableRb3'>,
+  deps: {
+    lifecycle: Pick<ControllerLifecycle, 'runQueuedChange' | 'isFaulted'>
+    config: Pick<ConfigurationManager, 'getPreference'>
+    isInitialized: () => boolean
+    init: () => Promise<void>
+  },
+): Promise<void> {
+  await deps.lifecycle.runQueuedChange('RB3 mode change', async () => {
+    if (!rb3.getIsRb3Enabled() || deps.lifecycle.isFaulted()) return
+    const saved = normalizeRb3ProcessingMode(deps.config.getPreference('rb3Prefs')?.processingMode)
+    if (rb3.getRb3Mode() === saved) return
+    // RB3 already holds the rig: audio is off and no simulation can have started.
+    await rb3.disableRb3()
+    await rb3.enableRb3(deps.isInitialized(), deps.init)
+  })
 }
