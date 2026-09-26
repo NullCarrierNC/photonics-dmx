@@ -2,7 +2,7 @@ import type { DmxFixture } from '../../../photonics-dmx/types'
 
 /** A fixture's base channels plus its added ones: every address its preview reads. */
 export function fixtureChannelNumbers(fixture: DmxFixture): number[] {
-  const base = Object.values(fixture.channels) as number[]
+  const base = Object.values(fixture.channels)
   const extras = (fixture.extraChannels ?? []).map((ec) => ec.channel)
   return [...base, ...extras]
 }

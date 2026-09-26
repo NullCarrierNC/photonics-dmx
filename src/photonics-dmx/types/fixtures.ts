@@ -67,6 +67,12 @@ export type RgbDmxChannels = BaseDmxFixture & {
 export const MIXABLE_CHANNEL_TYPES = ['white', 'amber', 'orange', 'lime', 'uv'] as const
 export type MixableChannelType = (typeof MIXABLE_CHANNEL_TYPES)[number]
 
+const MIXABLE_CHANNEL_TYPE_SET: ReadonlySet<string> = new Set(MIXABLE_CHANNEL_TYPES)
+
+export function isMixableChannelType(value: unknown): value is MixableChannelType {
+  return typeof value === 'string' && MIXABLE_CHANNEL_TYPE_SET.has(value)
+}
+
 /**
  * How a fixture's `white` emitter is driven, chosen by the White Channel Mix Mode preference.
  * Applies only to RGB fixtures carrying a `white` extra channel. Persisted values - never rename.

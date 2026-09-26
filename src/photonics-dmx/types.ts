@@ -66,6 +66,7 @@ export {
   FixtureTypes,
   isExtraChannelType,
   isFixtureType,
+  isMixableChannelType,
   isMovingHead,
   isSavedFixture,
   LEGACY_FIXTURE_RGB_STROBE,

@@ -137,7 +137,7 @@ export function findSharedChannelNumbers(fixtures: DmxFixture[]): number[] {
     if (typeof n === 'number' && n > 0) counts.set(n, (counts.get(n) ?? 0) + 1)
   }
   for (const fixture of fixtures) {
-    for (const v of Object.values(fixture.channels)) add(v as number)
+    for (const v of Object.values(fixture.channels)) add(v)
     for (const ec of fixture.extraChannels ?? []) add(ec.channel)
   }
   return [...counts.entries()]
