@@ -24,6 +24,7 @@ import {
 } from './eventNodeDocs'
 import { unlistedIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import FieldIssue, { issueAttributes } from '../shared/FieldIssue'
+import { DraftNumberField } from '../../../controls/DraftField'
 
 interface EventNodeEditorProps {
   node: NetEventNode | AudioEventNodeUnion
@@ -214,15 +215,15 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           </label>
           <label className="flex flex-col font-medium">
             Cooldown (ms)
-            <input
-              type="number"
+            <DraftNumberField
+              aria-label="Cooldown (ms)"
               min={0}
               step={10}
+              // A time in ms keeps the fraction the author types.
+              decimals={3}
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={(node as AudioEventNode).cooldownMs ?? 0}
-              onChange={(e) =>
-                updateAudioNode({ cooldownMs: Math.max(0, Number(e.target.value) || 0) })
-              }
+              onCommit={(cooldownMs) => updateAudioNode({ cooldownMs })}
             />
             <div className={DOC_BLOCK_CLASS}>
               Minimum time (ms) before this event can fire again after a trigger. 0 = no limit.
