@@ -1,4 +1,5 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import { normalizeRb3ProcessingMode } from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
@@ -545,6 +546,27 @@ export class ControllerManager {
    */
   public refreshRb3CueSelection(): void {
     this.listenerLifecycle.yargRb3.getProcessorManager()?.refreshRb3PrimaryGroup()
+  }
+
+  /**
+   * Bring a running RB3 session onto the saved processing mode. The coordinator reads the mode
+   * when RB3 is enabled, so a change while it runs is applied by ending the session and starting
+   * it again, as one queued op so no toggle or restart interleaves. A session already on the
+   * saved mode, no session, or a graph held failed (its fault response is switching RB3 off, and
+   * the saved mode applies at the next enable) is left alone.
+   */
+  public async applyRb3ProcessingMode(): Promise<void> {
+    await this.lifecycle.runQueuedOp(async () => {
+      const rb3 = this.listenerLifecycle.yargRb3
+      if (!rb3.getIsRb3Enabled() || this.lifecycle.isFaulted()) return
+      const saved = normalizeRb3ProcessingMode(
+        this.config.getPreference('rb3Prefs')?.processingMode,
+      )
+      if (rb3.getRb3Mode() === saved) return
+      // RB3 already holds the rig: audio is off and no simulation can have started.
+      await rb3.disableRb3()
+      await rb3.enableRb3(this.isInitialized, () => this.init())
+    })
   }
 
   /**
