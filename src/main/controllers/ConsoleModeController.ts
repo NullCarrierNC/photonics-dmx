@@ -10,6 +10,7 @@ import {
 } from '../../photonics-dmx/types'
 import { createLogger } from '../../shared/logger'
 import { restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
+import type { LifecyclePhase } from '../../shared/ipcTypes'
 
 const log = createLogger('ConsoleModeController')
 
@@ -30,6 +31,7 @@ export interface ConsoleModeControllerDeps {
   } | null
   getListenerSnapshot: () => ListenerChannelSnapshot
   getIsAudioEnabled: () => boolean
+  getLifecyclePhase: () => LifecyclePhase
   /** The three pauses run while console entry holds the lifecycle queue, so they must not queue. */
   pauseYarg: () => Promise<void>
   pauseRb3: () => Promise<void>
@@ -112,11 +114,16 @@ export class ConsoleModeController {
    * Gated on console mode being open, because `setManualBuffer` latches the publisher into manual
    * output and only `disableConsoleMode` lifts it, which returns early when it has no console
    * state to restore. Ungated, one stray message from a renderer would freeze cue output for the
-   * rest of the session with nothing reporting it.
+   * rest of the session with nothing reporting it. Refused too while the controllers are held
+   * failed, as the fault response has taken the wire dark.
    */
   public sendConsoleDmx(buffer: Record<number, number>): void {
     if (this.consoleRestore === null) {
       log.warn('Ignoring console DMX: console mode is not open')
+      return
+    }
+    if (this.deps.getLifecyclePhase() === 'failed') {
+      log.warn('Ignoring console DMX: the lighting controllers are held failed')
       return
     }
     this.deps.getDmxPublisher()?.setManualBuffer(buffer)

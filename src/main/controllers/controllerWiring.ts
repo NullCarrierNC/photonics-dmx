@@ -21,6 +21,7 @@ import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
 import { readMotionPrefs } from './cueRuntimeDomains'
+import type { LifecyclePhase } from '../../shared/ipcTypes'
 
 /**
  * The callbacks the controller collaborators need from their owner. ControllerManager implements
@@ -46,6 +47,7 @@ export interface ControllerHost {
   pushValidationError(error: { source: 'node-cue' | 'effect'; errors: string[] }): void
   refreshAudioCueSelection(): void
   getIsAudioEnabled(): boolean
+  getLifecyclePhase(): LifecyclePhase
   pauseYarg(): Promise<void>
   pauseRb3(): Promise<void>
   pauseAudio(): Promise<void>
@@ -186,6 +188,7 @@ export function buildControllerCollaborators(
         rb3: listenerLifecycle.yargRb3.getIsRb3Enabled(),
       }),
       getIsAudioEnabled: () => host.getIsAudioEnabled(),
+      getLifecyclePhase: () => host.getLifecyclePhase(),
       pauseYarg: () => host.pauseYarg(),
       pauseRb3: () => host.pauseRb3(),
       pauseAudio: () => host.pauseAudio(),

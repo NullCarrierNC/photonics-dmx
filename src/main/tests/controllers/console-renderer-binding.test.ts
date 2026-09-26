@@ -87,6 +87,7 @@ describe('console mode follows the page that opened it', () => {
       getDmxPublisher: () => ({ setManualBuffer, clearManualBuffer }),
       getListenerSnapshot: () => ({ yarg: false, rb3: false }),
       getIsAudioEnabled: () => false,
+      getLifecyclePhase: () => 'consoleMode',
       pauseYarg: async () => {},
       pauseRb3: async () => {},
       pauseAudio: async () => {},
