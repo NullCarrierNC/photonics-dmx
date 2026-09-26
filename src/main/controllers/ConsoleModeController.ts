@@ -3,13 +3,14 @@ import {
   LightingConfiguration,
   DmxRig,
   DmxLight,
+  DmxFixture,
   FixtureTypes,
   FixtureConfig,
   clampMergeMovingHeadFixtureConfig,
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import { createLogger } from '../../shared/logger'
-import { restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
+import { ipcError, restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
 
 const log = createLogger('ConsoleModeController')
 
@@ -144,7 +145,7 @@ export class ConsoleModeController {
       return { success: false, error: 'Fixture id does not match this light' }
     }
     // Both the rig and its fixture template are checked before either is written, so a refusal
-    // leaves neither half changed.
+    // leaves neither half changed. A template write that fails puts the rig and template back.
     const fixture = this.deps
       .getConfig()
       .getUserLights()
@@ -160,14 +161,54 @@ export class ConsoleModeController {
     const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
     const updatedLight: DmxLight = { ...light, config: newConfig }
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    await this.deps.getConfig().saveDmxRig({ ...rig, config: newRigConfig })
+    const config = this.deps.getConfig()
+    await config.saveDmxRig({ ...rig, config: newRigConfig })
 
-    await this.deps.getConfig().updateUserLight(fixtureId, (stored) => ({
-      ...stored,
-      config: clampMergeMovingHeadFixtureConfig(normalizeFixtureConfig(stored.config), patch),
-    }))
+    try {
+      await config.updateUserLight(fixtureId, (stored) => ({
+        ...stored,
+        config: clampMergeMovingHeadFixtureConfig(normalizeFixtureConfig(stored.config), patch),
+      }))
+    } catch (error) {
+      const failed = ipcError(error)
+      if (await this.restoreFixtureEdit(config, rig, fixtureId, fixture)) {
+        return failed
+      }
+      // Part of the edit stayed on disk, and the running graph has to follow what is there.
+      await restartAfterSave(() => this.deps.restartControllers())
+      return {
+        success: false,
+        error: `${failed.error}. The rig change could not be undone and is still saved.`,
+      }
+    }
 
     return restartAfterSave(() => this.deps.restartControllers())
+  }
+
+  /**
+   * Puts the template and then the rig back as they were before an edit, trying the rig whatever
+   * the template write does. False when either write fails.
+   */
+  private async restoreFixtureEdit(
+    config: ConfigurationManager,
+    rig: DmxRig,
+    fixtureId: string,
+    fixture: DmxFixture,
+  ): Promise<boolean> {
+    let restored = true
+    try {
+      await config.updateUserLight(fixtureId, () => fixture)
+    } catch (error) {
+      log.error('Could not put the fixture template back after a failed edit:', error)
+      restored = false
+    }
+    try {
+      await config.saveDmxRig(rig)
+    } catch (error) {
+      log.error('Could not put the rig back after a failed fixture edit:', error)
+      restored = false
+    }
+    return restored
   }
 
   private findLightInRig(rig: DmxRig, lightId: string): DmxLight | null {
