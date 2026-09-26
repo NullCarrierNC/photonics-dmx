@@ -17,65 +17,116 @@ const readNodeCueFile = jest.mocked(ipcApi.readNodeCueFile)
 
 import { useCueFileIO, type UseCueFileIOParams } from './useCueFileIO'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
-import type { NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { EditorDocument } from '../lib/types'
+import type {
+  NetNodeCueDefinition,
+  NetNodeCueFile,
+  NodeCueFile,
+  NodeCueKind,
+  YargEffectDefinition,
+  YargEffectFile,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { CueType } from '../../../../../photonics-dmx/cues/types/cueTypes'
+import type { EditorDocument, EditorMode } from '../lib/types'
 import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
+
+const SAVED_PATH = '/cues/motion-cues.json'
 
 const fileSummary = (): NodeCueFileSummary =>
   ({
-    path: '/cues/motion-cues.json',
+    path: SAVED_PATH,
     groupId: 'motion-group',
     mode: 'yarg',
   }) as NodeCueFileSummary
 
-/** A file holding both kinds, with the lighting cue sorting first by name. */
-const mixedFile = () => ({
+const cue = (id: string, kind: NodeCueKind, name: string): NetNodeCueDefinition => {
+  const graph = { id, name, nodes: { events: [], actions: [] }, connections: [] }
+  return kind === 'motion'
+    ? { ...graph, kind }
+    : { ...graph, kind, cueType: CueType.Chorus, style: 'primary' }
+}
+
+const effect = (id: string, name: string): YargEffectDefinition => ({
+  id,
+  name,
   mode: 'yarg',
-  group: { id: 'g', name: 'Group' },
-  cues: [
-    { id: 'cue-motion-b', kind: 'motion', name: 'Bravo Motion' },
-    { id: 'cue-light', kind: 'lighting', name: 'Alpha Lighting' },
-    { id: 'cue-motion-a', kind: 'motion', name: 'Alpha Motion' },
-  ],
+  nodes: { events: [], actions: [] },
+  connections: [],
 })
 
-/** A document open at the saved path, in the given mode, holding `file`. */
-const openAt = (mode: 'cue' | 'effect', file: unknown) => ({
-  mode,
-  path: '/cues/motion-cues.json',
-  file,
+const cueFileOf = (...cues: NetNodeCueDefinition[]): NetNodeCueFile => ({
+  version: 1,
+  mode: 'yarg',
+  group: { id: 'g', name: 'Group' },
+  cues,
+})
+
+/** A file holding both kinds, with the lighting cue sorting first by name. */
+const mixedFile = (): NetNodeCueFile =>
+  cueFileOf(
+    cue('cue-motion-b', 'motion', 'Bravo Motion'),
+    cue('cue-light', 'lighting', 'Alpha Lighting'),
+    cue('cue-motion-a', 'motion', 'Alpha Motion'),
+  )
+
+const effectFile = (): YargEffectFile => ({
+  version: 1,
+  mode: 'yarg',
+  group: { id: 'g', name: 'Group' },
+  effects: [effect('effect-b', 'Bravo Effect'), effect('effect-a', 'Alpha Effect')],
+})
+
+/** A document open at the saved path, in the given mode, with the items `added` after its own. */
+const openAt = (mode: EditorMode, ...added: string[]): EditorDocument => {
+  if (mode === 'cue') {
+    const file = mixedFile()
+    const cues = [...file.cues, ...added.map((id) => cue(id, 'lighting', id))]
+    return { mode, path: SAVED_PATH, file: { ...file, cues } }
+  }
+  const file = effectFile()
+  const effects = [...file.effects, ...added.map((id) => effect(id, id))]
+  return { mode, path: SAVED_PATH, file: { ...file, effects } }
+}
+
+/** The document as version 4 of a shipped library. */
+const shipped = (doc: EditorDocument): EditorDocument =>
+  doc.mode === 'cue'
+    ? { ...doc, file: { ...doc.file, bundled: true, cueVersion: 4 } }
+    : { ...doc, file: { ...doc.file, bundled: true, cueVersion: 4 } }
+
+const callbacks = () => ({
+  setEditorDoc: jest.fn<UseCueFileIOParams['setEditorDoc']>(),
+  setFilename: jest.fn<UseCueFileIOParams['setFilename']>(),
+  setSelectedCueId: jest.fn<UseCueFileIOParams['setSelectedCueId']>(),
+  setMode: jest.fn<UseCueFileIOParams['setMode']>(),
+  setCueKind: jest.fn<UseCueFileIOParams['setCueKind']>(),
+  setValidationErrors: jest.fn<UseCueFileIOParams['setValidationErrors']>(),
+  setIsDirty: jest.fn<UseCueFileIOParams['setIsDirty']>(),
+  loadCueIntoFlow: jest.fn<UseCueFileIOParams['loadCueIntoFlow']>(),
+  rememberLastFilePath: jest.fn<UseCueFileIOParams['rememberLastFilePath']>(),
+  clearLastFilePath: jest.fn<UseCueFileIOParams['clearLastFilePath']>(),
+  onSaveError: jest.fn<(message: string) => void>(),
+})
+
+/** The hook's parameters with nothing open, over `mocks` and then `overrides`. */
+const params = (
+  mocks: ReturnType<typeof callbacks>,
+  overrides: Partial<UseCueFileIOParams> = {},
+): UseCueFileIOParams => ({
+  editorDoc: null,
+  filename: 'untitled.json',
+  selectedCueId: null,
+  cueKind: 'lighting',
+  getUpdatedDocument: () => null,
+  refreshFiles: jest.fn(async () => undefined),
+  refreshEffectFiles: jest.fn(async () => undefined),
+  lastStoredFilePathRef: { current: null },
+  ...mocks,
+  ...overrides,
 })
 
 const setup = (overrides: Partial<UseCueFileIOParams> = {}) => {
-  const mocks = {
-    setEditorDoc: jest.fn(),
-    setFilename: jest.fn(),
-    setSelectedCueId: jest.fn(),
-    setMode: jest.fn(),
-    setCueKind: jest.fn(),
-    setValidationErrors: jest.fn(),
-    setIsDirty: jest.fn(),
-    loadCueIntoFlow: jest.fn(),
-    rememberLastFilePath: jest.fn(),
-    clearLastFilePath: jest.fn(),
-    onSaveError: jest.fn(),
-  }
-
-  const rendered = renderHook(() =>
-    useCueFileIO({
-      editorDoc: null,
-      filename: 'untitled.json',
-      selectedCueId: null,
-      cueKind: 'lighting',
-      getUpdatedDocument: jest.fn<() => null>(() => null),
-      refreshFiles: jest.fn(async () => undefined),
-      refreshEffectFiles: jest.fn(async () => undefined),
-      lastStoredFilePathRef: { current: null as string | null },
-      ...mocks,
-      ...overrides,
-    } as UseCueFileIOParams),
-  )
-
+  const mocks = callbacks()
+  const rendered = renderHook(() => useCueFileIO(params(mocks, overrides)))
   return { rendered, ...mocks }
 }
 
@@ -85,7 +136,7 @@ describe('useCueFileIO selectFile', () => {
   })
 
   it('synchronises cue kind from the preferred cue', async () => {
-    readNodeCueFile.mockResolvedValue(mixedFile() as never)
+    readNodeCueFile.mockResolvedValue(mixedFile())
     const { rendered, setCueKind, setSelectedCueId, loadCueIntoFlow } = setup()
 
     await act(async () => {
@@ -100,7 +151,7 @@ describe('useCueFileIO selectFile', () => {
   })
 
   it('keeps the active kind when a mixed file is opened with no preferred cue', async () => {
-    readNodeCueFile.mockResolvedValue(mixedFile() as never)
+    readNodeCueFile.mockResolvedValue(mixedFile())
     const { rendered, setCueKind, setSelectedCueId } = setup({ cueKind: 'motion' })
 
     await act(async () => {
@@ -115,11 +166,7 @@ describe('useCueFileIO selectFile', () => {
   })
 
   it('falls back across kinds when the file holds none of the active kind', async () => {
-    readNodeCueFile.mockResolvedValue({
-      mode: 'yarg',
-      group: { id: 'g', name: 'Group' },
-      cues: [{ id: 'cue-motion', kind: 'motion', name: 'Motion Cue' }],
-    } as never)
+    readNodeCueFile.mockResolvedValue(cueFileOf(cue('cue-motion', 'motion', 'Motion Cue')))
     const { rendered, setCueKind, setSelectedCueId } = setup({ cueKind: 'lighting' })
 
     await act(async () => {
@@ -131,7 +178,7 @@ describe('useCueFileIO selectFile', () => {
   })
 
   it('prefers the kind override over the active kind', async () => {
-    readNodeCueFile.mockResolvedValue(mixedFile() as never)
+    readNodeCueFile.mockResolvedValue(mixedFile())
     const { rendered, setCueKind, setSelectedCueId } = setup({ cueKind: 'lighting' })
 
     await act(async () => {
@@ -143,32 +190,21 @@ describe('useCueFileIO selectFile', () => {
   })
 
   it('ignores a superseded read so the newest selection wins', async () => {
-    let resolveFirst: (value: unknown) => void = () => {}
+    let resolveFirst: (value: NodeCueFile) => void = () => {}
     readNodeCueFile
       .mockReturnValueOnce(
         new Promise((resolve) => {
           resolveFirst = resolve
-        }) as never,
+        }),
       )
-      .mockResolvedValueOnce({
-        mode: 'yarg',
-        group: { id: 'g', name: 'Group' },
-        cues: [{ id: 'second-cue', kind: 'lighting', name: 'Second' }],
-      } as never)
+      .mockResolvedValueOnce(cueFileOf(cue('second-cue', 'lighting', 'Second')))
 
     const { rendered, setSelectedCueId } = setup()
 
     await act(async () => {
       const stale = rendered.result.current.selectFile(fileSummary())
-      await rendered.result.current.selectFile({
-        ...fileSummary(),
-        path: '/cues/second.json',
-      } as NodeCueFileSummary)
-      resolveFirst({
-        mode: 'yarg',
-        group: { id: 'g', name: 'Group' },
-        cues: [{ id: 'first-cue', kind: 'lighting', name: 'First' }],
-      })
+      await rendered.result.current.selectFile({ ...fileSummary(), path: '/cues/second.json' })
+      resolveFirst(cueFileOf(cue('first-cue', 'lighting', 'First')))
       await stale
     })
 
@@ -194,27 +230,17 @@ describe('useCueFileIO handleReload', () => {
     resetIpcApiMock()
   })
 
-  const openDoc = (selectedCueId: string | null) => ({
-    editorDoc: {
-      mode: 'cue',
-      path: '/cues/motion-cues.json',
-      file: mixedFile(),
-    },
+  const openDoc = (selectedCueId: string | null): Partial<UseCueFileIOParams> => ({
+    editorDoc: openAt('cue'),
     filename: 'motion-cues.json',
     selectedCueId,
-    lastStoredFilePathRef: { current: '/cues/motion-cues.json' as string | null },
+    lastStoredFilePathRef: { current: SAVED_PATH },
   })
 
   it('synchronises cue kind before selection and flow updates on reload', async () => {
-    readNodeCueFile.mockResolvedValue({
-      mode: 'yarg',
-      group: { id: 'g', name: 'Group' },
-      cues: [{ id: 'cue-motion', kind: 'motion', name: 'Motion Cue' }],
-    } as never)
+    readNodeCueFile.mockResolvedValue(cueFileOf(cue('cue-motion', 'motion', 'Motion Cue')))
 
-    const { rendered, setCueKind, setSelectedCueId, loadCueIntoFlow } = setup({
-      ...openDoc('cue-motion'),
-    } as Partial<UseCueFileIOParams>)
+    const { rendered, setCueKind, setSelectedCueId, loadCueIntoFlow } = setup(openDoc('cue-motion'))
 
     await act(async () => {
       await rendered.result.current.handleReload()
@@ -230,12 +256,12 @@ describe('useCueFileIO handleReload', () => {
   })
 
   it('prefers the active kind when the selected cue is gone', async () => {
-    readNodeCueFile.mockResolvedValue(mixedFile() as never)
+    readNodeCueFile.mockResolvedValue(mixedFile())
 
     const { rendered, setCueKind, setSelectedCueId } = setup({
       ...openDoc('deleted-cue'),
       cueKind: 'motion',
-    } as Partial<UseCueFileIOParams>)
+    })
 
     await act(async () => {
       await rendered.result.current.handleReload()
@@ -251,34 +277,24 @@ describe('useCueFileIO handleSave', () => {
     resetIpcApiMock()
   })
 
-  const openCueDoc = (): Partial<UseCueFileIOParams> =>
-    ({
-      editorDoc: {
-        mode: 'cue',
-        path: '/cues/motion-cues.json',
-        file: mixedFile(),
-      },
-      filename: 'motion-cues.json',
-      selectedCueId: 'cue-light',
-      cueKind: 'lighting',
-      getUpdatedDocument: jest.fn(() => openAt('cue', mixedFile())),
-      lastStoredFilePathRef: { current: '/cues/motion-cues.json' as string | null },
-    }) as unknown as Partial<UseCueFileIOParams>
+  const openCueDoc = (): Partial<UseCueFileIOParams> => ({
+    editorDoc: openAt('cue'),
+    filename: 'motion-cues.json',
+    selectedCueId: 'cue-light',
+    cueKind: 'lighting',
+    getUpdatedDocument: () => openAt('cue'),
+    lastStoredFilePathRef: { current: SAVED_PATH },
+  })
 
   it('leaves the file dirty when it was edited while the save ran', async () => {
     jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
     jest
       .mocked(ipcApi.saveNodeCueFile)
-      .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
-    const edited = { ...mixedFile(), cues: [] }
-    const getUpdatedDocument = jest.fn(() => openAt('cue', mixedFile()))
-    getUpdatedDocument
-      .mockReturnValueOnce(openAt('cue', mixedFile()))
-      .mockReturnValue(openAt('cue', edited))
-    const { rendered, setIsDirty } = setup({
-      ...openCueDoc(),
-      getUpdatedDocument: getUpdatedDocument as never,
-    })
+      .mockResolvedValue({ success: true, path: SAVED_PATH } as never)
+    const edited: EditorDocument = { mode: 'cue', path: SAVED_PATH, file: cueFileOf() }
+    const getUpdatedDocument = jest.fn<UseCueFileIOParams['getUpdatedDocument']>()
+    getUpdatedDocument.mockReturnValueOnce(openAt('cue')).mockReturnValue(edited)
+    const { rendered, setIsDirty } = setup({ ...openCueDoc(), getUpdatedDocument })
 
     await act(async () => {
       await rendered.result.current.handleSave()
@@ -294,19 +310,15 @@ describe('useCueFileIO handleSave', () => {
     'keeps an edit made while the %s file saved in the open document',
     async (docMode, save, validate) => {
       jest.mocked(ipcApi[validate]).mockResolvedValue({ valid: true, errors: [] } as never)
-      jest
-        .mocked(ipcApi[save])
-        .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
-      const added = { ...mixedFile(), cues: [...mixedFile().cues, { id: 'cue-new', name: 'New' }] }
-      const getUpdatedDocument = jest.fn(() => openAt(docMode, mixedFile()))
-      getUpdatedDocument
-        .mockReturnValueOnce(openAt(docMode, mixedFile()))
-        .mockReturnValue(openAt(docMode, added))
+      jest.mocked(ipcApi[save]).mockResolvedValue({ success: true, path: SAVED_PATH } as never)
+      const edited = openAt(docMode, 'item-new')
+      const getUpdatedDocument = jest.fn<UseCueFileIOParams['getUpdatedDocument']>()
+      getUpdatedDocument.mockReturnValueOnce(openAt(docMode)).mockReturnValue(edited)
       const { rendered, setEditorDoc, setIsDirty } = setup({
         ...openCueDoc(),
-        editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: mixedFile() },
-        getUpdatedDocument: getUpdatedDocument as never,
-      } as unknown as Partial<UseCueFileIOParams>)
+        editorDoc: openAt(docMode),
+        getUpdatedDocument,
+      })
 
       let saved: boolean | undefined
       await act(async () => {
@@ -314,37 +326,23 @@ describe('useCueFileIO handleSave', () => {
       })
 
       expect(saved).toBe(true)
-      expect(setEditorDoc).toHaveBeenLastCalledWith({
-        mode: docMode,
-        path: '/cues/motion-cues.json',
-        file: expect.objectContaining({
-          cues: expect.arrayContaining([expect.objectContaining({ id: 'cue-new' })]),
-        }),
-      })
+      expect(setEditorDoc).toHaveBeenLastCalledWith(edited)
       expect(setIsDirty).toHaveBeenLastCalledWith(true)
     },
   )
 
   it('leaves a file opened while the save ran as it is', async () => {
     jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
-    let answerSave: (value: unknown) => void = () => {}
+    let answerSave: (value: { success: true; path: string }) => void = () => {}
     jest.mocked(ipcApi.saveNodeCueFile).mockReturnValue(
       new Promise((resolve) => {
         answerSave = resolve
-      }) as never,
+      }),
     )
-    const mocks = {
-      setEditorDoc: jest.fn(),
-      setIsDirty: jest.fn(),
-      rememberLastFilePath: jest.fn(),
-    }
-    const saving = {
-      ...openCueDoc(),
-      ...mocks,
-      refreshFiles: jest.fn(async () => undefined),
-    } as unknown as UseCueFileIOParams
-    const other = { mode: 'cue', path: '/cues/other.json', file: mixedFile() }
-    const { result, rerender } = renderHook((params) => useCueFileIO(params), {
+    const mocks = callbacks()
+    const saving = params(mocks, openCueDoc())
+    const other: EditorDocument = { mode: 'cue', path: '/cues/other.json', file: mixedFile() }
+    const { result, rerender } = renderHook((props) => useCueFileIO(props), {
       initialProps: saving,
     })
 
@@ -352,13 +350,9 @@ describe('useCueFileIO handleSave', () => {
     await act(async () => {
       pending = result.current.handleSave()
     })
-    rerender({
-      ...saving,
-      editorDoc: other,
-      getUpdatedDocument: () => other,
-    } as unknown as UseCueFileIOParams)
+    rerender({ ...saving, editorDoc: other, getUpdatedDocument: () => other })
     await act(async () => {
-      answerSave({ success: true, path: '/cues/motion-cues.json' })
+      answerSave({ success: true, path: SAVED_PATH })
       await pending
     })
 
@@ -374,10 +368,10 @@ describe('useCueFileIO handleSave', () => {
   ] as const)('says so when no %s in the file is selected', async (docMode, message) => {
     const { rendered, onSaveError } = setup({
       ...openCueDoc(),
-      editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: mixedFile() },
+      editorDoc: openAt(docMode),
       selectedCueId: 'not-in-file',
-      getUpdatedDocument: jest.fn(() => null) as never,
-    } as unknown as Partial<UseCueFileIOParams>)
+      getUpdatedDocument: () => null,
+    })
 
     let saved: boolean | undefined
     await act(async () => {
@@ -394,7 +388,7 @@ describe('useCueFileIO handleSave', () => {
     jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
     jest
       .mocked(ipcApi.saveNodeCueFile)
-      .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
+      .mockResolvedValue({ success: true, path: SAVED_PATH } as never)
     const { rendered, setIsDirty } = setup(openCueDoc())
 
     await act(async () => {
@@ -408,7 +402,7 @@ describe('useCueFileIO handleSave', () => {
     jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
     jest.mocked(ipcApi.saveNodeCueFile).mockResolvedValue({
       success: true,
-      path: '/cues/motion-cues.json',
+      path: SAVED_PATH,
       groupEnableError: 'disk full',
     } as never)
     const { rendered, onSaveError, setIsDirty } = setup(openCueDoc())
@@ -428,25 +422,21 @@ describe('useCueFileIO handleSave', () => {
     'keeps the shipped marker when a %s file saves in place',
     async (docMode, save, validate) => {
       jest.mocked(ipcApi[validate]).mockResolvedValue({ valid: true, errors: [] } as never)
-      jest
-        .mocked(ipcApi[save])
-        .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
-      const shipped = { ...mixedFile(), bundled: true, cueVersion: 4 }
+      jest.mocked(ipcApi[save]).mockResolvedValue({ success: true, path: SAVED_PATH } as never)
+      const doc = shipped(openAt(docMode))
       const { rendered, setEditorDoc, setIsDirty } = setup({
         ...openCueDoc(),
-        editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: shipped },
-        getUpdatedDocument: jest.fn(() => openAt(docMode, shipped)) as never,
-      } as unknown as Partial<UseCueFileIOParams>)
+        editorDoc: doc,
+        getUpdatedDocument: () => doc,
+      })
 
       await act(async () => {
         await rendered.result.current.handleSave()
       })
 
-      const sent = jest.mocked(ipcApi[save]).mock.calls[0][0] as { content: object }
+      const sent = jest.mocked(ipcApi[save]).mock.calls[0][0]
       expect(sent.content).toMatchObject({ bundled: true, cueVersion: 4 })
-      expect(setEditorDoc).toHaveBeenLastCalledWith(
-        expect.objectContaining({ file: expect.objectContaining({ bundled: true }) }),
-      )
+      expect(setEditorDoc).toHaveBeenLastCalledWith(doc)
       expect(setIsDirty).toHaveBeenLastCalledWith(false)
     },
   )
@@ -512,13 +502,11 @@ describe('useCueFileIO delete and export', () => {
     resetIpcApiMock()
   })
 
-  const openCueDoc = (): Partial<UseCueFileIOParams> =>
-    ({
-      editorDoc: { mode: 'cue', path: '/cues/motion-cues.json', file: mixedFile() },
-      filename: 'motion-cues.json',
-      selectedCueId: 'cue-light',
-    }) as unknown as Partial<UseCueFileIOParams>
-
+  const openCueDoc = (): Partial<UseCueFileIOParams> => ({
+    editorDoc: openAt('cue'),
+    filename: 'motion-cues.json',
+    selectedCueId: 'cue-light',
+  })
   it('keeps the file open and says why when the delete is refused', async () => {
     jest
       .mocked(ipcApi.deleteNodeCueFile)
@@ -567,21 +555,16 @@ describe('useCueFileIO revertCurrentFileToDisk', () => {
     resetIpcApiMock()
   })
 
-  const openDoc = (selectedCueId: string | null) =>
-    ({
-      editorDoc: {
-        mode: 'cue',
-        path: '/cues/motion-cues.json',
-        file: mixedFile(),
-      },
-      filename: 'motion-cues.json',
-      selectedCueId,
-      cueKind: 'motion',
-      lastStoredFilePathRef: { current: '/cues/motion-cues.json' as string | null },
-    }) as Partial<UseCueFileIOParams>
+  const openDoc = (selectedCueId: string | null): Partial<UseCueFileIOParams> => ({
+    editorDoc: openAt('cue'),
+    filename: 'motion-cues.json',
+    selectedCueId,
+    cueKind: 'motion',
+    lastStoredFilePathRef: { current: SAVED_PATH },
+  })
 
   it('keeps the selected cue and reloads it when it survives the revert', async () => {
-    readNodeCueFile.mockResolvedValue(mixedFile() as never)
+    readNodeCueFile.mockResolvedValue(mixedFile())
     const { rendered, setCueKind, setSelectedCueId, loadCueIntoFlow, setIsDirty } = setup(
       openDoc('cue-motion-b'),
     )
@@ -597,7 +580,7 @@ describe('useCueFileIO revertCurrentFileToDisk', () => {
   })
 
   it('reselects the first cue of the active kind when the selection is gone', async () => {
-    readNodeCueFile.mockResolvedValue(mixedFile() as never)
+    readNodeCueFile.mockResolvedValue(mixedFile())
     const { rendered, setSelectedCueId, loadCueIntoFlow } = setup(openDoc('unsaved-cue'))
 
     await act(async () => {
