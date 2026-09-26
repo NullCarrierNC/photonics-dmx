@@ -220,3 +220,41 @@ describe('the built-in action literal check', () => {
     expect(result.valid && result.warnings).toEqual([])
   })
 })
+
+describe('the built-in array compare check', () => {
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  const withCompare = (left: Record<string, unknown>): Record<string, unknown> => {
+    const file = JSON.parse(
+      fs.readFileSync(path.join(CUE_ROOT, 'yarg', 'yarg-stagekit.json'), 'utf8'),
+    ) as { cues: { name: string; nodes: { logic?: unknown[] } }[] }
+    const cue = file.cues.find((c) => c.name === 'Searchlights')!
+    cue.nodes.logic = [
+      ...(cue.nodes.logic ?? []),
+      {
+        id: 'gate',
+        type: 'logic',
+        logicType: 'conditional',
+        comparator: '>',
+        left,
+        right: { source: 'literal', value: 0 },
+      },
+    ]
+    return file
+  }
+
+  it('warns when a conditional compares a light-array variable', () => {
+    const result = validateYargNodeCueFile(withCompare({ source: 'variable', name: 'allLights' }))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "cue 'Searchlights': conditional 'gate': 'allLights' is a light-array variable",
+    )
+  })
+
+  it('leaves a number variable alone', () => {
+    const result = validateYargNodeCueFile(withCompare({ source: 'variable', name: 'numLights' }))
+
+    expect(result.valid && result.warnings).toEqual([])
+  })
+})

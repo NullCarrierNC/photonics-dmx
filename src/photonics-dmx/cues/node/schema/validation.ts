@@ -27,7 +27,7 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 import { getCueDomain } from '../../domains'
 import { checkContinuousCueCalledWaits } from './audioEventPolicyCheck'
-import { actionLiteralIssues } from '../cueValueRules'
+import { actionLiteralIssues, compareOperandIssue } from '../cueValueRules'
 
 export type { StructuredValidationError } from './helpers'
 
@@ -90,6 +90,7 @@ export function __resetCueSemanticChecksForTests(): void {
   registerCueSemanticCheck(checkEventVocabulary)
   registerCueSemanticCheck(checkContinuousCueCalledWaits)
   registerCueSemanticCheck(checkActionLiteralWarnings)
+  registerCueSemanticCheck(checkArrayCompares)
 }
 
 /**
@@ -135,9 +136,24 @@ function checkActionLiteralWarnings(
   }
 }
 
+/** Warn about a conditional that compares an array variable, which reads as 0. */
+function checkArrayCompares(file: NodeCueFile, _errors: string[], warnings: string[]): void {
+  for (const cue of file.cues) {
+    const variables = [...(file.group.variables ?? []), ...(cue.variables ?? [])]
+    for (const node of cue.nodes.logic ?? []) {
+      if (node.logicType !== 'conditional') continue
+      for (const side of [node.left, node.right]) {
+        const issue = compareOperandIssue(side, variables)
+        if (issue) warnings.push(`cue '${cue.name}': conditional '${node.id}': ${issue.message}.`)
+      }
+    }
+  }
+}
+
 registerCueSemanticCheck(checkEventVocabulary)
 registerCueSemanticCheck(checkContinuousCueCalledWaits)
 registerCueSemanticCheck(checkActionLiteralWarnings)
+registerCueSemanticCheck(checkArrayCompares)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,

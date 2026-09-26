@@ -362,3 +362,19 @@ export function initialValueIssue(type: VariableType, value: unknown): ValueIssu
   }
   return error(`${shown(value)} is not a ${type} value, it reads as ${shown(read)}`)
 }
+
+/**
+ * Whether a conditional reading `source` compares what the author sees. It compares an array as a
+ * number, and an array reads as 0 whatever it holds.
+ */
+export function compareOperandIssue(
+  source: ValueSource | undefined,
+  variables: ReadonlyArray<{ name: string; type: string }>,
+): ValueIssue | null {
+  if (source?.source !== 'variable') return null
+  const type = variables.find((v) => v.name === source.name)?.type
+  if (type !== 'light-array' && type !== 'color-array') return null
+  return warning(
+    `'${source.name}' is a ${type} variable, which a compare reads as 0. An array-length node gives its size`,
+  )
+}
