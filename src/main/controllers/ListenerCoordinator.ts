@@ -12,6 +12,7 @@ import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import type { Rb3RunningMode } from '../../shared/ipc/listenerTypes'
 import { createLogger } from '../../shared/logger'
 import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { buildDomainChainHandlers } from './cueRuntimeDomains'
@@ -82,14 +83,22 @@ export class ListenerCoordinator {
     }
   }
 
-  /** Records whether a listener runs and tells every window, whatever started or stopped it. */
+  /**
+   * Records whether a listener runs and tells every window, whatever started or stopped it. RB3's
+   * announcement carries the mode its session runs.
+   */
   private setListenerEnabled(listener: 'yarg' | 'rb3', enabled: boolean): void {
     if (listener === 'yarg') {
       this.isYargEnabled = enabled
-    } else {
-      this.isRb3Enabled = enabled
+      this.deps.sendToAllWindows(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, { listener, enabled })
+      return
     }
-    this.deps.sendToAllWindows(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, { listener, enabled })
+    this.isRb3Enabled = enabled
+    this.deps.sendToAllWindows(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, {
+      listener,
+      enabled,
+      mode: this.getRb3Mode(),
+    })
   }
 
   public async enableYarg(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
@@ -437,7 +446,7 @@ export class ListenerCoordinator {
     await this.teardownRb3({ blackout: true })
   }
 
-  public getRb3Mode(): ProcessingMode | 'none' {
+  public getRb3Mode(): Rb3RunningMode {
     if (!this.isRb3Enabled || !this.processorManager) {
       return 'none'
     }

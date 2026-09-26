@@ -11,6 +11,7 @@
 import { CUE, LIGHT, RENDERER_RECEIVE, RENDERER_SEND } from '../ipcChannels'
 import type { MasterOutputSnapshot } from '../../photonics-dmx/controllers/MasterOutputState'
 import type { BlackoutShortcutBinding } from '../blackoutShortcut'
+import type { Rb3RunningMode } from './listenerTypes'
 import type { CueData, CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { NodeCueListSummary } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -87,7 +88,9 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
-  [RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED]: { listener: 'yarg' | 'rb3'; enabled: boolean }
+  [RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED]:
+    | { listener: 'yarg'; enabled: boolean }
+    | { listener: 'rb3'; enabled: boolean; mode: Rb3RunningMode }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
   [RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED]: undefined

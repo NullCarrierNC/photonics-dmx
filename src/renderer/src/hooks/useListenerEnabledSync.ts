@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useSetAtom } from 'jotai'
-import { rb3eListenerEnabledAtom, yargListenerEnabledAtom } from '../atoms'
+import { rb3eListenerEnabledAtom, rb3RunningModeAtom, yargListenerEnabledAtom } from '../atoms'
 import { getSystemStatus } from '../ipcApi'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { useLatestGenerationGate } from './useLatestGenerationGate'
@@ -10,13 +10,15 @@ import { createLogger } from '../../../shared/logger'
 const log = createLogger('useListenerEnabledSync')
 
 /**
- * Keeps yargListenerEnabledAtom and rb3eListenerEnabledAtom on what main is running: read on mount
- * and after a restart, then followed from each start and stop main announces. WindowShell runs it
- * once per window beside useAudioEnabledSync, so a switch in any window locks the others.
+ * Keeps yargListenerEnabledAtom, rb3eListenerEnabledAtom and rb3RunningModeAtom on what main is
+ * running: read on mount and after a restart, then followed from each start and stop main
+ * announces. WindowShell runs it once per window beside useAudioEnabledSync, so a switch in any
+ * window locks the others.
  */
 export function useListenerEnabledSync(): void {
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
+  const setRb3Mode = useSetAtom(rb3RunningModeAtom)
   const { nextGeneration, isCurrentGeneration } = useLatestGenerationGate()
 
   useEffect(() => {
@@ -27,6 +29,7 @@ export function useListenerEnabledSync(): void {
           if (!status.success || !isCurrentGeneration(token)) return
           setYargEnabled(status.isYargEnabled)
           setRb3Enabled(status.isRb3Enabled)
+          setRb3Mode(status.rb3Mode)
         },
         (error: unknown) => log.error('Failed to read which listener is running:', error),
       )
@@ -43,6 +46,7 @@ export function useListenerEnabledSync(): void {
           setYargEnabled(payload.enabled)
         } else {
           setRb3Enabled(payload.enabled)
+          setRb3Mode(payload.mode)
         }
       },
     )
@@ -50,5 +54,5 @@ export function useListenerEnabledSync(): void {
       stopRestart()
       stopChanged()
     }
-  }, [setYargEnabled, setRb3Enabled, nextGeneration, isCurrentGeneration])
+  }, [setYargEnabled, setRb3Enabled, setRb3Mode, nextGeneration, isCurrentGeneration])
 }

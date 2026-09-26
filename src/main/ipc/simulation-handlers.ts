@@ -453,6 +453,7 @@ export function setupSimulationHandlers(
       success: true,
       isYargEnabled: controllerManager.getIsYargEnabled(),
       isRb3Enabled: controllerManager.getIsRb3Enabled(),
+      rb3Mode: controllerManager.getListenerLifecycle().yargRb3.getRb3Mode(),
       senderStatus: controllerManager.getSenderLifecycle().getOutputSenderStatus(),
     }
   })
