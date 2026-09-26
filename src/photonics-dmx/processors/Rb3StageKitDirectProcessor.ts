@@ -38,7 +38,8 @@ const log = createLogger('Rb3StageKitDirectProcessor')
 export class Rb3StageKitDirectProcessor extends EventEmitter {
   private config: StageKitConfig
   /** Per-rig render processors keyed by rigId. Order doesn't matter — strobes/colours
-   *  run independently per rig. Built at construction; managed by `refreshRigs`. */
+   *  run independently per rig. Built once at construction, since a rig change restarts
+   *  the controllers. */
   private rigs: Map<string, Rb3StageKitRigProcessor> = new Map()
 
   // Bound event handler for proper cleanup
@@ -94,30 +95,15 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       log.warn('StageKitDirectProcessor: strobe outlived its packets, cutting it.')
       this.clearStrobeEffectsAtPositions([])
     })
-    this.rebuildRigProcessorsFromChains()
+    this.buildRigProcessors()
   }
 
   /**
-   * Synchronise `this.rigs` with the current chain list. Constructs a new rig processor
-   * for chains that joined; disposes processors for chains that left. Chains whose light
-   * count is below StageKit's 4-light minimum are skipped with a warning so a misconfigured
-   * rig can't break RB3 on its siblings. Public via `refreshRigs()`.
+   * Constructs one rig processor per chain. Chains whose light count is below StageKit's 4-light
+   * minimum are skipped with a warning so a misconfigured rig can't break RB3 on its siblings.
    */
-  private rebuildRigProcessorsFromChains(): void {
-    const chains = this.chainFanout.getChains()
-    const currentRigIds = new Set(chains.map((c) => c.rigId))
-
-    // Dispose rigs that left the active set.
-    for (const [rigId, rig] of this.rigs) {
-      if (!currentRigIds.has(rigId)) {
-        rig.dispose()
-        this.rigs.delete(rigId)
-      }
-    }
-
-    // Add rigs that joined.
-    for (const chain of chains) {
-      if (this.rigs.has(chain.rigId)) continue
+  private buildRigProcessors(): void {
+    for (const chain of this.chainFanout.getChains()) {
       try {
         const rig = new Rb3StageKitRigProcessor(
           chain.rigId,
@@ -127,20 +113,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
           this.getOutputRateHz,
         )
         this.rigs.set(rig.rigId, rig)
-        // A rig that joins during a strobe strobes with the others straight away.
-        if (this._currentStrobeType) {
-          rig.applyStrobeEffect(this._currentStrobeType, this._strobeStartedAt)
-        }
       } catch (err) {
         // Most likely the chain has <4 lights — skip it but keep the others working.
         log.warn(`Skipping StageKit rig ${chain.rigId}: ${(err as Error).message}`)
       }
     }
-  }
-
-  /** Public entry point for re-syncing the rig processors with the chain list. Idempotent. */
-  public refreshRigs(): void {
-    this.rebuildRigProcessorsFromChains()
   }
 
   /**

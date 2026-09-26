@@ -5,7 +5,6 @@
  * from the same LED positions.
  */
 import { EventEmitter } from 'events'
-import * as perfHooks from 'perf_hooks'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
@@ -39,24 +38,6 @@ function makeEightLightConfig(prefix = 'b') {
     ),
     backLights: [],
     strobeLights: [],
-  })
-}
-
-/** Four lights with the first one strobe-capable, named by `prefix`. */
-function makeStrobeConfig(prefix: string) {
-  const lights = Array.from({ length: 4 }, (_, i) =>
-    rgbLight({
-      id: `${prefix}-f${i}`,
-      position: i,
-      fixtureId: `${prefix}-f${i}`,
-      isStrobeEnabled: i === 0,
-    }),
-  )
-  return createMockLightingConfig({
-    numLights: 4,
-    frontLights: lights,
-    backLights: [],
-    strobeLights: [lights[0]],
   })
 }
 
@@ -326,56 +307,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(bHits).toHaveLength(1)
   })
 
-  it('a rig that joins during a strobe starts strobing with the others', async () => {
-    const strobeRig = (rigId: string) =>
-      makeChain(
-        rigId,
-        rigId === 'a',
-        createMockLightingConfig({
-          numLights: 4,
-          frontLights: [0, 1, 2, 3].map((position) =>
-            rgbLight({
-              id: `${rigId}-f${position}`,
-              position,
-              fixtureId: `${rigId}-f${position}`,
-              isStrobeEnabled: position === 0,
-            }),
-          ),
-          backLights: [],
-          strobeLights: [
-            rgbLight({
-              id: `${rigId}-f0`,
-              position: 0,
-              fixtureId: `${rigId}-f0`,
-              isStrobeEnabled: true,
-            }),
-          ],
-        }),
-      )
-    const a = strobeRig('a')
-    const b = strobeRig('b')
-    fanout.setChains([a.chain])
-    processor = new Rb3StageKitDirectProcessor(fanout)
-    processor.startListening(networkListener)
-    networkListener.emit('stagekit:data', {
-      positions: [0],
-      color: 'off',
-      strobeEffect: 'medium',
-      timestamp: Date.now(),
-    })
-
-    fanout.setChains([a.chain, b.chain])
-    processor.refreshRigs()
-    jest.advanceTimersByTime(100)
-    await Promise.resolve()
-
-    const bIds = b.setState.mock.calls.flatMap((c) => (c[0] as { id: string }[]).map((l) => l.id))
-    expect(bIds).toContain('b-f0')
-    expect(
-      processor.getStatus().activeStrobeEffects.some((s) => s.startsWith('stagekit-strobe-b-')),
-    ).toBe(true)
-  })
-
   it('one rig in strobe does not cause the other rig to receive setState calls', async () => {
     // Only chain A has a strobe-flagged light; chain B has no strobe lights configured.
     // The strobe should run on A only — B's sequencer never receives strobe-derived
@@ -510,73 +441,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(blend.blendedColor).not.toBeNull()
   })
 
-  it('refreshRigs adds processors for new chains and disposes processors for removed ones', () => {
-    const a = makeChain('a', true, makeFourLightConfig())
-    const b = makeChain(
-      'b',
-      false,
-      createMockLightingConfig({
-        numLights: 4,
-        frontLights: [
-          rgbLight({ id: 'b-f0', position: 0, fixtureId: 'b-f0' }),
-          rgbLight({ id: 'b-f1', position: 1, fixtureId: 'b-f1' }),
-          rgbLight({ id: 'b-f2', position: 2, fixtureId: 'b-f2' }),
-          rgbLight({ id: 'b-f3', position: 3, fixtureId: 'b-f3' }),
-        ],
-        backLights: [],
-        strobeLights: [],
-      }),
-    )
-
-    // Start with rig A only.
-    fanout.setChains([a.chain])
-    processor = new Rb3StageKitDirectProcessor(fanout)
-    processor.startListening(networkListener)
-
-    // First gameplay event reaches A only.
-    networkListener.emit('stagekit:data', {
-      positions: [0, 1],
-      color: 'red',
-      timestamp: Date.now(),
-    })
-    flushBlendingTimers()
-    expect(a.setState).toHaveBeenCalled()
-    expect(b.setState).not.toHaveBeenCalled()
-    a.setState.mockClear()
-
-    // Add rig B mid-flight: update the fanout chain list, then call refreshRigs.
-    fanout.setChains([a.chain, b.chain])
-    processor.refreshRigs()
-
-    networkListener.emit('stagekit:data', {
-      positions: [0, 1],
-      color: 'green',
-      timestamp: Date.now(),
-    })
-    flushBlendingTimers()
-
-    // Both rigs now drive setState.
-    expect(a.setState).toHaveBeenCalled()
-    expect(b.setState).toHaveBeenCalled()
-    a.setState.mockClear()
-    b.setState.mockClear()
-
-    // Remove rig A mid-flight: fanout sees only B; refreshRigs disposes A's processor.
-    fanout.setChains([b.chain])
-    processor.refreshRigs()
-
-    networkListener.emit('stagekit:data', {
-      positions: [0, 1],
-      color: 'blue',
-      timestamp: Date.now(),
-    })
-    flushBlendingTimers()
-
-    // Only rig B receives the new event.
-    expect(a.setState).not.toHaveBeenCalled()
-    expect(b.setState).toHaveBeenCalled()
-  })
-
   it('game state InGame transition blacks out every chain sequencer', async () => {
     const a = makeChain('a', true, makeFourLightConfig())
     const b = makeChain(
@@ -609,39 +473,5 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
 
     expect(a.blackout).toHaveBeenCalled()
     expect(b.blackout).toHaveBeenCalled()
-  })
-
-  it('keeps a rig added during a strobe in step with the rigs already strobing', () => {
-    jest.setSystemTime(0)
-    jest.spyOn(perfHooks.performance, 'now').mockImplementation(() => Date.now())
-    const flashTimes = (setState: jest.Mock): number[] => {
-      const times: number[] = []
-      setState.mockImplementation((...args: unknown[]) => {
-        const color = args[1] as { red: number; green: number; blue: number }
-        if (color.red === 255 && color.green === 255 && color.blue === 255) times.push(Date.now())
-      })
-      return times
-    }
-    const a = makeChain('a', true, makeStrobeConfig('a'))
-    fanout.setChains([a.chain])
-    processor = new Rb3StageKitDirectProcessor(fanout)
-    processor.startListening(networkListener)
-    networkListener.emit('stagekit:data', {
-      positions: [],
-      color: 'off',
-      strobeEffect: 'slow',
-      timestamp: Date.now(),
-    })
-    jest.advanceTimersByTime(300)
-
-    const c = makeChain('c', false, makeStrobeConfig('c'))
-    fanout.setChains([a.chain, c.chain])
-    processor.refreshRigs()
-    const aFlashes = flashTimes(a.setState)
-    const cFlashes = flashTimes(c.setState)
-    jest.advanceTimersByTime(1000)
-
-    expect(aFlashes.length).toBeGreaterThan(1)
-    expect(cFlashes).toEqual(aFlashes)
   })
 })
