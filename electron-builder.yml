@@ -51,6 +51,9 @@ nsis:
   allowElevation: true
   allowToChangeInstallationDirectory: true
 mac:
+  # Builds are never signed with a certificate. null stops electron-builder searching the keychain
+  # for an identity, and the fuse step leaves the app ad-hoc signed, which Apple Silicon requires.
+  identity: null
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
