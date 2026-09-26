@@ -78,6 +78,29 @@ export const groupIdsLower = (summaries: readonly { groupId: string }[]): Set<st
 export const basenamesLower = (summaries: readonly { path: string }[]): Set<string> =>
   new Set(summaries.map((f) => fileBasename(f.path).toLowerCase()))
 
+/** A picked file as a new file of the user's: under `groupId`, with no shipped-library markers. */
+export function asImportedFile<F extends NodeCueFile | EffectFile>(file: F, groupId: string): F {
+  const imported = { ...file, group: { ...file.group, id: groupId } }
+  delete imported.bundled
+  delete imported.cueVersion
+  return imported
+}
+
+/**
+ * A picked cue file as it saves from the tab it was imported on, or null when that tab has no place
+ * for it. The rb3 tab re-stamps a YARG-shaped file as rb3, since rb3 reuses the YARG cue shape, and
+ * an audio file has no rb3 shape.
+ */
+export function importedCueFile(
+  file: NodeCueFile,
+  saveMode: NodeCueMode,
+  groupId: string,
+): NodeCueFile | null {
+  if (saveMode !== 'rb3') return asImportedFile(file, groupId)
+  if (file.mode === 'audio') return null
+  return asImportedFile({ ...file, mode: 'rb3' }, groupId)
+}
+
 /** The effect library a platform's cues use. RB3 cues reference the YARG effects. */
 export const effectModeFor = (mode: NodeCueMode): EffectMode =>
   mode === 'audio' ? 'audio' : 'yarg'

@@ -15,7 +15,7 @@ import type { EditorDocument } from '../lib/types'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type { EffectFile, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { createDefaultEffectFile } from '../lib/cueDefaults'
+import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
 import { useCueFiles } from './useCueFiles'
 import {
   emitIpc,
@@ -265,6 +265,30 @@ describe('useCueFiles import', () => {
     expect(saved.content).not.toHaveProperty('cueVersion')
     expect(view.onSaveSuccess).toHaveBeenCalledWith('Cue imported: new.json')
     expect(view.result.current.pendingImport).toBeNull()
+  })
+
+  it('refuses an audio cue file imported on the RB3 tab and saves nothing', async () => {
+    const audio = createDefaultFile('audio', 'lighting')
+    jest.mocked(ipcApi.pickNodeCueImportFile).mockResolvedValue({
+      success: true,
+      sourceBasename: 'disco.json',
+      mode: 'rb3',
+      content: audio,
+    })
+    jest
+      .mocked(ipcApi.validateNodeCue)
+      .mockResolvedValue({ valid: true, data: audio, errors: [], mode: 'rb3' })
+    jest
+      .mocked(ipcApi.saveNodeCueFile)
+      .mockResolvedValue({ success: true, path: '/cues/rb3/disco.json' })
+    const view = await renderLoaded()
+    await run(view, (h) => h.handleImport())
+    await run(view, (h) => h.commitPendingImport('disco.json', 'disco'))
+
+    expect(view.onError).toHaveBeenCalledWith(
+      'Only a YARG or RB3 cue file can be imported on the RB3 tab.',
+    )
+    expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
   })
 
   it('saves an effect import without bundled markers', async () => {
