@@ -149,6 +149,24 @@ describe('FixtureChannelWriter', () => {
     expect(reported('warn')).toHaveLength(2)
   })
 
+  it('writes nothing for a fixture type this build does not know and reports it once', () => {
+    const wire: Record<number, number> = {}
+    const writer = writerFor(wire)
+    // A type a later build could store, reaching the writer without the parser's check.
+    const storedType: string = 'rgbw'
+    const unknownType = fixture({
+      fixture: storedType as FixtureTypes.RGB,
+      extraChannels: [fixed(9, 100)],
+    })
+
+    writer.writeLight('l1', unknownType, output({ red: 10 }), null, false)
+    writer.writeLight('l1', unknownType, output({ red: 10 }), null, false)
+    writer.writeUnvisited(new Map([['l1', unknownType]]), new Set(), null)
+
+    expect(wire).toEqual({})
+    expect(reported('error')).toHaveLength(1)
+  })
+
   it('writes fixed channels for planned fixtures no light state reached', () => {
     const wire: Record<number, number> = {}
     const fixtures = new Map<string, DmxFixture>([
