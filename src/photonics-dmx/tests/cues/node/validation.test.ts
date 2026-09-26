@@ -1012,15 +1012,11 @@ describe('Node cue validation', () => {
 
     const { id: _id, ...cueWithoutId } = validCue()
 
-    const withPalette = (initialValue: unknown) => ({
+    const withVariable = (type: string, initialValue: unknown) => ({
       ...validFile(),
-      cues: [
-        {
-          ...validCue(),
-          variables: [{ name: 'palette', type: 'color-array', scope: 'cue', initialValue }],
-        },
-      ],
+      cues: [{ ...validCue(), variables: [{ name: 'v', type, scope: 'cue', initialValue }] }],
     })
+    const withPalette = (initialValue: unknown) => withVariable('color-array', initialValue)
 
     it('accepts a colour-array variable that starts as known colours', () => {
       expect(validateNodeCueFile(withPalette(['red', 'amber'])).valid).toBe(true)
@@ -1033,6 +1029,26 @@ describe('Node cue validation', () => {
     ])('rejects a colour-array variable that starts as %s', (_label, initialValue) => {
       expect(validateNodeCueFile(withPalette(initialValue)).valid).toBe(false)
     })
+
+    it('accepts a light-array variable that starts empty', () => {
+      expect(validateNodeCueFile(withVariable('light-array', [])).valid).toBe(true)
+    })
+
+    it.each([
+      ['a light', [{ id: 'l1', position: 0 }]],
+      ['a colour', ['red']],
+      ['a number', 0],
+      ['text', ''],
+    ])('rejects a light-array variable that starts as %s', (_label, initialValue) => {
+      expect(validateNodeCueFile(withVariable('light-array', initialValue)).valid).toBe(false)
+    })
+
+    it.each(['number', 'boolean', 'string', 'color', 'cue-type', 'event'])(
+      'rejects an array initial value on %s variables',
+      (type) => {
+        expect(validateNodeCueFile(withVariable(type, [])).valid).toBe(false)
+      },
+    )
 
     it.each([
       ['cue missing id', cueWithoutId],
@@ -1512,6 +1528,54 @@ describe('Node cue validation', () => {
       })
       expect(result.valid).toBe(true)
       expect(result.data?.effects).toHaveLength(1)
+    })
+
+    it('rejects an effect whose colour-array variable starts with an unknown colour', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'effect-group', name: 'Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: { events: [{ id: 'e1', type: 'event', eventType: 'beat' }], actions: [] },
+            connections: [],
+            variables: [
+              { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['bleu'] },
+            ],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects an effect whose light-array parameter starts with lights', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'effect-group', name: 'Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: { events: [{ id: 'e1', type: 'event', eventType: 'beat' }], actions: [] },
+            connections: [],
+            variables: [
+              {
+                name: 'targets',
+                type: 'light-array',
+                scope: 'cue',
+                isParameter: true,
+                initialValue: [{ id: 'l1', position: 0 }],
+              },
+            ],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
     })
 
     it("migrates a removed 'half-beat' event to 'beat' in an effect file and warns once", () => {

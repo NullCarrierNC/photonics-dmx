@@ -6,7 +6,7 @@ import type {
   YargEffectFile,
 } from '../../types/nodeCueTypes'
 import { ajv } from './helpers'
-import { stringIdSchema } from './primitives'
+import { stringIdSchema, variableDefinitionSchema } from './primitives'
 
 const effectGroupMetaSchema: JSONSchemaType<EffectGroupMeta> = {
   type: 'object',
@@ -24,7 +24,8 @@ const effectGroupMetaSchema: JSONSchemaType<EffectGroupMeta> = {
  * which appears on the file and again on each effect it carries, so both come from here.
  *
  * The effect bodies stay loosely typed (`additionalProperties: true`, `nodes` as a bare object): a
- * graph is validated when the effect compiler builds it, not by this envelope.
+ * graph is validated when the effect compiler builds it, not by this envelope. An effect's
+ * variables are checked here against the variable definition schema.
  */
 const buildEffectFileSchema = (mode: EffectMode): Record<string, unknown> => ({
   type: 'object',
@@ -49,7 +50,7 @@ const buildEffectFileSchema = (mode: EffectMode): Record<string, unknown> => ({
           nodes: { type: 'object', nullable: true },
           connections: { type: 'array', nullable: true },
           layout: { type: 'object', nullable: true },
-          variables: { type: 'array', nullable: true },
+          variables: { type: 'array', nullable: true, items: variableDefinitionSchema },
           events: { type: 'array', nullable: true },
         },
       },

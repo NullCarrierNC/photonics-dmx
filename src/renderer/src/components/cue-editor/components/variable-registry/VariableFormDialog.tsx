@@ -7,12 +7,7 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import {
-  COLOR_OPTIONS,
-  isColor,
-  type TrackedLight,
-  type Color,
-} from '../../../../../../photonics-dmx/types'
+import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/types'
 import ColorListEditor from '../shared/ColorListEditor'
 import { DraftNumberField } from '../../../controls/DraftField'
 import {
@@ -37,8 +32,8 @@ type VariableFormDialogProps = {
 
 function getInitialValueInput(
   type: VariableType,
-  value: number | boolean | string | TrackedLight[] | Color[] | undefined,
-  onChange: (val: number | boolean | string | TrackedLight[] | Color[]) => void,
+  value: VariableDefinition['initialValue'] | undefined,
+  onChange: (val: VariableDefinition['initialValue']) => void,
   activeMode: NodeCueMode,
   cueKind: NodeCueKind,
 ) {
@@ -119,7 +114,7 @@ function getInitialValueInput(
     case 'color-array':
       return (
         <ColorListEditor
-          colors={Array.isArray(value) ? value.filter(isColor) : []}
+          colors={Array.isArray(value) ? value : []}
           onColorsChange={(colors) => onChange(colors)}
         />
       )
@@ -154,7 +149,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   if (!isOpen) return null
 
   const handleTypeChange = (newType: VariableType) => {
-    let newValue: number | boolean | string | TrackedLight[] | Color[] = 0
+    let newValue: VariableDefinition['initialValue'] = 0
     if (newType === 'boolean') newValue = false
     else if (newType === 'string' || newType === 'cue-type') newValue = ''
     else if (newType === 'event') newValue = getDefaultEventOption(activeMode, cueKind)?.value ?? ''
