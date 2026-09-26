@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 2,
+  "cueVersion": 4,
   "mode": "audio",
   "group": {
     "id": "audio-stagekit",
@@ -777,31 +777,15 @@
           {
             "id": "sk_audio_cool_auto-green-off",
             "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 4
-            },
+            "logicType": "expression",
+            "expression": "floor(numLights / 4)",
             "assignTo": "greenOffset"
           },
           {
             "id": "sk_audio_cool_auto-blue2-off",
             "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 2
-            },
+            "logicType": "expression",
+            "expression": "floor(numLights / 2)",
             "assignTo": "blue2Offset"
           }
         ],
@@ -1125,31 +1109,15 @@
           {
             "id": "sk_audio_warm_auto-yellow-off",
             "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 4
-            },
+            "logicType": "expression",
+            "expression": "floor(numLights / 4)",
             "assignTo": "yellowOffset"
           },
           {
             "id": "sk_audio_warm_auto-red2-off",
             "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 2
-            },
+            "logicType": "expression",
+            "expression": "floor(numLights / 2)",
             "assignTo": "red2Offset"
           }
         ],
@@ -1480,14 +1448,14 @@
             "id": "sk_audio_harmony-yellow-off",
             "type": "logic",
             "logicType": "math",
-            "operator": "divide",
+            "operator": "wrap",
             "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
               "source": "literal",
               "value": 3
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
             },
             "assignTo": "yellowOffset"
           },
@@ -1495,14 +1463,14 @@
             "id": "sk_audio_harmony-red-off",
             "type": "logic",
             "logicType": "math",
-            "operator": "divide",
+            "operator": "wrap",
             "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
               "source": "literal",
               "value": 4
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
             },
             "assignTo": "redOffset"
           },
@@ -1687,12 +1655,12 @@
           "fromPort": "false"
         },
         {
-          "from": "sk_audio_harmony-yellow",
-          "to": "sk_audio_harmony-red"
+          "from": "ev-sk_audio_harmony-beat",
+          "to": "sk_audio_harmony-yellow"
         },
         {
           "from": "ev-sk_audio_harmony-beat",
-          "to": "sk_audio_harmony-yellow"
+          "to": "sk_audio_harmony-red"
         }
       ],
       "effects": [
