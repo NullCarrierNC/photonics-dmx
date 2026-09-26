@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals'
-import { StrictMode, type KeyboardEvent, type ReactNode } from 'react'
+import { StrictMode, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ReactFlow, { ReactFlowProvider, type Node, type NodeChange } from 'reactflow'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
@@ -27,6 +27,26 @@ function open(props: Partial<ModalProps> = {}, children: ReactNode = form) {
     </Modal>,
   )
   return { onClose, ...view }
+}
+
+/** A button that takes itself off the page when clicked, as a toast's Dismiss button does. */
+function RemovesItself() {
+  const [shown, setShown] = useState(true)
+  return shown ? (
+    <button type="button" onClick={() => setShown(false)}>
+      Remove row
+    </button>
+  ) : null
+}
+
+/** Focuses the button and clicks it, leaving focus wherever the page puts it once it goes. */
+async function removeFocusedControl(): Promise<void> {
+  const button = screen.getByRole('button', { name: 'Remove row' })
+  button.focus()
+  fireEvent.click(button)
+  await act(async () => {
+    await Promise.resolve()
+  })
 }
 
 /** A press and release on one element, which is what a click on it takes. */
@@ -86,6 +106,15 @@ describe('Modal', () => {
       name.blur()
     })
 
+    expect(screen.getByRole('dialog')).toHaveFocus()
+  })
+
+  it('takes focus back when the focused control inside is removed', async () => {
+    open({}, <RemovesItself />)
+
+    await removeFocusedControl()
+
+    expect(screen.queryByRole('button', { name: 'Remove row' })).toBeNull()
     expect(screen.getByRole('dialog')).toHaveFocus()
   })
 
@@ -195,6 +224,34 @@ describe('Modal over a React Flow graph', () => {
     })
     await act(async () => {
       fireEvent.keyUp(panel, { key: 'Backspace', code: 'Backspace' })
+    })
+
+    const removed = onNodesChange.mock.calls.flat(2).filter((change) => change.type === 'remove')
+    expect(removed).toEqual([])
+  })
+
+  it('keeps Backspace off the selected node once the focused control is removed', async () => {
+    const onNodesChange = jest.fn<(changes: NodeChange[]) => void>()
+    render(
+      <>
+        <div style={{ width: 800, height: 600 }}>
+          <ReactFlowProvider>
+            <ReactFlow nodes={nodes} edges={[]} onNodesChange={onNodesChange} />
+          </ReactFlowProvider>
+        </div>
+        <Modal onClose={() => {}} panelClassName="panel">
+          <RemovesItself />
+        </Modal>
+      </>,
+    )
+    await removeFocusedControl()
+    const focused = document.activeElement ?? document.body
+
+    await act(async () => {
+      fireEvent.keyDown(focused, { key: 'Backspace', code: 'Backspace' })
+    })
+    await act(async () => {
+      fireEvent.keyUp(focused, { key: 'Backspace', code: 'Backspace' })
     })
 
     const removed = onNodesChange.mock.calls.flat(2).filter((change) => change.type === 'remove')

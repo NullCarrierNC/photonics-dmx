@@ -8,12 +8,18 @@ import {
   type MouseEvent,
   type ReactNode,
 } from 'react'
+import { innermostOpenDialog } from '../utils/openDialogs'
 
 const BACKDROP = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
 
 /** The controls Tab can land on. */
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** Whether focus sits on the page itself, where the panel's keys cannot see it. */
+function focusIsOnBody(): boolean {
+  return document.activeElement === null || document.activeElement === document.body
+}
 
 export interface ModalProps {
   /** Escape and a click on the backdrop, while the dialog is dismissible. */
@@ -40,9 +46,10 @@ export interface ModalProps {
 
 /**
  * The overlay a dialog sits in. It takes focus as it opens unless a control inside already has it,
- * keeps Tab inside the panel, closes on Escape, and gives focus back to whatever opened it when it
- * goes. Enter is left to the controls, so it activates whichever one has focus. The panel carries
- * React Flow's `nokey` class, so Backspace and Delete pressed in it leave the graph behind alone.
+ * keeps focus and Tab inside the panel, closes on Escape, and gives focus back to whatever opened
+ * it when it goes. Enter is left to the controls, so it activates whichever one has focus. The
+ * panel carries React Flow's `nokey` class, so Backspace and Delete pressed in it leave the graph
+ * behind alone.
  */
 const Modal: FC<ModalProps> = ({
   onClose,
@@ -80,6 +87,24 @@ const Modal: FC<ModalProps> = ({
     }
   }, [opener])
 
+  // A focused control that leaves the page, such as a toast's Dismiss button, drops focus on the
+  // page body. React holds its events back while it commits, so the blur of a control removed in a
+  // render never reaches handleBlur. Once the commit is done, focus found on the body comes back to
+  // the panel when this dialog is the one on top.
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) {
+      return
+    }
+    const observer = new MutationObserver(() => {
+      if (focusIsOnBody() && innermostOpenDialog() === panel) {
+        panel.focus()
+      }
+    })
+    observer.observe(panel, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [])
+
   // A control that blurs itself, as a draft field does to commit on Enter, leaves focus on the page
   // body, out of reach of the panel's keys. Once the blur settles, focus left on the body comes
   // back to the panel.
@@ -88,7 +113,7 @@ const Modal: FC<ModalProps> = ({
       return
     }
     queueMicrotask(() => {
-      if (document.activeElement === null || document.activeElement === document.body) {
+      if (focusIsOnBody()) {
         panelRef.current?.focus()
       }
     })

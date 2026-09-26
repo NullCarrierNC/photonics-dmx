@@ -92,14 +92,24 @@ function watchBubblePhase(): jest.Mock {
   return seen
 }
 
-function Dialog(props: Partial<ModalProps>) {
+function Dialog({ children, ...props }: Partial<ModalProps>) {
   const [open, setOpen] = useState(true)
   if (!open) return null
   return (
     <Modal onClose={() => setOpen(false)} panelClassName="" {...props}>
-      <input aria-label="Name" />
+      {children ?? <input aria-label="Name" />}
     </Modal>
   )
+}
+
+/** A button that takes itself off the page when clicked, as a toast's Dismiss button does. */
+function RemovesItself() {
+  const [shown, setShown] = useState(true)
+  return shown ? (
+    <button type="button" onClick={() => setShown(false)}>
+      Remove row
+    </button>
+  ) : null
 }
 
 /** Opens a dialog that takes focus as it opens and unmounts when it closes. */
@@ -140,6 +150,31 @@ describe('useBlackoutShortcut', () => {
 
       act(() => {
         press('escape', dialog)
+      })
+      await Promise.resolve()
+
+      expect(store.get(masterOutputAtom).blackout).toBe(false)
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('closes a dialog on Escape pressed after its focused control is removed', async () => {
+      const { store } = await mount()
+      render(
+        <Dialog>
+          <RemovesItself />
+        </Dialog>,
+      )
+      const button = screen.getByRole('button', { name: 'Remove row' })
+      button.focus()
+      act(() => {
+        button.click()
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      act(() => {
+        press('escape', document.activeElement ?? document.body)
       })
       await Promise.resolve()
 
