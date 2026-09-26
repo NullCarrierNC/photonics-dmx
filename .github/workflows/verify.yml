@@ -64,6 +64,10 @@ jobs:
       - name: Referenced paths are tracked
         run: npm run paths:check
 
+      # The cueVersion guard reads where HEAD meets development from the history this job fetches.
+      - name: Bundled cue timelines and cueVersions
+        run: npm run cue-sim:check
+
       # The branch as it stood before the push, or the target of a pull request, so a threshold
       # lowered on development itself is still held to what development had.
       - name: Coverage settings do not loosen

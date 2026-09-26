@@ -2,4 +2,4 @@ pushed=$(cat)
 # Every check after pushed:check reads the working tree, not the pushed commits. pushed:check
 # refuses the push unless each commit pushed is HEAD and nothing is left uncommitted, so the tree
 # the checks read is the one being pushed.
-printf '%s\n' "$pushed" | npm run pushed:check && npm run lint:check && npm run format:check && npm run typecheck && npx electron-vite build && npm run any:budget && npm run type-escape:budget && npm run knip:budget && npm run size:budget && npm run paths:check && printf '%s\n' "$pushed" | npm run coverage:check -- --pushed && npm run lockfile:check && npm run overrides:check && npm run audit:check && npm run test:coverage -- --randomize
+printf '%s\n' "$pushed" | npm run pushed:check && npm run lint:check && npm run format:check && npm run typecheck && npx electron-vite build && npm run any:budget && npm run type-escape:budget && npm run knip:budget && npm run size:budget && npm run paths:check && npm run cue-sim:check && printf '%s\n' "$pushed" | npm run coverage:check -- --pushed && npm run lockfile:check && npm run overrides:check && npm run audit:check && npm run test:coverage -- --randomize
