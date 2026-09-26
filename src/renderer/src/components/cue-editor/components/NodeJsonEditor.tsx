@@ -73,6 +73,7 @@ export type JsonValidationResult = {
   valid: boolean
   errors?: string[]
   structuredErrors?: { instancePath: string; message: string }[]
+  /** Cue validation reports these. Effect validation has none, so an effect shows no warnings. */
   warnings?: string[]
 }
 
