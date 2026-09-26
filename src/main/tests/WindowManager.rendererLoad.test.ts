@@ -79,19 +79,29 @@ describe('WindowManager renderer loads', () => {
   })
 
   it.each([
-    ['main', (manager: WindowManager) => manager.createMainWindow()],
-    ['cue editor', (manager: WindowManager) => manager.openCueEditorWindow()],
-    ['audio preview', (manager: WindowManager) => manager.openAudioPreviewWindow()],
-  ])('opens the %s page sandboxed, isolated and without Node', async (_role, open) => {
-    await withCapturedEntries(() => {
-      open(new WindowManager())
-    })
+    [
+      'main',
+      (manager: WindowManager) => manager.createMainWindow(),
+      { backgroundThrottling: false },
+    ],
+    ['cue editor', (manager: WindowManager) => manager.openCueEditorWindow(), {}],
+    ['audio preview', (manager: WindowManager) => manager.openAudioPreviewWindow(), {}],
+  ])(
+    'opens the %s page with only its sandboxed, isolated, Node-free preferences',
+    async (_role, open, extra) => {
+      await withCapturedEntries(() => {
+        open(new WindowManager())
+      })
 
-    const options = jest.mocked(BrowserWindow).mock.calls[0]?.[0]
-    expect(options?.webPreferences).toMatchObject({
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-    })
-  })
+      const options = jest.mocked(BrowserWindow).mock.calls[0]?.[0]
+      expect(options?.webPreferences).toEqual({
+        preload: expect.stringMatching(/[\\/]preload[\\/]index\.js$/),
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        devTools: false,
+        ...extra,
+      })
+    },
+  )
 })
