@@ -790,6 +790,16 @@ describe('inputValidation', () => {
         expect(validateDmxFixturesArray([fixtureWith(fields)]).ok).toBe(true)
       })
 
+      it.each([
+        ['a null', null],
+        ['an empty', ''],
+      ])('refuses a template saved with %s id', (_label, id) => {
+        expect(validateDmxFixturesArray([fixtureWith({ id })])).toEqual({
+          ok: false,
+          error: 'lights[0].id must be a non-empty string',
+        })
+      })
+
       it('rejects a layout light whose fixture type is unknown', () => {
         expect(
           validateLightingConfiguration(layoutWith(fixtureWith({ fixture: 'laser' }))).ok,

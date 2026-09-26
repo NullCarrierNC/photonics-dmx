@@ -5,7 +5,7 @@
 
 import type { DmxRig, LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types'
 import type { ValidationResult } from './primitives'
-import { ConfigStrobeType } from '../../../photonics-dmx/types'
+import { ConfigStrobeType, isSavedFixture } from '../../../photonics-dmx/types'
 import {
   parseDmxFixture,
   parseDmxLight,
@@ -168,5 +168,12 @@ export function validateDmxFixturesArray(
   if (!Array.isArray(value)) {
     return { ok: false, error: `${fieldName} must be an array` }
   }
-  return parseSavedList(value, fieldName, parseDmxFixture)
+  const parsed = parseSavedList(value, fieldName, parseDmxFixture)
+  if (!parsed.ok) return parsed
+  // Rig lights reference a saved template by id, so every template in the library carries one.
+  const unsaved = parsed.value.findIndex((fixture) => !isSavedFixture(fixture))
+  if (unsaved >= 0) {
+    return { ok: false, error: `${fieldName}[${unsaved}].id must be a non-empty string` }
+  }
+  return parsed
 }

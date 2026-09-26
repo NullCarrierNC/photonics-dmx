@@ -132,8 +132,9 @@ describe('parseDmxFixture', () => {
     expect(faults).toEqual(['lights[0].config.invertPan must be true or false'])
   })
 
-  it('reads a null id as a template with no id, and any other kind as a fault', () => {
+  it('reads a null or empty id as a template with no id, and any other kind as a fault', () => {
     expect(parse(rgb({ id: null }))).toEqual({ fixture: rgb({ id: null }), faults: [] })
+    expect(parse(rgb({ id: '' }))).toEqual({ fixture: rgb({ id: null }), faults: [] })
     expect(parse(rgb({ id: 7 })).faults).toEqual(['lights[0].id must be a string or null'])
   })
 })

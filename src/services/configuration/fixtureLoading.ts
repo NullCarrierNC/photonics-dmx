@@ -4,6 +4,7 @@
  * fixture of a type no build wrote fails the load, which sends the file through corrupt-file recovery.
  */
 import equal from 'fast-deep-equal'
+import { isSavedFixture } from '../../photonics-dmx/types'
 import type { DmxRigsConfig, LightingConfiguration } from '../../photonics-dmx/types'
 import {
   loadDmxFixture,
@@ -87,7 +88,7 @@ export function loadUserLightsFixtures(
   const faults: FixtureFault[] = []
   // Rig lights reference their template by id, so a template without one gets a new id.
   const lights = loadList(config.lights, 'lights', loadDmxFixture, faults).map((fixture, i) => {
-    if (fixture.id !== null) return fixture
+    if (isSavedFixture(fixture)) return fixture
     faults.push({ message: `lights[${i}].id is missing`, kind: 'reset' })
     return { ...fixture, id: globalThis.crypto.randomUUID() }
   })

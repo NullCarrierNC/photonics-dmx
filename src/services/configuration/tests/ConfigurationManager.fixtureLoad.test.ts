@@ -132,6 +132,16 @@ describe('ConfigurationManager fixture loading', () => {
     ])
   })
 
+  it('gives a template stored with an empty id a new id, and reports it', () => {
+    const cm = boot({ lights: [template({ id: '' })] })
+
+    expect(cm.getUserLights()[0].id).toEqual(expect.any(String))
+    expect(cm.getUserLights()[0].id).not.toBe('')
+    expect(reportsFor(cm, 'lights.json')).toEqual([
+      expect.objectContaining({ reason: 'repaired', message: expect.stringContaining('[0].id') }),
+    ])
+  })
+
   it('gives a template stored without an id a new id', () => {
     const { id: _id, ...stored } = template({})
     const cm = boot({ lights: [stored] })

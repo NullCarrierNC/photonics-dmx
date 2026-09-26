@@ -4,7 +4,7 @@ import equal from 'fast-deep-equal'
 
 import LightSettingsModal from '../components/LightSettingsModal'
 import LightChannelsPreview from '../components/LightChannelsPreview'
-import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
+import { DmxFixture, FixtureTypes, isSavedFixture } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
 import { useToast } from '../hooks/useToast'
@@ -72,7 +72,7 @@ const MyLights = () => {
     if (!currentLight || saving) return
     const lightToSave: DmxFixture = {
       ...currentLight,
-      id: currentLight.id || crypto.randomUUID(),
+      id: isSavedFixture(currentLight) ? currentLight.id : crypto.randomUUID(),
     }
     // Kept on the working copy, so a save retried after a refusal writes the same light.
     setCurrentLight(lightToSave)

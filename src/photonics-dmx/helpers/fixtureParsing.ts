@@ -294,8 +294,9 @@ export function parseDmxFixture(
   }
   const fixtureType = raw.fixture
 
+  // An empty id is a template not yet saved, the same as null.
   let id: string | null = null
-  if (typeof raw.id === 'string') id = raw.id
+  if (typeof raw.id === 'string') id = raw.id === '' ? null : raw.id
   else if (raw.id != null) report(`${path}.id must be a string or null`, 'reset')
 
   let position = 0

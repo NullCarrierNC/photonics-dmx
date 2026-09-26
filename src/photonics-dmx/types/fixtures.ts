@@ -238,8 +238,9 @@ export type DmxFixture = RgbFixture | RgbMovingHeadFixture | StrobeFixture
 /** A template saved to the user's library, which always has an id for rig lights to reference. */
 export type SavedFixture = DmxFixture & { id: string }
 
+/** Whether a template has been saved: an empty id counts as unsaved, the same as null. */
 export function isSavedFixture(fixture: DmxFixture): fixture is SavedFixture {
-  return fixture.id !== null
+  return fixture.id !== null && fixture.id !== ''
 }
 
 /** A rig light: a fixture plus the id of the template it came from. */
