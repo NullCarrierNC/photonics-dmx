@@ -1,5 +1,11 @@
+import * as fs from 'fs'
+import * as path from 'path'
 import { describe, expect, it } from '@jest/globals'
-import { migrateOlderNodeFile } from '../../../../cues/node/loader/migrateOlderNodeFile'
+import {
+  migrateOlderNodeFile,
+  type EffectLookup,
+} from '../../../../cues/node/loader/migrateOlderNodeFile'
+import type { EffectFile } from '../../../../cues/types/nodeCueTypes'
 
 const variable = (name: string, scope = 'cue') => ({
   name,
@@ -199,5 +205,133 @@ describe('migrateOlderNodeFile', () => {
 
     expect(migrateOlderNodeFile(file)).toEqual([])
     expect(file).toEqual(before)
+  })
+
+  describe('with the effects each raiser raises', () => {
+    const coreEffects: EffectFile = JSON.parse(
+      fs.readFileSync(
+        path.resolve(
+          __dirname,
+          '../../../../../../resources/defaults/node-data/effects/yarg/yarg-core-effects.json',
+        ),
+        'utf-8',
+      ),
+    )
+    const effects: EffectLookup = (fileId, effectId) =>
+      fileId === 'yarg-core-effects'
+        ? coreEffects.effects.find((effect) => effect.id === effectId)
+        : undefined
+    const lightArray = (name: string, scope = 'cue') => ({
+      name,
+      type: 'light-array',
+      scope,
+      initialValue: [],
+    })
+    const configData = (id: string, dataProperty: string, assignTo: string) => ({
+      id,
+      type: 'logic',
+      logicType: 'config-data',
+      dataProperty,
+      assignTo,
+    })
+    const raiser = (id: string, effectId: string, parameterValues: Record<string, unknown>) => ({
+      id,
+      type: 'effect-raiser',
+      effectId,
+      parameterValues,
+    })
+    const references = [
+      { effectId: 'effect-alternating-pattern', effectFileId: 'yarg-core-effects' },
+      { effectId: 'effect-rotation-cw', effectFileId: 'yarg-core-effects' },
+    ]
+
+    it('passes group names for a light array whose every write is a whole-group array', () => {
+      const file = {
+        group: { id: 'g', name: 'G', variables: [lightArray('backs', 'cue-group')] },
+        cues: [
+          {
+            id: 'c1',
+            name: 'One',
+            kind: 'lighting',
+            effects: references,
+            variables: [lightArray('everyLight'), lightArray('mixed')],
+            nodes: {
+              events: [],
+              actions: [],
+              logic: [
+                configData('l1', 'all-lights-array', 'everyLight'),
+                configData('l2', 'front-lights-array', 'mixed'),
+                {
+                  id: 'l3',
+                  logicType: 'shuffle-lights',
+                  sourceVariable: 'everyLight',
+                  assignTo: 'mixed',
+                },
+              ],
+              effectRaisers: [
+                raiser('r1', 'effect-alternating-pattern', {
+                  lights: read('everyLight'),
+                  lightFilter: read('everyLight'),
+                  patternBGroups: read('mixed'),
+                }),
+                raiser('r2', 'effect-rotation-cw', { lights: read('everyLight') }),
+                raiser('r3', 'effect-alternating-pattern', { lights: read('backs') }),
+              ],
+            },
+          },
+          {
+            id: 'c2',
+            name: 'Two',
+            kind: 'lighting',
+            nodes: {
+              events: [],
+              actions: [],
+              logic: [configData('l4', 'back-lights-array', 'backs')],
+            },
+          },
+        ],
+      }
+
+      const notes = migrateOlderNodeFile(file, effects)
+
+      const [r1, r2, r3] = file.cues[0].nodes.effectRaisers ?? []
+      expect(r1.parameterValues).toEqual({
+        lights: { source: 'literal', value: 'front,back' },
+        lightFilter: read('everyLight'),
+        patternBGroups: read('mixed'),
+      })
+      expect(r2.parameterValues).toEqual({ lights: read('everyLight') })
+      expect(r3.parameterValues).toEqual({ lights: { source: 'literal', value: 'back' } })
+      expect(notes).toEqual([
+        "A light array passed where an effect takes group names now passes the names of its groups: 'One' raiser 'r1' lights is now 'front,back', 'One' raiser 'r3' lights is now 'back'.",
+      ])
+    })
+
+    it('leaves a raiser whose effect this build cannot find', () => {
+      const file = {
+        group: { id: 'g', name: 'G' },
+        cues: [
+          {
+            id: 'c1',
+            name: 'One',
+            kind: 'lighting',
+            effects: [{ effectId: 'effect-alternating-pattern', effectFileId: 'my-effects' }],
+            variables: [lightArray('everyLight')],
+            nodes: {
+              events: [],
+              actions: [],
+              logic: [configData('l1', 'all-lights-array', 'everyLight')],
+              effectRaisers: [
+                raiser('r1', 'effect-alternating-pattern', { lights: read('everyLight') }),
+              ],
+            },
+          },
+        ],
+      }
+      const before = structuredClone(file)
+
+      expect(migrateOlderNodeFile(file, effects)).toEqual([])
+      expect(file).toEqual(before)
+    })
   })
 })

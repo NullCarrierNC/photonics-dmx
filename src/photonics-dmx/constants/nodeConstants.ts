@@ -44,6 +44,14 @@ export function isPatternTarget(value: unknown): value is PatternTarget {
 export const CONFIG_LIGHT_GROUPS = ['front', 'back'] as const satisfies readonly LocationGroup[]
 export type ConfigLightGroup = (typeof CONFIG_LIGHT_GROUPS)[number]
 
+/** The groups each whole-group light-array config property holds every light of. */
+export const CONFIG_LIGHT_ARRAY_GROUPS: ReadonlyMap<string, readonly LocationGroup[]> = new Map([
+  ['all-lights-array', ['front', 'back']],
+  ['front-lights-array', ['front']],
+  ['back-lights-array', ['back']],
+  ['strobe-lights-array', ['strobe']],
+])
+
 // Helper to generate pattern property IDs (used only for constant generation)
 const makePatternPropertyId = (group: ConfigLightGroup, target: PatternTarget): string =>
   `${group}-lights-${target}`

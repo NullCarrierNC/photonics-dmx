@@ -18,6 +18,26 @@ const log = createLogger('EffectRegistryBuilder')
 export type EffectFilesByMode = Map<EffectMode, Promise<Map<string, EffectFile>>>
 
 /**
+ * The effect files a cue of `mode` raises from, by group id, read through `effectFiles` the first
+ * time any cue of that effect tree asks.
+ */
+export function readEffectFiles(
+  effectLoader: Pick<EffectLoader, 'readEffectFilesByGroupId'>,
+  mode: NodeCueMode,
+  effectFiles: EffectFilesByMode,
+): Promise<Map<string, EffectFile>> {
+  // Which effect tree this mode raises from is the domain's to say, not the loader's: RB3 folds
+  // onto the yarg tree, and a mode added later brings its own answer with its descriptor.
+  const effectLoaderMode: EffectMode = getCueDomain(mode).effectMode
+  let filesForMode = effectFiles.get(effectLoaderMode)
+  if (!filesForMode) {
+    filesForMode = effectLoader.readEffectFilesByGroupId(effectLoaderMode)
+    effectFiles.set(effectLoaderMode, filesForMode)
+  }
+  return filesForMode
+}
+
+/**
  * Build the registry for one cue's effect references, reading each mode's effect files through
  * `effectFiles` the first time a reference needs them.
  */
@@ -33,15 +53,7 @@ export async function buildEffectRegistry(
     return registry
   }
 
-  // Which effect tree this mode raises from is the domain's to say, not the loader's: RB3 folds
-  // onto the yarg tree, and a mode added later brings its own answer with its descriptor.
-  const effectLoaderMode: EffectMode = getCueDomain(mode).effectMode
-  let filesForMode = effectFiles.get(effectLoaderMode)
-  if (!filesForMode) {
-    filesForMode = effectLoader.readEffectFilesByGroupId(effectLoaderMode)
-    effectFiles.set(effectLoaderMode, filesForMode)
-  }
-  const effectFilesById = await filesForMode
+  const effectFilesById = await readEffectFiles(effectLoader, mode, effectFiles)
 
   for (const effectRef of effectReferences) {
     try {

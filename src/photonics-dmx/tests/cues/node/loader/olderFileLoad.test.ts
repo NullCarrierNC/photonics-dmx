@@ -31,6 +31,7 @@ interface GraphJson {
   name: string
   cueType?: string
   nodes: {
+    effectRaisers?: Array<{ id: string; parameterValues: Record<string, ValueSourceJson> }>
     actions: Array<{
       id: string
       color: { name: ValueSourceJson; blendMode: ValueSourceJson }
@@ -224,8 +225,8 @@ describe('loading cue and effect files older builds wrote', () => {
     })
   })
 
-  describe('with a raiser parameter bound to a variable of another type', () => {
-    it('keeps a v0.5.5 Dischord raising the core effects this build ships, and warns', async () => {
+  describe('with a raiser passing a light array to an effect parameter naming groups', () => {
+    it('passes a v0.5.5 Dischord the groups its light array holds, and reports it', async () => {
       writeJson(path.join(cuesDir, 'user-alt1.json'), userCopyOfAlt1('user-alt1'))
       fs.mkdirSync(effectsDir, { recursive: true })
       fs.copyFileSync(
@@ -238,10 +239,16 @@ describe('loading cue and effect files older builds wrote', () => {
 
       expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
       expect(yarg.getGroup('user-alt1')?.cues.has(CueType.Dischord)).toBe(true)
+      expect(result.migrations).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/^user-alt1\.json: .*'Dischord' raiser 'y1-dischord-blue' lights/),
+        ]),
+      )
       const [summary] = loader.getSummary().yarg
-      expect(summary.warnings).toEqual([
-        "cue 'Dischord': effect raiser 'y1-dischord-blue' parameter 'lights': 'allLights' is a light-array variable, and this field takes string.",
-      ])
+      expect(summary.warnings).toBeUndefined()
+      const stored = dischordOf(readJson(path.join(cuesDir, 'user-alt1.json')))
+      const blue = stored.nodes.effectRaisers?.find((r) => r.id === 'y1-dischord-blue')
+      expect(blue?.parameterValues.lights).toEqual({ source: 'literal', value: 'front,back' })
     })
   })
 
