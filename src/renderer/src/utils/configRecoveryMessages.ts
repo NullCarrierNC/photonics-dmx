@@ -2,8 +2,9 @@
 export interface ConfigRecoveryFile {
   fileName: string
   /**
-   * 'repaired' when only some values went back to their defaults, 'newerVersion' when a newer build
-   * wrote the file, which is never saved over.
+   * 'repaired' when only some values went back to their defaults, 'keysDropped' when keys this
+   * version does not use were removed, 'newerVersion' when a newer build wrote the file, which is
+   * never saved over.
    */
   reason?: string
   message?: string
@@ -17,12 +18,14 @@ export interface ConfigRecoveryFile {
 /**
  * What to tell the user about settings files recovered at startup: one message for files that
  * were replaced by defaults, one for files that would not load and are still in place, one for
- * files where only some values were reset, and one each for files from a newer version that are in
- * use or unreadable, neither of which is saved to.
+ * files where only some values were reset, one for files that held entries this version does not
+ * use, and one each for files from a newer version that are in use or unreadable, neither of which
+ * is saved to.
  */
 export function configRecoveryMessages(files: readonly ConfigRecoveryFile[]): string[] {
   const messages: string[] = []
   const repaired = files.filter((f) => f.reason === 'repaired')
+  const keysDropped = files.filter((f) => f.reason === 'keysDropped')
   const repairCopies = files.filter((f) => f.reason === 'repairCopied')
   const newer = files.filter((f) => f.reason === 'newerVersion' && f.leftInPlace !== true)
   const newerUnreadable = files.filter((f) => f.reason === 'newerVersion' && f.leftInPlace === true)
@@ -30,6 +33,7 @@ export function configRecoveryMessages(files: readonly ConfigRecoveryFile[]): st
   const replaced = files.filter(
     (f) =>
       f.reason !== 'repaired' &&
+      f.reason !== 'keysDropped' &&
       f.reason !== 'newerVersion' &&
       f.reason !== 'repairCopied' &&
       f.leftInPlace !== true,
@@ -52,6 +56,14 @@ export function configRecoveryMessages(files: readonly ConfigRecoveryFile[]): st
       .join(', ')
     messages.push(
       `Some saved settings were invalid and went back to their defaults. Everything else was kept. (${details})`,
+    )
+  }
+  if (keysDropped.length > 0) {
+    const details = keysDropped
+      .map((f) => (f.message ? `${f.fileName}: ${f.message}` : f.fileName))
+      .join(', ')
+    messages.push(
+      `Some saved settings held entries this version does not use, and they were removed. Every setting was kept. (${details})`,
     )
   }
   if (newer.length > 0) {

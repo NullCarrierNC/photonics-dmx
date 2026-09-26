@@ -192,6 +192,34 @@ describe('ConfigurationManager fixture loading', () => {
     expect(reportsFor(cm, 'dmxRigs.json')).toEqual([])
   })
 
+  it('reports a dropped key apart from a value put back to its default', () => {
+    const cm = boot({
+      layoutLights: [
+        ...Array.from({ length: 6 }, (_, i) =>
+          template({ id: `l${i}`, fixtureId: 'tpl-1', group: 'front', mount: 'floor', spin: 1 }),
+        ),
+        template({
+          id: 'l6',
+          fixtureId: 'tpl-1',
+          group: 'front',
+          mount: 'floor',
+          channels: { masterDimmer: 1, red: 2, green: 700, blue: 4 },
+        }),
+      ],
+    })
+
+    expect(reportsFor(cm, 'lightsLayout.json')).toEqual([
+      expect.objectContaining({
+        reason: 'repaired',
+        message: 'frontLights[6].channels.green must be an integer DMX channel between 0 and 512',
+      }),
+      expect.objectContaining({
+        reason: 'keysDropped',
+        message: expect.stringContaining('frontLights[0].spin'),
+      }),
+    ])
+  })
+
   it('reports only the set-aside when a repaired file then fails its check', () => {
     const cm = boot({
       layout: { strobeType: 'Strobe' },

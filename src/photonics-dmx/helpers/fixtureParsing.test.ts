@@ -69,6 +69,20 @@ describe('parseDmxFixture', () => {
     expect(faults).toEqual(['lights[0].strobeValues.fastest must be an integer between 0 and 255'])
   })
 
+  it('tells a dropped key apart from a value put back to its default', () => {
+    const reports: Array<[string, string]> = []
+    parseDmxFixture(
+      rgb({ hasStrobeChannel: true, channels: { masterDimmer: 1, red: 2, green: 700, blue: 4 } }),
+      'lights[0]',
+      (message, kind) => reports.push([message, kind]),
+    )
+
+    expect(reports).toEqual([
+      ['lights[0].channels.green must be an integer DMX channel between 0 and 512', 'reset'],
+      ['lights[0].hasStrobeChannel is not a fixture field', 'dropped'],
+    ])
+  })
+
   it('drops an unusable extra channel and keeps the rest', () => {
     const { fixture, faults } = parse(
       rgb({

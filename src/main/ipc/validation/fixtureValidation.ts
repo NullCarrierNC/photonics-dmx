@@ -10,6 +10,7 @@ import {
   parseDmxFixture,
   parseDmxLight,
   parseFixtureList,
+  type FixtureFault,
   type FixtureFaultReport,
 } from '../../../photonics-dmx/helpers/fixtureParsing'
 import { isNonEmptyString, isPlainObject } from './primitives'
@@ -30,9 +31,9 @@ function parseSavedList<T>(
   path: string,
   parse: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
 ): ValidationResult<T[]> {
-  const faults: string[] = []
+  const faults: FixtureFault[] = []
   const parsed = parseFixtureList(list, path, parse, faults)
-  return parsed.ok && faults.length > 0 ? { ok: false, error: faults[0] } : parsed
+  return parsed.ok && faults.length > 0 ? { ok: false, error: faults[0].message } : parsed
 }
 
 export function validateLightingConfiguration(

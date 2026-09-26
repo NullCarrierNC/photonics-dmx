@@ -27,8 +27,20 @@ import type {
 import { isStorableBrightnessScale, isValidBrightnessScalePercent } from './brightnessScaling'
 import { migrateFixtureSchema } from './lightingConfigMigration'
 
+/**
+ * What a fault did to the stored fixture: `reset` put a value back to its default or dropped a
+ * value the fixture held, and `dropped` removed a key this build gives no meaning to.
+ */
+export type FixtureFaultKind = 'reset' | 'dropped'
+
 /** Receives one message per fault, naming the field by its path. */
-export type FixtureFaultReport = (message: string) => void
+export type FixtureFaultReport = (message: string, kind: FixtureFaultKind) => void
+
+/** One fault, as {@link parseFixtureList} collects them. */
+export interface FixtureFault {
+  message: string
+  kind: FixtureFaultKind
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -69,7 +81,7 @@ function parseChannels(
   report: FixtureFaultReport,
 ): FixtureChannelLayout {
   if (!isPlainObject(raw)) {
-    report(`${path}.channels is missing`)
+    report(`${path}.channels is missing`, 'reset')
   }
   const source = isPlainObject(raw) ? raw : {}
   const read = new Set<string>()
@@ -80,13 +92,14 @@ function parseChannels(
     if (isStoredChannel(value)) return value
     report(
       `${path}.channels.${key} must be an integer DMX channel between 0 and ${DMX_CHANNEL_MAX}`,
+      'reset',
     )
     return 0
   }
   const required = (key: string): number => {
     const value = channel(key)
     if (value !== undefined) return value
-    if (isPlainObject(raw)) report(`${path}.channels.${key} is missing`)
+    if (isPlainObject(raw)) report(`${path}.channels.${key} is missing`, 'reset')
     return 0
   }
 
@@ -130,7 +143,9 @@ function parseChannels(
   }
 
   for (const key of Object.keys(source)) {
-    if (!read.has(key)) report(`${path}.channels.${key} is not a channel of a ${fixture} fixture`)
+    if (!read.has(key)) {
+      report(`${path}.channels.${key} is not a channel of a ${fixture} fixture`, 'dropped')
+    }
   }
   return layout
 }
@@ -143,11 +158,11 @@ function parseConfig(raw: unknown, path: string, report: FixtureFaultReport): Fi
     if (value === undefined) continue
     if (isFixtureConfigFlagField(key)) {
       if (typeof value === 'boolean') stored[key] = value
-      else report(`${path}.config.${key} must be true or false`)
+      else report(`${path}.config.${key} must be true or false`, 'reset')
     } else if (typeof value === 'number' && Number.isFinite(value)) {
       stored[key] = value
     } else {
-      report(`${path}.config.${key} must be a number`)
+      report(`${path}.config.${key} must be a number`, 'reset')
     }
   }
   if (typeof source.invert === 'boolean') stored.invert = source.invert
@@ -162,7 +177,7 @@ function parseStrobeValues(
   report: FixtureFaultReport,
 ): StrobeChannelValues | undefined {
   if (!isPlainObject(raw)) {
-    report(`${path}.strobeValues must be a plain object`)
+    report(`${path}.strobeValues must be a plain object`, 'reset')
     return undefined
   }
   const { slow, medium, fast, fastest } = raw
@@ -170,7 +185,7 @@ function parseStrobeValues(
     return { slow, medium, fast, fastest }
   }
   const bad = STROBE_VALUE_KEYS.filter((key) => !isDmxValue(raw[key]))
-  report(`${path}.strobeValues.${bad.join(', ')} must be an integer between 0 and 255`)
+  report(`${path}.strobeValues.${bad.join(', ')} must be an integer between 0 and 255`, 'reset')
   return undefined
 }
 
@@ -180,37 +195,40 @@ function parseExtraChannel(
   report: FixtureFaultReport,
 ): ExtraChannel | undefined {
   if (!isPlainObject(raw)) {
-    report(`${path} must be an object`)
+    report(`${path} must be an object`, 'reset')
     return undefined
   }
   const { type, channel, value, scale } = raw
   if (!isExtraChannelType(type)) {
-    report(`${path}.type must be a valid extra-channel type`)
+    report(`${path}.type must be a valid extra-channel type`, 'reset')
     return undefined
   }
   if (!isStoredChannel(channel)) {
-    report(`${path}.channel must be an integer DMX channel between 0 and ${DMX_CHANNEL_MAX}`)
+    report(
+      `${path}.channel must be an integer DMX channel between 0 and ${DMX_CHANNEL_MAX}`,
+      'reset',
+    )
     return undefined
   }
   const extra: ExtraChannel = { type, channel }
   if (type === 'fixed') {
     if (!isDmxValue(value)) {
-      report(`${path}.value must be an integer between 0 and 255 for a fixed channel`)
+      report(`${path}.value must be an integer between 0 and 255 for a fixed channel`, 'reset')
       return undefined
     }
     extra.value = value
-    if (scale !== undefined) report(`${path}.scale is not valid on a fixed channel`)
+    if (scale !== undefined) report(`${path}.scale is not valid on a fixed channel`, 'dropped')
   } else {
-    if (value !== undefined) report(`${path}.value is only valid on a fixed channel`)
+    if (value !== undefined) report(`${path}.value is only valid on a fixed channel`, 'dropped')
     if (scale !== undefined && !isValidBrightnessScalePercent(scale)) {
-      report(`${path}.scale must be an integer percent between 0 and 100`)
+      report(`${path}.scale must be an integer percent between 0 and 100`, 'reset')
     } else if (isStorableBrightnessScale(scale)) {
       extra.scale = scale
     }
   }
   for (const key of Object.keys(raw)) {
     if (!['type', 'channel', 'value', 'scale'].includes(key)) {
-      report(`${path}.${key} is not an extra-channel field`)
+      report(`${path}.${key} is not an extra-channel field`, 'dropped')
     }
   }
   return extra
@@ -222,15 +240,18 @@ function parseBrightnessScaling(
   report: FixtureFaultReport,
 ): BrightnessScaling | undefined {
   if (!isPlainObject(raw)) {
-    report(`${path}.brightnessScaling must be a plain object`)
+    report(`${path}.brightnessScaling must be a plain object`, 'reset')
     return undefined
   }
   const scaling: BrightnessScaling = {}
   for (const [key, percent] of Object.entries(raw)) {
     if (key !== 'red' && key !== 'green' && key !== 'blue') {
-      report(`${path}.brightnessScaling.${key} is not a scalable colour channel`)
+      report(`${path}.brightnessScaling.${key} is not a scalable colour channel`, 'dropped')
     } else if (percent !== undefined && !isValidBrightnessScalePercent(percent)) {
-      report(`${path}.brightnessScaling.${key} must be an integer percent between 0 and 100`)
+      report(
+        `${path}.brightnessScaling.${key} must be an integer percent between 0 and 100`,
+        'reset',
+      )
     } else if (isStorableBrightnessScale(percent)) {
       scaling[key] = percent
     }
@@ -245,33 +266,33 @@ export function parseDmxFixture(
   report: FixtureFaultReport,
 ): DmxFixture | null {
   if (!isPlainObject(raw)) {
-    report(`${path} must be an object`)
+    report(`${path} must be an object`, 'reset')
     return null
   }
   if (!isFixtureType(raw.fixture)) {
-    report(`${path}.fixture '${String(raw.fixture)}' is not a fixture type`)
+    report(`${path}.fixture '${String(raw.fixture)}' is not a fixture type`, 'reset')
     return null
   }
   const fixtureType = raw.fixture
 
   let id: string | null = null
   if (typeof raw.id === 'string') id = raw.id
-  else if (raw.id != null) report(`${path}.id must be a string or null`)
+  else if (raw.id != null) report(`${path}.id must be a string or null`, 'reset')
 
   let position = 0
   if (typeof raw.position === 'number' && Number.isFinite(raw.position)) position = raw.position
-  else report(`${path}.position must be a number`)
+  else report(`${path}.position must be a number`, 'reset')
 
   const text = (key: 'label' | 'name'): string => {
     const value = raw[key]
     if (typeof value === 'string') return value
-    report(`${path}.${key} must be a string`)
+    report(`${path}.${key} must be a string`, 'reset')
     return ''
   }
 
   let isStrobeEnabled = false
   if (typeof raw.isStrobeEnabled === 'boolean') isStrobeEnabled = raw.isStrobeEnabled
-  else report(`${path}.isStrobeEnabled must be true or false`)
+  else report(`${path}.isStrobeEnabled must be true or false`, 'reset')
 
   const fixture: DmxFixture = {
     id,
@@ -283,19 +304,19 @@ export function parseDmxFixture(
   }
 
   if (typeof raw.group === 'string') fixture.group = raw.group
-  else if (raw.group != null) report(`${path}.group must be a string`)
+  else if (raw.group != null) report(`${path}.group must be a string`, 'reset')
 
   if (typeof raw.universe === 'number' && Number.isFinite(raw.universe)) {
     fixture.universe = raw.universe
   } else if (raw.universe != null) {
-    report(`${path}.universe must be a number`)
+    report(`${path}.universe must be a number`, 'reset')
   }
 
   if (raw.mount === 'floor' || raw.mount === 'ceiling') fixture.mount = raw.mount
-  else if (raw.mount != null) report(`${path}.mount must be floor or ceiling`)
+  else if (raw.mount != null) report(`${path}.mount must be floor or ceiling`, 'reset')
 
   if (isPlainObject(raw.config)) fixture.config = parseConfig(raw.config, path, report)
-  else if (raw.config != null) report(`${path}.config must be a plain object`)
+  else if (raw.config != null) report(`${path}.config must be a plain object`, 'reset')
 
   if (raw.strobeValues != null) {
     const strobeValues = parseStrobeValues(raw.strobeValues, path, report)
@@ -309,7 +330,7 @@ export function parseDmxFixture(
     })
     if (extras.length > 0) fixture.extraChannels = extras
   } else if (raw.extraChannels != null) {
-    report(`${path}.extraChannels must be an array`)
+    report(`${path}.extraChannels must be an array`, 'reset')
   }
 
   if (raw.brightnessScaling != null) {
@@ -319,7 +340,7 @@ export function parseDmxFixture(
 
   for (const key of Object.keys(raw)) {
     if (!FIXTURE_FIELDS.has(key)) {
-      report(`${path}.${key} is not a fixture field`)
+      report(`${path}.${key} is not a fixture field`, 'dropped')
     }
   }
   return fixture
@@ -332,14 +353,14 @@ export function parseDmxLight(
   report: FixtureFaultReport,
 ): DmxLight | null {
   if (!isPlainObject(raw)) {
-    report(`${path} must be an object`)
+    report(`${path} must be an object`, 'reset')
     return null
   }
   const { fixtureId, ...fields } = raw
   const fixture = parseDmxFixture(fields, path, report)
   if (!fixture) return null
   if (typeof fixtureId === 'string') return { ...fixture, fixtureId }
-  report(`${path}.fixtureId must be a string`)
+  report(`${path}.fixtureId must be a string`, 'reset')
   return { ...fixture, fixtureId: '' }
 }
 
@@ -375,14 +396,16 @@ export function parseFixtureList<T>(
   raw: readonly unknown[],
   path: string,
   parse: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
-  faults: string[],
+  faults: FixtureFault[],
 ): { ok: true; value: T[] } | { ok: false; error: string } {
   const value: T[] = []
   for (let i = 0; i < raw.length; i++) {
-    const entryFaults: string[] = []
-    const fixture = parse(raw[i], `${path}[${i}]`, (message) => entryFaults.push(message))
+    const entryFaults: FixtureFault[] = []
+    const fixture = parse(raw[i], `${path}[${i}]`, (message, kind) =>
+      entryFaults.push({ message, kind }),
+    )
     if (!fixture) {
-      return { ok: false, error: entryFaults.join('; ') }
+      return { ok: false, error: entryFaults.map((fault) => fault.message).join('; ') }
     }
     faults.push(...entryFaults)
     value.push(fixture)

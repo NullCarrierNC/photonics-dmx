@@ -1,7 +1,7 @@
 import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
 import { isStorableBrightnessScale } from './brightnessScaling'
-import { loadDmxFixture, loadDmxLight, parseFixtureList } from './fixtureParsing'
+import { loadDmxFixture, loadDmxLight, parseFixtureList, type FixtureFault } from './fixtureParsing'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -201,9 +201,18 @@ export function validateRigExportFile(
 export function loadRigExportFixtures(
   file: RigExportEnvelope,
   faults: string[],
-):
+): RigExportFixtures {
+  const found: FixtureFault[] = []
+  const loaded = loadRigFixtures(file, found)
+  faults.push(...found.map((fault) => fault.message))
+  return loaded
+}
+
+type RigExportFixtures =
   | { ok: true; rig: Record<string, unknown>; templates: DmxFixture[] }
-  | { ok: false; error: string } {
+  | { ok: false; error: string }
+
+function loadRigFixtures(file: RigExportEnvelope, faults: FixtureFault[]): RigExportFixtures {
   const templates = parseFixtureList(file.templates, 'templates', loadDmxFixture, faults)
   if (!templates.ok) {
     return templates
