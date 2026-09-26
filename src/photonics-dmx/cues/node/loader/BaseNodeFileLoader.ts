@@ -38,6 +38,8 @@ export interface BaseFileSummary<TMode extends string> {
   errors?: string[]
   /** What the load changed in a file an older build wrote, which it then saved. */
   migrations?: string[]
+  /** What the load read differently in a file it left as it is on disk, and why it left it. */
+  unsaved?: string[]
 }
 
 /** One summary bucket per mode, keyed by the mode discriminant. */
@@ -49,6 +51,8 @@ export interface BaseLoadResult {
   errors: string[]
   /** One line per change made to a file an older build wrote, led by the file's name. */
   migrations: string[]
+  /** One line per file the load read differently and left as it is on disk, led by its name. */
+  unsaved: string[]
 }
 
 export const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
@@ -145,8 +149,9 @@ export abstract class BaseNodeFileLoader<
         failed: acc.failed + curr.failed,
         errors: acc.errors.concat(curr.errors),
         migrations: acc.migrations.concat(curr.migrations),
+        unsaved: acc.unsaved.concat(curr.unsaved),
       }),
-      { loaded: 0, failed: 0, errors: [], migrations: [] },
+      { loaded: 0, failed: 0, errors: [], migrations: [], unsaved: [] },
     )
 
     this.emit('changed', this.getSummary())
@@ -188,6 +193,7 @@ export abstract class BaseNodeFileLoader<
     let failed = 0
     const errors: string[] = []
     const migrations: string[] = []
+    const unsaved: string[] = []
     const summaries: TSummary[] = []
 
     for (const file of files) {
@@ -206,6 +212,7 @@ export abstract class BaseNodeFileLoader<
         if (summary) {
           summaries.push(summary)
           for (const note of summary.migrations ?? []) migrations.push(`${file}: ${note}`)
+          for (const note of summary.unsaved ?? []) unsaved.push(`${file}: ${note}`)
         }
         loaded++
       } catch (error) {
@@ -224,7 +231,7 @@ export abstract class BaseNodeFileLoader<
     }
 
     this.summaries[mode] = summaries
-    return { loaded, failed, errors, migrations }
+    return { loaded, failed, errors, migrations, unsaved }
   }
 
   // ---- watching -------------------------------------------------------------
@@ -304,14 +311,29 @@ export abstract class BaseNodeFileLoader<
   }
 
   /**
-   * Write back a file a load brought forward from an older build, so the change is made and
-   * reported once. A failed write is logged, and the next load brings the file forward again.
+   * Write back a file a load brought forward from an older build, described by `notes`. The notes
+   * are reported as saved once the write lands. A failed write is reported as unsaved, and the
+   * next load brings the file forward again.
    */
-  protected async writeMigratedFile(filePath: string, data: unknown): Promise<void> {
+  protected async writeMigratedFile(
+    filePath: string,
+    data: unknown,
+    notes: readonly string[],
+  ): Promise<Pick<BaseFileSummary<TMode>, 'migrations' | 'unsaved'>> {
+    if (notes.length === 0) return {}
     try {
       await this.writeSavedFile(filePath, JSON.stringify(data, null, 2), false)
+      return { migrations: [...notes] }
     } catch (error) {
       log.warn('Could not save the brought-forward file', filePath, error)
+      const code = errorCode(error)
+      const reason =
+        typeof code === 'string' ? code : error instanceof Error ? error.message : String(error)
+      return {
+        unsaved: [
+          `Could not save the update from an older version (${reason}), so each load updates it again: ${notes.join(' ')}`,
+        ],
+      }
     }
   }
 

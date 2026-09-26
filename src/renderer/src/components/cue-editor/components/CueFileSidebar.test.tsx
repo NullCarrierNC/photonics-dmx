@@ -97,4 +97,12 @@ describe('CueFileSidebar', () => {
 
     expect(screen.getByText("Variable 'beat-count' became 'beat_count'.")).toBeTruthy()
   })
+
+  it('shows why a load left an effect file as it is on disk', () => {
+    const line =
+      'Could not save the update from an older version (EACCES), so each load updates it again.'
+    renderSidebar({ isEffectMode: true, effectFileList: [effectFile({ unsaved: [line] })] })
+
+    expect(screen.getByText(line)).toBeTruthy()
+  })
 })

@@ -71,6 +71,7 @@ describe('writing back cue and effect files a load brings forward', () => {
     await effectLoader.dispose()
     AudioCueRegistry.getInstance().reset()
     for (const dir of [cuesDir, effectsDir]) {
+      fs.chmodSync(dir, 0o755)
       for (const name of fs.readdirSync(dir)) fs.chmodSync(path.join(dir, name), 0o644)
     }
     fs.rmSync(baseDir, { recursive: true, force: true })
@@ -108,6 +109,62 @@ describe('writing back cue and effect files a load brings forward', () => {
       expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
       expect(fs.readdirSync(effectsDir)).toEqual(['my-effects.json'])
       expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+    })
+  })
+
+  describe('when the write-back fails', () => {
+    it('reports a read-only older file as unsaved on every load, never as saved', async () => {
+      const filePath = path.join(cuesDir, 'user-alt1.json')
+      const original = olderCueFileText('user-alt1')
+      fs.writeFileSync(filePath, original)
+      fs.chmodSync(filePath, 0o444)
+
+      const firstLaunch = await loader.loadAll()
+      await loader.dispose()
+      const secondLaunch = await new NodeCueLoader({
+        baseDir,
+        registries: { yarg, rb3: CueRegistry.create(), audio: AudioCueRegistry.getInstance() },
+        effectLoader,
+        runtimeBroadcaster: noopRuntimeBroadcaster(),
+      }).loadAll()
+
+      for (const launch of [firstLaunch, secondLaunch]) {
+        expect(launch).toEqual(
+          expect.objectContaining({
+            loaded: 1,
+            migrations: [],
+            unsaved: [
+              expect.stringMatching(
+                /^user-alt1\.json: Could not save the update from an older version \(EACCES\), so each load updates it again: .*'sin-out'/,
+              ),
+            ],
+          }),
+        )
+      }
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
+      expect(yarg.getGroup('user-alt1')?.cues.size).toBe(24)
+    })
+
+    it('reports an older effect file in a read-only folder as unsaved', async () => {
+      const filePath = path.join(effectsDir, 'my-effects.json')
+      fs.copyFileSync(path.join(HISTORICAL, 'f3f851db', 'my-effects.json'), filePath)
+      fs.chmodSync(effectsDir, 0o555)
+
+      const result = await effectLoader.loadAll()
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          loaded: 1,
+          migrations: [],
+          unsaved: [
+            expect.stringMatching(/^my-effects\.json: Could not save .*\(EACCES\).*'beat-count'/),
+          ],
+        }),
+      )
+      const [summary] = effectLoader.getSummary().yarg
+      expect(summary).toEqual(
+        expect.objectContaining({ migrations: undefined, unsaved: [expect.any(String)] }),
+      )
     })
   })
 

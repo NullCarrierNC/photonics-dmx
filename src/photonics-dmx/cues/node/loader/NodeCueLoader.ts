@@ -39,6 +39,8 @@ export interface NodeCueFileSummary {
   warnings?: string[]
   /** What the load changed in a file an older build wrote, which it then saved. */
   migrations?: string[]
+  /** What the load read differently in a file it left as it is on disk, and why it left it. */
+  unsaved?: string[]
   bundled?: boolean
 }
 
@@ -299,9 +301,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const compileErrors: string[] = []
     const compileWarnings: string[] = []
     await this.registerFile(filePath, mode, file, compileErrors, compileWarnings)
-    if (migrations.length > 0) {
-      await this.writeMigratedFile(filePath, parsed)
-    }
+    const saved = await this.writeMigratedFile(filePath, parsed, migrations)
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
     const motionCueCount = file.cues.filter((c) => c.kind === 'motion').length
@@ -329,7 +329,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
       warnings: warnings.length > 0 ? warnings : undefined,
-      migrations: migrations.length > 0 ? migrations : undefined,
+      migrations: saved.migrations,
+      unsaved: saved.unsaved,
     }
 
     this.updateSummary(summary)

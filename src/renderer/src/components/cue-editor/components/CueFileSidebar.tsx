@@ -138,7 +138,7 @@ const CueFileSidebar: React.FC<Props> = ({
                 {message}
               </div>
             ))}
-            {file.migrations?.map((message) => (
+            {[...(file.migrations ?? []), ...(file.unsaved ?? [])].map((message) => (
               <div
                 key={message}
                 className="text-[10px] text-amber-600 dark:text-amber-400 break-words">

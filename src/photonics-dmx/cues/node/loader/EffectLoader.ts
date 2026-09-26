@@ -23,6 +23,8 @@ export interface EffectFileSummary {
   errors?: string[]
   /** What the load changed in a file an older build wrote, which it then saved. */
   migrations?: string[]
+  /** What the load read differently in a file it left as it is on disk, and why it left it. */
+  unsaved?: string[]
   bundled?: boolean
 }
 
@@ -198,9 +200,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       }
     }
 
-    if (migrations.length > 0) {
-      await this.writeMigratedFile(filePath, parsed)
-    }
+    const saved = await this.writeMigratedFile(filePath, parsed, migrations)
 
     const summary: EffectFileSummary = {
       path: filePath,
@@ -211,7 +211,8 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
-      migrations: migrations.length > 0 ? migrations : undefined,
+      migrations: saved.migrations,
+      unsaved: saved.unsaved,
     }
 
     this.updateSummary(summary)

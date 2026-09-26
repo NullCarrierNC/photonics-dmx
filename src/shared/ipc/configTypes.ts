@@ -16,13 +16,15 @@ import type {
 import type { IpcErrorResult, IpcSavedResult, IpcSuccessResult } from './common'
 
 /**
- * What a startup load of the cue or effect files has to tell the user: files it refused, and
- * changes it made to files an older build wrote.
+ * What a startup load of the cue or effect files has to tell the user: files it refused, changes
+ * it made and saved to files an older build wrote, and files it read differently and left as they
+ * are on disk.
  */
 export interface CueFileLoadReport {
   source: 'node-cue' | 'effect'
   errors: string[]
   migrations: string[]
+  unsaved: string[]
 }
 
 export interface ConfigInvokeMap {
