@@ -3,7 +3,7 @@ import { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { Rb3GameModeSchedulePayload } from '../../../shared/ipcTypes'
-import { setListenCueData, getRb3CueGroups } from '../ipcApi'
+import { setListenCueData, getRb3CueGroups, getRb3Mode } from '../ipcApi'
 import { useRunningMotionLabels } from '../hooks/useRunningMotionLabels'
 import { useAtom } from 'jotai'
 import { rb3eListenerEnabledAtom } from '../atoms'
@@ -51,6 +51,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom)
   // Game-mode primary cue + countdown (live only; pushed from the RB3 game-mode manager).
   const [primaryGroupLabel, setPrimaryGroupLabel] = useState<string | null>(null)
+  const [directMode, setDirectMode] = useState(false)
   const [schedule, setSchedule] = useState<Rb3GameModeSchedulePayload | null>(null)
   const [remainingSec, setRemainingSec] = useState<number | null>(null)
   const {
@@ -67,6 +68,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
       setCurrentCueData(null)
       setColorBanks({ ...EMPTY_BANKS })
       setPrimaryGroupLabel(null)
+      setDirectMode(false)
       setSchedule(null)
       setRemainingSec(null)
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -75,6 +77,14 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
 
     // Tell the main process to start sending cue data
     setListenCueData(true)
+    // The enabled broadcast follows the processor build, so the answer is the running mode.
+    let stale = false
+    getRb3Mode().then(
+      (mode) => {
+        if (!stale) setDirectMode(mode === 'direct')
+      },
+      (error: unknown) => log.error('Failed to read the RB3 processing mode:', error),
+    )
 
     const handleCueData = (cueData: CueData) => {
       log.debug('Received RB3E cue data:', cueData)
@@ -110,6 +120,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
     addIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, handleDeadline)
 
     return () => {
+      stale = true
       setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
       removeIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, handlePrimaryChange)
@@ -349,7 +360,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
             <div className="flex items-center justify-between gap-4">
               <p className="min-w-0">
                 <span className="font-medium">Primary Cue:</span>{' '}
-                <span>{primaryGroupLabel ?? '—'}</span>
+                <span>{directMode ? 'DIRECT MODE' : primaryGroupLabel ?? '—'}</span>
               </p>
               <span className="shrink-0 tabular-nums font-medium" aria-live="polite">
                 {schedule?.pending
@@ -359,7 +370,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
                     : ''}
               </span>
             </div>
-            {motionEnabled && (
+            {motionEnabled && !directMode && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                 <p className="min-w-0">
                   <span className="font-medium">Motion Cue Group:</span>{' '}
