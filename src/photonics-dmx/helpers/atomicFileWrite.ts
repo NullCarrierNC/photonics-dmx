@@ -1,8 +1,12 @@
+/**
+ * File renames retried through transient locks, and whole-file writes made through a temp file.
+ */
 import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
+import * as path from 'path'
 import { createLogger } from '../../shared/logger'
 
-const log = createLogger('ConfigFile')
+const log = createLogger('atomicFileWrite')
 
 /** Rename failures another process holding the file can cause, which a short wait clears. */
 const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'])
@@ -51,5 +55,26 @@ export async function renameWithRetry(from: string, to: string): Promise<void> {
       )
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
+  }
+}
+
+/**
+ * Write a file through a temp file beside it and a rename, so a process killed or a disk filled
+ * mid-write leaves either the file as it was or the new one whole. A failed write removes its temp
+ * file.
+ */
+export async function writeFileAtomic(filePath: string, contents: string): Promise<void> {
+  const unique = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const tempPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.tmp.${unique}`)
+  try {
+    await fsPromises.writeFile(tempPath, contents, 'utf-8')
+    await renameWithRetry(tempPath, filePath)
+  } catch (error) {
+    try {
+      await fsPromises.unlink(tempPath)
+    } catch {
+      // The temp file never landed.
+    }
+    throw error
   }
 }
