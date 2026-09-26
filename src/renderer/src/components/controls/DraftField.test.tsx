@@ -236,6 +236,88 @@ describe('a draft field focused while its value changes elsewhere', () => {
   })
 })
 
+describe('a draft field that reports on unmount, removed while it holds typed text', () => {
+  it('reports the typed number to the handler it last rendered with', () => {
+    const first: number[] = []
+    const last: number[] = []
+    const view = renderWithProviders(
+      <DraftNumberField commitOnUnmount value={5} onCommit={(value) => void first.push(value)} />,
+    )
+
+    fireEvent.change(field(), { target: { value: '42' } })
+    view.rerender(
+      <DraftNumberField commitOnUnmount value={5} onCommit={(value) => void last.push(value)} />,
+    )
+    view.unmount()
+
+    expect(first).toEqual([])
+    expect(last).toEqual([42])
+  })
+
+  it('reports the typed text', () => {
+    const reported: string[] = []
+    const view = renderWithProviders(
+      <DraftTextField
+        commitOnUnmount
+        value="old"
+        onCommit={(value) => void reported.push(value)}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'new' } })
+    view.unmount()
+
+    expect(reported).toEqual(['new'])
+  })
+
+  it('reports a number once when it was blurred first', () => {
+    const reported: number[] = []
+    const view = renderWithProviders(
+      <DraftNumberField
+        commitOnUnmount
+        value={5}
+        onCommit={(value) => void reported.push(value)}
+      />,
+    )
+
+    fireEvent.change(field(), { target: { value: '42' } })
+    fireEvent.blur(field())
+    view.unmount()
+
+    expect(reported).toEqual([42])
+  })
+
+  it('reports nothing when left untyped', () => {
+    const reported: number[] = []
+    const view = renderWithProviders(
+      <DraftNumberField
+        commitOnUnmount
+        value={5}
+        onCommit={(value) => void reported.push(value)}
+      />,
+    )
+
+    fireEvent.focus(field())
+    view.unmount()
+
+    expect(reported).toEqual([])
+  })
+})
+
+describe('a draft field removed while it holds typed text', () => {
+  it('drops the typed number', () => {
+    const reported: number[] = []
+    const view = renderWithProviders(
+      <DraftNumberField value={5} onCommit={(value) => void reported.push(value)} />,
+    )
+
+    fireEvent.change(field(), { target: { value: '42' } })
+    view.unmount()
+
+    expect(reported).toEqual([])
+  })
+})
+
 /** A page with no committed edits that guards its unsaved changes. */
 function GuardedPage({ children }: { children: ReactNode }) {
   useUnloadGuard(false)

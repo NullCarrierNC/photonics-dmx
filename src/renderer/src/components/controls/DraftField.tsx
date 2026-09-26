@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useUncommittedDraft } from '../../hooks/useUnloadGuard'
 
 /**
@@ -43,10 +43,32 @@ function revertIfRefused(
   }
 }
 
+/**
+ * Runs a field's commit when it unmounts while `armed`, through the handlers it last rendered
+ * with, so a draft reaches the owner it was typed for. Returns the commit to call on blur.
+ */
+function useCommitOnUnmount(armed: boolean, commit: () => void): () => void {
+  const pendingCommit = useRef<(() => void) | null>(null)
+  useLayoutEffect(() => {
+    pendingCommit.current = armed ? commit : null
+  })
+  useEffect(() => () => pendingCommit.current?.(), [])
+  return () => {
+    pendingCommit.current = null
+    commit()
+  }
+}
+
 const INPUT_CLASS =
   'border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
 
 interface DraftFieldBaseProps {
+  /**
+   * Report typed text when the field unmounts before a blur. For a field whose owner outlives it,
+   * as the Cue Editor's node editor does when the selection moves to another node. A dialog's
+   * field leaves it off, so closing the dialog drops what was typed.
+   */
+  'commitOnUnmount'?: boolean
   'id'?: string
   'className'?: string
   'disabled'?: boolean
@@ -63,6 +85,7 @@ interface DraftTextFieldProps extends DraftFieldBaseProps {
 export const DraftTextField: React.FC<DraftTextFieldProps> = ({
   value,
   onCommit,
+  commitOnUnmount = false,
   className,
   ...rest
 }) => {
@@ -84,12 +107,12 @@ export const DraftTextField: React.FC<DraftTextFieldProps> = ({
 
   useUncommittedDraft(typed && draft !== value)
 
-  const commit = (): void => {
+  const commit = useCommitOnUnmount(commitOnUnmount && typed, () => {
     setTyped(false)
     if (draft !== value) {
       revertIfRefused(onCommit(draft), draft, value, setDraft)
     }
-  }
+  })
 
   return (
     <input
@@ -166,6 +189,7 @@ const NumberDraftInput: React.FC<
   step,
   decimals,
   commitWhenUnchanged = false,
+  commitOnUnmount = false,
   onNumber,
   onEmpty,
   className,
@@ -199,7 +223,7 @@ const NumberDraftInput: React.FC<
   const clearing = typed && onEmpty !== undefined && draft.trim() === '' && value !== undefined
   useUncommittedDraft(clearing || (pending !== null && pending !== value))
 
-  const commit = (): void => {
+  const commit = useCommitOnUnmount(commitOnUnmount && typed, () => {
     const typedSinceCommit = typed
     setTyped(false)
     if (draft.trim() === '' && onEmpty) {
@@ -215,7 +239,7 @@ const NumberDraftInput: React.FC<
     if (clamped !== value || (commitWhenUnchanged && typedSinceCommit)) {
       revertIfRefused(onNumber(clamped), String(clamped), shownText(value), setDraft)
     }
-  }
+  })
 
   return (
     <input
