@@ -2,8 +2,9 @@
  * Refuses a jest.config.js that loosens coverage against a base: a threshold set lower or dropped,
  * a collectCoverageFrom entry dropped or an exclusion added to it, a coveragePathIgnorePatterns
  * entry added, or a change that stops tests running, which is a project, a testRegex, testMatch or
- * roots entry dropped or a testPathIgnorePatterns entry added. The config is evaluated, so what is
- * compared is the config Jest runs with.
+ * roots entry dropped, a testPathIgnorePatterns or modulePathIgnorePatterns entry added, or a
+ * top-level option that narrows the run, such as testNamePattern, set. The config is evaluated, so
+ * what is compared is the config Jest runs with.
  *
  * The working tree is held to HEAD. With `--pushed`, as the pre-push hook runs it, the refs git is
  * pushing are read from stdin and each pushed commit is held to what the remote already has, or to

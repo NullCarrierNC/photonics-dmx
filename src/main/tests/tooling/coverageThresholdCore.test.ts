@@ -203,6 +203,59 @@ describe('loosenedCoverage on the tests Jest runs', () => {
     expect(loosenedCoverage(current, base)).toEqual(["projects drops 'renderer'"])
   })
 
+  it('names a module path ignore pattern a project adds', () => {
+    const current = withProject(1, { modulePathIgnorePatterns: ['<rootDir>/src/renderer/src/'] })
+
+    expect(loosenedCoverage(current, config())).toEqual([
+      "renderer: modulePathIgnorePatterns adds '<rootDir>/src/renderer/src/'",
+    ])
+  })
+
+  it('names a test name pattern the config sets or changes', () => {
+    expect(loosenedCoverage(config({ testNamePattern: 'fast' }), config())).toEqual([
+      "testNamePattern is set to 'fast'",
+    ])
+    expect(
+      loosenedCoverage(config({ testNamePattern: 'fast' }), config({ testNamePattern: '.' })),
+    ).toEqual(["testNamePattern is set to 'fast'"])
+  })
+
+  it('names a config that runs only changed, failed or related tests, or lists them', () => {
+    const current = config({
+      onlyChanged: true,
+      onlyFailures: true,
+      lastCommit: true,
+      changedFilesWithAncestor: true,
+      changedSince: 'development',
+      findRelatedTests: true,
+      filter: '<rootDir>/filter.js',
+      listTests: true,
+      collectTests: true,
+      watch: true,
+    })
+
+    expect(loosenedCoverage(current, config())).toEqual([
+      'onlyChanged is set to true',
+      'onlyFailures is set to true',
+      'lastCommit is set to true',
+      'changedFilesWithAncestor is set to true',
+      "changedSince is set to 'development'",
+      'findRelatedTests is set to true',
+      "filter is set to '<rootDir>/filter.js'",
+      'listTests is set to true',
+      'collectTests is set to true',
+      'watch is set to true',
+    ])
+  })
+
+  it('passes a test name pattern or module path ignore pattern the base already has', () => {
+    const base = withProject(0, { modulePathIgnorePatterns: ['<rootDir>/out/'] })
+    const both = { ...base, testNamePattern: 'fast', onlyChanged: false }
+
+    expect(loosenedCoverage(both, { ...base, testNamePattern: 'fast' })).toEqual([])
+    expect(loosenedCoverage(config(), both)).toEqual([])
+  })
+
   it('passes a test path ignore pattern removed and a project added', () => {
     const base = withProject(0, { testPathIgnorePatterns: ['/node_modules/', '/src/renderer/'] })
     const current = config({
@@ -263,6 +316,17 @@ describe('loosenedCoverage across a move to projects', () => {
 
     expect(loosenedCoverage(current, topLevel)).toEqual([
       "engine: testPathIgnorePatterns adds '<rootDir>/src/render.*/'",
+    ])
+  })
+
+  it('names a module path ignore pattern a project adds', () => {
+    const current = {
+      projects: [engine(), renderer({ modulePathIgnorePatterns: ['<rootDir>/src/renderer/src/'] })],
+    }
+
+    expect(loosenedCoverage(current, topLevel)).toEqual([
+      "engine: testPathIgnorePatterns adds '<rootDir>/src/renderer/'",
+      "renderer: modulePathIgnorePatterns adds '<rootDir>/src/renderer/src/'",
     ])
   })
 

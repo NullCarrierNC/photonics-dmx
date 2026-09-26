@@ -87,7 +87,7 @@ function coverageSettings(config) {
  *   or null when there is nothing to compare with
  * @returns {string[]} one line per threshold set lower or dropped, per collectCoverageFrom entry
  *   dropped, per exclusion added to collectCoverageFrom, per ignore pattern added and per change
- *   that stops a test running
+ *   that stops a test running or narrows the run
  */
 function loosenedCoverage(current, base) {
   if (!base) return []
@@ -123,7 +123,39 @@ function loosenedCoverage(current, base) {
     }
   }
 
-  return [...loosened, ...narrowedTests(current ?? {}, base)]
+  return [...loosened, ...narrowedTests(current ?? {}, base), ...narrowedRun(current ?? {}, base)]
+}
+
+/**
+ * Top-level options that run some of the tests or none, whichever tests the projects select: a
+ * name filter, only changed, failed or related tests, a filter module, or listing tests in place of
+ * running them.
+ */
+const RUN_NARROWING = [
+  'testNamePattern',
+  'onlyChanged',
+  'onlyFailures',
+  'lastCommit',
+  'changedFilesWithAncestor',
+  'changedSince',
+  'findRelatedTests',
+  'filter',
+  'listTests',
+  'collectTests',
+  'watch',
+]
+
+/**
+ * @param {Record<string, unknown>} current
+ * @param {Record<string, unknown>} base
+ * @returns {string[]} one line per run-narrowing option the config sets to a value the base does
+ *   not have
+ */
+function narrowedRun(current, base) {
+  return RUN_NARROWING.filter((key) => current[key] && current[key] !== base[key]).map((key) => {
+    const value = current[key]
+    return `${key} is set to ${typeof value === 'string' ? `'${value}'` : String(value)}`
+  })
 }
 
 /**
@@ -168,9 +200,19 @@ function testScopesOf(config) {
 }
 
 /**
+ * @typedef {{
+ *   ignore: string[],
+ *   modules: string[],
+ *   regex: string[],
+ *   match: string[],
+ *   roots: string[],
+ * }} TestSelection
+ */
+
+/**
  * @param {Record<string, unknown>} scope
- * @returns {{ ignore: string[], regex: string[], match: string[], roots: string[] }} which test
- *   files the scope runs, with Jest's defaults filled in
+ * @returns {TestSelection} which test files the scope runs, with Jest's defaults filled in. A
+ *   module path ignore pattern hides a test file from Jest as it hides any module.
  */
 function testSelection(scope) {
   const regex = stringOrStrings(scope.testRegex)
@@ -179,6 +221,7 @@ function testSelection(scope) {
     ignore: Array.isArray(scope.testPathIgnorePatterns)
       ? stringsIn(scope.testPathIgnorePatterns)
       : DEFAULT_IGNORE_PATTERNS,
+    modules: stringsIn(scope.modulePathIgnorePatterns),
     regex,
     match: match.length > 0 || regex.length > 0 ? match : DEFAULT_TEST_MATCH,
     roots: Array.isArray(scope.roots) ? stringsIn(scope.roots) : DEFAULT_ROOTS,
@@ -190,8 +233,8 @@ function testSelection(scope) {
  * coverage. A root is kept when a root that holds it remains.
  * @param {Record<string, unknown>} current
  * @param {Record<string, unknown>} base
- * @returns {string[]} one line per project dropped, test path ignore pattern added, testRegex or
- *   testMatch entry dropped and root dropped
+ * @returns {string[]} one line per project dropped, test or module path ignore pattern added,
+ *   testRegex or testMatch entry dropped and root dropped
  */
 function narrowedTests(current, base) {
   const now = testScopesOf(current)
@@ -215,6 +258,7 @@ function narrowedTests(current, base) {
         lines.push(`${prefix}testPathIgnorePatterns adds '${pattern}'`)
       }
     }
+    lines.push(...addedModuleIgnores(was, is, prefix))
     for (const [key, field] of [
       ['testRegex', 'regex'],
       ['testMatch', 'match'],
@@ -232,6 +276,18 @@ function narrowedTests(current, base) {
   return lines
 }
 
+/**
+ * @param {TestSelection} was
+ * @param {TestSelection} is
+ * @param {string} prefix the scope a line is reported under
+ * @returns {string[]} one line per module path ignore pattern `is` adds
+ */
+function addedModuleIgnores(was, is, prefix) {
+  return is.modules
+    .filter((pattern) => !was.modules.includes(pattern))
+    .map((pattern) => `${prefix}modulePathIgnorePatterns adds '${pattern}'`)
+}
+
 /** @param {string} pattern @returns {boolean} whether a regex matches only its own text */
 const isLiteral = (pattern) => !/[.*+?^${}()|[\]\\]/.test(pattern)
 
@@ -244,21 +300,26 @@ const holds = (kept, root) => root === kept || root.startsWith(`${kept}/`)
 
 /**
  * The base scope's tests against a set of scopes that replaced it. Each base root needs one scope
- * that holds it with every testRegex and testMatch entry. An ignore pattern that scope adds only
- * counts when it is not exactly the folder of another scope that runs those tests with the base's
- * selection and no added ignores.
+ * that holds it with every testRegex and testMatch entry. A test path ignore pattern that scope
+ * adds only counts when it is not exactly the folder of another scope that runs those tests with
+ * the base's selection and no added ignores. A module path ignore pattern counts in any scope that
+ * runs some of a base root's tests.
  * @param {Record<string, unknown>} baseScope
  * @param {Map<string, Record<string, unknown>>} scopes
- * @returns {string[]} the lines for the first scope holding a root, or `roots drops` when none does
+ * @returns {string[]} the lines for the first scope holding a root, or `roots drops` when none
+ *   does, and the module path ignore patterns added
  */
 function narrowedAcross(baseScope, scopes) {
   const was = testSelection(baseScope)
   const named = [...scopes].map(([name, scope]) => ({ name, is: testSelection(scope) }))
-  const keepsEntries = (/** @type {ReturnType<typeof testSelection>} */ is) =>
+  const keepsEntries = (/** @type {TestSelection} */ is) =>
     was.regex.every((entry) => is.regex.includes(entry)) &&
     was.match.every((entry) => is.match.includes(entry))
   const runsAsBase = named.filter(
-    ({ is }) => keepsEntries(is) && is.ignore.every((pattern) => was.ignore.includes(pattern)),
+    ({ is }) =>
+      keepsEntries(is) &&
+      is.ignore.every((pattern) => was.ignore.includes(pattern)) &&
+      is.modules.every((pattern) => was.modules.includes(pattern)),
   )
 
   /** @type {string[]} */
@@ -297,6 +358,12 @@ function narrowedAcross(baseScope, scopes) {
       return found
     })
     if (!problems.some((found) => found.length === 0)) lines.push(...problems[0])
+  }
+  for (const { name, is } of named) {
+    const overlaps = was.roots.some((root) =>
+      is.roots.some((kept) => holds(kept, root) || holds(root, kept)),
+    )
+    if (overlaps) lines.push(...addedModuleIgnores(was, is, name === '' ? '' : `${name}: `))
   }
   return [...new Set(lines)]
 }
