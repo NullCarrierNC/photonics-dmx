@@ -3,9 +3,9 @@
  * and only the wire, since the preview re-applies it from the IPC buffer and would otherwise double
  * it. Also which channels scale, the mixer path, rounding, and the unscaled case.
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
@@ -25,22 +25,8 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
   return { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace', ...overrides }
 }
 
-interface MockSender {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
-  getEnabledWireSenders: () => string[]
-  isIpcEnabled: () => boolean
-}
-
-function makeMockSender(ipc = true): MockSender {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => ipc,
-  }
+function makeMockSender(ipc = true): FakeSenderManager {
+  return fakeSenderManager({ isIpcEnabled: () => ipc })
 }
 
 type LightSpec = {
@@ -89,13 +75,13 @@ function setup(
   strobeManager?: StrobeStateManager,
 ): {
   publisher: DmxPublisher
-  sender: MockSender
+  sender: FakeSenderManager
   wire(): Record<number, number>
   ipc(): Record<number, number>
 } {
   const sender = makeMockSender()
   const publisher = new DmxPublisher(
-    sender as unknown as SenderManager,
+    sender,
     new LightStateManager(),
     strobeManager ?? new StrobeStateManager(),
   )

@@ -13,9 +13,9 @@
  *  - Lights without a strobe channel (or with isStrobeEnabled off) are unaffected by either
  *    behaviour.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import {
@@ -44,33 +44,10 @@ function makeBrightRgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 
 interface ScenarioContext {
   publisher: DmxPublisher
-  sender: {
-    send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-    getEnabledWireSenders: () => string[]
-    isIpcEnabled: () => boolean
-  }
+  sender: FakeSenderManager
   strobe: StrobeStateManager
   rig: DmxRig
   lastBuffer(): Record<number, number>
-}
-
-/**
- * Mock SenderManager surface used across this file. Advertises a single 'sacn' wire sender so
- * the publisher routes every test rig through that one slot; the assertions read the buffer
- * arg of the (slotId, buffer) call signature.
- */
-function makeMockSender(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  getEnabledWireSenders: () => string[]
-  isIpcEnabled: () => boolean
-} {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => false,
-  }
 }
 
 /**
@@ -81,10 +58,10 @@ function setupScenario(options: {
   withStrobeChannel: boolean
   isStrobeEnabled: boolean
 }): ScenarioContext {
-  const sender = makeMockSender()
+  const sender = fakeSenderManager()
   const lightStateManager = new LightStateManager()
   const strobe = new StrobeStateManager()
-  const publisher = new DmxPublisher(sender as unknown as SenderManager, lightStateManager, strobe)
+  const publisher = new DmxPublisher(sender, lightStateManager, strobe)
 
   const channels: RgbDmxChannels = {
     masterDimmer: 1,
@@ -265,13 +242,9 @@ describe('DmxPublisher strobe-channel runtime', () => {
   })
 
   it('falls back to default strobe values when the light has none configured', () => {
-    const sender = makeMockSender()
+    const sender = fakeSenderManager()
     const strobe = new StrobeStateManager()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      strobe,
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), strobe)
     publisher.updateActiveRigs([
       {
         ...ctx.rig,
@@ -294,13 +267,9 @@ describe('DmxPublisher dedicated STROBE fixtures', () => {
     // A dedicated STROBE fixture is a separate device class — it has its own strobe channel by
     // design and is not part of the new "RGB light with optional strobe channel" feature. The
     // publisher should leave it alone: no per-cue speed-value write, no RGB latch.
-    const sender = makeMockSender()
+    const sender = fakeSenderManager()
     const strobe = new StrobeStateManager()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      strobe,
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), strobe)
 
     const strobeRig: DmxRig = {
       id: 'rig-pure-strobe',

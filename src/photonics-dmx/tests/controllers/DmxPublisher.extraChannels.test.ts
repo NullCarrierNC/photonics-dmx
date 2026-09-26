@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, jest } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import {
@@ -27,20 +27,6 @@ import {
 
 function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
   return { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace', ...overrides }
-}
-
-function makeMockSender(ipc = false): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
-  getEnabledWireSenders: () => string[]
-  isIpcEnabled: () => boolean
-} {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => ipc,
-  }
 }
 
 interface LightSpec {
@@ -106,13 +92,13 @@ function makeRig(lights: LightSpec[]): DmxRig {
 
 function setup(lights: LightSpec[]): {
   publisher: DmxPublisher
-  sender: ReturnType<typeof makeMockSender>
+  sender: FakeSenderManager
   lastWire(): Record<number, number>
 } {
-  const sender = makeMockSender()
+  const sender = fakeSenderManager()
   const lsm = new LightStateManager()
   const strobe = new StrobeStateManager()
-  const publisher = new DmxPublisher(sender as unknown as SenderManager, lsm, strobe)
+  const publisher = new DmxPublisher(sender, lsm, strobe)
   publisher.updateActiveRigs([makeRig(lights)])
   return {
     publisher,

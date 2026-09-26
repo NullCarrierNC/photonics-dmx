@@ -522,3 +522,9 @@ export class SenderManager {
     this.handleSenderError(error)
   }
 }
+
+/** The part of SenderManager a DmxPublisher sends through. */
+export type PublisherSenders = Pick<
+  SenderManager,
+  'send' | 'sendIpc' | 'getEnabledWireSenders' | 'isIpcEnabled'
+>

@@ -12,7 +12,7 @@ import { blackoutUniverse, normaliseUniverseBuffer } from '../helpers/dmxHelpers
 import { scaleDmxValueByPercent } from '../helpers/brightnessScaling'
 import { resolveMovingHeadAxes, StrobePeakLatch } from './publisherLightOutput'
 import { FixtureChannelWriter, strobeChannelChops, type LightOutput } from './fixtureChannelWriter'
-import { SenderManager } from './SenderManager'
+import type { PublisherSenders } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import type {
   ProcessedLightColor,
@@ -122,7 +122,7 @@ interface ChainSubscription {
 
 export class DmxPublisher {
   private _rigManagers: Map<string, { manager: DmxLightManager; rig: DmxRig }> = new Map()
-  private _sender: SenderManager
+  private _sender: PublisherSenders
   /**
    * Single-source `LightStateManager` subscription used when the publisher is wired to one
    * merged stream (the historical model). Mutually exclusive with `_chainSubscriptions`:
@@ -183,7 +183,7 @@ export class DmxPublisher {
   private _ipc: IpcGovernor = { lastSendTimeMs: 0, pending: null, trailingTimer: null }
 
   constructor(
-    senderManager: SenderManager,
+    senderManager: PublisherSenders,
     lightStateManager: LightStateManager | null,
     strobeStateManager: StrobeStateManager = new StrobeStateManager(),
     options: DmxPublisherOptions = {},

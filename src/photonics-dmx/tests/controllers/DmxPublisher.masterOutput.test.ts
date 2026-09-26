@@ -7,9 +7,9 @@
  * rather than darken it, and a blackout that reset a mode channel would leave the rig misconfigured
  * once it came back.
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { MasterOutputState } from '../../controllers/MasterOutputState'
@@ -27,24 +27,6 @@ import {
 
 function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
   return { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace', ...overrides }
-}
-
-interface MockSender {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
-  sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
-  getEnabledWireSenders: () => string[]
-  isIpcEnabled: () => boolean
-}
-
-function makeMockSender(): MockSender {
-  return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
-    ),
-    sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => true,
-  }
 }
 
 type LightSpec = {
@@ -100,17 +82,14 @@ function setup(
   publisher: DmxPublisher
   master: MasterOutputState
   strobeManager: StrobeStateManager
-  sender: MockSender
+  sender: FakeSenderManager
   wire(): Record<number, number>
   ipc(): Record<number, number>
 } {
-  const sender = makeMockSender()
-  const publisher = new DmxPublisher(
-    sender as unknown as SenderManager,
-    new LightStateManager(),
-    strobeManager,
-    { masterOutput: master },
-  )
+  const sender = fakeSenderManager({ isIpcEnabled: () => true })
+  const publisher = new DmxPublisher(sender, new LightStateManager(), strobeManager, {
+    masterOutput: master,
+  })
   publisher.updateActiveRigs([makeRig(lights)])
   return {
     publisher,

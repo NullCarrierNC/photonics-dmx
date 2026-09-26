@@ -5,9 +5,9 @@
  * restrict which wire senders carry it. The publisher builds one buffer per enabled sender slot
  * and runs each slot's governor independently. IPC is always populated for every active rig.
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher, type PublisherTiming } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager, type FakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import {
@@ -53,37 +53,34 @@ interface SendCall {
   buffer: Record<number, number>
 }
 
-interface MockSender {
-  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>
-  sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
-  getEnabledWireSenders: jest.Mock<() => WireSenderId[]>
-  isIpcEnabled: jest.Mock<() => boolean>
+function makeMockSender(opts: {
+  wireSenders: WireSenderId[]
+  ipcEnabled?: boolean
+}): FakeSenderManager {
+  return fakeSenderManager({
+    getEnabledWireSenders: () => [...opts.wireSenders],
+    isIpcEnabled: () => opts.ipcEnabled === true,
+  })
 }
 
-function makeMockSender(opts: { wireSenders: WireSenderId[]; ipcEnabled?: boolean }): MockSender {
-  return {
-    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>(() =>
-      Promise.resolve(true),
-    ),
-    sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
-    getEnabledWireSenders: jest.fn<() => WireSenderId[]>(() => [...opts.wireSenders]),
-    isIpcEnabled: jest.fn<() => boolean>(() => opts.ipcEnabled === true),
-  }
-}
-
-function callsFor(sender: MockSender, slotId: WireSenderId): SendCall[] {
+function callsFor(sender: FakeSenderManager, slotId: WireSenderId): SendCall[] {
   return sender.send.mock.calls
     .filter((c) => (c[0] as WireSenderId) === slotId)
     .map((c) => ({ slotId: c[0] as WireSenderId, buffer: c[1] as Record<number, number> }))
 }
 
-function lastBufferFor(sender: MockSender, slotId: WireSenderId): Record<number, number> | null {
+function lastBufferFor(
+  sender: FakeSenderManager,
+  slotId: WireSenderId,
+): Record<number, number> | null {
   const list = callsFor(sender, slotId)
   return list.length === 0 ? null : list[list.length - 1]!.buffer
 }
 
 /** Most-recent `kind: 'rigs'` payload's rigBuffers (or null when none has been sent). */
-function lastIpcRigBuffers(sender: MockSender): Record<string, Record<number, number>> | null {
+function lastIpcRigBuffers(
+  sender: FakeSenderManager,
+): Record<string, Record<number, number>> | null {
   const calls = sender.sendIpc.mock.calls
   for (let i = calls.length - 1; i >= 0; i--) {
     const payload = calls[i]![0] as DmxValuesPayload
@@ -142,11 +139,7 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 describe('DmxPublisher per-rig sender routing', () => {
   it('routes Rig A to sACN-only and Rig B to OpenDMX-only without cross-talk', () => {
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1, ['sacn'])
     const rigB = makeRig('B', 'lb', 10, ['opendmx'])
     publisher.updateActiveRigs([rigA, rigB])
@@ -166,11 +159,7 @@ describe('DmxPublisher per-rig sender routing', () => {
 
   it('rig with outputs: undefined publishes to every enabled wire sender (legacy default)', () => {
     const sender = makeMockSender({ wireSenders: ['sacn', 'artnet', 'opendmx'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     publisher.updateActiveRigs([makeRig('default', 'l', 1)]) // no outputs
     publisher.publish(new Map<string, RGBIO>([['l', rgbio({ red: 50, intensity: 100 })]]))
 
@@ -183,11 +172,7 @@ describe('DmxPublisher per-rig sender routing', () => {
   it('rig outputs referencing a disabled sender are silently dropped (no error)', () => {
     // OpenDMX is not enabled — a rig that only targets opendmx publishes nothing on the wire.
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     publisher.updateActiveRigs([makeRig('B', 'lb', 1, ['opendmx'])])
     publisher.publish(new Map<string, RGBIO>([['lb', rgbio({ red: 100, intensity: 200 })]]))
 
@@ -197,11 +182,7 @@ describe('DmxPublisher per-rig sender routing', () => {
 
   it('empty outputs array publishes nowhere on the wire (but still IPC when enabled)', () => {
     const sender = makeMockSender({ wireSenders: ['sacn'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     publisher.updateActiveRigs([makeRig('quiet', 'l', 1, [])])
     publisher.publish(new Map<string, RGBIO>([['l', rgbio({ red: 80, intensity: 200 })]]))
 
@@ -216,11 +197,7 @@ describe('DmxPublisher per-rig sender routing', () => {
     // physical universes. The IPC payload keeps each rig's buffer independent, so the renderer
     // can pick one without the other's values leaking in.
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1, ['sacn']) // channels 1-4
     const rigB = makeRig('B', 'lb', 1, ['opendmx']) // channels 1-4 — would collide if merged
     publisher.updateActiveRigs([rigA, rigB])
@@ -241,11 +218,7 @@ describe('DmxPublisher per-rig sender routing', () => {
     // Channel overlap on the same sender is a documented user error and is left alone here. The
     // contract is "last write wins by iteration order".
     const sender = makeMockSender({ wireSenders: ['sacn'] })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     const rigA = makeRig('A', 'la', 1, ['sacn']) // channels 1-4
     const rigB = makeRig('B', 'lb', 1, ['sacn']) // channels 1-4 (collide!)
     publisher.updateActiveRigs([rigA, rigB])
@@ -266,7 +239,7 @@ describe('DmxPublisher per-rig sender routing', () => {
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'] })
     const timing = new FakeTiming()
     const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
+      sender,
       new LightStateManager(),
       new StrobeStateManager(),
       { outputRateHz: 40, timing }, // 25 ms interval, governor active
@@ -290,11 +263,7 @@ describe('DmxPublisher per-rig sender routing', () => {
 
   it('rig with active: false is excluded from both wire and IPC', () => {
     const sender = makeMockSender({ wireSenders: ['sacn'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     const rig = makeRig('A', 'la', 1)
     rig.active = false
     publisher.updateActiveRigs([rig])
@@ -313,12 +282,10 @@ describe('DmxPublisher per-sender governor isolation', () => {
     // OpenDMX must still propagate.
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'] })
     const timing = new FakeTiming()
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-      { outputRateHz: 40, timing },
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager(), {
+      outputRateHz: 40,
+      timing,
+    })
     const rigA = makeRig('A', 'la', 1, ['sacn'])
     const rigB = makeRig('B', 'lb', 10, ['opendmx'])
     publisher.updateActiveRigs([rigA, rigB])
@@ -349,11 +316,7 @@ describe('DmxPublisher per-sender governor isolation', () => {
 
   it('setManualBuffer emits a `kind: manual` IPC payload alongside the wire broadcast', () => {
     const sender = makeMockSender({ wireSenders: ['sacn'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
     publisher.setManualBuffer({ 1: 200, 2: 64 })
 
     // Wire send went out (clamped & normalised).
@@ -372,11 +335,7 @@ describe('DmxPublisher per-sender governor isolation', () => {
 
   it('shutdown sends a `kind: manual` blackout payload to IPC', () => {
     const sender = makeMockSender({ wireSenders: ['sacn'], ipcEnabled: true })
-    const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
-      new LightStateManager(),
-      new StrobeStateManager(),
-    )
+    const publisher = new DmxPublisher(sender, new LightStateManager(), new StrobeStateManager())
 
     publisher.shutdown()
 
@@ -396,7 +355,7 @@ describe('DmxPublisher per-sender governor isolation', () => {
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'] })
     const timing = new FakeTiming()
     const publisher = new DmxPublisher(
-      sender as unknown as SenderManager,
+      sender,
       new LightStateManager(),
       new StrobeStateManager(),
       { outputRateHz: 40, timing }, // 25 ms gate

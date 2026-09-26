@@ -1,6 +1,6 @@
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
-import { SenderManager } from '../../controllers/SenderManager'
+import { fakeSenderManager } from '../helpers/fakeSenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import {
   DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
@@ -50,14 +50,8 @@ function makeMovingHeadRig(config: FixtureConfig): DmxRig {
 
 /** The universe buffer one published frame puts on the wire. */
 function publishFrame(rig: DmxRig, pan: number, tilt: number): Record<number, number> {
-  const send = jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
-    Promise.resolve(true),
-  )
-  const sender = {
-    send,
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => false,
-  } as unknown as SenderManager
+  const sender = fakeSenderManager()
+  const { send } = sender
   const publisher = new DmxPublisher(sender, new LightStateManager())
   publisher.updateActiveRigs([rig])
   const state: RGBIO = {
