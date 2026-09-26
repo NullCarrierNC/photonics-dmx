@@ -135,6 +135,42 @@ describe('EffectLoader.saveFile group id uniqueness', () => {
   })
 })
 
+describe('EffectLoader folder mode', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+  let yargDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-folder-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+    yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    const audioFile = {
+      ...minimalYargEffectFixture('misplaced'),
+      mode: 'audio',
+      effects: [{ ...minimalYargEffectFixture('misplaced').effects[0]!, mode: 'audio' }],
+    }
+    fs.writeFileSync(path.join(yargDir, 'pulse.json'), JSON.stringify(audioFile), 'utf-8')
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('refuses to read a file whose mode is not its folder', async () => {
+    await expect(loader.readFile(path.join(yargDir, 'pulse.json'))).rejects.toThrow(
+      /Invalid effect file/,
+    )
+  })
+
+  it('lists a file whose mode is not its folder with its errors', async () => {
+    await loader.loadAll()
+
+    const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('pulse.json'))
+    expect(summary?.errors?.join(' ')).toMatch(/mode/)
+  })
+})
+
 describe('EffectLoader compile errors surface on the summary', () => {
   let tmpDir: string
   let loader: EffectLoader

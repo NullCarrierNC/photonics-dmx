@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import { validateEffectFile } from '../schema/validation'
+import { validateEffectFile, validateEffectFileInFolder } from '../schema/validation'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import { EffectFile, EffectMode } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
@@ -45,7 +45,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
 
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed = JSON.parse(data)
-    const validation = validateEffectFile(parsed)
+    const validation = validateEffectFileInFolder(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(`Invalid effect file: ${validation.errors.join(', ')}`)
@@ -145,7 +145,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   protected async loadFile(mode: EffectMode, filePath: string): Promise<EffectFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
-    const validation = validateEffectFile(parsed)
+    const validation = validateEffectFileInFolder(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(validation.errors.join(', '))
