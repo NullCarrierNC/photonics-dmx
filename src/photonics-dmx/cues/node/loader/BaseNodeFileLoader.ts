@@ -3,6 +3,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import { realPathOf } from '../../../helpers/realPath'
+import { writeFileAtomic } from '../../../helpers/atomicFileWrite'
 import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('BaseNodeFileLoader')
@@ -51,6 +52,32 @@ export interface BaseLoadResult {
 }
 
 export const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
+
+const errorCode = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+
+/** Write a new file, refusing a path that already holds one. */
+async function createFile(filePath: string, contents: string): Promise<void> {
+  try {
+    await fs.writeFile(filePath, contents, { encoding: 'utf-8', flag: 'wx' })
+  } catch (error) {
+    if (errorCode(error) === 'EEXIST') {
+      throw new Error(
+        `A file named '${path.basename(filePath)}' already exists. Choose a different name.`,
+      )
+    }
+    throw error
+  }
+}
+
+/** A rename replaces a read-only file, so a file's own write permission is checked first. */
+async function assertWritableIfPresent(filePath: string): Promise<void> {
+  try {
+    await fs.access(filePath, fs.constants.W_OK)
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT') throw error
+  }
+}
 
 export abstract class BaseNodeFileLoader<
   TMode extends string,
@@ -258,7 +285,8 @@ export abstract class BaseNodeFileLoader<
 
   /**
    * Write a file a save produced, noting what was written for {@link isOwnSave}. A create-only
-   * write refuses a path that already holds a file.
+   * write refuses a path that already holds a file. Any other write replaces the file whole
+   * through a temp file, and refuses a file the user made read-only.
    */
   protected async writeSavedFile(
     filePath: string,
@@ -266,15 +294,11 @@ export abstract class BaseNodeFileLoader<
     createOnly: boolean,
   ): Promise<void> {
     await fs.mkdir(path.dirname(filePath), { recursive: true })
-    try {
-      await fs.writeFile(filePath, contents, { encoding: 'utf-8', flag: createOnly ? 'wx' : 'w' })
-    } catch (error) {
-      if (createOnly && error instanceof Error && 'code' in error && error.code === 'EEXIST') {
-        throw new Error(
-          `A file named '${path.basename(filePath)}' already exists. Choose a different name.`,
-        )
-      }
-      throw error
+    if (createOnly) {
+      await createFile(filePath, contents)
+    } else {
+      await assertWritableIfPresent(filePath)
+      await writeFileAtomic(filePath, contents)
     }
     this.savedContents.set(path.resolve(filePath), contents)
   }
