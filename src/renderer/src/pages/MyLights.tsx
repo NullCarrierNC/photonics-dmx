@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useAtom } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import equal from 'fast-deep-equal'
 
 import LightSettingsModal from '../components/LightSettingsModal'
 import LightChannelsPreview from '../components/LightChannelsPreview'
-import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
-import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
+import { DmxFixture, DmxRig, FixtureTypes } from '../../../photonics-dmx/types'
+import { dmxRigsAtom, myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
+import { unassignedBaseChannelLabels } from '../components/lightChannelDisplay'
 import { saveMyLights } from '../ipcApi'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
@@ -13,11 +14,28 @@ import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('MyLights')
 
+/** Whether any light in any rig is built from the template with this id. */
+function placedInARig(rigs: DmxRig[], templateId: string): boolean {
+  return rigs.some(({ config }) =>
+    [...config.frontLights, ...config.backLights, ...config.strobeLights].some(
+      (light) => light.fixtureId === templateId,
+    ),
+  )
+}
+
+/** "Red", "Red and Blue", "Red, Green and Blue". */
+function joinNames(names: string[]): string {
+  return names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
 const MyLights = () => {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [myLights, setMyLights] = useAtom(myDmxLightsAtom)
   const [myLightsSorted] = useAtom(sortedMyDmxLightsAtom)
+  const rigs = useAtomValue(dmxRigsAtom)
 
   const [currentLight, setCurrentLight] = useState<DmxFixture | null>(null)
   /**
@@ -68,8 +86,28 @@ const MyLights = () => {
     return false
   }
 
+  /**
+   * Asks before saving a light that rigs use while one of its base channels is still at 0, since
+   * the rig lights built from it leave that channel undriven. The user can still save it.
+   */
+  const confirmUnassignedChannels = async (light: DmxFixture): Promise<boolean> => {
+    const unassigned = unassignedBaseChannelLabels(light)
+    if (unassigned.length === 0 || !light.id || !placedInARig(rigs, light.id)) return true
+    const one = unassigned.length === 1
+    return confirm({
+      title: one ? 'Channel not set' : 'Channels not set',
+      message:
+        `${joinNames(unassigned)} ${one ? 'has' : 'have'} no DMX channel yet. Lights in your ` +
+        `rigs that use ${light.name} won't drive ${one ? 'it' : 'them'} until you set ` +
+        `${one ? 'it' : 'them'}.`,
+      confirmLabel: 'Save anyway',
+      cancelLabel: 'Keep editing',
+    })
+  }
+
   const handleSave = async () => {
     if (!currentLight || saving) return
+    if (!(await confirmUnassignedChannels(currentLight))) return
     const lightToSave: DmxFixture = {
       ...currentLight,
       id: currentLight.id || crypto.randomUUID(),

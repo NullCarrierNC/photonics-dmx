@@ -1,5 +1,6 @@
 import equal from 'fast-deep-equal'
 import { clampDerivedDmxChannel, DMX_CHANNEL_MAX, FixtureTypes } from '../types'
+import { isRgbFamilyWithStrobeChannel } from './strobeChannelRigInspection'
 import type {
   DmxFixture,
   DmxLight,
@@ -27,7 +28,8 @@ import type {
  *  - The entire channel layout. Every channel except `masterDimmer` is derived as
  *    `rigMasterDimmer + (templateChannel - templateMasterDimmer)` — the same offset model
  *    {@link createDmxLightInstance} and LightChannelsConfig use. Re-laying-out channel offsets in
- *    a template therefore propagates to every rig light using it.
+ *    a template therefore propagates to every rig light using it. An unassigned (0) template
+ *    channel stays 0, and a rig light with no usable master address derives every channel as 0.
  *  - Default `strobeValues` (when the rig has no per-light override)
  *  - `extraChannels`: user-added channels beyond the archetype map. `type`/`value`/`scale` are
  *    copied verbatim; each `channel` is offset-derived from the template the same way the base
@@ -50,13 +52,24 @@ import type {
  */
 
 /**
+ * Places a template channel on a rig light addressed at `master`, by its offset from the template's
+ * own master. A template channel of 0 is unassigned and stays 0. A master that is not an address
+ * (0, or outside 1-512) gives every channel 0, since the light has no place in the universe. A
+ * result outside 1-512 collapses to 0 through {@link clampDerivedDmxChannel}.
+ */
+function channelAtOffset(templateMaster: number, master: number): (channel: number) => number {
+  const address = clampDerivedDmxChannel(master)
+  return (channel) =>
+    channel === 0 || address === 0
+      ? 0
+      : clampDerivedDmxChannel(address + (channel - templateMaster))
+}
+
+/**
  * Derives a rig light's `extraChannels` from its template. `type`, `value` and `scale` are
- * template-owned and copied verbatim; `channel` follows the same offset model as the base
- * channels: `master + (templateChannel - templateMaster)`. A template channel of 0 means "unassigned" and
- * stays 0 (never offset); a derived result outside 1–512 — off either end — collapses to 0 via
- * {@link clampDerivedDmxChannel} so it can't fail the 0–512 validators. Returns `undefined` for a
- * nullish *or empty* input — never `[]` — so callers can use the set/delete pattern and
- * deep-equality never trips on `[]` vs absent.
+ * template-owned and copied verbatim, and `channel` follows the base channels' offset model
+ * ({@link channelAtOffset}). Returns `undefined` for a nullish *or empty* input, never `[]`, so
+ * callers can use the set/delete pattern and deep-equality never trips on `[]` vs absent.
  */
 export function deriveExtraChannelsForMaster(
   templateExtras: ExtraChannel[] | undefined,
@@ -64,10 +77,8 @@ export function deriveExtraChannelsForMaster(
   master: number,
 ): ExtraChannel[] | undefined {
   if (!templateExtras?.length) return undefined
-  return templateExtras.map((ec) => ({
-    ...ec,
-    channel: ec.channel === 0 ? 0 : clampDerivedDmxChannel(master + (ec.channel - templateMaster)),
-  }))
+  const at = channelAtOffset(templateMaster, master)
+  return templateExtras.map((ec) => ({ ...ec, channel: at(ec.channel) }))
 }
 
 /**
@@ -114,16 +125,15 @@ export function maxMasterDimmerForTemplate(template: DmxFixture): number {
 
 /**
  * The template's fixture type with every base channel derived from a master dimmer using the
- * template's own offsets, the offset model this module documents. Results are normalised to the
- * persisted 0/1-512 domain via {@link clampDerivedDmxChannel}.
+ * template's own offsets ({@link channelAtOffset}). Results land in the persisted 0/1-512 domain,
+ * with an unassigned template channel at 0 and every channel at 0 for a master that is not an
+ * address.
  */
 export function deriveChannelLayoutForMaster(
   template: DmxFixture,
   master: number,
 ): FixtureChannelLayout {
-  const templateMaster = template.channels.masterDimmer
-  const at = (channel: number): number =>
-    clampDerivedDmxChannel(master + (channel - templateMaster))
+  const at = channelAtOffset(template.channels.masterDimmer, master)
   const masterDimmer = clampDerivedDmxChannel(master)
   switch (template.fixture) {
     case FixtureTypes.STROBE:
@@ -185,10 +195,9 @@ export function syncDmxLightWithTemplate(
   // one address (see {@link clampDerivedDmxChannel}).
   const layout = deriveChannelLayoutForMaster(template, rigMaster)
 
-  // Track whether `strobeChannel` was dropped, so we can clear `strobeValues` accordingly. The
-  // template either has a strobeChannel (RGB+S model) or doesn't; the rig's previous state may have
-  // had one. If the template no longer has it, any rig-side strobeValues are now meaningless.
-  const templateHasStrobeChannel = typeof templateChannels.strobeChannel === 'number'
+  // Strobe speed values belong to an RGB-family fixture with its own strobe channel. A template
+  // without one, or a dedicated strobe, gives the rig light none.
+  const templateHasStrobeChannel = isRgbFamilyWithStrobeChannel(template)
 
   // strobeValues: per-light override is preserved when present; otherwise materialize the template's
   // defaults onto the rig light so the publisher reads a self-contained snapshot.

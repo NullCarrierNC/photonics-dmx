@@ -1,6 +1,6 @@
 /**
- * The layout canvas: the rows of lights, the shared-channel warning above them, and the overlay
- * that follows a light while it is dragged.
+ * The layout canvas: the rows of lights, the shared-channel and missing-address warnings above
+ * them, and the overlay that follows a light while it is dragged.
  */
 import React, { useMemo } from 'react'
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core'
@@ -24,6 +24,11 @@ interface LightsLayoutCanvasProps {
   highlightedLight: number | null
   onLightClick: (position: number) => void
   onLightChange: (light: DmxLight) => void
+}
+
+/** "2 and 4", "2, 3 and 4". */
+function joinPositions(positions: number[]): string {
+  return `${positions.slice(0, -1).join(', ')} and ${positions[positions.length - 1]}`
 }
 
 const LightsLayoutCanvas: React.FC<LightsLayoutCanvasProps> = ({
@@ -60,6 +65,16 @@ const LightsLayoutCanvas: React.FC<LightsLayoutCanvasProps> = ({
     [allPrimaryLights],
   )
 
+  // A light with no master dimmer address derives every channel as 0, so it outputs nothing.
+  const unaddressedPositions = useMemo(
+    () =>
+      allPrimaryLights
+        .filter((l) => l.channels.masterDimmer === 0)
+        .map((l) => l.position)
+        .sort((a, b) => a - b),
+    [allPrimaryLights],
+  )
+
   return (
     <DndContext
       sensors={sensors}
@@ -77,6 +92,15 @@ const LightsLayoutCanvas: React.FC<LightsLayoutCanvasProps> = ({
               ? `DMX channel ${sharedRigChannels[0]} is used by more than one light in this rig.`
               : `DMX channels ${sharedRigChannels.join(', ')} are each used by more than one light in this rig.`}{' '}
             This will cause a conflict between the lights and incorrect lighting output.
+          </div>
+        )}
+        {unaddressedPositions.length > 0 && (
+          <div
+            role="status"
+            className="rounded border border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+            {unaddressedPositions.length === 1
+              ? `The light at position ${unaddressedPositions[0]} has no DMX address and stays dark. Set its Master Dimmer channel to use it.`
+              : `The lights at positions ${joinPositions(unaddressedPositions)} have no DMX address and stay dark. Set each one's Master Dimmer channel to use them.`}
           </div>
         )}
         <LightChannelAssignmentSection

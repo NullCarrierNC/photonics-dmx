@@ -35,6 +35,28 @@ export function sortBaseChannelEntries<T>(entries: Array<[string, T]>): Array<[s
   })
 }
 
+const BASE_CHANNEL_LABELS: Readonly<Record<string, string>> = {
+  masterDimmer: 'Master Dimmer',
+  red: 'Red',
+  green: 'Green',
+  blue: 'Blue',
+  white: 'White',
+  strobeChannel: 'Strobe Speed',
+  pan: 'Pan',
+  tilt: 'Tilt',
+}
+
+/**
+ * Display names of the base channels a fixture carries with no DMX number (0), in display order.
+ * Rig lights built from the fixture leave these channels undriven.
+ */
+export function unassignedBaseChannelLabels(fixture: DmxFixture): string[] {
+  const entries: Array<[string, number]> = Object.entries(fixture.channels)
+  return sortBaseChannelEntries(entries)
+    .filter(([, value]) => value === 0)
+    .map(([name]) => BASE_CHANNEL_LABELS[name] ?? name)
+}
+
 /** User-facing labels for each extra-channel type — the single source for these strings. */
 export const EXTRA_CHANNEL_TYPE_LABELS: Record<ExtraChannelType, string> = {
   red: 'Red',

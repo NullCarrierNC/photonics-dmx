@@ -5,9 +5,18 @@ import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
 } from '../types'
-import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, RgbFixture, RgbLight } from '../types'
+import type {
+  DmxFixture,
+  DmxLight,
+  DmxRig,
+  DmxRigsConfig,
+  ExtraChannel,
+  RgbFixture,
+  RgbLight,
+} from '../types'
 import {
   deriveChannelLayoutForMaster,
+  deriveExtraChannelsForMaster,
   maxMasterDimmerForTemplate,
   syncDmxLightWithTemplate,
   syncLightingConfigurationWithUserLights,
@@ -101,6 +110,38 @@ describe('syncDmxLightWithTemplate', () => {
     const { light, changed } = syncDmxLightWithTemplate(lightWithStrobe, baseRgbTemplate)
     expect(changed).toBe(true)
     expect(light.channels).not.toHaveProperty('strobeChannel')
+    expect(light.strobeValues).toBeUndefined()
+  })
+
+  it('drops strobe speed values when the template is a dedicated strobe', () => {
+    const rgbStrobeLight: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 11, red: 12, green: 13, blue: 14, strobeChannel: 15 },
+      strobeValues: { slow: 30, medium: 90, fast: 180, fastest: 240 },
+    }
+    const strobeTemplate: DmxFixture = {
+      ...baseRgbTemplate,
+      fixture: FixtureTypes.STROBE,
+      channels: { masterDimmer: 1, strobeChannel: 2 },
+    }
+    const { light } = syncDmxLightWithTemplate(rgbStrobeLight, strobeTemplate)
+    expect(light.fixture).toBe(FixtureTypes.STROBE)
+    expect(light.strobeValues).toBeUndefined()
+  })
+
+  it('gives a dedicated strobe none of its template strobe speed values', () => {
+    const strobeLight: DmxLight = {
+      ...baseRgbLight,
+      fixture: FixtureTypes.STROBE,
+      channels: { masterDimmer: 11, strobeChannel: 12 },
+    }
+    const strobeTemplate: DmxFixture = {
+      ...baseRgbTemplate,
+      fixture: FixtureTypes.STROBE,
+      channels: { masterDimmer: 1, strobeChannel: 2 },
+      strobeValues: { slow: 10, medium: 100, fast: 200, fastest: 250 },
+    }
+    const { light } = syncDmxLightWithTemplate(strobeLight, strobeTemplate)
     expect(light.strobeValues).toBeUndefined()
   })
 
@@ -315,6 +356,33 @@ describe('syncDmxLightWithTemplate', () => {
     expect(light.channels).toMatchObject({ masterDimmer: 510, red: 511, green: 512, blue: 0 })
   })
 
+  it('keeps an unassigned (0) base channel on the template at 0 on the rig light', () => {
+    const lightAtFive: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 },
+    }
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 0 },
+    }
+    const { light } = syncDmxLightWithTemplate(lightAtFive, template)
+    expect(light.channels).toEqual({ masterDimmer: 5, red: 6, green: 7, blue: 8, strobeChannel: 0 })
+  })
+
+  it('leaves every channel of a rig light with no master address at 0', () => {
+    const unaddressed: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 0, red: 12, green: 13, blue: 14 },
+    }
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      extraChannels: [{ type: 'fixed', channel: 5, value: 200 }],
+    }
+    const { light } = syncDmxLightWithTemplate(unaddressed, template)
+    expect(light.channels).toEqual({ masterDimmer: 0, red: 0, green: 0, blue: 0 })
+    expect(light.extraChannels).toEqual([{ type: 'fixed', channel: 0, value: 200 }])
+  })
+
   it('removes rig extraChannels when the template drops them', () => {
     const rigLight: DmxLight = {
       ...baseRgbLight,
@@ -522,5 +590,41 @@ describe('deriveChannelLayoutForMaster', () => {
       fixture: FixtureTypes.RGB,
       channels: { masterDimmer: 510, red: 511, green: 512, blue: 0 },
     })
+  })
+
+  it('keeps every unassigned template channel at 0', () => {
+    const movingHead: DmxFixture = {
+      ...baseRgbTemplate,
+      fixture: FixtureTypes.RGBMH,
+      channels: { masterDimmer: 1, red: 2, green: 0, blue: 4, pan: 0, tilt: 0, strobeChannel: 0 },
+    }
+    expect(deriveChannelLayoutForMaster(movingHead, 5)).toEqual({
+      fixture: FixtureTypes.RGBMH,
+      channels: { masterDimmer: 5, red: 6, green: 0, blue: 8, pan: 0, tilt: 0, strobeChannel: 0 },
+    })
+  })
+
+  it.each([0, -3, 513, 600, Number.NaN])('derives every channel as 0 for master %p', (master) => {
+    const withStrobe: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 5 },
+    }
+    expect(deriveChannelLayoutForMaster(withStrobe, master)).toEqual({
+      fixture: FixtureTypes.RGB,
+      channels: { masterDimmer: 0, red: 0, green: 0, blue: 0, strobeChannel: 0 },
+    })
+  })
+})
+
+describe('deriveExtraChannelsForMaster', () => {
+  it('derives every added channel as 0 for a master that is not an address', () => {
+    const extras: ExtraChannel[] = [
+      { type: 'white', channel: 5 },
+      { type: 'fixed', channel: 6, value: 40 },
+    ]
+    expect(deriveExtraChannelsForMaster(extras, 1, 0)).toEqual([
+      { type: 'white', channel: 0 },
+      { type: 'fixed', channel: 0, value: 40 },
+    ])
   })
 })
