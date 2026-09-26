@@ -1,3 +1,4 @@
+import { once } from 'events'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -232,11 +233,16 @@ describe('createFileLogSink', () => {
   describe('after a write stream error', () => {
     const createWriteStreamMock = jest.mocked(fs.createWriteStream)
 
+    /** Settles after the failing stream has raised its error to every listener, the sink's too. */
+    let streamErrored: Promise<unknown>
+
     beforeEach(() => {
       jest.spyOn(console, 'error').mockImplementation(() => {})
-      createWriteStreamMock.mockImplementationOnce((filePath) =>
-        failingWriteStream(String(filePath)),
-      )
+      createWriteStreamMock.mockImplementationOnce((filePath) => {
+        const stream = failingWriteStream(String(filePath))
+        streamErrored = once(stream, 'error')
+        return stream
+      })
     })
 
     afterEach(() => {
@@ -244,13 +250,11 @@ describe('createFileLogSink', () => {
       createWriteStreamMock.mockImplementation(actualFs.createWriteStream)
     })
 
-    const streamErrored = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30))
-
     it('settles close()', async () => {
       const t = new Date(2025, 3, 29, 10, 0, 0, 0).getTime()
       const { sink, close } = createFileLogSink({ logsDir: tmpDir, clock: () => t })
       sink(entry({ message: 'lost to the full disk' }))
-      await streamErrored()
+      await streamErrored
 
       expect(await settlesWithin(close(), 1000)).toBe('settled')
     })
@@ -259,7 +263,7 @@ describe('createFileLogSink', () => {
       let t = new Date(2025, 3, 29, 10, 0, 0, 0).getTime()
       const { sink, close } = createFileLogSink({ logsDir: tmpDir, clock: () => t })
       sink(entry({ message: 'lost to the full disk' }))
-      await streamErrored()
+      await streamErrored
 
       t += 60_000
       sink(entry({ message: 'after the disk freed up' }))
