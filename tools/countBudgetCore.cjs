@@ -1,8 +1,8 @@
 /**
  * The count budgets' rules: reading what a budget file records, holding the counts now to it, and
- * deciding what `--write` may record. A budget of one count records it alone on line 1. A budget of
- * several records one `<name> <count>` line each. ruleBudgetCore.mjs owns counting, the file and
- * the exit code.
+ * deciding what `--write` and `--init` may record. A budget of one count records it alone on line
+ * 1. A budget of several records one `<name> <count>` line each. ruleBudgetCore.mjs owns counting,
+ * the file and the exit code.
  */
 
 /**
@@ -42,31 +42,76 @@ function renderBudget(counts, counted, note) {
 
 /**
  * @typedef {{ ok: true, lines: string[], write?: string } | { ok: false, lines: string[] }} Verdict
- *   `write` is the budget file `--write` records
+ *   `write` is the budget file `--write` or `--init` records
  */
+
+/**
+ * @param {string[]} names
+ * @returns {string} what a budget file of these counts must record
+ */
+function unreadableBudget(names) {
+  return names.length === 1
+    ? 'Budget file must start with a non-negative integer on line 1'
+    : `Budget file must record ${names.map((n) => `\`${n} <count>\``).join(', ')}, one per line`
+}
 
 /**
  * @param {object} options
  * @param {Map<string, number>} options.counts the counts now, by name
  * @param {string | null} options.recordedText the budget file, or null when there is none
- * @param {boolean} options.write whether to record the counts rather than check them
+ * @param {boolean} options.write whether to lower the recorded budget to the counts
+ * @param {boolean} [options.init] whether to create a missing budget file from the counts
  * @param {string} options.label what the count is called on screen, e.g. "Explicit any"
  * @param {string} options.file the budget file's path, for the messages
  * @param {string} options.counted what is counted, written into the budget file
  * @param {string} options.note how to lower the budget, written into the budget file
  * @returns {Verdict}
  */
-function budgetVerdict({ counts, recordedText, write, label, file, counted, note }) {
+function budgetVerdict({ counts, recordedText, write, init = false, label, file, counted, note }) {
   const names = [...counts.keys()]
   const recorded = readBudget(recordedText, names)
   const title = (name) => (names.length === 1 ? label : `${label} ${name}`)
   const where = names.length === 1 ? `line 1 of ${file}` : file
+  const listed = names.map((n) => `${title(n)} ${counts.get(n)}`).join(', ')
+
+  if (init) {
+    // Creating a budget records any count, so it is its own flag and never replaces a file.
+    if (recordedText !== null) {
+      return {
+        ok: false,
+        lines: [
+          `${file} exists. --init only creates a missing budget, and --write lowers a recorded one`,
+        ],
+      }
+    }
+    return {
+      ok: true,
+      lines: [`Created ${file} with ${listed}`],
+      write: renderBudget(counts, counted, note),
+    }
+  }
 
   if (write) {
-    // A ratchet holds only while writing it can lower a count and never raise one.
-    const raised = names.filter(
-      (name) => recorded !== null && counts.get(name) > recorded.get(name),
-    )
+    // A ratchet holds only while writing it can lower a count and never raise one, so there has to
+    // be a recorded count for each name to hold the write to.
+    if (recordedText === null) {
+      return {
+        ok: false,
+        lines: [
+          `Missing ${file}. --write only lowers a recorded budget. Run the same command with --init to create it`,
+        ],
+      }
+    }
+    if (recorded === null) {
+      return {
+        ok: false,
+        lines: [
+          unreadableBudget(names),
+          `Refusing to rewrite ${file}. Fix it by hand or restore it from git`,
+        ],
+      }
+    }
+    const raised = names.filter((name) => counts.get(name) > recorded.get(name))
     if (raised.length > 0) {
       return {
         ok: false,
@@ -81,23 +126,16 @@ function budgetVerdict({ counts, recordedText, write, label, file, counted, note
     }
     return {
       ok: true,
-      lines: [`Wrote ${file} with ${names.map((n) => `${title(n)} ${counts.get(n)}`).join(', ')}`],
+      lines: [`Wrote ${file} with ${listed}`],
       write: renderBudget(counts, counted, note),
     }
   }
 
   if (recordedText === null) {
-    return { ok: false, lines: [`Missing ${file}. Run the same command with --write`] }
+    return { ok: false, lines: [`Missing ${file}. Run the same command with --init to create it`] }
   }
   if (recorded === null) {
-    return {
-      ok: false,
-      lines: [
-        names.length === 1
-          ? 'Budget file must start with a non-negative integer on line 1'
-          : `Budget file must record ${names.map((n) => `\`${n} <count>\``).join(', ')}, one per line`,
-      ],
-    }
+    return { ok: false, lines: [unreadableBudget(names)] }
   }
 
   const over = names.filter((name) => counts.get(name) > recorded.get(name))

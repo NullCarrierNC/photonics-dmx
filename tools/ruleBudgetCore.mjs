@@ -2,7 +2,8 @@
  * The ratchet behind the per-rule budgets: count how many times one ESLint rule reports under
  * `src/`, compare that to a budget file, and fail when the count has grown. `--write` records the
  * current count, which is how a budget comes down after a deliberate pass, and refuses to record a
- * higher one so the ratchet cannot be widened by rerunning the command the failure names.
+ * higher one or any count over a missing or unreadable file. `--init` creates a budget file that
+ * does not exist yet.
  * runCountBudget holds any other count to a budget file by the same rules.
  *
  * Rules that cannot go clean in one sitting are set to warn in the ESLint config and held here
@@ -101,6 +102,7 @@ export function runCountBudget({ count, counts, budgetFile, label, counted, note
     counts: counts ?? new Map([[label, count]]),
     recordedText: existsSync(file) ? readFileSync(file, 'utf8') : null,
     write: process.argv.includes('--write'),
+    init: process.argv.includes('--init'),
     label,
     file,
     counted,
