@@ -1,11 +1,13 @@
 /** @jest-environment jsdom */
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import Ajv from 'ajv'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import type { EditorDocument } from '../../lib/types'
 import type { VariableDefinition } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ConfirmModalHost from '../../../ConfirmModalHost'
 import { ToastStack } from '../../../Toast'
+import { variableDefinitionSchema } from '../../../../../../photonics-dmx/cues/node/schema/primitives'
 import VariableRegistry from './VariableRegistry'
 
 afterEach(() => cleanup())
@@ -102,10 +104,25 @@ describe('VariableRegistry', () => {
       addGroupVariable(name)
 
       expect(
-        await screen.findByText(new RegExp(`"${name}" is not a valid variable name`)),
+        await screen.findByText(new RegExp(`^"${name}" is not a valid variable name.*\\.$`)),
       ).toBeTruthy()
       expect(screen.getByRole('dialog')).toBeInTheDocument()
       expect(onVariablesChange).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['speed', '_step', 'Hold2', 'beat-count', 'my var', '2x', 'tëst'])(
+    'flags the name %s exactly when the schema refuses it',
+    (name) => {
+      const schemaAccepts = new Ajv().compile(variableDefinitionSchema)
+      renderRegistry()
+      fireEvent.click(screen.getAllByRole('button', { name: '+ Add' })[0])
+      const input = screen.getByPlaceholderText('variableName')
+      fireEvent.change(input, { target: { value: name } })
+
+      expect(input.getAttribute('aria-invalid') === 'true').toBe(
+        !schemaAccepts({ name, type: 'number', scope: 'cue', initialValue: 0 }),
+      )
     },
   )
 

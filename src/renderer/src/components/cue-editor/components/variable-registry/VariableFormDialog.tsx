@@ -8,7 +8,9 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/types'
+import { nameIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ColorListEditor from '../shared/ColorListEditor'
+import FieldIssue, { issueAttributes } from '../shared/FieldIssue'
 import { DraftNumberField } from '../../../controls/DraftField'
 import {
   AUDIO_EVENT_OPTIONS,
@@ -146,7 +148,9 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   editingVar,
 }) => {
   const titleId = useId()
+  const nameIssueId = useId()
   if (!isOpen) return null
+  const typedNameIssue = formData.name ? nameIssue('variable', formData.name) : null
 
   const handleTypeChange = (newType: VariableType) => {
     let newValue: VariableDefinition['initialValue'] = 0
@@ -176,9 +180,10 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
             value={formData.name ?? ''}
             onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
             placeholder="variableName"
-            pattern="[a-zA-Z_][a-zA-Z0-9_]*"
             disabled={!!editingVar}
+            {...issueAttributes(typedNameIssue, nameIssueId)}
           />
+          <FieldIssue issue={typedNameIssue} id={nameIssueId} />
           <span className="text-[10px] text-gray-500 mt-1">
             Must start with letter or underscore
           </span>

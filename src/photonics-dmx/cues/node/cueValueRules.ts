@@ -22,6 +22,7 @@ import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
 import { MAX_NODE_LAYER } from '../../constants/nodeConstants'
 import type { ActionNode, NodeCueMode, ValueSource, VariableType } from '../types/nodeCueTypes'
+import { isVariableName } from '../types/nodeCueTypes'
 
 export interface ValueIssue {
   severity: 'error' | 'warning'
@@ -222,6 +223,14 @@ export function actionLiteralIssues(
     const issue = literalIssue(rule, source.value, mode)
     return issue ? [{ field, issue }] : []
   })
+}
+
+/** Whether a variable or event name is one the schema accepts. */
+export function nameIssue(kind: 'variable' | 'event', name: string): ValueIssue | null {
+  if (isVariableName(name)) return null
+  return error(
+    `"${name}" is not a valid ${kind} name. Use letters, digits and underscores, starting with a letter or underscore`,
+  )
 }
 
 /** Whether a literal is one of a field's own choices, for a field no rule here covers. */
