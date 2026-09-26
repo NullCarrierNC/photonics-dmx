@@ -19,6 +19,7 @@ jest.mock('electron', () => ({
 jest.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 jest.mock('../rendererSessionSecurity', () => ({ denyWebContentsWillNavigate: jest.fn() }))
 
+import { BrowserWindow } from 'electron'
 import {
   setLogSink,
   setMinLogLevel,
@@ -75,5 +76,22 @@ describe('WindowManager renderer loads', () => {
     })
 
     expect(entries.filter((entry) => entry.level === 'error')).toEqual([])
+  })
+
+  it.each([
+    ['main', (manager: WindowManager) => manager.createMainWindow()],
+    ['cue editor', (manager: WindowManager) => manager.openCueEditorWindow()],
+    ['audio preview', (manager: WindowManager) => manager.openAudioPreviewWindow()],
+  ])('opens the %s page sandboxed, isolated and without Node', async (_role, open) => {
+    await withCapturedEntries(() => {
+      open(new WindowManager())
+    })
+
+    const options = jest.mocked(BrowserWindow).mock.calls[0]?.[0]
+    expect(options?.webPreferences).toMatchObject({
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+    })
   })
 })

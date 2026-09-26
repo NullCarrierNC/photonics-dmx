@@ -3,9 +3,18 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
-jest.mock('electron', () => ({ app: { once: jest.fn() }, protocol: {} }))
+jest.mock('electron', () => ({
+  app: { once: jest.fn() },
+  protocol: { registerSchemesAsPrivileged: jest.fn(), handle: jest.fn() },
+}))
 
-import { rendererFileFor, rendererPageUrl, rendererResponse } from '../rendererScheme'
+import { protocol } from 'electron'
+import {
+  rendererFileFor,
+  rendererPageUrl,
+  rendererResponse,
+  serveRendererFromScheme,
+} from '../rendererScheme'
 
 let scratch: string
 let rendererDir: string
@@ -106,5 +115,29 @@ describe('renderer scheme', () => {
       const file = rendererFileFor(url, rendererDir)
       expect(file === null || file.startsWith(rendererDir)).toBe(true)
     }
+  })
+
+  it.each([
+    'photonics://renderer/assets%2findex-abc.js',
+    'photonics://renderer/assets%2Findex-abc.js',
+    'photonics://renderer/assets%5cindex-abc.js',
+    'photonics://renderer/..%2f..%2f..%2fetc%2fhosts',
+  ])('maps %s, which holds an encoded separator, to no file', (url) => {
+    expect(rendererFileFor(url, rendererDir)).toBeNull()
+  })
+
+  it('maps a URL naming the folder itself to no file', () => {
+    expect(rendererFileFor('photonics://renderer//', rendererDir)).toBeNull()
+  })
+
+  it('registers the scheme as standard, secure and fetchable with no further privilege', () => {
+    serveRendererFromScheme(rendererDir)
+
+    expect(jest.mocked(protocol.registerSchemesAsPrivileged)).toHaveBeenCalledWith([
+      {
+        scheme: 'photonics',
+        privileges: { standard: true, secure: true, supportFetchAPI: true },
+      },
+    ])
   })
 })
