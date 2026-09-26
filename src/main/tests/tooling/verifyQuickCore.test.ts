@@ -1,10 +1,13 @@
 import { describe, expect, it } from '@jest/globals'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const {
   planChecks,
   parseNameStatus,
   projectsFor,
+  pushGateSteps,
 } = require('../../../../tools/verifyQuickCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -19,8 +22,10 @@ type Plan = {
   dependencyChecks: boolean
 }
 
-const plan = (changes: Change[], options?: { forceFull?: boolean }): Plan =>
-  planChecks(changes, options)
+type Step = { name: string; command: string; args: string[]; note?: string }
+type PushGate = { steps: Step[]; skipped: Array<{ name: string; reason: string }> }
+
+const plan = (changes: Change[]): Plan => planChecks(changes)
 const modified = (...paths: string[]): Change[] => paths.map((path) => ({ status: 'M', path }))
 
 describe('planChecks', () => {
@@ -82,13 +87,6 @@ describe('planChecks', () => {
     )
   })
 
-  it('takes the full set when asked, whatever changed', () => {
-    const result = plan(modified('src/main/menu.ts'), { forceFull: true })
-
-    expect(result.mode).toBe('full')
-    expect(result.reasons).toEqual(['asked for the full set'])
-  })
-
   it('runs the dependency checks only when a package file changes', () => {
     expect(plan(modified('package-lock.json')).dependencyChecks).toBe(true)
     expect(plan(modified('src/main/menu.ts')).dependencyChecks).toBe(false)
@@ -144,5 +142,58 @@ describe('parseNameStatus', () => {
       { status: 'R', path: 'src/main/old.ts' },
       { status: 'A', path: 'src/main/new.ts' },
     ])
+  })
+})
+
+describe('pushGateSteps', () => {
+  const hook = [
+    'pushed=$(cat)',
+    '# The checks read the working tree.',
+    'printf \'%s\\n\' "$pushed" | npm run pushed:check && npm run lint:check && ' +
+      'npx electron-vite build && npm run knip:budget && npm run cue-sim:check && ' +
+      'printf \'%s\\n\' "$pushed" | npm run coverage:check -- --pushed && ' +
+      'npm run audit:check && npm run test:coverage -- --randomize',
+  ].join('\n')
+
+  it('runs each check the hook chains, in order', () => {
+    const gate: PushGate = pushGateSteps(hook)
+
+    expect(gate.steps.map(({ command, args }) => [command, ...args].join(' '))).toEqual([
+      'npm run lint:check',
+      'npx electron-vite build',
+      'npm run knip:budget',
+      'npm run cue-sim:check',
+      'npm run coverage:check',
+      'npm run audit:check',
+      'npm run test:coverage -- --randomize',
+    ])
+  })
+
+  it('skips the pushed-commit check and runs the coverage guard on the working tree', () => {
+    const gate: PushGate = pushGateSteps(hook)
+
+    expect(gate.skipped).toEqual([
+      { name: 'npm run pushed:check', reason: 'it reads the refs of a push from stdin' },
+    ])
+    expect(gate.steps.find((step) => step.name === 'npm run coverage:check')?.note).toBe(
+      'held to HEAD and the branch base, without the refs of a push',
+    )
+  })
+
+  it("reads the repository's pre-push hook into the checks a push runs", () => {
+    const text = readFileSync(join(__dirname, '../../../../.husky/pre-push'), 'utf8')
+    const names = pushGateSteps(text).steps.map((step: Step) => step.name)
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'npm run lint:check',
+        'npm run format:check',
+        'npx electron-vite build',
+        'npm run knip:budget',
+        'npm run coverage:check',
+        'npm run audit:check',
+        'npm run test:coverage -- --randomize',
+      ]),
+    )
   })
 })
