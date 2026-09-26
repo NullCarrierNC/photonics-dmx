@@ -47,6 +47,7 @@ export {
   DEFAULT_TILT_RANGE_DEG,
   FIXTURE_CONFIG_FIELDS,
   fixtureConfigFieldBounds,
+  fixtureConfigFieldsOutOfRange,
   isFixtureConfigFlagField,
   normalizeFixtureConfig,
 } from './types/movingHead'

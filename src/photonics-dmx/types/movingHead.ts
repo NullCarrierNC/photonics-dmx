@@ -112,6 +112,26 @@ export function fixtureConfigFieldBounds(
   }
 }
 
+/**
+ * The number fields `patch` sets outside their editable range, each range read from `patch` laid
+ * over `base` (see {@link fixtureConfigFieldBounds}).
+ */
+export function fixtureConfigFieldsOutOfRange(
+  base: FixtureConfig,
+  patch: Partial<FixtureConfig>,
+): FixtureConfigNumberField[] {
+  const merged: FixtureConfig = { ...base, ...patch }
+  const outOfRange: FixtureConfigNumberField[] = []
+  for (const key of FIXTURE_CONFIG_FIELDS) {
+    if (isFixtureConfigFlagField(key)) continue
+    const value = patch[key]
+    if (value === undefined) continue
+    const { min, max } = fixtureConfigFieldBounds(key, merged)
+    if (value < min || value > max) outOfRange.push(key)
+  }
+  return outOfRange
+}
+
 /** Full defaults for moving-head fixture config, use {@link normalizeFixtureConfig} for persisted data. */
 export const DEFAULT_MOVING_HEAD_FIXTURE_CONFIG: Readonly<FixtureConfig> = {
   panHome: 50,

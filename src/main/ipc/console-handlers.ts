@@ -5,7 +5,7 @@ import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { isPlainObject } from './inputValidation'
 import { bindConsoleModeToRenderer } from '../controllers/consoleRendererBinding'
-import type { FixtureConfig } from '../../photonics-dmx/types'
+import { parseFixtureConfigPatch } from '../../photonics-dmx/helpers/fixtureParsing'
 
 const log = createLogger('console-handlers')
 
@@ -64,13 +64,20 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
     ) {
       return { success: false as const, error: 'Invalid console set fixture config payload' }
     }
+    const faults: string[] = []
+    const config = parseFixtureConfigPatch(data.config, 'payload', (message) =>
+      faults.push(message),
+    )
+    if (faults.length > 0) {
+      return { success: false as const, error: faults.join(', ') }
+    }
     // setConsoleFixtureConfig restarts controllers internally; the CONTROLLERS_RESTARTED broadcast
     // is fired centrally by restartControllers().
     const result = await controllerManager.getConsoleModeController().setConsoleFixtureConfig({
       rigId: data.rigId,
       lightId: data.lightId,
       fixtureId: data.fixtureId,
-      config: data.config as Partial<FixtureConfig>,
+      config,
     })
     return result
   })
