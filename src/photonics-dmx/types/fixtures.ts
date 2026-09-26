@@ -254,14 +254,17 @@ export function isMovingHead(fixture: DmxFixture): fixture is RgbMovingHeadFixtu
   return fixture.fixture === FixtureTypes.RGBMH
 }
 
+/** What a rig light adds to its fixture: an id of its own and the id of its template. */
+type RigLightFields = { id: string; fixtureId: string }
+
 /** A rig light: a fixture plus the id of the template it came from. */
-export type DmxLight = DmxFixture & { fixtureId: string }
+export type DmxLight = DmxFixture & RigLightFields
 
-export type RgbLight = RgbFixture & { fixtureId: string }
+export type RgbLight = RgbFixture & RigLightFields
 
-export type RgbMovingHeadLight = RgbMovingHeadFixture & { fixtureId: string }
+export type RgbMovingHeadLight = RgbMovingHeadFixture & RigLightFields
 
-export type StrobeLight = StrobeFixture & { fixtureId: string }
+export type StrobeLight = StrobeFixture & RigLightFields
 
 /**
  * A fixture's channels by name. Each fixture type declares its own closed channel map, so code

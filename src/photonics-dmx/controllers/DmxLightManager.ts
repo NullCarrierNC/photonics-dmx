@@ -57,18 +57,16 @@ export class DmxLightManager {
     const layoutId = this.config.lightLayout?.id
 
     this._frontLights = this.config.frontLights
-      .filter((light) => light.id !== null)
       .map((light) => ({
-        id: light.id as string,
+        id: light.id,
         position: light.position,
         config: light.config,
       }))
       .sort((a, b) => a.position - b.position)
 
     this._backLights = this.config.backLights
-      .filter((light) => light.id !== null)
       .map((light) => ({
-        id: light.id as string,
+        id: light.id,
         position: light.position,
         config: light.config,
         bearingIsFlipped: backLightBearingIsFlipped(layoutId, 'back'),
@@ -80,9 +78,9 @@ export class DmxLightManager {
     // gated again in DmxPublisher). A light placed in the strobe group but not strobe-enabled
     // must never receive strobe output.
     this._strobeLights = this.config.strobeLights
-      .filter((light) => light.id !== null && light.isStrobeEnabled === true)
+      .filter((light) => light.isStrobeEnabled === true)
       .map((light) => ({
-        id: light.id as string,
+        id: light.id,
         position: light.position,
         config: light.config,
       }))
@@ -102,7 +100,7 @@ export class DmxLightManager {
     ]
 
     allDmxLights.forEach((light) => {
-      this._dmxLights.set(light.id!, light)
+      this._dmxLights.set(light.id, light)
     })
   }
 

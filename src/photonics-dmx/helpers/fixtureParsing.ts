@@ -401,7 +401,10 @@ export function parseDmxFixture(
   return fixture
 }
 
-/** A rig light: a fixture plus the id of the template it came from. */
+/**
+ * A rig light: a fixture plus the id of the template it came from. Cues and the publisher find a
+ * light by its id, so a light stored without one is reported and given a new one.
+ */
 export function parseDmxLight(
   raw: unknown,
   path: string,
@@ -414,9 +417,14 @@ export function parseDmxLight(
   const { fixtureId, ...fields } = raw
   const fixture = parseDmxFixture(fields, path, report)
   if (!fixture) return null
-  if (typeof fixtureId === 'string') return { ...fixture, fixtureId }
+  let id = fixture.id
+  if (id === null) {
+    report(`${path}.id is missing`, 'reset')
+    id = globalThis.crypto.randomUUID()
+  }
+  if (typeof fixtureId === 'string') return { ...fixture, id, fixtureId }
   report(`${path}.fixtureId must be a string`, 'reset')
-  return { ...fixture, fixtureId: '' }
+  return { ...fixture, id, fixtureId: '' }
 }
 
 /** Brings a fixture any build may have written onto the current schema before it is parsed. */

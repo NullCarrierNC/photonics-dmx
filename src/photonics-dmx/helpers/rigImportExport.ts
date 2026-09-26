@@ -70,7 +70,7 @@ export function mapLightsToNewIdsForSave(
   makeId: () => string = defaultMakeId,
 ): DmxLight[] {
   return lights.map((light) => {
-    const originalId = light.id ?? makeId()
+    const originalId = light.id
     if (!idMap[originalId]) {
       idMap[originalId] = makeId()
     }

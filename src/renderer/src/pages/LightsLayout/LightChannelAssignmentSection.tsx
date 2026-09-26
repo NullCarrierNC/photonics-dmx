@@ -183,7 +183,7 @@ const LightChannelAssignmentSection: React.FC<LightChannelAssignmentSectionProps
   isStacked,
   sectionGroup,
 }) => {
-  const sortableIds = lights.map((l) => l.id).filter((id): id is string => Boolean(id))
+  const sortableIds = lights.map((l) => l.id).filter((id) => id !== '')
 
   const shared: Omit<LightCardSharedProps, 'light' | 'index'> = {
     myLights,
@@ -201,12 +201,12 @@ const LightChannelAssignmentSection: React.FC<LightChannelAssignmentSectionProps
       className="grid gap-4"
       style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
       {lights.map((light, index) => {
-        const rowKey = light.id ?? `idx-${index}`
+        const rowKey = light.id || `idx-${index}`
         const useSortableRow = Boolean(sectionGroup && light.id)
         return useSortableRow ? (
           <SortableLightCard
             key={rowKey}
-            id={light.id as string}
+            id={light.id}
             sectionGroup={sectionGroup as 'front' | 'back'}
             light={light}
             index={index}
