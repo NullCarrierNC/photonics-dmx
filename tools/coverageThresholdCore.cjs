@@ -147,14 +147,17 @@ function projectName(project, index) {
 }
 
 /**
+ * The scopes whose settings decide which tests run. A config with projects runs only its projects,
+ * and Jest reads no test selection from the top level then.
  * @param {Record<string, unknown>} config an evaluated Jest config
- * @returns {Map<string, Record<string, unknown>>} the config under '' and each project by name, a
- *   project given as a path under that path
+ * @returns {Map<string, Record<string, unknown>>} each project by name, a project given as a path
+ *   under that path, or the config itself under '' when it has no projects
  */
 function testScopesOf(config) {
-  /** @type {Map<string, Record<string, unknown>>} */
-  const scopes = new Map([['', config]])
   const projects = Array.isArray(config.projects) ? config.projects : []
+  if (projects.length === 0) return new Map([['', config]])
+  /** @type {Map<string, Record<string, unknown>>} */
+  const scopes = new Map()
   projects.forEach((project, index) => {
     if (typeof project === 'string') scopes.set(project, {})
     else if (project !== null && typeof project === 'object') {
@@ -195,8 +198,11 @@ function narrowedTests(current, base) {
   const then = testScopesOf(base)
   /** @type {string[]} */
   const lines = []
-  for (const name of then.keys()) {
-    if (!now.has(name)) lines.push(`projects drops '${name}'`)
+  for (const [name, baseScope] of then) {
+    if (now.has(name)) continue
+    // Moving to or from projects renames the scopes, so the tests are compared across them all.
+    if (name === '' || now.has('')) lines.push(...narrowedAcross(baseScope, now))
+    else lines.push(`projects drops '${name}'`)
   }
   for (const [name, baseScope] of then) {
     const currentScope = now.get(name)
@@ -224,6 +230,75 @@ function narrowedTests(current, base) {
     }
   }
   return lines
+}
+
+/** @param {string} pattern @returns {boolean} whether a regex matches only its own text */
+const isLiteral = (pattern) => !/[.*+?^${}()|[\]\\]/.test(pattern)
+
+/**
+ * @param {string} root
+ * @param {string} kept
+ * @returns {boolean} whether `kept` is `root` or a folder that holds it
+ */
+const holds = (kept, root) => root === kept || root.startsWith(`${kept}/`)
+
+/**
+ * The base scope's tests against a set of scopes that replaced it. Each base root needs one scope
+ * that holds it with every testRegex and testMatch entry. An ignore pattern that scope adds only
+ * counts when it is not exactly the folder of another scope that runs those tests with the base's
+ * selection and no added ignores.
+ * @param {Record<string, unknown>} baseScope
+ * @param {Map<string, Record<string, unknown>>} scopes
+ * @returns {string[]} the lines for the first scope holding a root, or `roots drops` when none does
+ */
+function narrowedAcross(baseScope, scopes) {
+  const was = testSelection(baseScope)
+  const named = [...scopes].map(([name, scope]) => ({ name, is: testSelection(scope) }))
+  const keepsEntries = (/** @type {ReturnType<typeof testSelection>} */ is) =>
+    was.regex.every((entry) => is.regex.includes(entry)) &&
+    was.match.every((entry) => is.match.includes(entry))
+  const runsAsBase = named.filter(
+    ({ is }) => keepsEntries(is) && is.ignore.every((pattern) => was.ignore.includes(pattern)),
+  )
+
+  /** @type {string[]} */
+  const lines = []
+  for (const root of was.roots) {
+    const holding = named.filter(({ is }) => is.roots.some((kept) => holds(kept, root)))
+    if (holding.length === 0) {
+      lines.push(`roots drops '${root}'`)
+      continue
+    }
+    const problems = holding.map(({ name, is }) => {
+      const prefix = name === '' ? '' : `${name}: `
+      /** @type {string[]} */
+      const found = []
+      for (const [key, field] of [
+        ['testRegex', 'regex'],
+        ['testMatch', 'match'],
+      ]) {
+        for (const entry of was[field]) {
+          if (!is[field].includes(entry)) found.push(`${prefix}${key} drops '${entry}'`)
+        }
+      }
+      for (const pattern of is.ignore) {
+        if (was.ignore.includes(pattern)) continue
+        const coveredElsewhere =
+          isLiteral(pattern) &&
+          runsAsBase.some(
+            (other) =>
+              other.name !== name &&
+              other.is.roots.some(
+                (otherRoot) => pattern === `${otherRoot}/` && holds(root, otherRoot),
+              ),
+          )
+        if (!coveredElsewhere) found.push(`${prefix}testPathIgnorePatterns adds '${pattern}'`)
+      }
+      return found
+    })
+    if (!problems.some((found) => found.length === 0)) lines.push(...problems[0])
+  }
+  return [...new Set(lines)]
 }
 
 /**

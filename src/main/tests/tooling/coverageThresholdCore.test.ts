@@ -213,6 +213,70 @@ describe('loosenedCoverage on the tests Jest runs', () => {
   })
 })
 
+describe('loosenedCoverage across a move to projects', () => {
+  const testRegex = '(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$'
+  const topLevel: Config = { testRegex, roots: ['<rootDir>/src'] }
+  const engine = (overrides: Config = {}): Config => ({
+    displayName: 'engine',
+    testRegex,
+    roots: ['<rootDir>/src'],
+    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/src/renderer/'],
+    ...overrides,
+  })
+  const renderer = (overrides: Config = {}): Config => ({
+    displayName: 'renderer',
+    testRegex,
+    roots: ['<rootDir>/src/renderer'],
+    ...overrides,
+  })
+
+  it('passes projects that split the folders between them', () => {
+    expect(loosenedCoverage({ projects: [engine(), renderer()] }, topLevel)).toEqual([])
+  })
+
+  it('names a testRegex entry no project keeps', () => {
+    const current = { projects: [engine({ testRegex: '\\.test\\.ts$' }), renderer()] }
+
+    expect(loosenedCoverage(current, topLevel)).toEqual([`engine: testRegex drops '${testRegex}'`])
+  })
+
+  it('names an ignore pattern no other project runs the tests under', () => {
+    const current = {
+      projects: [
+        engine({ testPathIgnorePatterns: ['/node_modules/', '<rootDir>/src/main/'] }),
+        renderer(),
+      ],
+    }
+
+    expect(loosenedCoverage(current, topLevel)).toEqual([
+      "engine: testPathIgnorePatterns adds '<rootDir>/src/main/'",
+    ])
+  })
+
+  it('names an ignore pattern that matches more than the other project folder', () => {
+    const current = {
+      projects: [
+        engine({ testPathIgnorePatterns: ['/node_modules/', '<rootDir>/src/render.*/'] }),
+        renderer(),
+      ],
+    }
+
+    expect(loosenedCoverage(current, topLevel)).toEqual([
+      "engine: testPathIgnorePatterns adds '<rootDir>/src/render.*/'",
+    ])
+  })
+
+  it('names a root no project holds', () => {
+    const current = { projects: [engine({ roots: ['<rootDir>/src/main'] }), renderer()] }
+
+    expect(loosenedCoverage(current, topLevel)).toEqual(["roots drops '<rootDir>/src'"])
+  })
+
+  it('passes projects folded back into the top level', () => {
+    expect(loosenedCoverage(topLevel, { projects: [engine(), renderer()] })).toEqual([])
+  })
+})
+
 describe('isMissingCommit', () => {
   it('reads the all-zero id and an empty one as no commit', () => {
     expect(isMissingCommit('0000000000000000000000000000000000000000')).toBe(true)
