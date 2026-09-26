@@ -56,6 +56,19 @@ describe('ExtraChannelsEditor', () => {
     expect(onChange).toHaveBeenCalledWith([{ type: 'red', channel: 5 }])
   })
 
+  it('explains the held value box on hover', () => {
+    render(
+      <ExtraChannelsEditor
+        light={rgbFixture({ extraChannels: [{ type: 'fixed', channel: 5, value: 42 }] })}
+        onChange={jest.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByTitle(/held on this channel whenever DMX output is running/),
+    ).toContainElement(screen.getByLabelText('Fixed value held value'))
+  })
+
   it('shows a collision warning when two channels share a DMX number', () => {
     render(
       <ExtraChannelsEditor

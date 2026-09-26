@@ -106,7 +106,9 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
               }`}
             />
             {extra.type === 'fixed' && (
-              <span className="flex items-center space-x-1">
+              <span
+                className="flex items-center space-x-1"
+                title="DMX value 0 to 255 held on this channel whenever DMX output is running">
                 <span className="text-gray-600 dark:text-gray-400">=</span>
                 <DraftNumberField
                   aria-label={`${label} held value`}
