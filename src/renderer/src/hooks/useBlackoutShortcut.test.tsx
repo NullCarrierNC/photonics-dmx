@@ -157,6 +157,26 @@ describe('useBlackoutShortcut', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
+    it('blacks out on Escape inside a dialog that drives output, which stays open', async () => {
+      const { store } = await mount()
+      const dialog = openDialog({ drivesOutput: true })
+
+      press('escape', dialog)
+
+      await waitFor(() => expect(store.get(masterOutputAtom).blackout).toBe(true))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('blacks out on Escape inside a dialog that is not dismissible, which stays open', async () => {
+      const { store } = await mount()
+      const dialog = openDialog({ dismissible: false })
+
+      press('escape', dialog)
+
+      await waitFor(() => expect(store.get(masterOutputAtom).blackout).toBe(true))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
     it('leaves Escape to a drag that has claimed it', async () => {
       const { store } = await mount()
       const release = claimEscape()

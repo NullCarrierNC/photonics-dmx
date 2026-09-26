@@ -15,7 +15,7 @@ const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export interface ModalProps {
-  /** Escape and, unless turned off, a click on the backdrop. */
+  /** Escape and a click on the backdrop, while the dialog is dismissible. */
   onClose: () => void
   /** Id of the element that titles the dialog. */
   labelledBy?: string
@@ -25,8 +25,13 @@ export interface ModalProps {
   panelClassName: string
   /** Extra classes for the backdrop, such as padding that keeps a tall panel off the window edge. */
   backdropClassName?: string
-  /** Turn off for a form whose typed input a stray click should not throw away. */
-  closeOnBackdrop?: boolean
+  /** Turn off for a form whose typed input a stray click or Escape should not throw away. */
+  dismissible?: boolean
+  /**
+   * Turn on for a dialog that holds live DMX output, so the blackout key bound to Escape blacks out
+   * there too.
+   */
+  drivesOutput?: boolean
   /** Keys the dialog handles itself. Runs before Escape and Tab, and claims a key with preventDefault. */
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
   children: ReactNode
@@ -43,7 +48,8 @@ const Modal: FC<ModalProps> = ({
   role = 'dialog',
   panelClassName,
   backdropClassName,
-  closeOnBackdrop = true,
+  dismissible = true,
+  drivesOutput = false,
   onKeyDown,
   children,
 }) => {
@@ -81,8 +87,10 @@ const Modal: FC<ModalProps> = ({
       return
     }
     if (event.key === 'Escape') {
-      event.stopPropagation()
-      onClose()
+      if (dismissible) {
+        event.stopPropagation()
+        onClose()
+      }
       return
     }
     if (event.key !== 'Tab') {
@@ -107,13 +115,14 @@ const Modal: FC<ModalProps> = ({
   return (
     <div
       className={backdropClassName ? `${BACKDROP} ${backdropClassName}` : BACKDROP}
-      onClick={closeOnBackdrop ? onClose : undefined}
+      onClick={dismissible ? onClose : undefined}
       role="presentation">
       <div
         ref={panelRef}
         role={role}
         aria-modal="true"
         aria-labelledby={labelledBy}
+        data-escape-closes={dismissible && !drivesOutput ? '' : undefined}
         tabIndex={-1}
         className={panelClassName}
         onClick={(event) => event.stopPropagation()}

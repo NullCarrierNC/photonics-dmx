@@ -89,6 +89,18 @@ describe('EventRegistry dialogs', () => {
 
     expect(await screen.findByText('An event named "flash" already exists')).toBeInTheDocument()
   })
+
+  it('keeps the event being typed when Escape is pressed in the form', () => {
+    renderEvents()
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }))
+    const name = screen.getByPlaceholderText('eventName')
+    fireEvent.change(name, { target: { value: 'myEvent' } })
+
+    fireEvent.keyDown(name, { key: 'Escape' })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('eventName')).toHaveValue('myEvent')
+  })
 })
 
 describe('EffectRegistry dialogs', () => {

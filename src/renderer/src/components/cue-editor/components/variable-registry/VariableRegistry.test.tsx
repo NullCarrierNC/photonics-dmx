@@ -105,4 +105,16 @@ describe('VariableRegistry', () => {
     )
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('keeps the name being typed when Escape is pressed in the form', () => {
+    renderRegistry()
+    fireEvent.click(screen.getAllByRole('button', { name: '+ Add' })[0])
+    const name = screen.getByPlaceholderText('variableName')
+    fireEvent.change(name, { target: { value: 'speed' } })
+
+    fireEvent.keyDown(name, { key: 'Escape' })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('variableName')).toHaveValue('speed')
+  })
 })

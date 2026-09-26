@@ -28,6 +28,13 @@ function open(props: Partial<ModalProps> = {}, children: ReactNode = form) {
   return { onClose, ...view }
 }
 
+/** A press and release on one element, which is what a click on it takes. */
+function clickOn(element: HTMLElement, detail = 1): void {
+  fireEvent.mouseDown(element, { detail })
+  fireEvent.mouseUp(element, { detail })
+  fireEvent.click(element, { detail })
+}
+
 describe('Modal', () => {
   it.each(['dialog', 'alertdialog'] as const)('is a modal %s named by its title', (role) => {
     open({ role })
@@ -92,10 +99,16 @@ describe('Modal', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('stays open on a backdrop click when closeOnBackdrop is off', () => {
-    const { onClose } = open({ closeOnBackdrop: false })
-    fireEvent.click(screen.getByRole('presentation'))
+  it('keeps typed input through a backdrop click and Escape when it is not dismissible', () => {
+    const { onClose } = open({ dismissible: false })
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    fireEvent.change(name, { target: { value: 'typed' } })
+
+    clickOn(screen.getByRole('presentation'))
+    fireEvent.keyDown(name, { key: 'Escape' })
+
     expect(onClose).not.toHaveBeenCalled()
+    expect(name).toHaveValue('typed')
   })
 
   it('keeps Tab inside the panel and skips disabled controls', () => {
