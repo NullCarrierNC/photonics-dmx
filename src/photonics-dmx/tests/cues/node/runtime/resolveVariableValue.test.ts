@@ -48,6 +48,18 @@ describe('resolveVariableValue', () => {
     })
   })
 
+  it.each<[string, VariableValue]>([
+    ['an empty light array', { type: 'light-array', value: [] }],
+    ['a colour array', { type: 'color-array', value: ['red'] }],
+    ['NaN', { type: 'number', value: Number.NaN }],
+  ])('reads a variable holding %s as the number 0', (_label, held) => {
+    const context = contextWith({ v: held })
+    expect(resolveVariableValue('number', variable('v'), context)).toEqual({
+      type: 'number',
+      value: 0,
+    })
+  })
+
   it('throws for a variable that was never set', () => {
     expect(() => resolveVariableValue('number', variable('missing'), contextWith())).toThrow(
       UninitializedVariableError,

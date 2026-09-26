@@ -52,27 +52,24 @@ function lookupVariable(
   return existing
 }
 
+/** A number from an authored or stored value, with 0 for anything unreadable. */
+export function toNumber(raw: unknown): number {
+  if (typeof raw === 'boolean') return raw ? 1 : 0
+  const n = typeof raw === 'string' ? parseFloat(raw) : raw
+  return typeof n === 'number' && !Number.isNaN(n) ? n : 0
+}
+
 export function resolveNumber(
   source: ValueSource | undefined,
   context: ExecutionContext,
   variableDefinitions?: VariableDefinitionsForScope,
 ): number {
   if (!source) return 0
-  if (source.source === 'literal') {
-    const value = source.value
-    if (typeof value === 'boolean') return value ? 1 : 0
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value)
-      return isNaN(parsed) ? 0 : parsed
-    }
-    return typeof value === 'number' ? value : 0
-  }
-  const value = lookupVariable(source.name, context, variableDefinitions).value
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value)
-    return isNaN(parsed) ? 0 : parsed
-  }
-  return typeof value === 'number' ? value : value ? 1 : 0
+  return toNumber(
+    source.source === 'literal'
+      ? source.value
+      : lookupVariable(source.name, context, variableDefinitions).value,
+  )
 }
 
 export function resolveBoolean(
