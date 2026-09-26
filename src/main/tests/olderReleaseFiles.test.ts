@@ -190,6 +190,12 @@ const strobeRow = {
   rig: 'strobe[0] rgb masterDimmer=31 red=32 green=33 blue=34',
 }
 
+/** The PAR template with its master set to 0, and the light of the rig it places. */
+const parWithNoMaster = {
+  template: 'PAR: rgb masterDimmer=0 red=2 green=3 blue=4',
+  rig: 'front[0] rgb masterDimmer=1 red=3 green=4 blue=5',
+}
+
 const NO_FIXTURES: LoadedFixtures = { templates: [], layout: [], rigs: {} }
 
 const EXPECTED: Record<string, Expected> = {
@@ -275,6 +281,7 @@ const EXPECTED: Record<string, Expected> = {
     config: [...strobeRowRepairs.layout(false), strobeRowRepairs.rig],
     cues: [harmonyEasing],
   },
+  'v0.6.2-alpha.6-user': { cues: [harmonyEasing], retired: ['audio-motion-fast.json'] },
   'v0.7.0-alpha.7': {
     // The v7 prefs upgrade moves every install onto RB3 cue mode.
     settings: { 'rb3Prefs.processingMode': 'cue' },
@@ -284,6 +291,18 @@ const EXPECTED: Record<string, Expected> = {
       rigs: { Stage: lightsFromV062 },
     },
     cues: [harmonyEasing],
+  },
+  'v0.7.0-alpha.7-user': {
+    settings: { 'rb3Prefs.processingMode': 'cue' },
+    fixtures: {
+      templates: [parWithNoMaster.template, ...templatesFromV062.slice(1)],
+      layout: lightsFromV062,
+      rigs: { Stage: [parWithNoMaster.rig, ...lightsFromV062.slice(1)] },
+    },
+    cues: [
+      "my-alt1.json: Unknown easing 'sin-out' in 'Harmony' now reads sinInOut.",
+      harmonyEasing,
+    ],
   },
   'f3f851db': {
     fixtures: {
@@ -445,26 +464,33 @@ const storedCueFiles = (set: CorpusSet, refused: string[]): string[] =>
     })
     .sort()
 
+/** Makes an empty app data folder for the mocked electron app, returning its Photonics folder. */
+function freshAppData(): string {
+  for (const level of ['log', 'info', 'warn', 'error'] as const) {
+    jest.spyOn(console, level).mockImplementation(() => {})
+  }
+  appData = fs.mkdtempSync(path.join(os.tmpdir(), 'older-release-files-'))
+  const baseDir = path.join(appData, 'Photonics.rocks')
+  fs.mkdirSync(baseDir, { recursive: true })
+  return baseDir
+}
+
+async function removeAppData(baseDir: string): Promise<void> {
+  await settledWrites(baseDir)
+  fs.rmSync(appData, { recursive: true, force: true })
+  jest.restoreAllMocks()
+}
+
 describe.each(sets.map((set) => [set.id, set] as const))('files the %s build wrote', (_id, set) => {
   const expected = EXPECTED[set.id] ?? {}
-  let tmp: string
   let baseDir: string
 
   beforeEach(() => {
-    jest.spyOn(console, 'log').mockImplementation(() => {})
-    jest.spyOn(console, 'info').mockImplementation(() => {})
-    jest.spyOn(console, 'warn').mockImplementation(() => {})
-    jest.spyOn(console, 'error').mockImplementation(() => {})
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'older-release-files-'))
-    appData = tmp
-    baseDir = path.join(tmp, 'Photonics.rocks')
-    fs.mkdirSync(baseDir, { recursive: true })
+    baseDir = freshAppData()
   })
 
   afterEach(async () => {
-    await settledWrites(baseDir)
-    fs.rmSync(tmp, { recursive: true, force: true })
-    jest.restoreAllMocks()
+    await removeAppData(baseDir)
   })
 
   it('boots on its settings files, reporting only the listed migrations once', async () => {
@@ -521,5 +547,108 @@ describe.each(sets.map((set) => [set.id, set] as const))('files the %s build wro
     expect(outcome.fileErrors).toEqual({})
     expect(setAside(baseDir)).toEqual([])
     expect(retired(baseDir)).toEqual(expected.retired ?? [])
+  })
+})
+
+function corpusSet(id: string): CorpusSet {
+  const set = sets.find((candidate) => candidate.id === id)
+  if (!set) throw new Error(`No corpus set ${id}`)
+  return set
+}
+
+/** The bytes the corpus holds for the file `set` left at `to`. */
+function corpusText(set: CorpusSet, to: string): string {
+  const file = set.files.find((candidate) => candidate.to === to)
+  if (!file) throw new Error(`${set.id} leaves nothing at ${to}`)
+  return fs.readFileSync(path.join(HISTORICAL, file.file), 'utf-8')
+}
+
+/** The copies startup kept beside `file`, named without the time they were kept. */
+function keptBeside(file: string): { name: string; text: string }[] {
+  const dir = path.dirname(file)
+  return fs
+    .readdirSync(dir)
+    .filter((name) => name.startsWith(`${path.basename(file)}.`))
+    .map((name) => ({
+      name: name.replace(/-\d{4}-\d\d-\d\dT[\d-]+Z$/, ''),
+      text: fs.readFileSync(path.join(dir, name), 'utf-8'),
+    }))
+}
+
+describe('the files a user saved through the v0.7.0-alpha.7 build', () => {
+  const set = corpusSet('v0.7.0-alpha.7-user')
+  let baseDir: string
+
+  beforeEach(() => {
+    baseDir = freshAppData()
+  })
+
+  afterEach(async () => {
+    await removeAppData(baseDir)
+  })
+
+  it('replaces the edited shipped library with the newer shipped one, keeping the edit beside it', async () => {
+    seed(baseDir, set, () => true)
+    const alt1 = 'node-data/cues/yarg/yarg-alt1.json'
+
+    new ConfigurationManager().drainConfigCorruptRecovery()
+    await copyDefaultData('', baseDir)
+    const outcome = await loadNodeFiles(baseDir)
+
+    const shipped = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '../../../resources/defaults', alt1), 'utf-8'),
+    ) as { cues: unknown[] }
+    const onDisk: unknown = JSON.parse(fs.readFileSync(path.join(baseDir, alt1), 'utf-8'))
+    expect(onDisk).toEqual({ ...shipped, bundled: true })
+    expect(keptBeside(path.join(baseDir, alt1))).toEqual([
+      { name: 'yarg-alt1.json.v2', text: corpusText(set, alt1) },
+    ])
+    expect(outcome.cueFiles).toContain(`yarg-alt1.json: yarg-alt1, ${shipped.cues.length} cues`)
+  })
+
+  it("keeps the imported library as the user's, under its own group id", async () => {
+    seed(baseDir, set, () => true)
+    const myAlt1 = 'node-data/cues/yarg/my-alt1.json'
+
+    new ConfigurationManager().drainConfigCorruptRecovery()
+    await copyDefaultData('', baseDir)
+    const outcome = await loadNodeFiles(baseDir)
+
+    const onDisk: unknown = JSON.parse(fs.readFileSync(path.join(baseDir, myAlt1), 'utf-8'))
+    expect(onDisk).not.toHaveProperty('bundled')
+    expect(outcome.cueFiles).toContain('my-alt1.json: my-alt1, 24 cues')
+  })
+
+  it('places the rig light of a template whose master is 0 at its master plus each template channel', () => {
+    seed(baseDir, set, (file) => !isNodeData(file))
+
+    const par = new ConfigurationManager().getDmxRigs()[0].config.frontLights[0]
+
+    expect(par.channels).toEqual({ masterDimmer: 1, red: 3, green: 4, blue: 5 })
+  })
+})
+
+describe('the files a user saved through the v0.6.2-alpha.6 build', () => {
+  const set = corpusSet('v0.6.2-alpha.6-user')
+  let baseDir: string
+
+  beforeEach(() => {
+    baseDir = freshAppData()
+  })
+
+  afterEach(async () => {
+    await removeAppData(baseDir)
+  })
+
+  it('retires the edited Fast motion library this build does not ship, keeping the edit', async () => {
+    seed(baseDir, set, () => true)
+    const fast = 'node-data/cues/audio/audio-motion-fast.json'
+
+    await copyDefaultData('', baseDir)
+
+    expect(fs.existsSync(path.join(baseDir, fast))).toBe(false)
+    expect(keptBeside(path.join(baseDir, fast))).toEqual([
+      { name: 'audio-motion-fast.json.retired', text: corpusText(set, fast) },
+    ])
   })
 })

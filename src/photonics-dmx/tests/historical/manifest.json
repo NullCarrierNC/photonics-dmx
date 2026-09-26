@@ -1,5 +1,5 @@
 {
-  "description": "Files release builds left in a user's app data, which olderReleaseFiles.test.ts loads. A bundled file is that release's resources/defaults copy, which its copyDefaultData seeded marked as bundled. A settings file was written through that release's own ConfigurationManager, from the payloads its editors saved, and formatted with prettier.",
+  "description": "Files release builds left in a user's app data, which olderReleaseFiles.test.ts loads. A bundled file is that release's resources/defaults copy, which its copyDefaultData seeded marked as bundled. A settings file was written through that release's own ConfigurationManager, from the payloads its editors saved, and formatted with prettier. A user file is a release file changed only where that release's editors or settings pages let a user change it, as its source records.",
   "sets": [
     {
       "id": "v0.0.22-alpha.1-fix",
@@ -548,6 +548,122 @@
       ]
     },
     {
+      "id": "v0.6.2-alpha.6-user",
+      "releases": ["v0.6.2-alpha.6"],
+      "files": [
+        {
+          "file": "v0.6.0-alpha.6/audio-70s-light-organs.json",
+          "to": "node-data/cues/audio/audio-70s-light-organs.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/audio/audio-70s-light-organs.json",
+          "blob": "9c9ae1446fd578b179802013f101aeadbd48321f"
+        },
+        {
+          "file": "v0.6.0-alpha.6/audio-disco.json",
+          "to": "node-data/cues/audio/audio-disco.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/audio/audio-disco.json",
+          "blob": "9e462cf30c94a55f648b5fa59c041f90f508501a"
+        },
+        {
+          "file": "v0.5.5-alpha.5/audio-motion-default.json",
+          "to": "node-data/cues/audio/audio-motion-default.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/audio/audio-motion-default.json",
+          "blob": "c1f047b0348f883fe935084a82d1486c0ba32a37"
+        },
+        {
+          "file": "v0.6.0-alpha.6/audio-rock.json",
+          "to": "node-data/cues/audio/audio-rock.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/audio/audio-rock.json",
+          "blob": "3fafe354c3a719fa7beff0af9ed356bfcd76b91d"
+        },
+        {
+          "file": "v0.6.2-alpha.6/audio-stagekit.json",
+          "to": "node-data/cues/audio/audio-stagekit.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/audio/audio-stagekit.json",
+          "blob": "1105b21993b7094db6354ff9862c0f8b5fca29fc"
+        },
+        {
+          "file": "v0.6.0-alpha.6/stage-kit-alt-1.json",
+          "to": "node-data/cues/yarg/stage-kit-alt-1.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/yarg/stage-kit-alt-1.json",
+          "blob": "6ce1ea37504c1a61bb2145891c93948ad483c8ae"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-alt1.json",
+          "to": "node-data/cues/yarg/yarg-alt1.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/yarg/yarg-alt1.json",
+          "blob": "b9326c64ff8edf3f590c49b30abe0a7dcd4457eb"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-fade.json",
+          "to": "node-data/cues/yarg/yarg-fade.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/yarg/yarg-fade.json",
+          "blob": "42b9a11292721d911d1f3a9973e6adad911945a8"
+        },
+        {
+          "file": "v0.5.5-alpha.5/yarg-motion-default.json",
+          "to": "node-data/cues/yarg/yarg-motion-default.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/yarg/yarg-motion-default.json",
+          "blob": "522e64e6c308d91fe894c7b1f0e2791867bc8202"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-stagekit.json",
+          "to": "node-data/cues/yarg/yarg-stagekit.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/yarg/yarg-stagekit.json",
+          "blob": "4337830aa46636f78c054fb1eaf1e20c87fd5a79"
+        },
+        {
+          "file": "v0.5.5-alpha.5/audio-core-effects.json",
+          "to": "node-data/effects/audio/audio-core-effects.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/effects/audio/audio-core-effects.json",
+          "blob": "05f8f8b6354bdccaa96a4cf5fed39644be846353"
+        },
+        {
+          "file": "v0.5.5-alpha.5/audio-stagekit-effects.json",
+          "to": "node-data/effects/audio/audio-stagekit-effects.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/effects/audio/audio-stagekit-effects.json",
+          "blob": "e26db040205b1c4533992e654311d66899df5b7a"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-core-effects.json",
+          "to": "node-data/effects/yarg/yarg-core-effects.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/effects/yarg/yarg-core-effects.json",
+          "blob": "ac71419e1340df5376e4fbe8348fc4c59237e94f"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-fade-effects.json",
+          "to": "node-data/effects/yarg/yarg-fade-effects.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/effects/yarg/yarg-fade-effects.json",
+          "blob": "7ab5ff878458a0c1673accadd382158697d36249"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-stagekit-effects.json",
+          "to": "node-data/effects/yarg/yarg-stagekit-effects.json",
+          "bundled": true,
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/effects/yarg/yarg-stagekit-effects.json",
+          "blob": "b2b2e90957ded62fb0cea2ddcbd3b7e083d1b981"
+        },
+        {
+          "file": "v0.6.2-alpha.6-user/audio-motion-fast.json",
+          "to": "node-data/cues/audio/audio-motion-fast.json",
+          "source": "git show v0.6.2-alpha.6:resources/defaults/node-data/cues/audio/audio-motion-fast.json, as that build seeded it, then saved in place from its cue editor with Pendulum at size 40 and Figure-8 at size 35"
+        }
+      ]
+    },
+    {
       "id": "v0.7.0-alpha.7",
       "releases": ["v0.7.0-alpha.7"],
       "files": [
@@ -738,6 +854,203 @@
           "file": "v0.7.0-alpha.7/prefs.json",
           "to": "prefs.json",
           "source": "written by v0.7.0-alpha.7 through its ConfigurationManager, from its editors' save payloads"
+        }
+      ]
+    },
+    {
+      "id": "v0.7.0-alpha.7-user",
+      "releases": ["v0.7.0-alpha.7"],
+      "files": [
+        {
+          "file": "v0.6.0-alpha.6/audio-70s-light-organs.json",
+          "to": "node-data/cues/audio/audio-70s-light-organs.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/audio/audio-70s-light-organs.json",
+          "blob": "9c9ae1446fd578b179802013f101aeadbd48321f"
+        },
+        {
+          "file": "v0.6.0-alpha.6/audio-disco.json",
+          "to": "node-data/cues/audio/audio-disco.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/audio/audio-disco.json",
+          "blob": "9e462cf30c94a55f648b5fa59c041f90f508501a"
+        },
+        {
+          "file": "v0.7.0-alpha.7/audio-motion-default.json",
+          "to": "node-data/cues/audio/audio-motion-default.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/audio/audio-motion-default.json",
+          "blob": "b6a3032239c0e23edafc475ab151a887366078f8"
+        },
+        {
+          "file": "v0.6.0-alpha.6/audio-rock.json",
+          "to": "node-data/cues/audio/audio-rock.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/audio/audio-rock.json",
+          "blob": "3fafe354c3a719fa7beff0af9ed356bfcd76b91d"
+        },
+        {
+          "file": "v0.7.0-alpha.7/audio-stagekit.json",
+          "to": "node-data/cues/audio/audio-stagekit.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/audio/audio-stagekit.json",
+          "blob": "67be2c1b94811604b3f38955a0bc865e10c1c958"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-bloom.json",
+          "to": "node-data/cues/rb3/rb3-bloom.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-bloom.json",
+          "blob": "99916eb40a471032471a87fc1ea8f47c7a900149"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-glow.json",
+          "to": "node-data/cues/rb3/rb3-glow.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-glow.json",
+          "blob": "1b51ebdac72226f2f82e12092b49372df75e4140"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-mirror-blended.json",
+          "to": "node-data/cues/rb3/rb3-mirror-blended.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-mirror-blended.json",
+          "blob": "41d0bb0eb12b2a38ba210fdada5a7f96f2304b73"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-mirror.json",
+          "to": "node-data/cues/rb3/rb3-mirror.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-mirror.json",
+          "blob": "ba9a063f9182701b48b5a7a7c69149229eb18974"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-motion-default.json",
+          "to": "node-data/cues/rb3/rb3-motion-default.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-motion-default.json",
+          "blob": "810f821cc63d816c7c83bc9c3bc1039706637818"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-stagekit-reversed.json",
+          "to": "node-data/cues/rb3/rb3-stagekit-reversed.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-stagekit-reversed.json",
+          "blob": "b9b8c54ffd602a8d5319ff951d26d38f9e9de3f8"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-stagekit-wash.json",
+          "to": "node-data/cues/rb3/rb3-stagekit-wash.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-stagekit-wash.json",
+          "blob": "8be13588338984ecd533a83582d8fea0b6b05731"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-stagekit.json",
+          "to": "node-data/cues/rb3/rb3-stagekit.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-stagekit.json",
+          "blob": "0c0be46baa0302efa2ad7aa3ca601b2448d9f541"
+        },
+        {
+          "file": "v0.7.0-alpha.7/rb3-trail.json",
+          "to": "node-data/cues/rb3/rb3-trail.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/rb3/rb3-trail.json",
+          "blob": "ceaaf4ead2131daf90739b07d0268d058c2b26ca"
+        },
+        {
+          "file": "v0.7.0-alpha.7/stage-kit-alt-1.json",
+          "to": "node-data/cues/yarg/stage-kit-alt-1.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/yarg/stage-kit-alt-1.json",
+          "blob": "4e9150078854260d00cdc46861ca9cd8850439e5"
+        },
+        {
+          "file": "v0.7.0-alpha.7/yarg-fade.json",
+          "to": "node-data/cues/yarg/yarg-fade.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/yarg/yarg-fade.json",
+          "blob": "1bdf0489140ab3ad67766b196e0e3166702dae98"
+        },
+        {
+          "file": "v0.7.0-alpha.7/yarg-motion-default.json",
+          "to": "node-data/cues/yarg/yarg-motion-default.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/yarg/yarg-motion-default.json",
+          "blob": "fab916a962536086d85ed793c9fac814436d9e02"
+        },
+        {
+          "file": "v0.7.0-alpha.7/yarg-stagekit.json",
+          "to": "node-data/cues/yarg/yarg-stagekit.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/yarg/yarg-stagekit.json",
+          "blob": "7bee8eeac9e14434f172b03f5135bdbc66c26ec9"
+        },
+        {
+          "file": "v0.5.5-alpha.5/audio-core-effects.json",
+          "to": "node-data/effects/audio/audio-core-effects.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/effects/audio/audio-core-effects.json",
+          "blob": "05f8f8b6354bdccaa96a4cf5fed39644be846353"
+        },
+        {
+          "file": "v0.5.5-alpha.5/audio-stagekit-effects.json",
+          "to": "node-data/effects/audio/audio-stagekit-effects.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/effects/audio/audio-stagekit-effects.json",
+          "blob": "e26db040205b1c4533992e654311d66899df5b7a"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-core-effects.json",
+          "to": "node-data/effects/yarg/yarg-core-effects.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/effects/yarg/yarg-core-effects.json",
+          "blob": "ac71419e1340df5376e4fbe8348fc4c59237e94f"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-fade-effects.json",
+          "to": "node-data/effects/yarg/yarg-fade-effects.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/effects/yarg/yarg-fade-effects.json",
+          "blob": "7ab5ff878458a0c1673accadd382158697d36249"
+        },
+        {
+          "file": "v0.6.0-alpha.6/yarg-stagekit-effects.json",
+          "to": "node-data/effects/yarg/yarg-stagekit-effects.json",
+          "bundled": true,
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/effects/yarg/yarg-stagekit-effects.json",
+          "blob": "b2b2e90957ded62fb0cea2ddcbd3b7e083d1b981"
+        },
+        {
+          "file": "v0.7.0-alpha.7-user/yarg-alt1.json",
+          "to": "node-data/cues/yarg/yarg-alt1.json",
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/yarg/yarg-alt1.json, as that build seeded it, then saved in place from its cue editor with Score orange at high brightness and Menu purple over 500 ms"
+        },
+        {
+          "file": "v0.7.0-alpha.7-user/my-alt1.json",
+          "to": "node-data/cues/yarg/my-alt1.json",
+          "source": "git show v0.7.0-alpha.7:resources/defaults/node-data/cues/yarg/yarg-alt1.json, imported through that build's cue editor as my-alt1.json with group id my-alt1, which drops bundled and cueVersion"
+        },
+        {
+          "file": "v0.7.0-alpha.7-user/dmxRigs.json",
+          "to": "dmxRigs.json",
+          "source": "v0.7.0-alpha.7/dmxRigs.json with the PAR light's channels as that build's template sync derives them from a PAR template master of 0"
+        },
+        {
+          "file": "v0.7.0-alpha.7-user/lights.json",
+          "to": "lights.json",
+          "source": "v0.7.0-alpha.7/lights.json with the PAR template's master dimmer set to 0 in My Lights"
+        },
+        {
+          "file": "v0.7.0-alpha.7/lightsLayout.json",
+          "to": "lightsLayout.json",
+          "source": "written by v0.7.0-alpha.7 through its ConfigurationManager, from its editors' save payloads"
+        },
+        {
+          "file": "v0.7.0-alpha.7-user/prefs.json",
+          "to": "prefs.json",
+          "source": "v0.7.0-alpha.7/prefs.json with the senders, brightness, clock rate, publishing rate, cue consistency, Stage Kit priority and YARG cue selection changed in that build's settings pages, and RB3 in direct mode"
         }
       ]
     },
