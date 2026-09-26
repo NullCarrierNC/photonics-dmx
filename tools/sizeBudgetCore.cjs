@@ -53,7 +53,7 @@ function parseBaseline(text) {
  * @param {string} line
  */
 function isHeaderNote(line) {
-  return line.startsWith('Auto-generated:') || line.startsWith('Entries may only shrink')
+  return line.startsWith('Auto-generated:') || line.startsWith('Regenerate after a split with')
 }
 
 /**
@@ -170,7 +170,7 @@ function renderBaseline(sizes, limit) {
   const header = [
     `limit ${limit}`,
     'Auto-generated: non-test sources under src/ that exceed the line limit.',
-    'Entries may only shrink. Regenerate after a split with: node tools/size-budget.mjs --write',
+    'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in a commit of its own.',
   ]
   const body = overLimitEntries(sizes, limit).map(([path, lines]) => `${lines} ${path}`)
   return `${[...header, ...body].join('\n')}\n`

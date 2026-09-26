@@ -16,11 +16,13 @@ const verdict = (
   counts: Map<string, number>,
   recordedText: string | null,
   write = false,
+  init = false,
 ): { ok: boolean; lines: string[]; write?: string } =>
   budgetVerdict({
     counts,
     recordedText,
     write,
+    init,
     label: counts.size === 1 ? 'Explicit any' : 'Knip',
     file,
     counted: 'reports of the rule.',
@@ -43,10 +45,10 @@ describe('budgetVerdict', () => {
     expect(result.lines[0]).toBe(`Explicit any count 22 exceeds budget 21 (file ${file})`)
   })
 
-  it('fails when there is no budget file', () => {
+  it('fails when there is no budget file, naming --init', () => {
     expect(verdict(one(0), null)).toEqual({
       ok: false,
-      lines: [`Missing ${file}. Run the same command with --write`],
+      lines: [`Missing ${file}. Run the same command with --init to create it`],
     })
   })
 
@@ -64,8 +66,51 @@ describe('budgetVerdict', () => {
     )
   })
 
-  it('records a first budget with --write', () => {
-    expect(verdict(one(40), null, true).write).toMatch(/^40\n/)
+  it('creates a missing budget with --init', () => {
+    const result = verdict(one(40), null, false, true)
+
+    expect(result.ok).toBe(true)
+    expect(result.write).toMatch(/^40\n/)
+    expect(verdict(several(3, 115), null, false, true).write).toMatch(/^files 3\nexports 115\n/)
+  })
+
+  it('refuses --write when there is no budget file', () => {
+    const result = verdict(one(999), null, true)
+
+    expect(result.ok).toBe(false)
+    expect(result.write).toBeUndefined()
+    expect(result.lines).toEqual([
+      `Missing ${file}. --write only lowers a recorded budget. Run the same command with --init to create it`,
+    ])
+  })
+
+  it('refuses --write over a budget file that is empty or does not record every count', () => {
+    for (const text of ['', '\n', '565 (was)\nAuto-generated: x\nnote\n', 'twenty\n']) {
+      const result = verdict(one(999), text, true)
+
+      expect(result.ok).toBe(false)
+      expect(result.write).toBeUndefined()
+      expect(result.lines).toEqual([
+        'Budget file must start with a non-negative integer on line 1',
+        `Refusing to rewrite ${file}. Fix it by hand or restore it from git`,
+      ])
+    }
+    const partial = verdict(several(3, 115), 'files 4\n', true)
+
+    expect(partial.ok).toBe(false)
+    expect(partial.write).toBeUndefined()
+  })
+
+  it('refuses --init over a budget file that exists, readable or not', () => {
+    for (const text of ['21\n', 'twenty\n', '']) {
+      const result = verdict(one(3), text, false, true)
+
+      expect(result.ok).toBe(false)
+      expect(result.write).toBeUndefined()
+      expect(result.lines).toEqual([
+        `${file} exists. --init only creates a missing budget, and --write lowers a recorded one`,
+      ])
+    }
   })
 
   it('refuses to raise the budget with --write', () => {
