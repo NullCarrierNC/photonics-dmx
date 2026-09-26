@@ -3,7 +3,11 @@
  * way, and how each fault reports. The publisher suites cover it inside whole frames.
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
-import { FixtureChannelWriter, type LightOutput } from '../../controllers/fixtureChannelWriter'
+import {
+  FixtureChannelWriter,
+  strobeChannelChops,
+  type LightOutput,
+} from '../../controllers/fixtureChannelWriter'
 import {
   resetLogConfiguration,
   setLogSink,
@@ -178,5 +182,25 @@ describe('FixtureChannelWriter', () => {
     writerFor(wire).writeUnvisited(fixtures, new Set(['visited']), null)
 
     expect(wire).toEqual({ 11: 6 })
+  })
+})
+
+describe('strobeChannelChops', () => {
+  const strobeLight = (strobeChannel: number): RgbFixture =>
+    fixture({
+      isStrobeEnabled: true,
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel },
+    })
+
+  it('chops a strobe-enabled light whose strobe channel has an address', () => {
+    expect(strobeChannelChops(strobeLight(5), 'fast')).toBe(true)
+  })
+
+  it.each([
+    ['unassigned', 0],
+    ['past the universe', 513],
+    ['fractional', 5.5],
+  ])('leaves a light whose strobe channel is %s to the flash', (_label, channel) => {
+    expect(strobeChannelChops(strobeLight(channel), 'fast')).toBe(false)
   })
 })

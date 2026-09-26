@@ -3,6 +3,7 @@ import { ConfigStrobeType, FixtureTypes } from '../types'
 import type { DmxLight, LightingConfiguration, RgbLight, StrobeLight } from '../types'
 import {
   getStrobeChannelLightsInConfig,
+  hasHardwareStrobeChannel,
   isRgbFamilyWithStrobeChannel,
 } from './strobeChannelRigInspection'
 
@@ -73,7 +74,45 @@ describe('isRgbFamilyWithStrobeChannel', () => {
   })
 })
 
+describe('hasHardwareStrobeChannel', () => {
+  it('is true for an RGB light whose strobe channel has an address', () => {
+    expect(hasHardwareStrobeChannel(makeRgbWithStrobeChannel())).toBe(true)
+  })
+
+  it.each([
+    ['unassigned', 0],
+    ['past the universe', 513],
+    ['fractional', 5.5],
+  ])('is false for an RGB light whose strobe channel is %s', (_label, strobeChannel) => {
+    const light = makeRgbLight({
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel },
+    })
+
+    expect(isRgbFamilyWithStrobeChannel(light)).toBe(true)
+    expect(hasHardwareStrobeChannel(light)).toBe(false)
+  })
+
+  it('is false for a plain RGB light and for a dedicated STROBE fixture', () => {
+    expect(hasHardwareStrobeChannel(makeRgbLight())).toBe(false)
+    expect(hasHardwareStrobeChannel(makeDedicatedStrobe())).toBe(false)
+  })
+})
+
 describe('getStrobeChannelLightsInConfig', () => {
+  it('leaves out a light whose strobe channel has no address', () => {
+    const config = makeConfig({
+      frontLights: [
+        makeRgbWithStrobeChannel({ id: 'f1' }),
+        makeRgbLight({
+          id: 'f2',
+          channels: { masterDimmer: 6, red: 7, green: 8, blue: 9, strobeChannel: 0 },
+        }),
+      ],
+    })
+
+    expect(getStrobeChannelLightsInConfig(config).map((l) => l.id)).toEqual(['f1'])
+  })
+
   it('returns matching lights from frontLights and backLights', () => {
     const config = makeConfig({
       frontLights: [makeRgbWithStrobeChannel({ id: 'f1' })],
