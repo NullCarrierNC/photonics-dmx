@@ -14,7 +14,7 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
   /**
    * Show a file in the system file explorer
    */
-  handleInvoke(ipcMain, SHELL.SHOW_ITEM_IN_FOLDER, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, SHELL.SHOW_ITEM_IN_FOLDER, log, async (_event, filePath: unknown) => {
     const validatedPath = validatePathUnderAllowedRoots(filePath)
     if (!validatedPath.ok) {
       return ipcError(validatedPath.error)
@@ -26,7 +26,7 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
   /**
    * Open a path with the default system application
    */
-  handleInvoke(ipcMain, SHELL.OPEN_PATH, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, SHELL.OPEN_PATH, log, async (_event, filePath: unknown) => {
     const validatedPath = validateOpenablePath(filePath)
     if (!validatedPath.ok) {
       return ipcError(validatedPath.error)

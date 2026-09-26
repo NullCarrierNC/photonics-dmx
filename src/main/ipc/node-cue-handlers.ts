@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { NodeCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import {
   cueDomainBinding,
@@ -14,7 +14,12 @@ import { ipcError, validationRefusal } from './ipcResult'
 import { NODE_CUES } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
-import { validateCueTypesPayload, validateNodeCueSavePayload } from './inputValidation'
+import {
+  validateCueFileCheckPayload,
+  validateCueFilePath,
+  validateCueTypesPayload,
+  validateNodeCueSavePayload,
+} from './inputValidation'
 
 const log = createLogger('node-cue-handlers')
 
@@ -24,11 +29,6 @@ const ensureLoader = (controllerManager: ControllerManager) => {
     throw new Error('Node cue loader is not initialized.')
   }
   return loader
-}
-
-interface ValidatePayload {
-  path?: string
-  content?: NodeCueFile
 }
 
 async function persistGroupEnableAfterNodeCueSave(
@@ -53,9 +53,12 @@ async function persistGroupEnableAfterNodeCueSave(
 }
 
 export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  handleInvoke(ipcMain, NODE_CUES.SET_DEBUG, log, async (_event, enabled: boolean) => {
+  handleInvoke(ipcMain, NODE_CUES.SET_DEBUG, log, async (_event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') {
+      return ipcError('Debug flag must be true or false')
+    }
     const loader = ensureLoader(controllerManager)
-    loader.setDebugEnabled(Boolean(enabled))
+    loader.setDebugEnabled(enabled)
     return { success: true, enabled: loader.isDebugEnabled() }
   })
 
@@ -69,9 +72,13 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return loader.reload()
   })
 
-  handleInvoke(ipcMain, NODE_CUES.READ, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, NODE_CUES.READ, log, async (_event, data: unknown) => {
+    const filePath = validateCueFilePath(data)
+    if (!filePath.ok) {
+      return ipcError(filePath.error)
+    }
     const loader = ensureLoader(controllerManager)
-    return loader.readFile(filePath)
+    return loader.readFile(filePath.value)
   })
 
   handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, data: unknown) => {
@@ -97,26 +104,28 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return result
   })
 
-  handleInvoke(ipcMain, NODE_CUES.DELETE, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, NODE_CUES.DELETE, log, async (_event, data: unknown) => {
+    const filePath = validateCueFilePath(data)
+    if (!filePath.ok) {
+      return ipcError(filePath.error)
+    }
     const loader = ensureLoader(controllerManager)
-    return loader.deleteFile(filePath)
+    return loader.deleteFile(filePath.value)
   })
 
-  handleInvoke(ipcMain, NODE_CUES.VALIDATE, log, async (_event, payload: ValidatePayload) => {
+  handleInvoke(ipcMain, NODE_CUES.VALIDATE, log, async (_event, data: unknown) => {
     try {
+      const request = validateCueFileCheckPayload(data)
+      if (!request.ok) {
+        return validationRefusal(request.error)
+      }
+      if ('content' in request.value) {
+        return validateNodeCueFile(request.value.content)
+      }
+      // readFile rejects invalid JSON or schema, and the canonical validator runs on both
+      // branches.
       const loader = ensureLoader(controllerManager)
-
-      if (payload.content) {
-        return validateNodeCueFile(payload.content)
-      }
-
-      if (payload.path) {
-        // readFile rejects invalid JSON or schema, and the canonical validator runs on both
-        // branches.
-        return validateNodeCueFile(await loader.readFile(payload.path))
-      }
-
-      throw new Error('Validation payload must include either content or path.')
+      return validateNodeCueFile(await loader.readFile(request.value.path))
     } catch (error) {
       return validationRefusal(error)
     }
@@ -131,7 +140,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return loader.getAvailableCueTypes(validation.value.mode, validation.value.kind)
   })
 
-  handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: NodeCueMode) => {
+  handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: unknown) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
@@ -163,11 +172,15 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
   })
 
-  handleInvoke(ipcMain, NODE_CUES.EXPORT, log, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, NODE_CUES.EXPORT, log, async (_event, data: unknown) => {
+    const filePath = validateCueFilePath(data)
+    if (!filePath.ok) {
+      return ipcError(filePath.error)
+    }
     const loader = ensureLoader(controllerManager)
     // Resolve through the loader so the source path used for fs.copyFile is the same
     // rooted path the loader vetted; never copy from the raw IPC string.
-    const resolvedSource = loader.resolveCueFilePathForIpc(filePath)
+    const resolvedSource = loader.resolveCueFilePathForIpc(filePath.value)
     await loader.readFile(resolvedSource) // ensure file is valid/exists
 
     const result = await dialog.showSaveDialog({

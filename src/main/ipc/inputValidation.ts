@@ -57,6 +57,8 @@ export {
   validateNodeCueSavePayload,
   validateEffectSavePayload,
   validateCueTypesPayload,
+  validateCueFilePath,
+  validateCueFileCheckPayload,
 } from './validation/cueFileValidation'
 
 export { validateOpenablePath, validatePathUnderAllowedRoots } from './validation/pathValidation'
