@@ -76,6 +76,8 @@ export class GraphExecutionEngine {
   private pendingParameters: ExecutionParameters | null = null
   /** When the lifecycle run holding the slot started, on the monotonic clock. */
   private lifecycleRunStartedAt = 0
+  /** Tells the node engine the lifecycle run that replaced an expired one has ended. */
+  private onReplacingRunEnd?: () => void
 
   private get compiled(): CompiledNetCue {
     if (!this.compiledCue) {
@@ -335,8 +337,8 @@ export class GraphExecutionEngine {
   /**
    * Restart a lifecycle run that has held the slot past {@link LIFECYCLE_RUN_EXPIRY_MS} with the
    * arriving frame, which `dispatch` starts, and report whether it did. An effect the stuck run
-   * waits on is taken over by the new run when it submits it again, and removed when it does not.
-   * The frame waiting behind the stuck run is dropped.
+   * waits on is taken over by the new run when it submits it again, and removed once the new run
+   * ends without it. The frame waiting behind the stuck run is dropped.
    */
   private expireStuckLifecycleRun(dispatch: () => void): boolean {
     const engine = this.nodeEngine
@@ -346,7 +348,8 @@ export class GraphExecutionEngine {
       ...this.compiled.eventMap.values(),
     ])
     const eventIds = [...cueStartedNodes, ...cueCalledNodes].map((event) => event.id)
-    engine.restartEventRuns(eventIds, () => {
+    engine.restartEventRuns(eventIds, (runEnded) => {
+      this.onReplacingRunEnd = runEnded
       this.isExecutingCueStarted = false
       this.pendingParameters = null
       dispatch()
@@ -356,6 +359,9 @@ export class GraphExecutionEngine {
 
   private onCueEventComplete(): void {
     this.isExecutingCueStarted = false
+    const runEnded = this.onReplacingRunEnd
+    this.onReplacingRunEnd = undefined
+    runEnded?.()
     if (this.pendingParameters) {
       const next = this.pendingParameters
       this.pendingParameters = null
@@ -375,6 +381,7 @@ export class GraphExecutionEngine {
   cancelAll(skipEffectRemoval = false): void {
     this.pendingParameters = null
     this.isExecutingCueStarted = false
+    this.onReplacingRunEnd = undefined
     this.esmLifecycle.cancelAll()
     if (this.nodeEngine) {
       this.nodeEngine.cancelAll(skipEffectRemoval)

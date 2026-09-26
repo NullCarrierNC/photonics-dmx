@@ -210,6 +210,65 @@ function raiserHeldCue(event: AudioEventNode): AudioNodeCue {
   )
 }
 
+/**
+ * A restart graph that waits 50 ms and then holds red until a beat. With `firstRunOnly`, only the
+ * first run paints and every later run just waits 100 ms.
+ */
+function delayedHoldCue(firstRunOnly: boolean): AudioNodeCue {
+  const first: LogicNode = {
+    id: 'first',
+    type: 'logic',
+    logicType: 'conditional',
+    comparator: '==',
+    left: { source: 'variable', name: 'runs' },
+    right: { source: 'literal', value: 0 },
+  }
+  const counted: LogicNode = {
+    id: 'counted',
+    type: 'logic',
+    logicType: 'variable',
+    mode: 'set',
+    varName: 'runs',
+    valueType: 'number',
+    value: { source: 'literal', value: 1 },
+  }
+  const delay = (id: string, ms: number): LogicNode => ({
+    id,
+    type: 'logic',
+    logicType: 'delay',
+    delayTime: { source: 'literal', value: ms },
+  })
+  const definition: AudioLightingNodeCueDefinition = {
+    kind: 'lighting',
+    id: 'delayed-hold',
+    cueTypeId: 'delayed-hold',
+    name: 'Delayed hold',
+    style: 'secondary',
+    variables: [{ name: 'runs', type: 'number', scope: 'cue', initialValue: 0 }],
+    nodes: {
+      events: [calledWith('restart')],
+      actions: [setColor('hold', { source: 'literal', value: 'red' }, 'beat')],
+      logic: firstRunOnly
+        ? [first, counted, delay('pause', 50), delay('idle', 100)]
+        : [delay('pause', 50)],
+    },
+    connections: firstRunOnly
+      ? [
+          { from: 'called', to: 'first' },
+          { from: 'first', to: 'counted', fromPort: 'true' },
+          { from: 'counted', to: 'pause' },
+          { from: 'pause', to: 'hold' },
+          { from: 'first', to: 'idle', fromPort: 'false' },
+        ]
+      : [
+          { from: 'called', to: 'pause' },
+          { from: 'pause', to: 'hold' },
+        ],
+    layout: { nodePositions: {} },
+  }
+  return new AudioNodeCue('g', NodeCueCompiler.compileCue<AudioEventNodeUnion>(definition, 'audio'))
+}
+
 const frameData = (energy = 0.5): AudioCueData => ({
   timestamp: 0,
   executionCount: 1,
@@ -228,6 +287,7 @@ describe('audio cue-called execution policy', () => {
     cue = null
     h = null
     jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 
   /** Run 60 frames with no beat, then a beat, and count the submissions of each action. */
@@ -331,6 +391,40 @@ describe('audio cue-called execution policy', () => {
     }
     expect(Math.min(...crossfade)).toBeGreaterThanOrEqual(250)
     expect(front()).toEqual({ red: 0, green: 255 })
+  })
+
+  /** The front light's red after each 10 ms of timers and frames, for `ticks` ticks. */
+  function redEvery10ms(harness: SequencerHarness, ticks: number): number[] {
+    const reds: number[] = []
+    for (let tick = 0; tick < ticks; tick++) {
+      jest.advanceTimersByTime(10)
+      harness.advanceBy(10)
+      reds.push(harness.getLightState(harness.frontLightIds[0])?.red ?? 0)
+    }
+    return reds
+  }
+
+  it('restart keeps the held look through the delay before the new run submits it again', async () => {
+    jest.useFakeTimers()
+    cue = delayedHoldCue(false)
+    h = createSequencerHarness({ frontCount: 4, backCount: 0 })
+
+    await cue.execute(frameData(), h.sequencer, h.lightManager)
+    redEvery10ms(h, 20)
+    await cue.execute(frameData(), h.sequencer, h.lightManager)
+    expect(Math.min(...redEvery10ms(h, 20))).toBe(255)
+  })
+
+  it('restart keeps a held look until the new run ends without it', async () => {
+    jest.useFakeTimers()
+    cue = delayedHoldCue(true)
+    h = createSequencerHarness({ frontCount: 4, backCount: 0 })
+
+    await cue.execute(frameData(), h.sequencer, h.lightManager)
+    redEvery10ms(h, 20)
+    await cue.execute(frameData(), h.sequencer, h.lightManager)
+    expect(Math.min(...redEvery10ms(h, 9))).toBe(255)
+    expect(redEvery10ms(h, 5).at(-1)).toBe(0)
   })
 
   /** The front light's red after each 20 ms audio frame, one frame per entry of `energies`. */

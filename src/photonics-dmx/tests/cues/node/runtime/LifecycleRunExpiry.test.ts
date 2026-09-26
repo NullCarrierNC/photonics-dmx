@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { EffectCompiler } from '../../../../cues/node/compiler/EffectCompiler'
@@ -73,6 +73,8 @@ function cueDefinition(
       { name: 'shade', type: 'color', scope: 'cue', initialValue: 'red' },
       { name: 'nextShade', type: 'color', scope: 'cue', initialValue: 'red' },
       { name: 'venue', type: 'string', scope: 'cue', initialValue: '' },
+      { name: 'until', type: 'string', scope: 'cue', initialValue: 'keyframe' },
+      { name: 'nextUntil', type: 'string', scope: 'cue', initialValue: 'keyframe' },
     ],
     nodes,
     connections,
@@ -138,6 +140,32 @@ const raisesAndWaits: NetNodeCueDefinition = cueDefinition(
   ],
 )
 
+const wait = (id: string, ms: number): LogicNode => ({
+  id,
+  type: 'logic',
+  logicType: 'delay',
+  delayTime: { source: 'literal', value: ms },
+})
+
+/** Reads the venue size into `venue` and takes the true port for a large venue. */
+const venueLogic: LogicNode[] = [
+  {
+    id: 'venue',
+    type: 'logic',
+    logicType: 'cue-data',
+    dataProperty: 'venue-size',
+    assignTo: 'venue',
+  },
+  {
+    id: 'large',
+    type: 'logic',
+    logicType: 'conditional',
+    comparator: '==',
+    left: { source: 'variable', name: 'venue' },
+    right: { source: 'literal', value: 'Large' },
+  },
+]
+
 /**
  * One keyframe-held red on the front lights, reached from cue-called and from beat. A run that
  * gets past it on a frame from a large venue paints the back lights green.
@@ -152,23 +180,7 @@ const sharedHold: NetNodeCueDefinition = cueDefinition(
       paint('hold', 'front', { source: 'literal', value: 'red' }, 'keyframe'),
       paint('mark', 'back', { source: 'literal', value: 'green' }, 'none'),
     ],
-    logic: [
-      {
-        id: 'venue',
-        type: 'logic',
-        logicType: 'cue-data',
-        dataProperty: 'venue-size',
-        assignTo: 'venue',
-      },
-      {
-        id: 'large',
-        type: 'logic',
-        logicType: 'conditional',
-        comparator: '==',
-        left: { source: 'variable', name: 'venue' },
-        right: { source: 'literal', value: 'Large' },
-      },
-    ],
+    logic: venueLogic,
   },
   [
     { from: 'called', to: 'hold' },
@@ -179,11 +191,72 @@ const sharedHold: NetNodeCueDefinition = cueDefinition(
   ],
 )
 
+/**
+ * {@link waitsForKeyframe} on layer 1 with a 50 ms delay before the paint. With `untilVariable`
+ * the first run's paint waits for a keyframe and every later run's paint does not wait at all.
+ */
+function delaysThenWaits(untilVariable = false): NetNodeCueDefinition {
+  const held = paint('paint', 'front', shade, 'keyframe')
+  const pickUntil: LogicNode = {
+    id: 'pick-until',
+    type: 'logic',
+    logicType: 'variable',
+    mode: 'set',
+    varName: 'until',
+    valueType: 'string',
+    assignments: [
+      { varName: 'until', valueType: 'string', value: { source: 'variable', name: 'nextUntil' } },
+      { varName: 'nextUntil', valueType: 'string', value: { source: 'literal', value: 'none' } },
+    ],
+  }
+  return cueDefinition(
+    {
+      events: [{ id: 'called', type: 'event', eventType: 'cue-called' }],
+      actions: [
+        untilVariable
+          ? {
+              ...held,
+              timing: { ...held.timing, waitUntilCondition: { source: 'variable', name: 'until' } },
+            }
+          : held,
+      ],
+      logic: [pickShade, pickUntil, wait('wait', 50)],
+    },
+    [
+      { from: 'called', to: 'pick' },
+      { from: 'pick', to: 'pick-until' },
+      { from: 'pick-until', to: 'wait' },
+      { from: 'wait', to: 'paint' },
+    ],
+  )
+}
+
+/** Paints red and waits for a keyframe on a frame from a large venue, otherwise waits 100 ms. */
+const paintsForLargeVenues: NetNodeCueDefinition = cueDefinition(
+  {
+    events: [{ id: 'called', type: 'event', eventType: 'cue-called' }],
+    actions: [paint('paint', 'front', { source: 'literal', value: 'red' }, 'keyframe')],
+    logic: [...venueLogic, wait('wait', 100)],
+  },
+  [
+    { from: 'called', to: 'venue' },
+    { from: 'venue', to: 'large' },
+    { from: 'large', to: 'paint', fromPort: 'true' },
+    { from: 'large', to: 'wait', fromPort: 'false' },
+  ],
+)
+
 const frame = { beat: 'Off', strobeState: 'Strobe_Off' } as CueData
 
 describe('a lifecycle run that never completes', () => {
   let h: SequencerHarness | null = null
   let cue: LightingNodeCue | null = null
+
+  beforeEach(() => {
+    jest.useFakeTimers({
+      doNotFake: ['queueMicrotask', 'Date', 'performance', 'nextTick', 'setImmediate'],
+    })
+  })
 
   afterEach(() => {
     cue?.onStop()
@@ -191,6 +264,7 @@ describe('a lifecycle run that never completes', () => {
     cue = null
     h = null
     jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 
   function start(
@@ -213,6 +287,7 @@ describe('a lifecycle run that never completes', () => {
   function frontShown(harness: SequencerHarness, ticks: number): number[] {
     const shown: number[] = []
     for (let tick = 0; tick < ticks; tick++) {
+      jest.advanceTimersByTime(10)
       harness.advanceBy(10)
       const state = harness.getLightState(harness.frontLightIds[0])
       shown.push((state?.red ?? 0) + (state?.blue ?? 0))
@@ -288,5 +363,33 @@ describe('a lifecycle run that never completes', () => {
     harness.sequencer.onKeyframe()
     harness.advanceBy(200)
     expect(harness.getLightState(harness.backLightIds[0])?.green).toBe(255)
+  })
+
+  it.each([
+    ['a paint that waits', false],
+    ['a paint that does not wait', true],
+  ])(
+    'keeps the look the expired run left through the delay before %s takes it over',
+    (_, untilVariable) => {
+      const harness = start(delaysThenWaits(untilVariable))
+
+      send()
+      expect(frontShown(harness, 20).at(-1)).toBe(255)
+      harness.advanceBy(LIFECYCLE_RUN_EXPIRY_MS)
+      send()
+      expect(Math.min(...frontShown(harness, 15))).toBeGreaterThanOrEqual(250)
+      expect(harness.getLightState(harness.frontLightIds[0])?.blue).toBe(255)
+    },
+  )
+
+  it('keeps the look the expired run left until the newest run ends without it', () => {
+    const harness = start(paintsForLargeVenues)
+
+    send({ ...frame, venueSize: 'Large' } as CueData)
+    harness.advanceBy(200)
+    harness.advanceBy(LIFECYCLE_RUN_EXPIRY_MS)
+    send({ ...frame, venueSize: 'Small' } as CueData)
+    expect(Math.min(...frontShown(harness, 9))).toBe(255)
+    expect(frontShown(harness, 5).at(-1)).toBe(0)
   })
 })

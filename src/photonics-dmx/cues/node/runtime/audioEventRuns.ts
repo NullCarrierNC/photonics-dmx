@@ -32,7 +32,7 @@ export class AudioEventRuns {
         this.pending.set(event.id, data)
         return
       }
-      engine.restartEventRuns([event.id], () => this.run(engine, event, data))
+      engine.restartEventRuns([event.id], (runEnded) => this.run(engine, event, data, runEnded))
       return
     }
     this.run(engine, event, data)
@@ -48,10 +48,12 @@ export class AudioEventRuns {
     engine: NodeExecutionEngine,
     event: BaseEventNode,
     data: CueData | AudioCueData,
+    runEnded?: () => void,
   ): void {
     const token = {}
     this.running.set(event.id, token)
     engine.startExecutionWithCallback(event, data, () => {
+      runEnded?.()
       if (this.running.get(event.id) !== token) return
       this.running.delete(event.id)
       const next = this.pending.get(event.id)
