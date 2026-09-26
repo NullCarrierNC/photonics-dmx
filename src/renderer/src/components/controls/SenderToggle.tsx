@@ -19,7 +19,10 @@ export interface SenderToggleProps {
   prefsFlag: keyof OutputConfig
   /** Builds the enable call, which carries whatever configuration this sender needs. */
   enable: () => Promise<unknown> | unknown
-  /** Blocks the switch when this sender is not configured well enough to start. */
+  /**
+   * Holds the switch off while this sender is not configured well enough to start. A running
+   * sender can still be switched off.
+   */
   notReady?: boolean
   disabled?: boolean
   compact?: boolean
@@ -63,7 +66,7 @@ const SenderToggle: React.FC<SenderToggleProps> = ({
         label={label}
         checked={isRunning}
         onToggle={handleToggle}
-        disabled={notReady || disabled || inFlight}
+        disabled={(notReady && !isRunning) || disabled || inFlight}
         compact={compact}
       />
       <RoutedRigsHint senderId={senderId} compact={compact} />
