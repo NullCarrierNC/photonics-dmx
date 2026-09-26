@@ -1,7 +1,8 @@
 /**
- * Brings a parsed cue or effect file that an older build wrote onto what this build accepts, before
- * validation: a retired blend mode reads as replace, an unknown easing as the default, a variable name
- * the editor once accepted is renamed with every use of it, and an initial value takes its type.
+ * Brings a parsed cue or effect file an older build wrote onto what this build accepts, before
+ * validation: a cue with no kind reads as lighting, a retired blend mode as replace, an unknown
+ * easing as the default, an unused wait count is dropped, a variable name the editor once accepted
+ * is renamed with every use of it, and an initial value takes its type.
  */
 import { VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { VariableType } from '../../types/nodeCueTypes'
@@ -65,6 +66,14 @@ function actionsOf(graphs: readonly JsonObject[]): { action: JsonObject; graph: 
   })
 }
 
+/** Builds before v0.5.3 stored a cue with no kind, and every cue they had was a lighting cue. */
+function defaultCueKinds(file: JsonObject): string | null {
+  const cues = Array.isArray(file.cues) ? file.cues.filter(isObject) : []
+  const changed = cues.filter((cue) => !('kind' in cue))
+  for (const cue of changed) cue.kind = 'lighting'
+  return changed.length > 0 ? 'Cues stored with no kind now read as lighting cues.' : null
+}
+
 function retireBlendModes(graphs: readonly JsonObject[]): string | null {
   const changed = new Set<string>()
   for (const { action, graph } of actionsOf(graphs)) {
@@ -109,6 +118,37 @@ function replaceUnknownEasings(graphs: readonly JsonObject[]): string | null {
   }
   return changed.size > 0
     ? `Unknown easing ${[...values].join(', ')} in ${[...changed].join(', ')} now reads ${DEFAULT_EASING}.`
+    : null
+}
+
+/** Each wait condition field, with the field that counts how many times it must fire. */
+const COUNTED_WAITS = [
+  ['waitForCondition', 'waitForConditionCount'],
+  ['waitUntilCondition', 'waitUntilConditionCount'],
+] as const
+
+/**
+ * A wait with no condition never counts, so a count below one on it is dropped. The Stage Kit
+ * library the v0.4 builds shipped stored a count of 0 there.
+ */
+function dropUncountedWaitCounts(graphs: readonly JsonObject[]): string | null {
+  const changed = new Set<string>()
+  for (const { action, graph } of actionsOf(graphs)) {
+    const timing = isObject(action.timing) ? action.timing : null
+    if (!timing) continue
+    for (const [conditionField, countField] of COUNTED_WAITS) {
+      const condition = timing[conditionField]
+      const count = timing[countField]
+      if (!isObject(condition) || condition.source !== 'literal' || condition.value !== 'none') {
+        continue
+      }
+      if (!isObject(count) || count.source !== 'literal' || Number(count.value) >= 1) continue
+      delete timing[countField]
+      changed.add(graph)
+    }
+  }
+  return changed.size > 0
+    ? `A wait count below one on a wait with no condition in ${[...changed].join(', ')} is dropped.`
     : null
 }
 
@@ -235,8 +275,10 @@ export function migrateOlderNodeFile(file: unknown): string[] {
   if (!isObject(file)) return []
   const graphs = graphsOf(file)
   return [
+    defaultCueKinds(file),
     retireBlendModes(graphs),
     replaceUnknownEasings(graphs),
+    dropUncountedWaitCounts(graphs),
     renameVariables(file, graphs),
     conformInitialValues(declarationsOf(file, graphs)),
   ].filter((note): note is string => note !== null)

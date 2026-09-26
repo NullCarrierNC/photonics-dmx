@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "data": {
+    "effectDebounce": 100,
+    "complex": true,
+    "enabledCueGroups": ["stagekit", "yarg-alt1"],
+    "cueConsistencyWindow": 60000,
+    "clockRate": 10,
+    "brightness": {
+      "low": 40,
+      "medium": 100,
+      "high": 180,
+      "max": 255
+    },
+    "dmxOutputConfig": {
+      "sacnEnabled": true,
+      "artNetEnabled": false,
+      "enttecProEnabled": false
+    },
+    "sacnConfig": {
+      "universe": 1,
+      "useUnicast": false,
+      "unicastDestination": ""
+    },
+    "stageKitPrefs": {
+      "yargPriority": "prefer-for-tracked"
+    },
+    "dmxSettingsPrefs": {
+      "artNetExpanded": false,
+      "enttecProExpanded": false,
+      "sacnExpanded": false
+    }
+  }
+}

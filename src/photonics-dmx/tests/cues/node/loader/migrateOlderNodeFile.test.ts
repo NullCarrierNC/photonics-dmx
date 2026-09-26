@@ -18,6 +18,7 @@ describe('migrateOlderNodeFile', () => {
         {
           id: 'c1',
           name: 'One',
+          kind: 'lighting',
           variables: [variable('beat-count'), variable('beat_count'), variable('2x')],
           nodes: {
             events: [],
@@ -117,6 +118,67 @@ describe('migrateOlderNodeFile', () => {
       { source: 'variable', name: 'curve' },
     ])
     expect(notes).toEqual(["Unknown easing 'sin-out', 'bounce' in 'Swell' now reads sinInOut."])
+  })
+
+  it('reads a cue stored with no kind as a lighting cue', () => {
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        { id: 'c1', name: 'One', cueType: 'Intro', nodes: {} },
+        { id: 'c2', name: 'Two', kind: 'motion', cueType: 'Sweep', nodes: {} },
+        { id: 'c3', name: 'Three', kind: 'lighting', cueType: 'Verse', nodes: {} },
+      ],
+    }
+
+    const notes = migrateOlderNodeFile(file)
+
+    expect(file.cues.map((cue) => cue.kind)).toEqual(['lighting', 'motion', 'lighting'])
+    expect(notes).toEqual(['Cues stored with no kind now read as lighting cues.'])
+  })
+
+  it('drops a wait count below one from a wait with no condition', () => {
+    const lit = (value: unknown) => ({ source: 'literal', value })
+    const file = {
+      cues: [
+        {
+          id: 'c1',
+          name: 'Stomp',
+          kind: 'lighting',
+          nodes: {
+            actions: [
+              {
+                id: 'a1',
+                timing: {
+                  waitForCondition: lit('none'),
+                  waitForConditionCount: lit(0),
+                  waitUntilCondition: lit('none'),
+                  waitUntilConditionCount: lit(0),
+                },
+              },
+              {
+                id: 'a2',
+                timing: { waitUntilCondition: lit('beat'), waitUntilConditionCount: lit(0) },
+              },
+              {
+                id: 'a3',
+                timing: { waitUntilCondition: lit('none'), waitUntilConditionCount: lit(2) },
+              },
+            ],
+          },
+        },
+      ],
+    }
+
+    const notes = migrateOlderNodeFile(file)
+
+    expect(file.cues[0].nodes.actions.map((a) => a.timing)).toEqual([
+      { waitForCondition: lit('none'), waitUntilCondition: lit('none') },
+      { waitUntilCondition: lit('beat'), waitUntilConditionCount: lit(0) },
+      { waitUntilCondition: lit('none'), waitUntilConditionCount: lit(2) },
+    ])
+    expect(notes).toEqual([
+      "A wait count below one on a wait with no condition in 'Stomp' is dropped.",
+    ])
   })
 
   it('changes nothing in a file already on the current rules', () => {

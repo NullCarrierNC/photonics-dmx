@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "data": {
+    "numLights": 3,
+    "lightLayout": {
+      "id": "front-back",
+      "label": "Front and Back (back lights behind audience)"
+    },
+    "strobeType": "Dedicated",
+    "frontLights": [
+      {
+        "id": "eece8fd6-3f97-4e7a-af6e-e906a3d85aed",
+        "fixtureId": "788447fe-af09-43b9-bdf8-1ada8c2a4166",
+        "position": 1,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "masterDimmer": 1
+        },
+        "mount": "floor"
+      },
+      {
+        "id": "57c41374-665b-43e7-b4f0-136aaa2a733d",
+        "fixtureId": "af2e8400-0c76-48ce-8b60-41545c95630b",
+        "position": 2,
+        "fixture": "rgb/mh",
+        "label": "An RGB Light",
+        "name": "Spot",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "red": 12,
+          "green": 13,
+          "blue": 14,
+          "masterDimmer": 11,
+          "pan": 15,
+          "tilt": 16
+        },
+        "config": {
+          "panHome": 50,
+          "panMin": 0,
+          "panMax": 255,
+          "panRangeDeg": 540,
+          "panDirectionCW": true,
+          "panStageDeg": 270,
+          "tiltHome": 50,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "tiltRangeDeg": 180,
+          "tiltStageDeg": 90,
+          "invertPan": false,
+          "invertTilt": false
+        },
+        "mount": "floor"
+      }
+    ],
+    "backLights": [
+      {
+        "id": "041c7c96-8e23-4d5f-926e-78c10e822f9e",
+        "fixtureId": "803511a3-b8fe-4c3c-a956-551e9f8aa807",
+        "position": 3,
+        "fixture": "strobe",
+        "label": "An RGB Light",
+        "name": "Strobe",
+        "isStrobeEnabled": false,
+        "group": "back",
+        "channels": {
+          "masterDimmer": 21,
+          "strobeChannel": 22
+        },
+        "mount": "floor"
+      }
+    ],
+    "strobeLights": [
+      {
+        "id": "526accdd-41b9-4487-825f-517679c66b98",
+        "fixtureId": "7f7cc25d-0e1b-414c-af7e-3d2290f26b25",
+        "position": 4,
+        "fixture": "strobe",
+        "label": "An RGB Light",
+        "name": "PAR S",
+        "isStrobeEnabled": true,
+        "group": "strobe",
+        "channels": {
+          "red": 32,
+          "green": 33,
+          "blue": 34,
+          "masterDimmer": 31,
+          "strobeChannel": 35
+        },
+        "mount": "floor"
+      }
+    ]
+  }
+}

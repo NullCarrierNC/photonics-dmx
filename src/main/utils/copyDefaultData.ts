@@ -13,7 +13,8 @@ const COPYFILE_EXCL = fs.constants.COPYFILE_EXCL
  * JSON: writes when the destination is missing. If it exists and `bundled` is true, overwrites when
  * the bundled `cueVersion` is greater than the on-disk value (missing `cueVersion` is treated as 0)
  * and keeps a copy of the file it replaces. JSON with `bundled` not true is never overwritten.
- * Non-JSON files copy only when missing.
+ * Non-JSON files copy only when missing. A seeded JSON file this build does not ship is set aside in
+ * the folder it was seeded into, see retireUnshippedFiles.
  * In development, source is resources/defaults in the project;
  * in production, source is process.resourcesPath/defaults.
  */
@@ -82,8 +83,49 @@ async function keepReplacedFile(filePath: string, version: number): Promise<bool
   }
 }
 
+/**
+ * Set aside each seeded JSON file in `destDir` that the build does not ship, named
+ * `<name>.retired-<time>`. Only files still carrying the shipped marker go, so a file the user has
+ * made theirs stays, and the copy keeps any hand edits to one that has not.
+ */
+async function retireUnshippedFiles(destDir: string, shipped: ReadonlySet<string>): Promise<void> {
+  const entries = await fs.readdir(destDir, { withFileTypes: true }).catch(() => [])
+  for (const entry of entries) {
+    const name = entry.name
+    if (!entry.isFile() || !name.toLowerCase().endsWith('.json') || shipped.has(name)) continue
+    const filePath = path.join(destDir, name)
+    let data: unknown
+    try {
+      data = JSON.parse(await fs.readFile(filePath, 'utf-8'))
+    } catch {
+      continue
+    }
+    if (
+      typeof data !== 'object' ||
+      data === null ||
+      !('bundled' in data) ||
+      data.bundled !== true
+    ) {
+      continue
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const retiredName = `${filePath}.retired-${stamp}`
+    try {
+      await fs.rename(filePath, retiredName)
+      log.info(`Retired ${filePath}, which this build no longer ships, as ${retiredName}`)
+    } catch (err) {
+      log.error(`Could not retire ${filePath}, which this build no longer ships:`, err)
+    }
+  }
+}
+
 async function copyDirectory(sourceDir: string, destBase: string): Promise<void> {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true })
+  const shippedJson = new Set(
+    entries
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'))
+      .map((entry) => entry.name),
+  )
 
   for (const entry of entries) {
     const sourcePath = path.join(sourceDir, entry.name)
@@ -166,5 +208,11 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
         }
       }
     }
+  }
+
+  // Retire only in a folder this build seeds files into. The app data root holds none, so the
+  // settings files there are never read here.
+  if (shippedJson.size > 0) {
+    await retireUnshippedFiles(destBase, shippedJson)
   }
 }

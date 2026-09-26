@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "data": {
+    "numLights": 3,
+    "lightLayout": {
+      "id": "front-back",
+      "label": "Front and Back"
+    },
+    "strobeType": "Dedicated",
+    "frontLights": [
+      {
+        "id": "a042ed7c-2c3f-4ae6-bfca-c4dd87490507",
+        "fixtureId": "96182eb3-a576-4d72-a4cc-87bb7b8de849",
+        "position": 1,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      },
+      {
+        "id": "f694a1a3-4315-485f-8110-dbca565df698",
+        "fixtureId": "4daf62ed-bcab-4c72-85d7-a9f585c52641",
+        "position": 2,
+        "fixture": "rgbw/mh",
+        "label": "An RGB Light",
+        "name": "Spot",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "masterDimmer": 11,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "white": 5,
+          "pan": 6,
+          "tilt": 7
+        },
+        "config": {
+          "panHome": 0,
+          "panMin": 0,
+          "panMax": 255,
+          "tiltHome": 0,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "invert": false
+        }
+      }
+    ],
+    "backLights": [
+      {
+        "id": "ef36ac1c-7960-420f-b62d-d17fc9b851c1",
+        "fixtureId": "96182eb3-a576-4d72-a4cc-87bb7b8de849",
+        "position": 3,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "back",
+        "channels": {
+          "masterDimmer": 21,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ],
+    "strobeLights": [
+      {
+        "id": "03790204-ec30-4313-bdb3-1262bdcdddb6",
+        "fixtureId": "96182eb3-a576-4d72-a4cc-87bb7b8de849",
+        "position": 4,
+        "fixture": "strobe",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": true,
+        "group": "strobe",
+        "channels": {
+          "masterDimmer": 31,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ]
+  }
+}

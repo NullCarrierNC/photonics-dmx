@@ -1,0 +1,1570 @@
+{
+  "version": 1,
+  "cueVersion": 1,
+  "mode": "rb3",
+  "group": {
+    "id": "rb3-mirror-blended",
+    "name": "RB3 Mirror Blended",
+    "description": "Mirrored StageKit colours with the rear LED data blended additively onto the matching front light."
+  },
+  "cues": [
+    {
+      "id": "cue-rb3-mirror-blended",
+      "name": "Mirror Blended",
+      "description": "Mirrored StageKit colours with the rear LED data blended additively onto the matching front light.",
+      "cueType": "RB3",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-mirrorb-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "rb3-mirrorb-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-mirrorb-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "rb3-mirrorb-red-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colRed"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layRed"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-red-over-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "overColRed"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "overLayRed"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-green-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colGreen"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layGreen"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-green-over-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "overColGreen"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "overLayGreen"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-blue-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colBlue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layBlue"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-blue-over-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "overColBlue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "overLayBlue"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-yellow-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colYellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layYellow"
+            }
+          },
+          {
+            "id": "rb3-mirrorb-yellow-over-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "overColYellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "overLayYellow"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "rb3-mirrorb-ring",
+            "type": "logic",
+            "logicType": "build-ring",
+            "assignTo": "ringLights",
+            "assignGroupSize": "ringGroupSize"
+          },
+          {
+            "id": "rb3-mirrorb-cd-red",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-red-states",
+            "assignTo": "mRed"
+          },
+          {
+            "id": "rb3-mirrorb-cd-green",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-green-states",
+            "assignTo": "mGreen"
+          },
+          {
+            "id": "rb3-mirrorb-cd-blue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-blue-states",
+            "assignTo": "mBlue"
+          },
+          {
+            "id": "rb3-mirrorb-cd-yellow",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-yellow-states",
+            "assignTo": "mYellow"
+          },
+          {
+            "id": "rb3-mirrorb-each",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "ringLights",
+            "currentLightVariable": "curCell",
+            "currentIndexVariable": "j"
+          },
+          {
+            "id": "rb3-mirrorb-jg",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "j / ringGroupSize",
+            "assignTo": "jg"
+          },
+          {
+            "id": "rb3-mirrorb-cell",
+            "type": "logic",
+            "logicType": "select-from-list",
+            "list": [0, 1, 2, 3, 4, 5, 6, 7],
+            "index": {
+              "source": "variable",
+              "name": "jg"
+            },
+            "assignTo": "cellIdx"
+          },
+          {
+            "id": "rb3-mirrorb-led",
+            "type": "logic",
+            "logicType": "select-from-list",
+            "list": [0, 1, 2, 3, 3, 2, 1, 0],
+            "index": {
+              "source": "variable",
+              "name": "jg"
+            },
+            "assignTo": "ledIdx"
+          },
+          {
+            "id": "rb3-mirrorb-red-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mRed / pow(2, ledIdx)) % 2",
+            "assignTo": "bitRed"
+          },
+          {
+            "id": "rb3-mirrorb-red-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "red"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitRed"
+            },
+            "assignTo": "colRed"
+          },
+          {
+            "id": "rb3-mirrorb-red-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "10 + cellIdx",
+            "assignTo": "layRed"
+          },
+          {
+            "id": "rb3-mirrorb-red-over-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mRed / pow(2, 7 - cellIdx)) % 2 * clamp(4 - cellIdx, 0, 1)",
+            "assignTo": "overRed"
+          },
+          {
+            "id": "rb3-mirrorb-red-over-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "red"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "overRed"
+            },
+            "assignTo": "overColRed"
+          },
+          {
+            "id": "rb3-mirrorb-red-over-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "50 + cellIdx",
+            "assignTo": "overLayRed"
+          },
+          {
+            "id": "rb3-mirrorb-green-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mGreen / pow(2, ledIdx)) % 2",
+            "assignTo": "bitGreen"
+          },
+          {
+            "id": "rb3-mirrorb-green-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "green"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitGreen"
+            },
+            "assignTo": "colGreen"
+          },
+          {
+            "id": "rb3-mirrorb-green-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "20 + cellIdx",
+            "assignTo": "layGreen"
+          },
+          {
+            "id": "rb3-mirrorb-green-over-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mGreen / pow(2, 7 - cellIdx)) % 2 * clamp(4 - cellIdx, 0, 1)",
+            "assignTo": "overGreen"
+          },
+          {
+            "id": "rb3-mirrorb-green-over-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "green"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "overGreen"
+            },
+            "assignTo": "overColGreen"
+          },
+          {
+            "id": "rb3-mirrorb-green-over-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "60 + cellIdx",
+            "assignTo": "overLayGreen"
+          },
+          {
+            "id": "rb3-mirrorb-blue-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mBlue / pow(2, ledIdx)) % 2",
+            "assignTo": "bitBlue"
+          },
+          {
+            "id": "rb3-mirrorb-blue-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "blue"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitBlue"
+            },
+            "assignTo": "colBlue"
+          },
+          {
+            "id": "rb3-mirrorb-blue-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "30 + cellIdx",
+            "assignTo": "layBlue"
+          },
+          {
+            "id": "rb3-mirrorb-blue-over-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mBlue / pow(2, 7 - cellIdx)) % 2 * clamp(4 - cellIdx, 0, 1)",
+            "assignTo": "overBlue"
+          },
+          {
+            "id": "rb3-mirrorb-blue-over-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "blue"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "overBlue"
+            },
+            "assignTo": "overColBlue"
+          },
+          {
+            "id": "rb3-mirrorb-blue-over-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "70 + cellIdx",
+            "assignTo": "overLayBlue"
+          },
+          {
+            "id": "rb3-mirrorb-yellow-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mYellow / pow(2, ledIdx)) % 2",
+            "assignTo": "bitYellow"
+          },
+          {
+            "id": "rb3-mirrorb-yellow-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "yellow"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitYellow"
+            },
+            "assignTo": "colYellow"
+          },
+          {
+            "id": "rb3-mirrorb-yellow-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "40 + cellIdx",
+            "assignTo": "layYellow"
+          },
+          {
+            "id": "rb3-mirrorb-yellow-over-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mYellow / pow(2, 7 - cellIdx)) % 2 * clamp(4 - cellIdx, 0, 1)",
+            "assignTo": "overYellow"
+          },
+          {
+            "id": "rb3-mirrorb-yellow-over-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "yellow"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "overYellow"
+            },
+            "assignTo": "overColYellow"
+          },
+          {
+            "id": "rb3-mirrorb-yellow-over-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "80 + cellIdx",
+            "assignTo": "overLayYellow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": [
+          {
+            "id": "rb3-mirrorb-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Mirror plus the rear data",
+            "style": "notes",
+            "note": "The base layer is the Mirror look: ring cells 0-3 (the front row) show LEDs 1-4 and cells 4-7 (the back row) repeat their mirrored front partner. On top of that, each FRONT light also receives its partner's rear LED with blend 'add', so front light 1 carries LED 1 plus LED 8, front light 2 carries LED 2 plus LED 7, and so on."
+          },
+          {
+            "id": "rb3-mirrorb-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Layer bands",
+            "style": "notes",
+            "note": "Mirror lights draw on the low per-bank bands (red 10, green 20, blue 30, yellow 40, plus the ring cell) and the rear overlay draws higher (red 50, green 60, blue 70, yellow 80, plus the ring cell), all with blend 'add' over the black floor on layer 0."
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "rb3-mirrorb-start",
+          "to": "rb3-mirrorb-ring"
+        },
+        {
+          "from": "rb3-mirrorb-ring",
+          "to": "rb3-mirrorb-black"
+        },
+        {
+          "from": "rb3-mirrorb-called",
+          "to": "rb3-mirrorb-cd-red"
+        },
+        {
+          "from": "rb3-mirrorb-cd-red",
+          "to": "rb3-mirrorb-cd-green"
+        },
+        {
+          "from": "rb3-mirrorb-cd-green",
+          "to": "rb3-mirrorb-cd-blue"
+        },
+        {
+          "from": "rb3-mirrorb-cd-blue",
+          "to": "rb3-mirrorb-cd-yellow"
+        },
+        {
+          "from": "rb3-mirrorb-cd-yellow",
+          "to": "rb3-mirrorb-each"
+        },
+        {
+          "from": "rb3-mirrorb-each",
+          "to": "rb3-mirrorb-jg",
+          "fromPort": "each"
+        },
+        {
+          "from": "rb3-mirrorb-jg",
+          "to": "rb3-mirrorb-cell"
+        },
+        {
+          "from": "rb3-mirrorb-cell",
+          "to": "rb3-mirrorb-led"
+        },
+        {
+          "from": "rb3-mirrorb-led",
+          "to": "rb3-mirrorb-red-bit"
+        },
+        {
+          "from": "rb3-mirrorb-red-bit",
+          "to": "rb3-mirrorb-red-col"
+        },
+        {
+          "from": "rb3-mirrorb-red-col",
+          "to": "rb3-mirrorb-red-lay"
+        },
+        {
+          "from": "rb3-mirrorb-red-lay",
+          "to": "rb3-mirrorb-red-act"
+        },
+        {
+          "from": "rb3-mirrorb-red-act",
+          "to": "rb3-mirrorb-red-over-bit"
+        },
+        {
+          "from": "rb3-mirrorb-red-over-bit",
+          "to": "rb3-mirrorb-red-over-col"
+        },
+        {
+          "from": "rb3-mirrorb-red-over-col",
+          "to": "rb3-mirrorb-red-over-lay"
+        },
+        {
+          "from": "rb3-mirrorb-red-over-lay",
+          "to": "rb3-mirrorb-red-over-act"
+        },
+        {
+          "from": "rb3-mirrorb-red-over-act",
+          "to": "rb3-mirrorb-green-bit"
+        },
+        {
+          "from": "rb3-mirrorb-green-bit",
+          "to": "rb3-mirrorb-green-col"
+        },
+        {
+          "from": "rb3-mirrorb-green-col",
+          "to": "rb3-mirrorb-green-lay"
+        },
+        {
+          "from": "rb3-mirrorb-green-lay",
+          "to": "rb3-mirrorb-green-act"
+        },
+        {
+          "from": "rb3-mirrorb-green-act",
+          "to": "rb3-mirrorb-green-over-bit"
+        },
+        {
+          "from": "rb3-mirrorb-green-over-bit",
+          "to": "rb3-mirrorb-green-over-col"
+        },
+        {
+          "from": "rb3-mirrorb-green-over-col",
+          "to": "rb3-mirrorb-green-over-lay"
+        },
+        {
+          "from": "rb3-mirrorb-green-over-lay",
+          "to": "rb3-mirrorb-green-over-act"
+        },
+        {
+          "from": "rb3-mirrorb-green-over-act",
+          "to": "rb3-mirrorb-blue-bit"
+        },
+        {
+          "from": "rb3-mirrorb-blue-bit",
+          "to": "rb3-mirrorb-blue-col"
+        },
+        {
+          "from": "rb3-mirrorb-blue-col",
+          "to": "rb3-mirrorb-blue-lay"
+        },
+        {
+          "from": "rb3-mirrorb-blue-lay",
+          "to": "rb3-mirrorb-blue-act"
+        },
+        {
+          "from": "rb3-mirrorb-blue-act",
+          "to": "rb3-mirrorb-blue-over-bit"
+        },
+        {
+          "from": "rb3-mirrorb-blue-over-bit",
+          "to": "rb3-mirrorb-blue-over-col"
+        },
+        {
+          "from": "rb3-mirrorb-blue-over-col",
+          "to": "rb3-mirrorb-blue-over-lay"
+        },
+        {
+          "from": "rb3-mirrorb-blue-over-lay",
+          "to": "rb3-mirrorb-blue-over-act"
+        },
+        {
+          "from": "rb3-mirrorb-blue-over-act",
+          "to": "rb3-mirrorb-yellow-bit"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-bit",
+          "to": "rb3-mirrorb-yellow-col"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-col",
+          "to": "rb3-mirrorb-yellow-lay"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-lay",
+          "to": "rb3-mirrorb-yellow-act"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-act",
+          "to": "rb3-mirrorb-yellow-over-bit"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-over-bit",
+          "to": "rb3-mirrorb-yellow-over-col"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-over-col",
+          "to": "rb3-mirrorb-yellow-over-lay"
+        },
+        {
+          "from": "rb3-mirrorb-yellow-over-lay",
+          "to": "rb3-mirrorb-yellow-over-act"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-mirrorb-start": {
+            "x": 3.5846357848495245,
+            "y": -1.2213180251419544
+          },
+          "rb3-mirrorb-called": {
+            "x": 267.6378573682159,
+            "y": -7.9597079157829285
+          },
+          "rb3-mirrorb-black": {
+            "x": 6.402890380471945,
+            "y": 221.10488744825125
+          },
+          "rb3-mirrorb-red-act": {
+            "x": 601.8857146444566,
+            "y": 215.62731598623418
+          },
+          "rb3-mirrorb-red-over-act": {
+            "x": 640.675359396264,
+            "y": 692.5645407065749
+          },
+          "rb3-mirrorb-green-act": {
+            "x": 1044.5338326971978,
+            "y": 4.5964153334498405
+          },
+          "rb3-mirrorb-green-over-act": {
+            "x": 1043.8325092922896,
+            "y": 477.00927859917283
+          },
+          "rb3-mirrorb-blue-act": {
+            "x": 1045.47424678877,
+            "y": 942.6119720600545
+          },
+          "rb3-mirrorb-blue-over-act": {
+            "x": 1420.9774138275534,
+            "y": 211.307776812464
+          },
+          "rb3-mirrorb-yellow-act": {
+            "x": 1430.2410910278559,
+            "y": 686.0141841508448
+          },
+          "rb3-mirrorb-yellow-over-act": {
+            "x": 1822.4860212448984,
+            "y": -6.724518343806267
+          },
+          "rb3-mirrorb-ring": {
+            "x": 2.1900340877473354,
+            "y": 92.78842483088374
+          },
+          "rb3-mirrorb-cd-red": {
+            "x": 250.72806284204125,
+            "y": 96.2367454469204
+          },
+          "rb3-mirrorb-cd-green": {
+            "x": 261.8485528435558,
+            "y": 212.22184563055634
+          },
+          "rb3-mirrorb-cd-blue": {
+            "x": 260.45239497348666,
+            "y": 371.9895866289735
+          },
+          "rb3-mirrorb-cd-yellow": {
+            "x": 263.18987849354744,
+            "y": 479.0099838785827
+          },
+          "rb3-mirrorb-each": {
+            "x": 261.39912217482924,
+            "y": 595.0901933461428
+          },
+          "rb3-mirrorb-jg": {
+            "x": 268.4035803657025,
+            "y": 733.7486577741802
+          },
+          "rb3-mirrorb-cell": {
+            "x": 260.9443178009242,
+            "y": 832.2828002758324
+          },
+          "rb3-mirrorb-led": {
+            "x": 267.6003334764391,
+            "y": 940.2940309457481
+          },
+          "rb3-mirrorb-red-bit": {
+            "x": 271.4104554541409,
+            "y": 1048.8043646141887
+          },
+          "rb3-mirrorb-red-col": {
+            "x": 658.7971459850669,
+            "y": -7.522058572620153
+          },
+          "rb3-mirrorb-red-lay": {
+            "x": 647.1708227396011,
+            "y": 107.46945351362228
+          },
+          "rb3-mirrorb-red-over-bit": {
+            "x": 640.3143803868443,
+            "y": 362.12987277284265
+          },
+          "rb3-mirrorb-red-over-col": {
+            "x": 678.4737852998078,
+            "y": 471.1917444268862
+          },
+          "rb3-mirrorb-red-over-lay": {
+            "x": 655.1478654034436,
+            "y": 579.6307408958673
+          },
+          "rb3-mirrorb-green-bit": {
+            "x": 658.6907592602074,
+            "y": 834.8169414550066
+          },
+          "rb3-mirrorb-green-col": {
+            "x": 651.0092299468815,
+            "y": 937.536757286638
+          },
+          "rb3-mirrorb-green-lay": {
+            "x": 655.2737638074905,
+            "y": 1055.3468578644097
+          },
+          "rb3-mirrorb-green-over-bit": {
+            "x": 1051.3582994528115,
+            "y": 144.68053256720304
+          },
+          "rb3-mirrorb-green-over-col": {
+            "x": 1094.9754178032758,
+            "y": 264.87105273423845
+          },
+          "rb3-mirrorb-green-over-lay": {
+            "x": 1138.7677800143058,
+            "y": 368.1932345669511
+          },
+          "rb3-mirrorb-blue-bit": {
+            "x": 1050.5329659357667,
+            "y": 612.6859867759049
+          },
+          "rb3-mirrorb-blue-col": {
+            "x": 1073.793941166252,
+            "y": 724.855768956244
+          },
+          "rb3-mirrorb-blue-lay": {
+            "x": 1048.1358471624553,
+            "y": 836.842302877456
+          },
+          "rb3-mirrorb-blue-over-bit": {
+            "x": 1043.0094344243407,
+            "y": 1093.271350942552
+          },
+          "rb3-mirrorb-blue-over-col": {
+            "x": 1432.7537949606776,
+            "y": 0.8766952902078629
+          },
+          "rb3-mirrorb-blue-over-lay": {
+            "x": 1423.4314613975585,
+            "y": 114.63942198082805
+          },
+          "rb3-mirrorb-yellow-bit": {
+            "x": 1433.7791244089603,
+            "y": 369.3354313336313
+          },
+          "rb3-mirrorb-yellow-col": {
+            "x": 1444.3124274963984,
+            "y": 463.9964774890957
+          },
+          "rb3-mirrorb-yellow-lay": {
+            "x": 1501.5056097634774,
+            "y": 585.1489646705747
+          },
+          "rb3-mirrorb-yellow-over-bit": {
+            "x": 1423.7187533415854,
+            "y": 841.6715426184237
+          },
+          "rb3-mirrorb-yellow-over-col": {
+            "x": 1470.0374282758435,
+            "y": 955.3266082108387
+          },
+          "rb3-mirrorb-yellow-over-lay": {
+            "x": 1433.8504454251379,
+            "y": 1053.4077815786004
+          },
+          "rb3-mirrorb-note-1": {
+            "x": 1939.3074792460434,
+            "y": 115.10214669388586
+          },
+          "rb3-mirrorb-note-3": {
+            "x": 1940.6007617931655,
+            "y": 325.8656509424462
+          }
+        },
+        "viewport": {
+          "x": 76.2929407082703,
+          "y": 190.2376196100049,
+          "zoom": 0.6399783709725961
+        }
+      },
+      "variables": [
+        {
+          "name": "ringLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "ringGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "curCell",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "j",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "jg",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "cellIdx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "ledIdx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bitRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colRed",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 10,
+          "isParameter": false
+        },
+        {
+          "name": "overRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "overColRed",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "overLayRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 50,
+          "isParameter": false
+        },
+        {
+          "name": "bitGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colGreen",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 20,
+          "isParameter": false
+        },
+        {
+          "name": "overGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "overColGreen",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "overLayGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 60,
+          "isParameter": false
+        },
+        {
+          "name": "bitBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colBlue",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 30,
+          "isParameter": false
+        },
+        {
+          "name": "overBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "overColBlue",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "overLayBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 70,
+          "isParameter": false
+        },
+        {
+          "name": "bitYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colYellow",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 40,
+          "isParameter": false
+        },
+        {
+          "name": "overYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "overColYellow",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "overLayYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 80,
+          "isParameter": false
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

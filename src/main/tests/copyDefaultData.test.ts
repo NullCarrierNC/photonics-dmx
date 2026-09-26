@@ -15,9 +15,13 @@ function seedSource(files: Record<string, string>): void {
   const dir = path.join(appRoot, 'resources', 'defaults')
   fs.mkdirSync(dir, { recursive: true })
   for (const [name, contents] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true })
     fs.writeFileSync(path.join(dir, name), contents)
   }
 }
+
+const retiredCopies = (dir: string, name: string): string[] =>
+  fs.readdirSync(dir).filter((f) => f.startsWith(`${name}.retired-`))
 
 describe('copyDefaultData', () => {
   let tmp: string
@@ -160,5 +164,49 @@ describe('copyDefaultData', () => {
 
     expect(fs.existsSync(path.join(appData, 'a-cue.json'))).toBe(false)
     expect(fs.existsSync(path.join(appData, 'b-cue.json'))).toBe(true)
+  })
+
+  it('sets aside a seeded file the build does not ship, keeping its bytes', async () => {
+    seedSource({ 'kept.json': JSON.stringify({ cueVersion: 1 }) })
+    const gone = JSON.stringify({ cueVersion: 3, bundled: true, marker: 'edited' })
+    fs.writeFileSync(path.join(appData, 'gone.json'), gone)
+
+    await copyDefaultData(appRoot, appData)
+
+    expect(fs.existsSync(path.join(appData, 'gone.json'))).toBe(false)
+    const [copy] = retiredCopies(appData, 'gone.json')
+    expect(fs.readFileSync(path.join(appData, copy), 'utf-8')).toBe(gone)
+  })
+
+  it("leaves a file that is the user's, unreadable or still shipped", async () => {
+    seedSource({ 'broken.json': '{ this is not json', 'kept.json': JSON.stringify({}) })
+    const files = {
+      'mine.json': JSON.stringify({ bundled: false }),
+      'unmarked.json': JSON.stringify({ group: { id: 'g' } }),
+      'garbled.json': '{ not json',
+      'broken.json': JSON.stringify({ bundled: true }),
+    }
+    for (const [name, contents] of Object.entries(files)) {
+      fs.writeFileSync(path.join(appData, name), contents)
+    }
+
+    await copyDefaultData(appRoot, appData)
+
+    for (const [name, contents] of Object.entries(files)) {
+      expect(fs.readFileSync(path.join(appData, name), 'utf-8')).toBe(contents)
+    }
+    expect(fs.readdirSync(appData).filter((f) => f.includes('.retired-'))).toEqual([])
+  })
+
+  it('retires nothing in a folder the build seeds no files into', async () => {
+    seedSource({ 'cues/kept.json': JSON.stringify({}) })
+    fs.mkdirSync(path.join(appData, 'cues'), { recursive: true })
+    fs.writeFileSync(path.join(appData, 'root.json'), JSON.stringify({ bundled: true }))
+    fs.writeFileSync(path.join(appData, 'cues', 'gone.json'), JSON.stringify({ bundled: true }))
+
+    await copyDefaultData(appRoot, appData)
+
+    expect(fs.existsSync(path.join(appData, 'root.json'))).toBe(true)
+    expect(retiredCopies(path.join(appData, 'cues'), 'gone.json')).toHaveLength(1)
   })
 })
