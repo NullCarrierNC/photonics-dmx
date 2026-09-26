@@ -2,6 +2,7 @@ import type { DmxFixture, DmxLight, DmxRigsConfig, LightingConfiguration } from 
 import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
+  isMovingHead,
   LEGACY_FIXTURE_RGB_STROBE,
   LEGACY_FIXTURE_RGBW,
   LEGACY_FIXTURE_RGBW_MH,
@@ -194,12 +195,8 @@ export function migrateFixtureSchema(fixture: LegacyDmxFixture): {
   }
 }
 
-function isMovingHeadFixture(light: DmxFixture): boolean {
-  return light.fixture === FixtureTypes.RGBMH
-}
-
 function deriveMountFromConfig(light: DmxFixture): 'floor' | 'ceiling' {
-  if (!isMovingHeadFixture(light)) {
+  if (!isMovingHead(light)) {
     return 'floor'
   }
   const c = normalizeFixtureConfig(light.config)

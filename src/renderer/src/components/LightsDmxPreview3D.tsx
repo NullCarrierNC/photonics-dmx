@@ -4,7 +4,12 @@ import { Billboard, Center, Grid, OrbitControls, SpotLight, Text3D } from '@reac
 import helvetikerFontUrl from 'three/examples/fonts/helvetiker_regular.typeface.json?url'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { LightingConfiguration, DmxFixture, ConfigStrobeType } from '../../../photonics-dmx/types'
+import {
+  LightingConfiguration,
+  DmxFixture,
+  ConfigStrobeType,
+  isMovingHead,
+} from '../../../photonics-dmx/types'
 import { getDmxPreviewLightColor } from './dmxPreviewLightColor'
 import {
   panTiltDmxToStageVector,
@@ -15,7 +20,6 @@ import {
   beamPropsEqual,
   bodyPropsEqual,
   fixtureMount,
-  isMovingHead,
   masterDimmer01,
   type FixtureBeamProps,
   type FixtureBodyProps,

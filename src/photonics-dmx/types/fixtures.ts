@@ -243,6 +243,11 @@ export function isSavedFixture(fixture: DmxFixture): fixture is SavedFixture {
   return fixture.id !== null && fixture.id !== ''
 }
 
+/** Whether a fixture is a moving head, which alone carries pan and tilt. */
+export function isMovingHead(fixture: DmxFixture): fixture is RgbMovingHeadFixture {
+  return fixture.fixture === FixtureTypes.RGBMH
+}
+
 /** A rig light: a fixture plus the id of the template it came from. */
 export type DmxLight = DmxFixture & { fixtureId: string }
 
