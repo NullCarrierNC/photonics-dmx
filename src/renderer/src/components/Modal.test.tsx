@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import type { KeyboardEvent, ReactNode } from 'react'
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import Modal, { type ModalProps } from './Modal'
 
@@ -50,6 +50,18 @@ describe('Modal', () => {
   it('leaves focus on a control that took it as the dialog opened', () => {
     open({}, <input aria-label="Name" autoFocus />)
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+  })
+
+  it('takes focus back when a control inside blurs to the page body', async () => {
+    open()
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    name.focus()
+
+    await act(async () => {
+      name.blur()
+    })
+
+    expect(screen.getByRole('dialog')).toHaveFocus()
   })
 
   it('closes on Escape from inside the panel', () => {

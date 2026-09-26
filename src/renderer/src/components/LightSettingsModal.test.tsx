@@ -5,7 +5,7 @@
  * the page decides whether it needs confirming.
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { act, render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FixtureTypes, type RgbFixture } from '../../../photonics-dmx/types'
 import LightSettingsModal from './LightSettingsModal'
 
@@ -72,6 +72,23 @@ describe('LightSettingsModal', () => {
 
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(onCancel).toHaveBeenCalledTimes(3)
+  })
+
+  it('reports a cancel on Escape after Enter commits a channel number', async () => {
+    const onChange = jest.fn()
+    const onCancel = jest.fn()
+    renderModal({ onChange, onCancel })
+    const red = screen.getByRole('spinbutton', { name: 'red:' })
+    red.focus()
+
+    fireEvent.change(red, { target: { value: '7' } })
+    await act(async () => {
+      fireEvent.keyDown(red, { key: 'Enter' })
+    })
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
   it('does not treat a click inside the panel as a dismissal', () => {

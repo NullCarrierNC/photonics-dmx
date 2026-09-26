@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FC, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FC,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 
 const BACKDROP = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
 
@@ -53,6 +61,20 @@ const Modal: FC<ModalProps> = ({
     }
   }, [opener])
 
+  // A control that blurs itself, as a draft field does to commit on Enter, leaves focus on the page
+  // body, out of reach of the panel's keys. Once the blur settles, focus left on the body comes
+  // back to the panel.
+  const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
+    if (event.relatedTarget !== null) {
+      return
+    }
+    queueMicrotask(() => {
+      if (document.activeElement === null || document.activeElement === document.body) {
+        panelRef.current?.focus()
+      }
+    })
+  }
+
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event)
     if (event.defaultPrevented) {
@@ -95,6 +117,7 @@ const Modal: FC<ModalProps> = ({
         tabIndex={-1}
         className={panelClassName}
         onClick={(event) => event.stopPropagation()}
+        onBlur={handleBlur}
         onKeyDown={handleKeyDown}>
         {children}
       </div>
