@@ -5,6 +5,7 @@ import {
   normalizeOpenDmxSpeedHz,
 } from '../../shared/dmxOutputRefresh'
 import { clampSacnUniverse } from '../../shared/sacnUniverse'
+import { isPlainObject } from '../../shared/plainObject'
 import { clampClockRateMs } from '../../shared/clockRate'
 import {
   CUE_DOMAINS,
@@ -333,10 +334,6 @@ export function seedMissingRequiredPrefs(prefs: AppPreferences): AppPreferences 
     seeded[key] = (DEFAULT_PREFERENCES as unknown as Record<string, unknown>)[key]
   }
   return seeded as unknown as AppPreferences
-}
-
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value)
 }
 
 /**

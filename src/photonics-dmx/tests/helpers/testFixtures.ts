@@ -49,6 +49,7 @@ export const strobeFixture = (overrides: Partial<StrobeFixture> = {}): StrobeFix
 
 export const rgbLight = (overrides: Partial<RgbLight> = {}): RgbLight => ({
   ...rgbFixture(),
+  id: fixtureFields.id,
   fixtureId: 'test-fixture-1',
   ...overrides,
 })
@@ -57,12 +58,14 @@ export const rgbMovingHeadLight = (
   overrides: Partial<RgbMovingHeadLight> = {},
 ): RgbMovingHeadLight => ({
   ...rgbMovingHeadFixture(),
+  id: fixtureFields.id,
   fixtureId: 'test-fixture-1',
   ...overrides,
 })
 
 export const strobeLight = (overrides: Partial<StrobeLight> = {}): StrobeLight => ({
   ...strobeFixture(),
+  id: fixtureFields.id,
   fixtureId: 'test-fixture-1',
   ...overrides,
 })

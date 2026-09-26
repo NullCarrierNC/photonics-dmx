@@ -4,7 +4,12 @@ import { Billboard, Center, Grid, OrbitControls, SpotLight, Text3D } from '@reac
 import helvetikerFontUrl from 'three/examples/fonts/helvetiker_regular.typeface.json?url'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { LightingConfiguration, DmxFixture, ConfigStrobeType } from '../../../photonics-dmx/types'
+import {
+  LightingConfiguration,
+  DmxFixture,
+  ConfigStrobeType,
+  isMovingHead,
+} from '../../../photonics-dmx/types'
 import { getDmxPreviewLightColor } from './dmxPreviewLightColor'
 import {
   panTiltDmxToStageVector,
@@ -15,7 +20,6 @@ import {
   beamPropsEqual,
   bodyPropsEqual,
   fixtureMount,
-  isMovingHead,
   masterDimmer01,
   type FixtureBeamProps,
   type FixtureBodyProps,
@@ -347,7 +351,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       const back = [...lightingConfig.backLights].reverse()
       front.forEach((light, i) => {
         out.push({
-          key: `top-${light.id ?? i}`,
+          key: `top-${light.id}`,
           light,
           position: [spreadX(front.length, i), topY, BAR_Z],
           rowKey: 'top',
@@ -356,7 +360,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       })
       back.forEach((light, i) => {
         out.push({
-          key: `bottom-${light.id ?? i}`,
+          key: `bottom-${light.id}`,
           light,
           position: [spreadX(back.length, i), botY, BAR_Z],
           rowKey: 'bottom',
@@ -370,7 +374,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       const back = [...lightingConfig.backLights].reverse()
       front.forEach((light, i) => {
         out.push({
-          key: `front-${light.id ?? i}`,
+          key: `front-${light.id}`,
           light,
           position: [spreadX(front.length, i), 0.2, frontZ],
           rowKey: 'front',
@@ -379,7 +383,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       })
       back.forEach((light, i) => {
         out.push({
-          key: `back-${light.id ?? i}`,
+          key: `back-${light.id}`,
           light,
           position: [spreadX(back.length, i), 0.2, backZ],
           rowKey: 'back',
@@ -463,7 +467,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
           const dim = masterDimmer01(sl, dmxValues)
           const pos: [number, number, number] = [2.4 + (i % 3) * 0.4, 0.35, 2.2]
           return (
-            <group key={sl.id ?? `strobe-${i}`} position={pos}>
+            <group key={sl.id} position={pos}>
               <mesh castShadow>
                 <boxGeometry args={[0.55, 0.28, 0.2]} />
                 <meshStandardMaterial

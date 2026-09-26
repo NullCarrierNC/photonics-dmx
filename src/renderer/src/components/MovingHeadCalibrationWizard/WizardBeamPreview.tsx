@@ -4,7 +4,6 @@
  * Before the stage references are captured the preview can only show motor space, so it draws the
  * uninverted console values. After that it can place the beam on the stage.
  */
-import { FixtureTypes } from '../../../../photonics-dmx/types'
 import type { FixtureConfig, RgbMovingHeadLight } from '../../../../photonics-dmx/types'
 import { getDmxPreviewLightColorCss } from '../dmxPreviewLightColor'
 import { panTiltDmxToSphericalXY, panTiltDmxToWizardMotorSpaceXY } from '../LightsDmxPreview'
@@ -39,10 +38,7 @@ export function WizardBeamPreview({
 
   // Shared with the DMX previews, so added colour channels (white, amber, UV) tint the wizard
   // swatch the same way they tint the stage preview.
-  const bg =
-    light.fixture === FixtureTypes.RGBMH
-      ? getDmxPreviewLightColorCss(light, buffer)
-      : 'rgb(40,40,40)'
+  const bg = getDmxPreviewLightColorCss(light, buffer)
 
   const baseCircleClasses =
     'w-14 h-14 rounded-full flex items-center justify-center text-sm font-semibold shadow-md relative overflow-hidden'

@@ -1,7 +1,8 @@
 import equal from 'fast-deep-equal'
-import type { DmxFixture, DmxLight, DmxRig } from '../types'
+import { isSavedFixture, type DmxFixture, type DmxLight, type DmxRig } from '../types'
 import { isStorableBrightnessScale } from './brightnessScaling'
 import { loadDmxFixture, loadDmxLight, parseFixtureList, type FixtureFault } from './fixtureParsing'
+import { isPlainObject } from '../../shared/plainObject'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -31,10 +32,6 @@ const defaultMakeId = (): string => globalThis.crypto.randomUUID()
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Compare two templates ignoring instance-only fields (`id`, `position`); JSON-normalized so an
@@ -73,7 +70,7 @@ export function mapLightsToNewIdsForSave(
   makeId: () => string = defaultMakeId,
 ): DmxLight[] {
   return lights.map((light) => {
-    const originalId = light.id ?? makeId()
+    const originalId = light.id
     if (!idMap[originalId]) {
       idMap[originalId] = makeId()
     }
@@ -110,9 +107,7 @@ export function collectReferencedTemplates(
   rig: DmxRig,
   allTemplates: DmxFixture[],
 ): { templates: DmxFixture[]; missingFixtureIds: string[] } {
-  const byId = new Map(
-    allTemplates.filter((t) => t.id != null).map((t) => [t.id as string, t] as const),
-  )
+  const byId = new Map(allTemplates.filter(isSavedFixture).map((t) => [t.id, t] as const))
   const seen = new Set<string>()
   const missing = new Set<string>()
   const templates: DmxFixture[] = []
@@ -251,9 +246,7 @@ export function reconcileImportedTemplates(
   opts: { makeId?: () => string } = {},
 ): { templatesToAdd: DmxFixture[]; fixtureIdMap: Record<string, string>; reusedCount: number } {
   const makeId = opts.makeId ?? defaultMakeId
-  const existingById = new Map(
-    existing.filter((t) => t.id != null).map((t) => [t.id as string, t] as const),
-  )
+  const existingById = new Map(existing.filter(isSavedFixture).map((t) => [t.id, t] as const))
   // Content-match pool grows with templates we add, so two equal imported templates collapse to one.
   const matchPool: DmxFixture[] = [...existing]
 

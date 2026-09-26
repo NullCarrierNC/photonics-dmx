@@ -38,6 +38,9 @@ export type ConfigFileHooks<T> = {
    * persisted. Use to seed shape additions (e.g. new required keys) so a same-version file that
    * predates them passes validation instead of triggering corrupt-recovery.
    *
+   * `data` is typed T but not yet checked, so a hook tests any shape it relies on. `validate` is
+   * the check that follows.
+   *
    * `reportRepair` tells the corrupt-recovery hook that stored values were put back to their
    * defaults, or that keys were dropped, with a message naming them. It is passed on only once the
    * repaired data passes `validate`, since a file that fails is set aside whole.
@@ -291,6 +294,7 @@ export class ConfigFile<T> {
       if (envelope.versioned) {
         data = envelope.data
       } else {
+        // Unchecked like the versioned data above: `validate` below is the check.
         data = envelope.raw as T
       }
       if (version < this.currentVersion) {

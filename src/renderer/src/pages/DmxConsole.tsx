@@ -255,9 +255,6 @@ const DmxConsole: React.FC = () => {
     previousChannel: number,
     newChannel: number,
   ): CommitOutcome => {
-    if (light.id === null) {
-      return
-    }
     const clamped = Math.max(1, Math.min(512, Math.round(newChannel)))
     if (clamped === previousChannel) {
       return
@@ -311,7 +308,7 @@ const DmxConsole: React.FC = () => {
     const cardInactive = !consoleEnabled
     return (
       <div
-        key={light.id ?? `light-${light.position}`}
+        key={light.id}
         aria-disabled={cardInactive}
         className={`p-3 border rounded-lg mb-3 transition-[opacity,box-shadow,background-color,border-color] duration-200 ${
           modified ? 'border-l-4 border-l-amber-400 dark:border-l-amber-500 ' : ''
@@ -358,7 +355,7 @@ const DmxConsole: React.FC = () => {
                     value={channelNumber}
                     min={1}
                     max={512}
-                    disabled={!consoleEnabled || light.id === null}
+                    disabled={!consoleEnabled}
                     onCommit={(channel) =>
                       handleChannelNumberCommit(light, channelName, channelNumber, channel)
                     }

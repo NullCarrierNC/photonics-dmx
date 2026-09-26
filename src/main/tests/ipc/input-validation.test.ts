@@ -482,6 +482,30 @@ describe('inputValidation', () => {
     ])('rejects an invalid %s of %p', (field, value) => {
       expect(validateLightingConfiguration({ ...validPayload, [field]: value }).ok).toBe(false)
     })
+
+    it.each([
+      ['a null id', { id: null }],
+      ['an empty id', { id: '' }],
+    ])('refuses a rig light with %s', (_label, fields) => {
+      const light = {
+        id: 'l1',
+        fixtureId: 'tpl-1',
+        position: 1,
+        fixture: 'rgb',
+        label: 'RGB',
+        name: 'RGB',
+        isStrobeEnabled: false,
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+      }
+      expect(validateLightingConfiguration({ ...validPayload, frontLights: [light] }).ok).toBe(true)
+
+      const result = validateLightingConfiguration({
+        ...validPayload,
+        frontLights: [{ ...light, ...fields }],
+      })
+
+      expect(result.ok).toBe(false)
+    })
   })
 
   describe('validateStringUnion', () => {

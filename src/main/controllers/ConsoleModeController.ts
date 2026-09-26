@@ -7,6 +7,7 @@ import {
   FixtureTypes,
   FixtureConfig,
   clampMergeMovingHeadFixtureConfig,
+  fixtureConfigFieldsOutOfRange,
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import { createLogger } from '../../shared/logger'
@@ -174,6 +175,13 @@ export class ConsoleModeController {
     }
 
     const baseConfig = normalizeFixtureConfig(light.config)
+    const outOfRange = new Set([
+      ...fixtureConfigFieldsOutOfRange(baseConfig, patch),
+      ...fixtureConfigFieldsOutOfRange(normalizeFixtureConfig(fixture.config), patch),
+    ])
+    if (outOfRange.size > 0) {
+      return { success: false, error: `Out of range: ${[...outOfRange].join(', ')}` }
+    }
     const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
     const updatedLight: DmxLight = { ...light, config: newConfig }
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)

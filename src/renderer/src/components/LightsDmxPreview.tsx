@@ -6,9 +6,8 @@ import { FaUser } from 'react-icons/fa'
 import {
   LightingConfiguration,
   DmxFixture,
-  FixtureTypes,
   ConfigStrobeType,
-  type RgbMovingHeadFixture,
+  isMovingHead,
 } from '../../../photonics-dmx/types'
 import { panTiltDmxToSphericalXY } from './lightsDmxPreviewMath'
 import {
@@ -128,9 +127,6 @@ const LightChannelSwatches: React.FC<{ entries: ChannelBreakdownEntry[] }> = ({ 
     ))}
   </div>
 )
-
-const isMovingHead = (light: DmxFixture): light is RgbMovingHeadFixture =>
-  light.fixture === FixtureTypes.RGBMH
 
 const baseCircleClasses =
   'w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md'

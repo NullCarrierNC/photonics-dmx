@@ -1,5 +1,6 @@
 /**
- * IPC tests for setupConsoleHandlers: enabling the console ties it to the page that asked for it.
+ * IPC tests for setupConsoleHandlers: enabling the console ties it to the page that asked for it,
+ * and a fixture config change is checked before either stored config takes it.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { EventEmitter } from 'node:events'
@@ -24,6 +25,17 @@ jest.mock('../../utils/windowUtils', () => ({
 import { setupConsoleHandlers } from '../../ipc/console-handlers'
 import type { ControllerManager } from '../../controllers/ControllerManager'
 import { lifecycleBlockedOn, restartGraph, stubbedManager } from '../controllers/lifecycleStub'
+import { ConsoleModeController } from '../../controllers/ConsoleModeController'
+import {
+  rgbMovingHeadFixture,
+  rgbMovingHeadLight,
+} from '../../../photonics-dmx/tests/helpers/testFixtures'
+import {
+  ConfigStrobeType,
+  type DmxFixture,
+  type DmxRig,
+  type FixtureConfig,
+} from '../../../photonics-dmx/types'
 
 function register(manager: ControllerManager): void {
   setupConsoleHandlers(mockIpcMain as never, manager)
@@ -190,5 +202,96 @@ describe('console entry queued behind another lifecycle op', () => {
     expect(manager.getLifecyclePhase()).toBe('consoleMode')
     expect(pub.isManual()).toBe(true)
     expect(page.listenerCount('destroyed')).toBe(1)
+  })
+})
+
+/** A console whose rig and template store keeps what the fixture-config channel saves. */
+function consoleWithStore(): {
+  setConfig: (config: unknown) => Promise<unknown>
+  lightConfig: () => FixtureConfig | undefined
+  templateConfig: () => FixtureConfig | undefined
+} {
+  let rig: DmxRig = {
+    id: 'rig-1',
+    name: 'Main',
+    active: true,
+    config: {
+      numLights: 1,
+      lightLayout: { id: 'front', label: 'Front' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [rgbMovingHeadLight({ id: 'mh-1', fixtureId: 'tpl-mh' })],
+      backLights: [],
+      strobeLights: [],
+    },
+  }
+  let template: DmxFixture = rgbMovingHeadFixture({ id: 'tpl-mh' })
+  const store = {
+    getDmxRig: (id: string) => (id === rig.id ? rig : undefined),
+    getUserLights: () => [template],
+    saveDmxRig: async (next: DmxRig) => {
+      rig = next
+    },
+    updateUserLight: async (_id: string, change: (fixture: DmxFixture) => DmxFixture) => {
+      template = change(template)
+    },
+  }
+  const controller = new ConsoleModeController({
+    getConfig: () => store as never,
+    ensureInitialized: () => Promise.resolve(),
+    getDmxPublisher: () => null,
+    getListenerSnapshot: () => ({ yarg: false, rb3: false }),
+    getIsAudioEnabled: () => false,
+    getLifecyclePhase: () => 'running',
+    pauseYarg: () => Promise.resolve(),
+    pauseRb3: () => Promise.resolve(),
+    pauseAudio: () => Promise.resolve(),
+    restartControllers: () => Promise.resolve(),
+  })
+  setupConsoleHandlers(
+    mockIpcMain as never,
+    {
+      getConsoleModeController: () => controller,
+    } as never,
+  )
+  const handler = getHandler(LIGHT.CONSOLE_SET_FIXTURE_CONFIG)
+  return {
+    setConfig: (config) =>
+      handler({}, { rigId: 'rig-1', lightId: 'mh-1', fixtureId: 'tpl-mh', config }),
+    lightConfig: () => rig.config.frontLights[0].config,
+    templateConfig: () => template.config,
+  }
+}
+
+describe('console fixture config', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it.each([
+    ['a word where a flag belongs', { invertPan: 'yes' }],
+    ['a word where a number belongs', { panMin: 'abc' }],
+    ['a key no fixture config has', { bogus: 1 }],
+    ['a DMX limit below 0', { tiltMax: -999 }],
+    ['a home beyond 100 percent', { panHome: 150 }],
+  ])('refuses %s and keeps both stored configs', async (_case, config) => {
+    const session = consoleWithStore()
+    const light = session.lightConfig()
+    const template = session.templateConfig()
+
+    const result = await session.setConfig(config)
+
+    expect(result).toMatchObject({ success: false })
+    expect(session.lightConfig()).toEqual(light)
+    expect(session.templateConfig()).toEqual(template)
+  })
+
+  it('saves a config within range to the rig light and its template', async () => {
+    const session = consoleWithStore()
+
+    const result = await session.setConfig({ panMin: 10, invertTilt: true })
+
+    expect(result).toEqual({ success: true })
+    expect(session.lightConfig()).toMatchObject({ panMin: 10, invertTilt: true })
+    expect(session.templateConfig()).toMatchObject({ panMin: 10, invertTilt: true })
   })
 })

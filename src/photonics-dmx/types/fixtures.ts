@@ -67,6 +67,12 @@ export type RgbDmxChannels = BaseDmxFixture & {
 export const MIXABLE_CHANNEL_TYPES = ['white', 'amber', 'orange', 'lime', 'uv'] as const
 export type MixableChannelType = (typeof MIXABLE_CHANNEL_TYPES)[number]
 
+const MIXABLE_CHANNEL_TYPE_SET: ReadonlySet<string> = new Set(MIXABLE_CHANNEL_TYPES)
+
+export function isMixableChannelType(value: unknown): value is MixableChannelType {
+  return typeof value === 'string' && MIXABLE_CHANNEL_TYPE_SET.has(value)
+}
+
 /**
  * How a fixture's `white` emitter is driven, chosen by the White Channel Mix Mode preference.
  * Applies only to RGB fixtures carrying a `white` extra channel. Persisted values - never rename.
@@ -243,14 +249,22 @@ export function isSavedFixture(fixture: DmxFixture): fixture is SavedFixture {
   return fixture.id !== null && fixture.id !== ''
 }
 
+/** Whether a fixture is a moving head, which alone carries pan and tilt. */
+export function isMovingHead(fixture: DmxFixture): fixture is RgbMovingHeadFixture {
+  return fixture.fixture === FixtureTypes.RGBMH
+}
+
+/** What a rig light adds to its fixture: an id of its own and the id of its template. */
+type RigLightFields = { id: string; fixtureId: string }
+
 /** A rig light: a fixture plus the id of the template it came from. */
-export type DmxLight = DmxFixture & { fixtureId: string }
+export type DmxLight = DmxFixture & RigLightFields
 
-export type RgbLight = RgbFixture & { fixtureId: string }
+export type RgbLight = RgbFixture & RigLightFields
 
-export type RgbMovingHeadLight = RgbMovingHeadFixture & { fixtureId: string }
+export type RgbMovingHeadLight = RgbMovingHeadFixture & RigLightFields
 
-export type StrobeLight = StrobeFixture & { fixtureId: string }
+export type StrobeLight = StrobeFixture & RigLightFields
 
 /**
  * A fixture's channels by name. Each fixture type declares its own closed channel map, so code

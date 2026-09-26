@@ -1,13 +1,11 @@
 import {
   DmxFixture,
   FixtureTypes,
-  MIXABLE_CHANNEL_TYPES,
+  isMixableChannelType,
   type MixableChannelType,
 } from '../../../photonics-dmx/types'
 import { EMITTER_PRIMARIES } from '../../../photonics-dmx/helpers/colorChannelMixer'
 import { EXTRA_CHANNEL_TYPE_LABELS, extraChannelDisplayLabel } from './lightChannelDisplay'
-
-const MIXABLE_TYPE_SET = new Set<string>(MIXABLE_CHANNEL_TYPES)
 
 /**
  * Combines a fixture's colour channels — base red/green/blue plus any user-added channels — into
@@ -45,9 +43,8 @@ function mixPreviewRgb(
       green = Math.max(green, value)
     } else if (extra.type === 'blue') {
       blue = Math.max(blue, value)
-    } else if (MIXABLE_TYPE_SET.has(extra.type)) {
-      const type = extra.type as MixableChannelType
-      valueByType.set(type, Math.max(valueByType.get(type) ?? 0, value))
+    } else if (isMixableChannelType(extra.type)) {
+      valueByType.set(extra.type, Math.max(valueByType.get(extra.type) ?? 0, value))
     }
   }
 
@@ -222,9 +219,11 @@ export function getLightColorChannelBreakdown(
     const primary =
       ec.type === 'red' || ec.type === 'green' || ec.type === 'blue'
         ? BASE_PRIMARIES[ec.type]
-        : EMITTER_PRIMARIES[ec.type as MixableChannelType]
-    // A type this build doesn't know has no primary to draw a swatch from. The publisher skips the
-    // channel for the same reason, so showing nothing keeps the two agreeing.
+        : isMixableChannelType(ec.type)
+          ? EMITTER_PRIMARIES[ec.type]
+          : undefined
+    // A type this build does not know has no primary to draw a swatch from, so it shows nothing.
+    // The publisher's mixer would throw on one, and every fixture load and save drops it first.
     if (!primary) return
     // Indexed against the full extras array so the numbering matches the channel list exactly.
     entries.push({

@@ -47,6 +47,7 @@ export {
   DEFAULT_TILT_RANGE_DEG,
   FIXTURE_CONFIG_FIELDS,
   fixtureConfigFieldBounds,
+  fixtureConfigFieldsOutOfRange,
   isFixtureConfigFlagField,
   normalizeFixtureConfig,
 } from './types/movingHead'
@@ -65,6 +66,8 @@ export {
   FixtureTypes,
   isExtraChannelType,
   isFixtureType,
+  isMixableChannelType,
+  isMovingHead,
   isSavedFixture,
   LEGACY_FIXTURE_RGB_STROBE,
   LEGACY_FIXTURE_RGBW,

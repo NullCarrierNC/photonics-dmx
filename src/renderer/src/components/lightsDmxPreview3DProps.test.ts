@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals'
 import type { Texture } from 'three'
-import { FixtureTypes, type RgbFixture } from '../../../photonics-dmx/types'
+import { FixtureTypes, isMovingHead, type RgbFixture } from '../../../photonics-dmx/types'
 import {
   rgbMovingHeadFixture,
   strobeFixture,
@@ -12,7 +12,6 @@ import {
   beamPropsEqual,
   bodyPropsEqual,
   fixtureMount,
-  isMovingHead,
   masterDimmer01,
   type FixtureBeamProps,
   type FixtureBodyProps,

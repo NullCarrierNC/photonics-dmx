@@ -132,6 +132,19 @@ describe('parseDmxFixture', () => {
     expect(faults).toEqual(['lights[0].config.invertPan must be true or false'])
   })
 
+  it('reports a config that is an object of another kind, such as a date', () => {
+    const { fixture, faults } = parse(
+      rgb({
+        fixture: 'rgb/mh',
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, pan: 5, tilt: 6 },
+        config: new Date(0),
+      }),
+    )
+
+    expect(fixture?.config).toBeUndefined()
+    expect(faults).toEqual(['lights[0].config must be a plain object'])
+  })
+
   it('reads a null or empty id as a template with no id, and any other kind as a fault', () => {
     expect(parse(rgb({ id: null }))).toEqual({ fixture: rgb({ id: null }), faults: [] })
     expect(parse(rgb({ id: '' }))).toEqual({ fixture: rgb({ id: null }), faults: [] })

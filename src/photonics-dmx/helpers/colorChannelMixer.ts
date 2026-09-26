@@ -112,9 +112,10 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
   const redChannels: number[] = []
   const greenChannels: number[] = []
   const blueChannels: number[] = []
-  if (isValidDmxChannel(named.red)) redChannels.push(named.red)
-  if (isValidDmxChannel(named.green)) greenChannels.push(named.green)
-  if (isValidDmxChannel(named.blue)) blueChannels.push(named.blue)
+  const { red, green, blue } = named
+  if (red !== undefined && isValidDmxChannel(red)) redChannels.push(red)
+  if (green !== undefined && isValidDmxChannel(green)) greenChannels.push(green)
+  if (blue !== undefined && isValidDmxChannel(blue)) blueChannels.push(blue)
 
   // Valid channel numbers per mixable type. A white emitter is an ordinary extra channel: an RGBW
   // fixture is RGB plus a `white` extra, so its white lands here like any other emitter.

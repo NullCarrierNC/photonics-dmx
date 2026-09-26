@@ -3,6 +3,7 @@ import {
   isValidDmxChannel,
   type ChannelView,
   type DmxFixture,
+  type DmxLight,
   type LightingConfiguration,
 } from '../types'
 
@@ -43,8 +44,13 @@ export function buildBrightnessScaleMap(fixture: DmxFixture): Map<number, number
   if (scaling) {
     for (const key of ['red', 'green', 'blue'] as const) {
       const percent = scaling[key]
-      if (isStorableBrightnessScale(percent) && isValidDmxChannel(named[key])) {
-        map.set(named[key], percent)
+      const channel = named[key]
+      if (
+        isStorableBrightnessScale(percent) &&
+        channel !== undefined &&
+        isValidDmxChannel(channel)
+      ) {
+        map.set(channel, percent)
       }
     }
   }
@@ -66,13 +72,13 @@ export function fixtureHasBrightnessScaling(fixture: DmxFixture): boolean {
 }
 
 /** Every light in a rig; the three arrays are equivalent here. */
-function allLights(config: LightingConfiguration): DmxFixture[] {
+function allLights(config: LightingConfiguration): DmxLight[] {
   return [...config.frontLights, ...config.backLights, ...config.strobeLights]
 }
 
 /** Same ordering the publisher uses when multiple fixtures write the same DMX address. */
-function lightsInPublishOrder(config: LightingConfiguration): DmxFixture[] {
-  return allLights(config).sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''))
+function lightsInPublishOrder(config: LightingConfiguration): DmxLight[] {
+  return allLights(config).sort((a, b) => a.id.localeCompare(b.id))
 }
 
 /** True when the fixture maps a DMX address through a base or extra channel. */

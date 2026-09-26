@@ -1,4 +1,4 @@
-import { DEFAULT_STROBE_CHANNEL_VALUES, type DmxFixture } from '../types'
+import { DEFAULT_STROBE_CHANNEL_VALUES, isFixtureType, type DmxFixture } from '../types'
 import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
 import {
   applyChannelMixPlan,
@@ -45,6 +45,8 @@ export class FixtureChannelWriter {
   /** Light ids already reported for excluded extra channels. Separate from the range set, so a
    *  fixture with both faults reports both. */
   private _reportedInvalidExtraLights = new Set<string>()
+  /** Light ids already reported for a fixture type this build does not know. */
+  private _reportedUnknownTypeLights = new Set<string>()
   /**
    * Colour-mixing plans keyed by fixture object identity. `syncDmxLightWithTemplate` replaces a
    * fixture object whenever its channels or extras change and returns the same reference
@@ -79,6 +81,7 @@ export class FixtureChannelWriter {
   public resetFaultReports(): void {
     this._reportedBadChannelLights.clear()
     this._reportedInvalidExtraLights.clear()
+    this._reportedUnknownTypeLights.clear()
   }
 
   /**
@@ -92,6 +95,7 @@ export class FixtureChannelWriter {
     strobeSlot: StrobeSpeedSlot | null,
     additiveWhite: boolean,
   ): void {
+    if (!this._isKnownType(lightId, fixture)) return
     this._lightId = lightId
     this._scaleMap = this._scaleMapFor(fixture)
 
@@ -162,7 +166,7 @@ export class FixtureChannelWriter {
   ): void {
     this._scaleMap = null
     for (const [lightId, fixture] of fixtures) {
-      if (visited.has(lightId)) continue
+      if (visited.has(lightId) || !this._isKnownType(lightId, fixture)) continue
       this._lightId = lightId
       const strobeChannel = fixture.channels.strobeChannel
       if (
@@ -205,6 +209,20 @@ export class FixtureChannelWriter {
     if (this._ipcBuffer !== null) {
       this._ipcBuffer[channelNumber] = clamped
     }
+  }
+
+  /**
+   * Whether this build knows the fixture's type, reporting one it does not once per light. Every
+   * load and save boundary parses fixtures, which refuses an unknown type, and this check keeps
+   * one that reaches the writer another way off the wire.
+   */
+  private _isKnownType(lightId: string, fixture: DmxFixture): boolean {
+    if (isFixtureType(fixture.fixture)) return true
+    if (!this._reportedUnknownTypeLights.has(lightId)) {
+      this._reportedUnknownTypeLights.add(lightId)
+      log.error(`Light ${lightId}: fixture type "${String(fixture.fixture)}" is unknown; skipping`)
+    }
+    return false
   }
 
   private _mixPlanFor(fixture: DmxFixture): ChannelMixPlan | null {

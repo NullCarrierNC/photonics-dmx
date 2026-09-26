@@ -10,9 +10,7 @@
  */
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
+export { isPlainObject } from '../../../shared/plainObject'
 
 export function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0

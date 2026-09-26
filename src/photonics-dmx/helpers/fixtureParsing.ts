@@ -27,6 +27,7 @@ import type {
 } from '../types'
 import { isStorableBrightnessScale, isValidBrightnessScalePercent } from './brightnessScaling'
 import { migrateFixtureSchema } from './lightingConfigMigration'
+import { isPlainObject } from '../../shared/plainObject'
 
 /**
  * What a fault did to the stored fixture: `reset` put a value back to its default or dropped a
@@ -41,10 +42,6 @@ export type FixtureFaultReport = (message: string, kind: FixtureFaultKind) => vo
 export interface FixtureFault {
   message: string
   kind: FixtureFaultKind
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** A channel number as stored: 1-512, or 0 for unassigned. */
@@ -154,28 +151,66 @@ function parseChannels(
 /** Config keys a stored fixture may carry: the current fields and the legacy `invert` flag. */
 const STORED_CONFIG_FIELDS: ReadonlySet<string> = new Set([...FIXTURE_CONFIG_FIELDS, 'invert'])
 
-function parseConfig(raw: unknown, path: string, report: FixtureFaultReport): FixtureConfig {
-  const stored: Partial<FixtureConfig> & LegacyFixtureConfigFields = {}
-  const source = isPlainObject(raw) ? raw : {}
+/**
+ * The config fields `source` holds as a flag or a finite number. Any other value, and any key
+ * outside `known`, is reported.
+ */
+function readConfigFields(
+  source: Record<string, unknown>,
+  known: ReadonlySet<string>,
+  path: string,
+  report: FixtureFaultReport,
+): Partial<FixtureConfig> {
+  const fields: Partial<FixtureConfig> = {}
   for (const key of FIXTURE_CONFIG_FIELDS) {
     const value = source[key]
     if (value === undefined) continue
     if (isFixtureConfigFlagField(key)) {
-      if (typeof value === 'boolean') stored[key] = value
+      if (typeof value === 'boolean') fields[key] = value
       else report(`${path}.config.${key} must be true or false`, 'reset')
     } else if (typeof value === 'number' && Number.isFinite(value)) {
-      stored[key] = value
+      fields[key] = value
     } else {
       report(`${path}.config.${key} must be a number`, 'reset')
     }
   }
-  if (typeof source.invert === 'boolean') stored.invert = source.invert
   for (const key of Object.keys(source)) {
-    if (!STORED_CONFIG_FIELDS.has(key)) {
+    if (!known.has(key)) {
       report(`${path}.config.${key} is not a fixture config field`, 'dropped')
     }
   }
+  return fields
+}
+
+function parseConfig(raw: unknown, path: string, report: FixtureFaultReport): FixtureConfig {
+  const source = isPlainObject(raw) ? raw : {}
+  const stored: Partial<FixtureConfig> & LegacyFixtureConfigFields = readConfigFields(
+    source,
+    STORED_CONFIG_FIELDS,
+    path,
+    report,
+  )
+  if (typeof source.invert === 'boolean') stored.invert = source.invert
   return normalizeFixtureConfig(stored)
+}
+
+const CURRENT_CONFIG_FIELDS: ReadonlySet<string> = new Set(FIXTURE_CONFIG_FIELDS)
+
+/**
+ * A config change from an IPC payload: the fields it names, by the same rule a stored config is
+ * read with. The legacy `invert` flag is not a field a change can carry. A caller refuses a change
+ * with any fault, since nothing here is repaired.
+ */
+export function parseFixtureConfigPatch(
+  raw: unknown,
+  path: string,
+  report: FixtureFaultReport,
+): Partial<FixtureConfig> {
+  if (!isPlainObject(raw)) {
+    report(`${path}.config must be a plain object`, 'reset')
+    return {}
+  }
+  return readConfigFields(raw, CURRENT_CONFIG_FIELDS, path, report)
 }
 
 const STROBE_VALUE_KEYS = ['slow', 'medium', 'fast', 'fastest'] as const
@@ -366,7 +401,10 @@ export function parseDmxFixture(
   return fixture
 }
 
-/** A rig light: a fixture plus the id of the template it came from. */
+/**
+ * A rig light: a fixture plus the id of the template it came from. Cues and the publisher find a
+ * light by its id, so a light stored without one is reported and given a new one.
+ */
 export function parseDmxLight(
   raw: unknown,
   path: string,
@@ -379,9 +417,14 @@ export function parseDmxLight(
   const { fixtureId, ...fields } = raw
   const fixture = parseDmxFixture(fields, path, report)
   if (!fixture) return null
-  if (typeof fixtureId === 'string') return { ...fixture, fixtureId }
+  let id = fixture.id
+  if (id === null) {
+    report(`${path}.id is missing`, 'reset')
+    id = globalThis.crypto.randomUUID()
+  }
+  if (typeof fixtureId === 'string') return { ...fixture, id, fixtureId }
   report(`${path}.fixtureId must be a string`, 'reset')
-  return { ...fixture, fixtureId: '' }
+  return { ...fixture, id, fixtureId: '' }
 }
 
 /** Brings a fixture any build may have written onto the current schema before it is parsed. */

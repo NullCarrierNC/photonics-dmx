@@ -192,6 +192,23 @@ describe('ConfigurationManager fixture loading', () => {
     expect(reportsFor(cm, 'lightsLayout.json')[0]?.message).toContain('frontLights[0].channels')
   })
 
+  it('gives each rig light stored without an id its own new id, and reports it', () => {
+    const light = (fields: Record<string, unknown>) =>
+      template({ fixtureId: 'tpl-1', group: 'front', mount: 'floor', ...fields })
+    const cm = boot({ layoutLights: [light({ id: null }), light({ id: '' })] })
+
+    const [first, second] = cm.getLightingLayout().frontLights
+    expect(first.id).toEqual(expect.any(String))
+    expect(second.id).toEqual(expect.any(String))
+    expect(new Set([first.id, second.id, ''])).toHaveProperty('size', 3)
+    expect(reportsFor(cm, 'lightsLayout.json')).toEqual([
+      expect.objectContaining({
+        reason: 'repaired',
+        message: 'frontLights[0].id is missing, frontLights[1].id is missing',
+      }),
+    ])
+  })
+
   it('boots on the rigs file the strobe-None layout editor saved, and reports nothing', () => {
     const rigsText = readRealFile(nodePath.join(HISTORICAL, 'f3f851db', 'dmxRigs.json'), 'utf-8')
     const cm = boot({ rigsText, lights: [template({ id: 'tpl-rgb' })] })
