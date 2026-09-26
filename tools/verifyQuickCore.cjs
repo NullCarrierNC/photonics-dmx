@@ -14,11 +14,15 @@
  *   typecheckProjects: string[],
  *   testFiles: string[],
  *   dependencyChecks: boolean,
+ *   cueSim: boolean,
  * }} Plan
  */
 
 const CODE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const FORMATTED = /\.(?:[cm]?[jt]s|[jt]sx|json|md|ya?ml|css)$/
+
+/** Bundled data the cue sim check simulates, and the fingerprints it holds the timelines to. */
+const CUE_SIM_INPUTS = /^(?:resources\/|metrics\/cue-sim-fingerprints\.txt$)/
 
 /** Paths whose effect on the suite a related-tests run cannot follow, each with the reason. */
 const FULL_RUN_PATHS = [
@@ -79,6 +83,7 @@ function planChecks(changes) {
     typecheckProjects: ['node', 'web', 'test'].filter((project) => projects.has(project)),
     testFiles: present.filter((path) => path.startsWith('src/') && CODE.test(path)),
     dependencyChecks: changes.some(({ path }) => /^package(?:-lock)?\.json$/.test(path)),
+    cueSim: changes.some(({ path }) => CUE_SIM_INPUTS.test(path)),
   }
 }
 

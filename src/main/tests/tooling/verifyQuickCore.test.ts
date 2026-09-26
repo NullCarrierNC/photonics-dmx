@@ -20,6 +20,7 @@ type Plan = {
   typecheckProjects: string[]
   testFiles: string[]
   dependencyChecks: boolean
+  cueSim: boolean
 }
 
 type Step = { name: string; command: string; args: string[]; note?: string }
@@ -90,6 +91,14 @@ describe('planChecks', () => {
   it('runs the dependency checks only when a package file changes', () => {
     expect(plan(modified('package-lock.json')).dependencyChecks).toBe(true)
     expect(plan(modified('src/main/menu.ts')).dependencyChecks).toBe(false)
+  })
+
+  it('runs the cue sim check for a bundled data or fingerprint change', () => {
+    expect(plan(modified('resources/defaults/node-data/cues/yarg/yarg-fade.json')).cueSim).toBe(
+      true,
+    )
+    expect(plan(modified('metrics/cue-sim-fingerprints.txt')).cueSim).toBe(true)
+    expect(plan(modified('src/main/menu.ts', 'metrics/size-budget.txt')).cueSim).toBe(false)
   })
 
   it('formats data and docs files but lints and tests only code', () => {
