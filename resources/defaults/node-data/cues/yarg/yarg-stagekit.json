@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 13,
+  "cueVersion": 14,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -2860,12 +2860,13 @@
         },
         {
           "from": "sk-harmony-is-large",
-          "to": "sk-harmony-cyan",
-          "fromPort": "false"
+          "to": "sk-harmony-red",
+          "fromPort": "true"
         },
         {
-          "from": "sk-harmony-yellow",
-          "to": "sk-harmony-red"
+          "from": "sk-harmony-is-large",
+          "to": "sk-harmony-cyan",
+          "fromPort": "false"
         }
       ],
       "layout": {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 3,
+  "cueVersion": 4,
   "mode": "audio",
   "group": {
     "id": "audio-stagekit",
@@ -1655,12 +1655,12 @@
           "fromPort": "false"
         },
         {
-          "from": "sk_audio_harmony-yellow",
-          "to": "sk_audio_harmony-red"
+          "from": "ev-sk_audio_harmony-beat",
+          "to": "sk_audio_harmony-yellow"
         },
         {
           "from": "ev-sk_audio_harmony-beat",
-          "to": "sk_audio_harmony-yellow"
+          "to": "sk_audio_harmony-red"
         }
       ],
       "effects": [
