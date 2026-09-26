@@ -6,6 +6,7 @@ const {
   isMissingCommit,
   parsePushedRefs,
   commandLineOverrides,
+  narrowedCommandLines,
   testCoverageScriptProblems,
   importsOfUncounted,
   coverageIgnoreHints,
@@ -414,6 +415,107 @@ describe('commandLineOverrides', () => {
     expect(
       commandLineOverrides("bash -c 'echo --config'\nnode tools/check.mjs --config x"),
     ).toEqual([])
+  })
+})
+
+describe('narrowedCommandLines', () => {
+  const texts = (entries: Record<string, string>): Map<string, string> =>
+    new Map(Object.entries(entries))
+  const base = texts({
+    'package.json test': 'jest',
+    'package.json test:watch': 'jest --watch',
+    'package.json test:coverage': 'jest --coverage',
+    '.husky/pre-push': 'npm run lint:check && npm run test:coverage -- --randomize',
+  })
+  const withScript = (command: string): Map<string, string> =>
+    new Map([...base, ['package.json test:coverage', command]])
+
+  it('passes command lines that match the base', () => {
+    expect(narrowedCommandLines(base, base)).toEqual([])
+  })
+
+  it('names each option that narrows the tests a script runs', () => {
+    const current = withScript(
+      'jest --coverage --testPathIgnorePatterns src/renderer --selectProjects engine --shard=1/4',
+    )
+
+    expect(narrowedCommandLines(current, base)).toEqual([
+      'package.json test:coverage passes --testPathIgnorePatterns=src/renderer to Jest',
+      'package.json test:coverage passes --selectProjects=engine to Jest',
+      'package.json test:coverage passes --shard=1/4 to Jest',
+    ])
+  })
+
+  it('names a test name pattern by its short flag', () => {
+    expect(narrowedCommandLines(withScript('jest --coverage -t fast'), base)).toEqual([
+      'package.json test:coverage passes --testNamePattern=fast to Jest',
+    ])
+  })
+
+  it('names a test path pattern and leaves out the values options take', () => {
+    const current = withScript('jest --coverage src/photonics-dmx --maxWorkers 2 --seed=4')
+
+    expect(narrowedCommandLines(current, base)).toEqual([
+      "package.json test:coverage passes the test path pattern 'src/photonics-dmx' to Jest",
+    ])
+  })
+
+  it('names runs of changed, failed or related tests, and runs that list tests', () => {
+    const current = withScript('jest --coverage -o --onlyFailures --findRelatedTests --listTests')
+
+    expect(narrowedCommandLines(current, base)).toEqual([
+      'package.json test:coverage passes --onlyChanged to Jest',
+      'package.json test:coverage passes --onlyFailures to Jest',
+      'package.json test:coverage passes --findRelatedTests to Jest',
+      'package.json test:coverage passes --listTests to Jest',
+    ])
+  })
+
+  it('names an ignore pattern widened against the one the base passes', () => {
+    const was = withScript('jest --coverage --testPathIgnorePatterns=/dist/')
+    const is = withScript('jest --coverage --testPathIgnorePatterns /dist/ /src/main/')
+
+    expect(narrowedCommandLines(is, was)).toEqual([
+      'package.json test:coverage passes --testPathIgnorePatterns=/src/main/ to Jest',
+    ])
+  })
+
+  it('names what a hook passes through npm after its --', () => {
+    const current = new Map([
+      ...base,
+      ['.husky/pre-push', 'npm run lint:check && npm run test:coverage -- --randomize src/main'],
+    ])
+
+    expect(narrowedCommandLines(current, base)).toEqual([
+      ".husky/pre-push passes the test path pattern 'src/main' to Jest",
+    ])
+  })
+
+  it('names a new script that narrows the run', () => {
+    const current = new Map([...base, ['package.json test:engine', 'jest --selectProjects engine']])
+
+    expect(narrowedCommandLines(current, base)).toEqual([
+      'package.json test:engine passes --selectProjects=engine to Jest',
+    ])
+  })
+
+  it('passes a narrowing the base already has and one switched off', () => {
+    const current = withScript('jest --coverage --randomize --no-watch --onlyChanged=false')
+
+    expect(narrowedCommandLines(new Map([...base, ...current]), base)).toEqual([])
+    expect(
+      narrowedCommandLines(texts({ 'package.json test:watch': 'jest --watch' }), base),
+    ).toEqual([])
+  })
+
+  it('leaves out a redirection and commands that do not run Jest', () => {
+    const current = new Map([
+      ...base,
+      ['package.json test:coverage', 'jest --coverage > coverage.txt 2>&1'],
+      ['package.json cue-sim', 'node tools/cue-sim.mjs src/cues'],
+    ])
+
+    expect(narrowedCommandLines(current, base)).toEqual([])
   })
 })
 

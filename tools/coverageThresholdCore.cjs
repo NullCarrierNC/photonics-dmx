@@ -1,8 +1,9 @@
 /**
  * The coverage ratchet's pure core: reading the settings that decide what coverage measures, how
  * much of it has to pass and which tests run out of an evaluated Jest config, naming each one a
- * config loosens against a base, reading the refs the pre-push hook is given, and finding coverage
- * options on a command line and coverage ignore hints in source. The CLI in
+ * config loosens against a base, reading the refs the pre-push hook is given, finding coverage
+ * options on a command line, naming the ways Jest command lines narrow the tests they run against a
+ * base's, and finding coverage ignore hints in source. The CLI in
  * coverage-threshold-check.mjs owns git, reading the files, evaluating jest.config.js and the exit
  * code.
  */
@@ -10,6 +11,14 @@
 const { posix } = require('node:path')
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- the tests require this core
 const ts = require('typescript')
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- the tests require this core
+const { createRequire } = require('node:module')
+
+/**
+ * Jest's command line options as its own parser reads them, from the jest-cli that jest runs.
+ * @type {Record<string, { type?: string, alias?: string | string[] }>}
+ */
+const JEST_OPTIONS = createRequire(require.resolve('jest'))('jest-cli').yargsOptions
 
 /** What Jest leaves out of coverage when a config names nothing. */
 const DEFAULT_IGNORE_PATTERNS = ['/node_modules/']
@@ -459,6 +468,179 @@ function commandLineOverrides(text) {
 }
 
 /**
+ * Command line options that run some of the tests or none: a path or name filter, a project
+ * choice, a shard, only changed, failed or related tests, a filter module, test file patterns and
+ * roots, or a mode that lists tests, prints the config or clears the cache in place of running.
+ */
+const NARROWING_OPTIONS = new Set([
+  'testPathPatterns',
+  'testPathIgnorePatterns',
+  'testNamePattern',
+  'selectProjects',
+  'ignoreProjects',
+  'shard',
+  'onlyChanged',
+  'onlyFailures',
+  'lastCommit',
+  'changedFilesWithAncestor',
+  'changedSince',
+  'findRelatedTests',
+  'filter',
+  'listTests',
+  'collectTests',
+  'watch',
+  'testMatch',
+  'testRegex',
+  'roots',
+  'projects',
+  'modulePathIgnorePatterns',
+  'clearCache',
+  'showConfig',
+  'help',
+  'version',
+])
+
+/** @param {string} name @returns {string} an option name with its dashes dropped, lower-cased */
+const flatName = (name) => name.replace(/-/g, '').toLowerCase()
+
+/** Each option Jest takes by its flat name and its aliases, with the flags yargs adds itself. */
+const OPTION_NAMES = new Map([
+  ['help', 'help'],
+  ['h', 'help'],
+  ['version', 'version'],
+])
+for (const [name, spec] of Object.entries(JEST_OPTIONS)) {
+  OPTION_NAMES.set(flatName(name), name)
+  for (const alias of [spec.alias ?? []].flat()) OPTION_NAMES.set(flatName(alias), name)
+}
+
+/**
+ * @param {string} name a Jest option
+ * @returns {'flag' | 'list' | 'value'} whether it stands alone, takes every word after it or takes
+ *   one
+ */
+function optionArity(name) {
+  const type = JEST_OPTIONS[name]?.type
+  if (!(name in JEST_OPTIONS) || type === 'boolean') return 'flag'
+  return type === 'array' ? 'list' : 'value'
+}
+
+/**
+ * @param {string} written a flag as written after its dashes
+ * @returns {{ name: string | undefined, negated: boolean }} the Jest option it names, and whether
+ *   a `no-` prefix switches it off
+ */
+function optionNamed(written) {
+  const name = OPTION_NAMES.get(flatName(written))
+  if (name !== undefined || !/^no-?/i.test(written)) return { name, negated: false }
+  const negated = OPTION_NAMES.get(flatName(written.replace(/^no-?/i, '')))
+  return { name: negated, negated: negated !== undefined }
+}
+
+/**
+ * The words a command hands Jest: those after the jest binary, or after the npm script that runs
+ * it, where npm's own `--` is dropped. A shell redirection ends them.
+ * @param {string} command one shell command that runs Jest
+ * @returns {string[]}
+ */
+function jestWordsIn(command) {
+  const words = command
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.replace(/^['"]|['"]$/g, ''))
+  const redirect = words.findIndex((word) => /^\d*[<>]/.test(word))
+  const handed = redirect >= 0 ? words.slice(0, redirect) : words
+  const binary = handed.findIndex((word) => /(?:^|\/)jest$/.test(word))
+  if (binary >= 0) return handed.slice(binary + 1)
+  const npm = handed.indexOf('npm')
+  const script = handed.findIndex((word, index) => index > npm && /^test(?::[\w-]+)?$/.test(word))
+  const rest = handed.slice(script + 1)
+  return rest[0] === '--' ? rest.slice(1) : rest
+}
+
+/** @param {string} pattern @returns {string} */
+const pathPattern = (pattern) => `the test path pattern '${pattern}'`
+
+/** @param {string | undefined} word @returns {boolean} whether an option can take it as a value */
+const isValue = (word) => word !== undefined && !word.startsWith('-')
+
+/**
+ * What a Jest command line does to the set of tests Jest runs, read as Jest's parser reads it: an
+ * option that stands alone takes no value but `true` or `false`, a list option takes every word up
+ * to the next option, and any other option takes the next word. A word no option takes is a test
+ * path pattern, and short flags written together, as `-io`, are each their own flag.
+ * @param {string[]} words
+ * @returns {string[]} each narrowing option with its value, and each test path pattern
+ */
+function narrowingIn(words) {
+  /** @type {string[]} */
+  const found = []
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    if (word === '--') {
+      found.push(...words.slice(i + 1).map(pathPattern))
+      break
+    }
+    const option = /^(-{1,2})([^-=][^=]*)(?:=(.*))?$/.exec(word)
+    if (!option) {
+      found.push(pathPattern(word))
+      continue
+    }
+    const [, dashes, written, given] = option
+    const flags = dashes === '--' ? [written] : [...written]
+    const last = flags.pop() ?? ''
+    for (const flag of flags) {
+      const { name } = optionNamed(flag)
+      if (name !== undefined && NARROWING_OPTIONS.has(name)) found.push(`--${name}`)
+    }
+
+    const { name, negated } = optionNamed(last)
+    const arity = name === undefined ? 'flag' : optionArity(name)
+    const values = given === undefined ? [] : [given]
+    if (given === undefined && arity === 'value' && isValue(words[i + 1])) values.push(words[++i])
+    while (given === undefined && arity === 'list' && isValue(words[i + 1])) values.push(words[++i])
+    if (given === undefined && arity === 'flag' && /^(?:true|false)$/.test(words[i + 1] ?? '')) {
+      values.push(words[++i])
+    }
+    if (name === undefined || negated || !NARROWING_OPTIONS.has(name)) continue
+    if (arity === 'flag' ? values[0] !== 'false' : values.length === 0) found.push(`--${name}`)
+    if (arity !== 'flag') found.push(...values.map((value) => `--${name}=${value}`))
+  }
+  return found
+}
+
+/**
+ * Jest command lines that narrow the tests Jest runs where the base's do not: an option that runs
+ * some of the tests or none, or a test path pattern, that the same script, hook or workflow in the
+ * base does not pass.
+ * @param {Map<string, string>} current shell text by where it lives, such as `package.json test`
+ *   or `.husky/pre-push`
+ * @param {Map<string, string>} base the same, as the base has it
+ * @returns {string[]} one line per narrowing the base does not have
+ */
+function narrowedCommandLines(current, base) {
+  /** @param {string | undefined} text @returns {Set<string>} */
+  const narrowing = (text) => {
+    /** @type {Set<string>} */
+    const found = new Set()
+    for (const command of (text ?? '').split(/&&|\|\||[;|\n]/)) {
+      if (!RUNS_JEST.test(command)) continue
+      for (const entry of narrowingIn(jestWordsIn(command))) found.add(entry)
+    }
+    return found
+  }
+  /** @type {string[]} */
+  const lines = []
+  for (const [where, text] of current) {
+    const had = narrowing(base.get(where))
+    for (const entry of narrowing(text)) {
+      if (!had.has(entry)) lines.push(`${where} passes ${entry} to Jest`)
+    }
+  }
+  return lines
+}
+
+/**
  * @param {Record<string, string> | undefined} scripts package.json's scripts
  * @returns {string[]} a line when `test:coverage` does not switch coverage on, since that script is
  *   what the pre-push hook and CI run to enforce the thresholds
@@ -677,6 +859,7 @@ module.exports = {
   isMissingCommit,
   parsePushedRefs,
   commandLineOverrides,
+  narrowedCommandLines,
   testCoverageScriptProblems,
   importsOfUncounted,
   coverageIgnoreHints,

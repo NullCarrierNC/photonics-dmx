@@ -175,3 +175,39 @@ describe('coverage-threshold-check without a branch base', () => {
     expect(out).toContain('refs/heads/trunk: found no commit at its branch base to compare with')
   })
 })
+
+describe('coverage-threshold-check on the tests Jest runs', () => {
+  it('fails a script that narrows the tests against the last commit', () => {
+    const repo = fixture()
+    repo.write({
+      'package.json': JSON.stringify({
+        scripts: { 'test:coverage': 'jest --coverage --selectProjects engine' },
+      }),
+    })
+
+    const { status, out } = repo.run()
+
+    expect(status).toBe(1)
+    expect(out).toContain(
+      'the working tree: package.json test:coverage passes --selectProjects=engine to Jest, against the last commit',
+    )
+  })
+
+  it('fails a pushed hook that narrows the tests against the remote', () => {
+    const repo = fixture()
+    const remote = repo.commit({ '.husky/pre-push': 'npm run test:coverage -- --randomize\n' })
+    const head = repo.commit({
+      '.husky/pre-push': 'npm run test:coverage -- --randomize --shard=1/2\n',
+    })
+
+    const { status, out } = repo.run(
+      undefined,
+      `refs/heads/development ${head} refs/heads/development ${remote}\n`,
+    )
+
+    expect(status).toBe(1)
+    expect(out).toContain(
+      'refs/heads/development: .husky/pre-push passes --shard=1/2 to Jest, against refs/heads/development on the remote',
+    )
+  })
+})
