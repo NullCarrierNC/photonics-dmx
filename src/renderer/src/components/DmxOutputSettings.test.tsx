@@ -499,6 +499,16 @@ describe('DmxOutputSettings OpenDMX refresh rate', () => {
     await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(40))
   })
 
+  it('shows the 40 Hz default once zero is saved over it', async () => {
+    await renderPanel(openDmxOpen(40))
+    const field = screen.getByRole('spinbutton') as HTMLInputElement
+
+    commit(field, '0')
+
+    await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(40))
+    await waitFor(() => expect(field.value).toBe('40'))
+  })
+
   it('keeps the port when only the rate changes', async () => {
     await renderPanel(openDmxOpen())
 

@@ -171,6 +171,36 @@ describe('DraftNumberField refused commits', () => {
   })
 })
 
+describe('DraftNumberField stored values', () => {
+  it('shows the number the commit answers that it stored', async () => {
+    renderWithProviders(
+      <DraftNumberField value={40} min={0} onCommit={() => Promise.resolve(40)} />,
+    )
+
+    fireEvent.change(field(), { target: { value: '0' } })
+    fireEvent.blur(field())
+    await act(async () => {})
+
+    expect(field()).toHaveValue(40)
+  })
+
+  it('leaves a newer entry alone when the stored number lands late', async () => {
+    let answer!: (stored: number) => void
+    const pending = new Promise<number>((resolve) => {
+      answer = resolve
+    })
+    renderWithProviders(<DraftNumberField value={40} min={0} onCommit={() => pending} />)
+
+    fireEvent.change(field(), { target: { value: '0' } })
+    fireEvent.blur(field())
+    fireEvent.focus(field())
+    fireEvent.change(field(), { target: { value: '7' } })
+    await act(async () => answer(40))
+
+    expect(field()).toHaveValue(7)
+  })
+})
+
 describe('DraftTextField', () => {
   it('puts the committed value back when the commit is refused', async () => {
     renderWithProviders(<DraftTextField value="one" onCommit={() => Promise.resolve(false)} />)

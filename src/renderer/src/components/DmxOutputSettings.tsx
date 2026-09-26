@@ -325,8 +325,11 @@ const DmxOutputSettings: React.FC = () => {
   const handleOpenDmxComPortChange = (newPort: string): Promise<boolean> =>
     commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
 
-  const handleOpenDmxSpeedChange = (hz: number): Promise<boolean> =>
-    commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
+  /** Saves the rate, answering with the one stored, since 0 stores the default. */
+  const handleOpenDmxSpeedChange = async (hz: number): Promise<number | false> => {
+    const dmxSpeed = parseOpenDmxSpeed(String(hz))
+    return (await commitOpenDmxConfig({ dmxSpeed }, 'the OpenDMX rate')) && dmxSpeed
+  }
 
   const handleGlobalDmxRateChange = async (hz: number): Promise<boolean> => {
     const sanitized = parseGlobalPublishingRate(String(hz))

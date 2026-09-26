@@ -24,22 +24,30 @@ import { useUncommittedDraft } from '../../hooks/useUnloadGuard'
 export type CommitOutcome = boolean | void | Promise<boolean | void>
 
 /**
- * Puts `committed` back in the field when the commit is refused, unless the user has typed
- * something else since.
+ * What a number commit handler answers. It may also answer with the number it stored, when a save
+ * turns the typed number into another, so the field shows that one.
  */
-function revertIfRefused(
-  outcome: CommitOutcome,
+export type NumberCommitOutcome = CommitOutcome | number | Promise<boolean | void | number>
+
+/**
+ * Puts `committed` back in the field when the commit is refused, and the stored number when the
+ * handler answers with one, unless the user has typed something else since.
+ */
+function settleCommit(
+  outcome: NumberCommitOutcome,
   shown: string,
   committed: string,
   setDraft: (update: (current: string) => string) => void,
 ): void {
-  const revert = () => setDraft((current) => (current === shown ? committed : current))
-  if (outcome === false) {
-    revert()
-  } else if (outcome instanceof Promise) {
-    outcome.then((accepted) => {
-      if (accepted === false) revert()
-    }, revert)
+  const replace = (text: string) => setDraft((current) => (current === shown ? text : current))
+  const settle = (answer: boolean | void | number) => {
+    if (answer === false) replace(committed)
+    else if (typeof answer === 'number') replace(String(answer))
+  }
+  if (outcome instanceof Promise) {
+    outcome.then(settle, () => replace(committed))
+  } else {
+    settle(outcome)
   }
 }
 
@@ -87,7 +95,7 @@ export const DraftTextField: React.FC<DraftTextFieldProps> = ({
   const commit = (): void => {
     setTyped(false)
     if (draft !== value) {
-      revertIfRefused(onCommit(draft), draft, value, setDraft)
+      settleCommit(onCommit(draft), draft, value, setDraft)
     }
   }
 
@@ -128,14 +136,14 @@ interface NumberEntryProps extends DraftFieldBaseProps {
 interface DraftNumberFieldProps extends NumberEntryProps {
   value: number
   /** Given the typed number, held inside min and max. */
-  onCommit: (value: number) => CommitOutcome
+  onCommit: (value: number) => NumberCommitOutcome
 }
 
 interface DraftOptionalNumberFieldProps extends NumberEntryProps {
   /** Undefined shows an empty field, and the setting it stands for is off. */
   value: number | undefined
   /** Given the typed number, held inside min and max, or undefined when the user empties it. */
-  onCommit: (value: number | undefined) => CommitOutcome
+  onCommit: (value: number | undefined) => NumberCommitOutcome
 }
 
 /** Whole numbers unless the field asks for decimals, which the fractional audio fields do. */
@@ -156,8 +164,8 @@ const shownText = (value: number | undefined): string => (value === undefined ? 
 const NumberDraftInput: React.FC<
   NumberEntryProps & {
     value: number | undefined
-    onNumber: (value: number) => CommitOutcome
-    onEmpty?: () => CommitOutcome
+    onNumber: (value: number) => NumberCommitOutcome
+    onEmpty?: () => NumberCommitOutcome
   }
 > = ({
   value,
@@ -203,7 +211,7 @@ const NumberDraftInput: React.FC<
     const typedSinceCommit = typed
     setTyped(false)
     if (draft.trim() === '' && onEmpty) {
-      if (value !== undefined) revertIfRefused(onEmpty(), '', shownText(value), setDraft)
+      if (value !== undefined) settleCommit(onEmpty(), '', shownText(value), setDraft)
       return
     }
     const clamped = resolveDraft()
@@ -213,7 +221,7 @@ const NumberDraftInput: React.FC<
     }
     setDraft(String(clamped))
     if (clamped !== value || (commitWhenUnchanged && typedSinceCommit)) {
-      revertIfRefused(onNumber(clamped), String(clamped), shownText(value), setDraft)
+      settleCommit(onNumber(clamped), String(clamped), shownText(value), setDraft)
     }
   }
 
