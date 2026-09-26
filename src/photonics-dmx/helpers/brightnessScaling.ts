@@ -44,8 +44,13 @@ export function buildBrightnessScaleMap(fixture: DmxFixture): Map<number, number
   if (scaling) {
     for (const key of ['red', 'green', 'blue'] as const) {
       const percent = scaling[key]
-      if (isStorableBrightnessScale(percent) && isValidDmxChannel(named[key])) {
-        map.set(named[key], percent)
+      const channel = named[key]
+      if (
+        isStorableBrightnessScale(percent) &&
+        channel !== undefined &&
+        isValidDmxChannel(channel)
+      ) {
+        map.set(channel, percent)
       }
     }
   }

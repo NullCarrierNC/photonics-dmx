@@ -26,10 +26,8 @@ export type BaseDmxFixture = {
 export const DMX_CHANNEL_MAX = 512
 
 /** True for an assigned, addressable channel number. 0 (unassigned) is deliberately not valid. */
-export function isValidDmxChannel(channel: number | undefined): channel is number {
-  return (
-    channel !== undefined && Number.isInteger(channel) && channel >= 1 && channel <= DMX_CHANNEL_MAX
-  )
+export function isValidDmxChannel(channel: number): boolean {
+  return Number.isInteger(channel) && channel >= 1 && channel <= DMX_CHANNEL_MAX
 }
 
 /**
