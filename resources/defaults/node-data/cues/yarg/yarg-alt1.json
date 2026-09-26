@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 2,
+  "cueVersion": 3,
   "mode": "yarg",
   "group": {
     "id": "yarg-alt1",
@@ -6651,8 +6651,8 @@
             "effectId": "effect-alternating-pattern",
             "parameterValues": {
               "lights": {
-                "source": "variable",
-                "name": "allLights"
+                "source": "literal",
+                "value": "front,back"
               },
               "lightFilter": {
                 "source": "literal",

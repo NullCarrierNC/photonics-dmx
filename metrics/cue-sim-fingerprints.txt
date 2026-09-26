@@ -51,7 +51,7 @@ yarg__yarg-alt1__Chorus ea784a4ddaae 0fc8ec.0c1c72.b58f6d.7dd005.34566b.027243.e
 yarg__yarg-alt1__Cool_Automatic 9a41d5c13d6a b45465.b45465.b45465.b45465.2a1209.2a1209.2a1209.2a1209.d71b32.d71b32 af01.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.cc30.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 yarg__yarg-alt1__Cool_Manual 1253fc2850f3 99c516.53b07d.99c516.53b07d.99c516.53b07d.99c516.53b07d.d71b32.d71b32 0ddc.e3b0.e3b0.e3b0.0279.e3b0.f248.e3b0.d6b4.e3b0.16e2.e3b0.2b96.e3b0.753a.e3b0.e3b0
 yarg__yarg-alt1__Default fd2be0140518 be8ba1.be8ba1.be8ba1.be8ba1.890283.890283.890283.890283.d71b32.d71b32 691e.c486.95c6.e3b0.34c9.e3b0.e3b0.e44e.9cef.e3b0.1578.9e62.e3b0.4d9f.e3b0.e3b0.e3b0
-yarg__yarg-alt1__Dischord e2c305ea3e92 8a7cf7.ea3b79.2be02a.813bf4.c14c4e.9b94e1.f1b54c.8b126e.d71b32.d71b32 f5fe.70de.4358.644a.aa5d.e3b0.1c15.9a15.9ffd.e3b0.2ad0.e3b0.9d5f.b453.d0b2.e3b0.e3b0
+yarg__yarg-alt1__Dischord 3a11229d0057 8a7cf7.ea3b79.2be02a.813bf4.c14c4e.d0cb59.e879ef.8b126e.d71b32.d71b32 69c3.d435.4358.644a.aa5d.e3b0.1c15.9a15.97da.e3b0.0be2.e3b0.9d5f.b453.d0b2.e3b0.e3b0
 yarg__yarg-alt1__Flare_Fast b6f80ba0c64b 803815.4135cb.574bb9.f9a0db.d71b32.d71b32.d71b32.d71b32.d71b32.d71b32 0840.c2f1.2ec6.1897.ce20.1831.ea87.4fa7.1040.3050.6e43.29e0.a1a1.2bb6.418c.32f9.be1f
 yarg__yarg-alt1__Flare_Slow 6c25d9a2a2fe a5f62d.a1a12d.65b504.da62ca.d71b32.d71b32.d71b32.d71b32.d71b32.d71b32 48d3.f3ae.2718.102c.c8a2.2fbf.efb7.77ae.97ed.7a49.fa70.b93c.826f.51d2.9b84.bd43.5c34
 yarg__yarg-alt1__Frenzy 65cc19c8ea5c f7c856.f7c856.f7c856.f7c856.f7c856.f7c856.f7c856.f7c856.d71b32.d71b32 93d8.e3b0.e859.e3b0.016d.e3b0.e380.e3b0.e3b0.e3b0.e3b0.e3b0.df88.e3b0.e3b0.e3b0.e3b0
