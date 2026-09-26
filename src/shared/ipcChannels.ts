@@ -329,6 +329,8 @@ export const RENDERER_RECEIVE = {
   NODE_CUE_RUNTIME_ERROR: 'node-cue:runtime-error',
   /** Controller-manager lifecycle phase changed (every transition between phases). */
   LIFECYCLE_PHASE_CHANGED: 'lifecycle:phase-changed',
+  /** Main left DMX console mode without a page asking, with the reason to show the user. */
+  CONSOLE_LEFT: 'console:left',
 } as const
 
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */

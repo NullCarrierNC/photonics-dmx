@@ -21,6 +21,8 @@ import {
   rgbLight,
 } from '../../../photonics-dmx/tests/helpers/testFixtures'
 import type { ControllerManager } from '../../controllers/ControllerManager'
+import { sendToAllWindows } from '../../utils/windowUtils'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { restartGraph, stubbedManager } from './lifecycleStub'
 
 const UNMAPPED = 100
@@ -111,6 +113,15 @@ describe('an uncaught exception while the DMX console is open', () => {
 
     expect(universe[1]).toBe(0)
     expect(universe[UNMAPPED]).toBe(0)
+  })
+
+  it('tells the open console page that the console has closed and points to Retry', async () => {
+    manager.handleUncaughtException(new Error('frame path threw'))
+    await run(10)
+
+    expect(sendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.CONSOLE_LEFT, {
+      reason: expect.stringMatching(/console closed.*stopped after an error.*Retry/),
+    })
   })
 
   it('refuses to reopen the console while the fault is held', async () => {

@@ -1,6 +1,7 @@
 import type { ControllerLifecycle } from './ControllerLifecycle'
 import type { ListenerLifecycleController } from './ListenerLifecycleController'
 import type { ChainFanout } from '../../photonics-dmx/controllers/ChainFanout'
+import type { ConsoleModeController } from './ConsoleModeController'
 import { isNetworkSendError } from './SenderLifecycleController'
 import { createLogger } from '../../shared/logger'
 
@@ -12,7 +13,7 @@ const FAULT_STEP_TIMEOUT_MS = 1000
 /** The manager surfaces the fault response drives. */
 export interface FaultHost {
   getChainFanout(): ChainFanout
-  disableConsoleMode(): Promise<unknown>
+  getConsoleModeController(): Pick<ConsoleModeController, 'leaveAfterFault'>
   preemptSimulation(): Promise<void>
   getListenerLifecycle(): ListenerLifecycleController
 }
@@ -61,9 +62,7 @@ export async function holdFailedAfterFault(
     await boundedStep('Disabling RB3', () => listeners.yargRb3.disableRb3())
     await boundedStep('Disabling audio', () => listeners.audio.disableAudio())
   }
-  await boundedStep('Leaving the console', async () => {
-    await host.disableConsoleMode()
-  })
+  await boundedStep('Leaving the console', () => host.getConsoleModeController().leaveAfterFault())
   await boundedStep('Stopping the simulations', () => host.preemptSimulation())
   await boundedStep('Blackout', () => host.getChainFanout().blackout(0))
   await boundedStep('Waiting for the running toggle', () => lifecycle.awaitActiveOp())

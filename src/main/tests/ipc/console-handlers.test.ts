@@ -246,6 +246,7 @@ function consoleWithStore(): {
     pauseRb3: () => Promise.resolve(),
     pauseAudio: () => Promise.resolve(),
     restartControllers: () => Promise.resolve(),
+    announceConsoleLeft: () => {},
   })
   setupConsoleHandlers(
     mockIpcMain as never,

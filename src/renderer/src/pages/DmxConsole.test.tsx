@@ -6,6 +6,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { emitIpc } from '@renderer/tests/helpers/ipcListenerStub'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { lightingPrefsAtom, previewRigIdAtom } from '../atoms'
@@ -92,6 +94,19 @@ describe('DmxConsole', () => {
     view.unmount()
 
     await waitFor(() => expect(jest.mocked(ipcApi.disableConsole)).toHaveBeenCalled())
+  })
+
+  it('turns the console off with the reason when main leaves it', async () => {
+    renderConsole()
+    const toggle = await screen.findByRole('button', { name: 'Enable console' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    fireEvent.click(toggle)
+    await screen.findByRole('button', { name: 'Disable console' })
+
+    act(() => emitIpc(RENDERER_RECEIVE.CONSOLE_LEFT, { reason: 'The controllers stopped.' }))
+
+    expect(screen.getByRole('button', { name: 'Enable console' })).toBeTruthy()
+    expect(screen.getByText('The controllers stopped.')).toBeTruthy()
   })
 
   it('shows the channel again when an entry cannot move it', async () => {
