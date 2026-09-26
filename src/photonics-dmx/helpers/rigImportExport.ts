@@ -2,6 +2,7 @@ import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
 import { isStorableBrightnessScale } from './brightnessScaling'
 import { loadDmxFixture, loadDmxLight, parseFixtureList, type FixtureFault } from './fixtureParsing'
+import { isPlainObject } from '../../shared/plainObject'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -31,10 +32,6 @@ const defaultMakeId = (): string => globalThis.crypto.randomUUID()
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Compare two templates ignoring instance-only fields (`id`, `position`); JSON-normalized so an

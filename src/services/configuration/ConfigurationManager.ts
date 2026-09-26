@@ -31,7 +31,7 @@ import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 import { type AppPreferences } from './configurationDefaults'
 import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
 import { runStartupMigrations, type UserLightsConfig } from './startupMigrations'
-import { isPlainObject } from './preferencesMigration'
+import { isPlainObject } from '../../shared/plainObject'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigurationManager')

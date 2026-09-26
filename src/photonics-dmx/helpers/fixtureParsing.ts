@@ -27,6 +27,7 @@ import type {
 } from '../types'
 import { isStorableBrightnessScale, isValidBrightnessScalePercent } from './brightnessScaling'
 import { migrateFixtureSchema } from './lightingConfigMigration'
+import { isPlainObject } from '../../shared/plainObject'
 
 /**
  * What a fault did to the stored fixture: `reset` put a value back to its default or dropped a
@@ -41,10 +42,6 @@ export type FixtureFaultReport = (message: string, kind: FixtureFaultKind) => vo
 export interface FixtureFault {
   message: string
   kind: FixtureFaultKind
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** A channel number as stored: 1-512, or 0 for unassigned. */
