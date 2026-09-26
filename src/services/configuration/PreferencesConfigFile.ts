@@ -1,15 +1,13 @@
 import { ConfigFile, type ConfigFileHooks } from './ConfigFile'
 import type { AppPreferences } from './configurationDefaults'
 import { DEFAULT_PREFERENCES } from './configurationDefaults'
+import { migratePrefsV3ToV4, migratePrefsV4ToV5, migratePrefsV5ToV6 } from './preferencesMigration'
 import {
   healStoredClockRate,
   healStoredSenderConfigs,
-  migratePrefsV3ToV4,
-  migratePrefsV4ToV5,
-  migratePrefsV5ToV6,
   repairCueDomains,
   seedMissingRequiredPrefs,
-} from './preferencesMigration'
+} from './preferencesLoadRepair'
 import { validateAppPreferencesData } from './configDataValidators'
 import { repairInvalidPreferenceFields } from './preferencesFieldRepair'
 

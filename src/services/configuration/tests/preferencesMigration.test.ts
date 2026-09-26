@@ -4,10 +4,12 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
+} from '../preferencesMigration'
+import {
   healStoredClockRate,
   healStoredSenderConfigs,
   repairCueDomains,
-} from '../preferencesMigration'
+} from '../preferencesLoadRepair'
 import type { AppPreferences } from '../configurationDefaults'
 import { validateSenderEnablePayload } from '../../../main/ipc/validation/senderValidation'
 import {

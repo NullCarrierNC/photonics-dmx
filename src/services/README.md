@@ -13,7 +13,8 @@ Shared services used across main and (where applicable) renderer. Currently focu
 | `PreferencesConfigFile` | Typed preferences persistence layered on `ConfigFile`. Carries the prefs version and its migration chain, and seeds cue domains missing from an older file         |
 | `configurationDefaults` | The `AppPreferences` shape, `DEFAULT_PREFERENCES`, and the value normalizers preferences are read through                                                          |
 | `startupMigrations`     | One-time migrations that span several config files: fixture schema, stray sender keys, and the move to DMX rigs                                                    |
-| `preferencesMigration`  | The versioned `prefs.json` migrations and the cue-domain seeding `PreferencesConfigFile` calls                                                                     |
+| `preferencesMigration`  | The versioned `prefs.json` migrations `PreferencesConfigFile` calls                                                                                                |
+| `preferencesLoadRepair` | The repairs every `prefs.json` load runs: required keys and cue domains seeded, sender settings and the clock rate brought back into range                         |
 | `configDataValidators`  | Schema validation for each document, run after every load and before every write                                                                                   |
 | `configCorruptTypes`    | Corrupt-file reasons, the report the renderer receives, and the backup file name                                                                                   |
 | `cueDomainTypes`        | The six cue domains (`yarg`, `audio`, `rb3` and a motion counterpart for each), their preference shape, and the defaults                                           |
