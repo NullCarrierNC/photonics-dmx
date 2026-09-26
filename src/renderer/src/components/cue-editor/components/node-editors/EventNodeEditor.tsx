@@ -216,6 +216,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           <label className="flex flex-col font-medium">
             Cooldown (ms)
             <DraftNumberField
+              commitOnUnmount
               aria-label="Cooldown (ms)"
               min={0}
               step={10}

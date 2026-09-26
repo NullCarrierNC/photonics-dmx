@@ -79,7 +79,7 @@ type Props = {
   updateNodeId?: (newId: string) => void
 }
 
-/** Keyed by nodeId so draft state resets when selection changes without using an effect. */
+/** Mounted per node by the sidebar's key, so its draft starts from the node's id. */
 const NodeIdInput: React.FC<{
   nodeId: string
   onCommit?: (newId: string) => void
@@ -156,7 +156,9 @@ const NodeSidebar: React.FC<Props> = ({
         </div>
       ) : (
         <div className="p-3 flex-1 overflow-y-auto space-y-4">
-          <div>
+          {/* Keyed by node, so each node gets its own editor and a draft typed into one node's
+              editor commits to that node as the editor unmounts. */}
+          <div key={selectedNode.id}>
             <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
             {showNodeIds && (
               <div className="mb-3">
@@ -164,11 +166,7 @@ const NodeSidebar: React.FC<Props> = ({
                   Node ID
                 </label>
                 {updateNodeId ? (
-                  <NodeIdInput
-                    key={selectedNode.id}
-                    nodeId={selectedNode.id}
-                    onCommit={updateNodeId}
-                  />
+                  <NodeIdInput nodeId={selectedNode.id} onCommit={updateNodeId} />
                 ) : (
                   <span className="block text-sm font-mono text-gray-700 dark:text-gray-300 break-all">
                     {selectedNode.id}
