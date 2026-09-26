@@ -110,7 +110,7 @@ describe('an audio chase started on a beat frame', () => {
     )
   }
 
-  it.each<AudioCueLayerStyle>(['primary'])(
+  it.each<AudioCueLayerStyle>(['primary', 'secondary', 'strobe'])(
     'shows its first step on every rig from the %s slot',
     async (slot) => {
       const rigs = await playChaseOnBeatFrame(slot)
