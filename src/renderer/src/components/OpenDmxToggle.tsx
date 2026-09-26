@@ -20,6 +20,8 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
       label="OpenDMX Out"
       runningAtom={senderOpenDmxEnabledAtom}
       prefsFlag="openDmxEnabled"
+      // Nothing to open until a COM port or device path is set.
+      notReady={comPort.length < 3}
       disabled={disabled}
       compact={compact}
       enable={() => enableSender({ sender: 'opendmx', devicePath: comPort, dmxSpeed })}
