@@ -21,6 +21,9 @@ import {
 import { ValueSource, VariableType } from '../../types/nodeCueTypes'
 import type { ExecutionContext } from './ExecutionContext'
 import type { VariableValue } from './executionTypes'
+import { createLogger } from '../../../../shared/logger'
+
+const log = createLogger('valueResolver')
 
 /** Optional; when provided, variable lookups use scope-aware store (cue vs cue-group). */
 type VariableDefinitionsForScope = { name: string; scope: 'cue' | 'cue-group' }[]
@@ -150,8 +153,30 @@ export function inferVariableValue(value: number | string | boolean): VariableVa
 }
 
 /**
- * Comma-separated group names ("front,back"), keeping the known ones, or the front group when
- * none is known.
+ * Unknown values already reported, keyed by what they were read as and their text. A cue re-reads
+ * its values on every dispatch, so each text is reported once. The cap bounds a variable whose
+ * text changes on every read.
+ */
+const reportedUnknownValues = new Set<string>()
+const MAX_REPORTED_UNKNOWN_VALUES = 256
+
+/**
+ * Warns, once per text, that `value` is not a known `kind`. An undefined value is a source with
+ * nothing to read, such as a variable the caller could not look up, and takes its fallback quietly.
+ */
+function reportUnknownValue(kind: string, value: unknown, outcome: string): void {
+  if (value === undefined) return
+  const text = String(value)
+  const key = `${kind}:${text}`
+  if (reportedUnknownValues.has(key)) return
+  if (reportedUnknownValues.size >= MAX_REPORTED_UNKNOWN_VALUES) return
+  reportedUnknownValues.add(key)
+  log.warn(`Unknown ${kind} "${text}", ${outcome}`)
+}
+
+/**
+ * Comma-separated group names ("front,back"), keeping the known ones. Text naming no known group
+ * targets no lights, and warns.
  */
 export function parseLocationGroups(value: unknown): LocationGroup[] {
   const groups =
@@ -161,11 +186,15 @@ export function parseLocationGroups(value: unknown): LocationGroup[] {
           .map((g) => g.trim())
           .filter(isLocationGroup)
       : []
-  return groups.length > 0 ? groups : ['front']
+  if (groups.length === 0) reportUnknownValue('light group', value, 'lighting nothing')
+  return groups
 }
 
+/** A light filter, or every light of the groups for text naming no filter, which warns. */
 export function parseLightTarget(value: unknown): LightTarget {
-  return isLightTarget(value) ? value : 'all'
+  if (isLightTarget(value)) return value
+  reportUnknownValue('light filter', value, 'lighting every light of the groups')
+  return 'all'
 }
 
 export function parseColor(value: unknown): Color {
@@ -180,14 +209,21 @@ export function parseBlendMode(value: unknown): BlendMode {
   return isBlendMode(value) ? value : 'replace'
 }
 
+/** A wait condition, or no wait for text naming no condition, which warns. */
 export function parseWaitCondition(value: unknown): WaitCondition {
-  return isWaitCondition(value) ? value : 'none'
+  if (isWaitCondition(value)) return value
+  reportUnknownValue('wait condition', value, 'waiting for nothing')
+  return 'none'
 }
 
+/** The groups a target names. A light-array variable targets its own lights and names none. */
 export function resolveLocationGroups(
   source: ValueSource,
   context: ExecutionContext,
 ): LocationGroup[] {
+  if (source.source === 'variable' && lookupVariable(source.name, context).type === 'light-array') {
+    return []
+  }
   return parseLocationGroups(resolveString(source, context))
 }
 

@@ -538,16 +538,13 @@ describe('ActionEffectFactory resolving an authored action', () => {
     expect(getLights).toHaveBeenCalledWith(['back'], 'odd')
   })
 
-  it('falls back to the front lights, all of them, for variables it cannot read', () => {
-    const lightManager = new DmxLightManager(createMockLightingConfig())
-    const getLights = jest.spyOn(lightManager, 'getLights')
+  it('targets no lights for group and filter variables it cannot read', () => {
+    const resolved = ActionEffectFactory.resolveLights(
+      new DmxLightManager(createMockLightingConfig()),
+      { groups: variable('groupVar'), filter: variable('filterVar') },
+    )
 
-    ActionEffectFactory.resolveLights(lightManager, {
-      groups: variable('groupVar'),
-      filter: variable('filterVar'),
-    })
-
-    expect(getLights).toHaveBeenCalledWith(['front'], 'all')
+    expect(resolved).toEqual([])
   })
 
   it('reads a colour off its literals', () => {
@@ -625,13 +622,13 @@ describe('ActionEffectFactory resolving an authored action', () => {
       (values: Record<string, string>) =>
       (name: string): VariableValue => ({ type: 'string', value: values[name] })
 
-    it('falls back to the front lights for a literal group it does not know', () => {
+    it('targets no lights for a literal group it does not know', () => {
       const resolved = ActionEffectFactory.resolveLights(rig(), {
         groups: literal('frnt'),
         filter: literal('all'),
       })
 
-      expect(ids(resolved)).toEqual(['f1', 'f2'])
+      expect(ids(resolved)).toEqual([])
     })
 
     it('keeps the known groups of a list and drops the unknown one', () => {
@@ -652,11 +649,21 @@ describe('ActionEffectFactory resolving an authored action', () => {
       expect(ids(resolved)).toEqual(['f1', 'f2'])
     })
 
-    it('applies the same fallbacks to groups and a filter held in string variables', () => {
+    it('targets no lights for a group held in a string variable it does not know', () => {
       const resolved = ActionEffectFactory.resolveLights(
         rig(),
         { groups: variable('groupVar'), filter: variable('filterVar') },
-        stringVariables({ groupVar: 'frnt', filterVar: 'evens' }),
+        stringVariables({ groupVar: 'frnt', filterVar: 'all' }),
+      )
+
+      expect(ids(resolved)).toEqual([])
+    })
+
+    it('targets all of the lights for a filter held in a string variable it does not know', () => {
+      const resolved = ActionEffectFactory.resolveLights(
+        rig(),
+        { groups: variable('groupVar'), filter: variable('filterVar') },
+        stringVariables({ groupVar: 'front', filterVar: 'evens' }),
       )
 
       expect(ids(resolved)).toEqual(['f1', 'f2'])
