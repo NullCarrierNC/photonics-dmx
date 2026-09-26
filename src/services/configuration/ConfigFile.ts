@@ -38,7 +38,8 @@ export type ConfigFileHooks<T> = {
    * predates them passes validation instead of triggering corrupt-recovery.
    *
    * `reportRepair` tells the corrupt-recovery hook that stored values were put back to their
-   * defaults, with a message naming them.
+   * defaults, with a message naming them. It is passed on only once the repaired data passes
+   * `validate`, since a file that fails is set aside whole.
    */
   normalizeLoaded?: (data: T, reportRepair: (message: string) => void) => T
 }
@@ -286,6 +287,7 @@ export class ConfigFile<T> {
 
     let data: T
     let migratedNeedsPersist = false
+    const repairs: ConfigCorruptInfo[] = []
     try {
       if (envelope.versioned) {
         data = envelope.data
@@ -300,7 +302,7 @@ export class ConfigFile<T> {
         // Repair shape additions that a same-version file may predate (e.g. new required keys),
         // so validation below never fails on them. Persist only when it actually changed the data.
         const normalized = this.normalizeLoaded(data, (message) =>
-          this.onCorruptRecovery?.({
+          repairs.push({
             fileName: path.basename(this.filePath),
             filePath: this.filePath,
             reason: 'repaired',
@@ -329,6 +331,7 @@ export class ConfigFile<T> {
       }
     }
 
+    for (const repair of repairs) this.onCorruptRecovery?.(repair)
     return { ok: true, data, version, needsPersist: migratedNeedsPersist }
   }
 

@@ -51,6 +51,7 @@ function boot(files: {
   lights?: unknown[]
   lightsFile?: unknown
   layoutLights?: unknown[]
+  layout?: Record<string, unknown>
 }): ConfigurationManager {
   ;(fs.existsSync as jest.Mock).mockReturnValue(true)
   ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
@@ -59,7 +60,7 @@ function boot(files: {
       return JSON.stringify(files.lightsFile ?? { lights: files.lights ?? [] })
     }
     if (path.includes('lightsLayout.json')) {
-      return JSON.stringify(layoutWith(files.layoutLights ?? []))
+      return JSON.stringify({ ...layoutWith(files.layoutLights ?? []), ...files.layout })
     }
     return '{}'
   })
@@ -172,5 +173,18 @@ describe('ConfigurationManager fixture loading', () => {
       blue: 0,
     })
     expect(reportsFor(cm, 'lightsLayout.json')[0]?.message).toContain('frontLights[0].channels')
+  })
+
+  it('reports only the set-aside when a repaired file then fails its check', () => {
+    const cm = boot({
+      layout: { strobeType: 'Strobe' },
+      layoutLights: [
+        template({ fixtureId: 'tpl-1', group: 'front', mount: 'floor', channels: { red: 2 } }),
+      ],
+    })
+
+    expect(reportsFor(cm, 'lightsLayout.json')).toEqual([
+      expect.objectContaining({ reason: 'schema' }),
+    ])
   })
 })
