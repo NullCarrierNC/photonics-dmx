@@ -53,7 +53,8 @@ function sameStep(a: EffectTransition, b: EffectTransition): boolean {
  * Carries `running` over to `steps`, its effect resubmitted for the same light. With the same
  * steps it runs on untouched. Partway through the same first fade to a different colour, it takes
  * the new steps and the fade heads for the new colour from where it is, on its own clock. Returns
- * false when the light has to start the resubmission afresh.
+ * false when the light has to start the resubmission afresh, which an effect past its last
+ * step always does.
  */
 function carryOver(
   running: LightEffectState | undefined,
@@ -63,6 +64,7 @@ function carryOver(
   lightTransitionController: LightTransitionController,
 ): boolean {
   if (running?.name !== name || steps.length === 0) return false
+  if (running.currentTransitionIndex >= running.transitions.length) return false
   if (
     running.transitions.length === steps.length &&
     running.transitions.every((step, index) => sameStep(step, steps[index]))

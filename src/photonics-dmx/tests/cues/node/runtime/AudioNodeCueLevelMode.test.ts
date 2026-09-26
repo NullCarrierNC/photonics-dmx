@@ -552,4 +552,46 @@ describe('AudioNodeCue level mode', () => {
       h.cleanup()
     }
   })
+
+  it.each([
+    ['a steady level', (): number => 0.8],
+    ['a level rising every frame', (frame: number): number => 0.4 + frame * 0.05],
+  ] as const)('builds a 100 ms fade across 20 ms frames at %s', async (_, energyAt) => {
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-fade',
+      cueTypeId: 'level-fade',
+      name: 'Level fade',
+      style: 'secondary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [setColor('sc1', { source: 'literal', value: 'front' }, 1)],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    }
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+
+    try {
+      const reds: number[] = []
+      for (let frame = 0; frame < 12; frame++) {
+        await cue.execute(audioCueData(energyAt(frame)), h.sequencer, h.lightManager)
+        h.advanceBy(10)
+        h.advanceBy(10)
+        reds.push(h.getLightState(h.frontLightIds[0])?.red ?? 0)
+      }
+
+      expect(reds[6]).toBe(255)
+      expect(reds.every((red, index) => index === 0 || red >= reds[index - 1])).toBe(true)
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
+  })
 })

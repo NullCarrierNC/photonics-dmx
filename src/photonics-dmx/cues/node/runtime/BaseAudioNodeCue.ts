@@ -47,6 +47,11 @@ const LEVEL_BASE_OFF: RGBIO = {
   blendMode: 'replace',
 }
 
+/** Whether two light lists name the same lights in the same order. */
+function sameLights(a: TrackedLight[], b: TrackedLight[]): boolean {
+  return a.length === b.length && a.every((light, index) => light.id === b[index].id)
+}
+
 /**
  * Take a level effect off the sequencer. The sequencer keeps a light's layer-0 state once the
  * effect there ends, so a look on the base layer also sets its lights to black, unless a blackout
@@ -333,12 +338,16 @@ export abstract class BaseAudioNodeCue {
           })
 
           if (effect) {
+            const running = state.activeLevelEffects.get(effectKey)
             if (state.firstSubmissionUsesSetEffectRef.use) {
               // The first submission replaces the look like the engine's, leaving motion running.
               state.firstSubmissionUsesSetEffectRef.use = false
               sequencer.setEffect(effectKey, effect)
+            } else if (running && running.layer === layer && sameLights(running.lights, lights)) {
+              // Each frame's level goes to the effect already running, so a fade builds.
+              sequencer.updateEffect(effectKey, effect)
             } else {
-              sequencer.removeEffect(effectKey, layer)
+              if (running) sequencer.removeEffect(effectKey, running.layer)
               sequencer.addEffect(effectKey, effect)
             }
             state.activeLevelEffects.set(effectKey, { layer, lights })
