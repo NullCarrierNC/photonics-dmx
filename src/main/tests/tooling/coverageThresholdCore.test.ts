@@ -157,6 +157,62 @@ describe('loosenedCoverage', () => {
   })
 })
 
+describe('loosenedCoverage on the tests Jest runs', () => {
+  it('names a test path ignore pattern a project adds', () => {
+    const current = withProject(0, { testPathIgnorePatterns: ['/node_modules/', '/src/main/'] })
+
+    expect(loosenedCoverage(current, config())).toEqual([
+      "engine: testPathIgnorePatterns adds '/src/main/'",
+    ])
+  })
+
+  it('names a testRegex or testMatch entry dropped', () => {
+    const base = withProject(0, { testRegex: ['\\.test\\.ts$', '\\.spec\\.ts$'] })
+    const current = withProject(0, { testRegex: ['\\.test\\.ts$'] })
+    const matchBase = withProject(1, { testMatch: ['**/*.test.tsx', '**/*.spec.tsx'] })
+    const matchCurrent = withProject(1, { testMatch: ['**/*.test.tsx'] })
+
+    expect(loosenedCoverage(current, base)).toEqual(["engine: testRegex drops '\\.spec\\.ts$'"])
+    expect(loosenedCoverage(matchCurrent, matchBase)).toEqual([
+      "renderer: testMatch drops '**/*.spec.tsx'",
+    ])
+  })
+
+  it("names Jest's default testMatch dropped when a narrower testRegex replaces it", () => {
+    const current = withProject(1, { testRegex: 'renderer/.*\\.test\\.tsx$' })
+
+    expect(loosenedCoverage(current, config())).toEqual([
+      "renderer: testMatch drops '**/__tests__/**/*.?([mc])[jt]s?(x)'",
+      "renderer: testMatch drops '**/?(*.)+(spec|test).?([mc])[jt]s?(x)'",
+    ])
+  })
+
+  it('names a root narrowed and passes one widened', () => {
+    const base = withProject(0, { roots: ['<rootDir>/src'] })
+
+    expect(loosenedCoverage(withProject(0, { roots: ['<rootDir>/src/main'] }), base)).toEqual([
+      "engine: roots drops '<rootDir>/src'",
+    ])
+    expect(loosenedCoverage(withProject(0, { roots: ['<rootDir>'] }), base)).toEqual([])
+  })
+
+  it('names a project dropped', () => {
+    const base = config()
+    const current = config({ projects: [(base.projects as Config[])[0]] })
+
+    expect(loosenedCoverage(current, base)).toEqual(["projects drops 'renderer'"])
+  })
+
+  it('passes a test path ignore pattern removed and a project added', () => {
+    const base = withProject(0, { testPathIgnorePatterns: ['/node_modules/', '/src/renderer/'] })
+    const current = config({
+      projects: [...(config().projects as Config[]), { displayName: 'tools' }],
+    })
+
+    expect(loosenedCoverage(current, base)).toEqual([])
+  })
+})
+
 describe('isMissingCommit', () => {
   it('reads the all-zero id and an empty one as no commit', () => {
     expect(isMissingCommit('0000000000000000000000000000000000000000')).toBe(true)
