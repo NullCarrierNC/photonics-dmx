@@ -16,7 +16,6 @@ import type {
   ValueSource,
 } from '../../types/nodeCueTypes'
 import {
-  ResolvedActionTarget,
   ResolvedActionTiming,
   ResolvedColorSetting,
   resolvePositionToAbsolutePercent,
@@ -40,13 +39,6 @@ const literalValue = (source: ValueSource | undefined) =>
   source?.source === 'literal' ? source.value : undefined
 
 export class ActionEffectFactory {
-  private static resolveTarget(target: NodeActionTarget): ResolvedActionTarget {
-    return {
-      groups: parseLocationGroups(literalValue(target.groups)),
-      filter: parseLightTarget(literalValue(target.filter)),
-    }
-  }
-
   private static resolveColorSetting(color: NodeColorSetting): ResolvedColorSetting {
     const opacity = color.opacity?.source === 'literal' ? Number(color.opacity.value) : undefined
 
@@ -78,33 +70,26 @@ export class ActionEffectFactory {
     }
   }
 
+  /**
+   * The lights an action targets. A light-array variable in the groups slot names its own lights
+   * and skips the filter. Groups and a filter held in any other variable read its value.
+   */
   public static resolveLights(
     lightManager: DmxLightManager,
     target: NodeActionTarget,
     variableResolver?: (name: string) => VariableValue | undefined,
   ): TrackedLight[] {
-    // Check if groups is a variable reference
-    if (target.groups.source === 'variable' && variableResolver) {
-      const varValue = variableResolver(target.groups.name)
+    const read = (source: ValueSource): unknown =>
+      source.source === 'variable' ? variableResolver?.(source.name)?.value : source.value
 
-      // If it's a light-array variable, use those exact lights (ignore filter)
-      if (varValue?.type === 'light-array') {
-        return varValue.value
-      }
-
-      // If it's a string variable, treat as group name(s) and resolve with filter
-      if (varValue && typeof varValue.value === 'string') {
-        const filter =
-          target.filter.source === 'variable'
-            ? parseLightTarget(variableResolver(target.filter.name)?.value)
-            : parseLightTarget(target.filter.value)
-        return lightManager.getLights(parseLocationGroups(varValue.value), filter)
-      }
+    if (target.groups.source === 'variable') {
+      const held = variableResolver?.(target.groups.name)
+      if (held?.type === 'light-array') return held.value
     }
 
-    // Standard group/filter resolution
-    const resolved = this.resolveTarget(target)
-    return lightManager.getLights(resolved.groups, resolved.filter)
+    const groups = parseLocationGroups(read(target.groups))
+    if (groups.length === 0) return []
+    return lightManager.getLights(groups, parseLightTarget(read(target.filter)))
   }
 
   public static buildEffect(params: BuildEffectParams): Effect | null {

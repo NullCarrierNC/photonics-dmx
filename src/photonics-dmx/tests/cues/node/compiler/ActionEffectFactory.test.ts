@@ -662,6 +662,16 @@ describe('ActionEffectFactory resolving an authored action', () => {
       expect(ids(resolved)).toEqual(['f1', 'f2'])
     })
 
+    it('filters literal groups by a filter held in a string variable', () => {
+      const resolved = ActionEffectFactory.resolveLights(
+        rig(),
+        { groups: literal('front'), filter: variable('filterVar') },
+        stringVariables({ filterVar: 'odd' }),
+      )
+
+      expect(ids(resolved)).toEqual(['f2'])
+    })
+
     it('uses blue at medium, replacing, for colour literals it does not know', () => {
       const unknown = firstTransition(
         setColor({
