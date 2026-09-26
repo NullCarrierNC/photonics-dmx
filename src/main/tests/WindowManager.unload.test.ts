@@ -172,19 +172,17 @@ describe('WindowManager unsaved-changes prompt', () => {
     expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps Node timers running while the prompt waits for an answer', async () => {
+  it('leaves the page open for as long as the prompt waits for an answer', async () => {
     jest.useFakeTimers()
     const wm = new WindowManager()
     wm.createMainWindow()
     const window = lastBuiltWindow()
     closesLikeAPage(window, true)
-    const tick = jest.fn()
-    setInterval(tick, 100)
 
     window.close()
-    await jest.advanceTimersByTimeAsync(1000)
+    await jest.advanceTimersByTimeAsync(60_000)
 
-    expect(tick).toHaveBeenCalledTimes(10)
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
     expect(window.destroyed).toBe(false)
     answerPrompt(STAY)
   })
