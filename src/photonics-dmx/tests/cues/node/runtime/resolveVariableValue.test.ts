@@ -24,7 +24,8 @@ describe('resolveVariableValue', () => {
     ['an unreadable string as a number', 'number', literal('fast'), 0],
     ['a string as a string', 'string', literal('beat'), 'beat'],
     ['a number as a string', 'string', literal(5), '5'],
-    ['a colour name as a colour', 'color', literal('blue'), 'blue'],
+    ['a colour name as a colour', 'color', literal('red'), 'red'],
+    ['an unknown colour name as blue', 'color', literal('mauve'), 'blue'],
     ['a flag as a flag', 'boolean', literal(true), true],
   ] as const)('reads %s', (_label, type, source, expected) => {
     expect(resolveVariableValue(type, source, contextWith())).toEqual({ type, value: expected })

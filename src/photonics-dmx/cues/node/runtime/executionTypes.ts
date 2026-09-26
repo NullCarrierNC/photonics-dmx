@@ -1,5 +1,6 @@
 import { TrackedLight, Color, isColor } from '../../../types'
 import type { VariableType } from '../../types/nodeCueTypes'
+import { parseColor } from './valueResolver'
 
 /**
  * Variable value stored in variable stores, holding the value its type names.
@@ -7,7 +8,8 @@ import type { VariableType } from '../../types/nodeCueTypes'
 export type VariableValue =
   | { type: 'number'; value: number }
   | { type: 'boolean'; value: boolean }
-  | { type: 'string' | 'cue-type' | 'event' | 'color'; value: string }
+  | { type: 'string' | 'cue-type' | 'event'; value: string }
+  | { type: 'color'; value: Color }
   | { type: 'light-array'; value: TrackedLight[] }
   | { type: 'color-array'; value: Color[] }
 
@@ -30,6 +32,8 @@ export function variableValue(type: VariableType, raw: unknown): VariableValue {
       return { type, value: raw === true || raw === 'true' }
     case 'light-array':
       return { type, value: [] }
+    case 'color':
+      return { type, value: parseColor(raw) }
     case 'color-array':
       return { type, value: Array.isArray(raw) ? raw.filter(isColor) : [] }
     default:
