@@ -55,6 +55,8 @@ interface Expected {
   effects?: string[]
   /** Files that do not load at all, as the loader reports them. */
   refused?: string[]
+  /** Seeded files this build does not ship, which startup sets aside. */
+  retired?: string[]
 }
 
 const noKind = (file: string): string =>
@@ -94,16 +96,21 @@ const EXPECTED: Record<string, Expected> = {
       noKind('audio-stagekit.json'),
     ],
   },
-  'v0.5.5-alpha.5': { cues: [harmonyEasing] },
+  'v0.5.5-alpha.5': {
+    cues: [harmonyEasing],
+    retired: ['audio-motion-fast.json', 'yarg-motion-fast.json'],
+  },
   'v0.6.1-alpha.6': {
     cues: [harmonyEasing],
-    // Seeded by these builds and shipped by none since. The action waits on 'audio-trigger',
-    // which this build does not read as a wait condition.
+    // Seeded by these builds and shipped by none since, so startup retires it. Its action waits on
+    // 'audio-trigger', which this build does not read as a wait condition.
     refused: [
       "tests.json: No audio cue in the group compiled. audio cue 'custom-audio-cue': Action 'action-fe655c4d-85a9-4321-ae5c-53a7f125c434' timing.waitForCondition 'audio-trigger' is not a known wait condition.",
     ],
+    retired: ['audio-motion-fast.json', 'tests.json'],
   },
   'v0.6.2-alpha.6': {
+    retired: ['audio-motion-fast.json'],
     config: [
       ...inLayout(strobeRowRepairs('strobeLights[0]', false)),
       ...inRigs(strobeRowRepairs('rigs[0].config.strobeLights[0]', false)),
@@ -139,6 +146,15 @@ function setAside(dir: string): string[] {
   return fs
     .readdirSync(dir, { recursive: true, encoding: 'utf-8' })
     .filter((name) => /\.(corrupt|repaired)-/.test(name))
+}
+
+/** The files under `dir` that startup retired, by the name they had. */
+function retired(dir: string): string[] {
+  return fs
+    .readdirSync(dir, { recursive: true, encoding: 'utf-8' })
+    .filter((name) => name.includes('.retired-'))
+    .map((name) => path.basename(name).replace(/\.retired-.*$/, ''))
+    .sort()
 }
 
 /** Waits for the settings files' background saves, which leave a temp file while in flight. */
@@ -270,8 +286,9 @@ describe.each(sets.map((set) => [set.id, set] as const))('files the %s build wro
     await copyDefaultData('', baseDir)
     const outcome = await loadNodeFiles(baseDir)
 
-    expect(outcome.errors).toEqual(expected.refused ?? [])
+    expect(outcome.errors).toEqual([])
     expect(outcome.fileErrors).toEqual({})
     expect(setAside(baseDir)).toEqual([])
+    expect(retired(baseDir)).toEqual(expected.retired ?? [])
   })
 })
