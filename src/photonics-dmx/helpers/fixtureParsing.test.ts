@@ -62,11 +62,29 @@ describe('parseDmxFixture', () => {
     ])
   })
 
-  it('drops unusable strobe values', () => {
+  it('keeps the usable strobe values and puts only the bad one back to its default', () => {
     const { fixture, faults } = parse(rgb({ strobeValues: { slow: 1, medium: 2, fast: 3 } }))
 
-    expect(fixture).not.toHaveProperty('strobeValues')
+    expect(fixture?.strobeValues).toEqual({
+      slow: 1,
+      medium: 2,
+      fast: 3,
+      fastest: DEFAULT_STROBE_CHANNEL_VALUES.fastest,
+    })
     expect(faults).toEqual(['lights[0].strobeValues.fastest must be an integer between 0 and 255'])
+  })
+
+  it('reports a config key no fixture config has', () => {
+    const { fixture, faults } = parse(
+      rgb({
+        fixture: 'rgb/mh',
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, pan: 5, tilt: 6 },
+        config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG, spin: true },
+      }),
+    )
+
+    expect(fixture?.config).toEqual(DEFAULT_MOVING_HEAD_FIXTURE_CONFIG)
+    expect(faults).toEqual(['lights[0].config.spin is not a fixture config field'])
   })
 
   it('tells a dropped key apart from a value put back to its default', () => {

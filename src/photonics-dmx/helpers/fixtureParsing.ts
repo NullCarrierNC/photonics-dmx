@@ -4,6 +4,7 @@
  * reported, and a fixture of a type this build does not know comes back as null.
  */
 import {
+  DEFAULT_STROBE_CHANNEL_VALUES,
   DMX_CHANNEL_MAX,
   FixtureTypes,
   FIXTURE_CONFIG_FIELDS,
@@ -150,6 +151,9 @@ function parseChannels(
   return layout
 }
 
+/** Config keys a stored fixture may carry: the current fields and the legacy `invert` flag. */
+const STORED_CONFIG_FIELDS: ReadonlySet<string> = new Set([...FIXTURE_CONFIG_FIELDS, 'invert'])
+
 function parseConfig(raw: unknown, path: string, report: FixtureFaultReport): FixtureConfig {
   const stored: Partial<FixtureConfig> & LegacyFixtureConfigFields = {}
   const source = isPlainObject(raw) ? raw : {}
@@ -166,11 +170,17 @@ function parseConfig(raw: unknown, path: string, report: FixtureFaultReport): Fi
     }
   }
   if (typeof source.invert === 'boolean') stored.invert = source.invert
+  for (const key of Object.keys(source)) {
+    if (!STORED_CONFIG_FIELDS.has(key)) {
+      report(`${path}.config.${key} is not a fixture config field`, 'dropped')
+    }
+  }
   return normalizeFixtureConfig(stored)
 }
 
 const STROBE_VALUE_KEYS = ['slow', 'medium', 'fast', 'fastest'] as const
 
+/** The stored strobe values, with each unusable one back at its default. */
 function parseStrobeValues(
   raw: unknown,
   path: string,
@@ -180,13 +190,22 @@ function parseStrobeValues(
     report(`${path}.strobeValues must be a plain object`, 'reset')
     return undefined
   }
-  const { slow, medium, fast, fastest } = raw
-  if (isDmxValue(slow) && isDmxValue(medium) && isDmxValue(fast) && isDmxValue(fastest)) {
-    return { slow, medium, fast, fastest }
+  const values: StrobeChannelValues = { ...DEFAULT_STROBE_CHANNEL_VALUES }
+  const bad: string[] = []
+  for (const key of STROBE_VALUE_KEYS) {
+    const value = raw[key]
+    if (isDmxValue(value)) values[key] = value
+    else bad.push(key)
   }
-  const bad = STROBE_VALUE_KEYS.filter((key) => !isDmxValue(raw[key]))
-  report(`${path}.strobeValues.${bad.join(', ')} must be an integer between 0 and 255`, 'reset')
-  return undefined
+  if (bad.length > 0) {
+    report(`${path}.strobeValues.${bad.join(', ')} must be an integer between 0 and 255`, 'reset')
+  }
+  for (const key of Object.keys(raw)) {
+    if (!(STROBE_VALUE_KEYS as readonly string[]).includes(key)) {
+      report(`${path}.strobeValues.${key} is not a strobe speed`, 'dropped')
+    }
+  }
+  return values
 }
 
 function parseExtraChannel(
