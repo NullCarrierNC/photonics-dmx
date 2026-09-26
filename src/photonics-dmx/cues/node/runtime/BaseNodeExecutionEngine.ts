@@ -33,6 +33,7 @@ import {
 import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
 import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
+import { AwaitedEffects } from './awaitedEffects'
 import type { AudioCueData } from '../../types/audioCueTypes'
 import type { Effect } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
@@ -107,6 +108,7 @@ export abstract class BaseNodeExecutionEngine {
   protected variableDefinitions: VariableDefinition[]
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   protected submittedEffects: Map<string, number> = new Map()
+  private readonly awaitedEffects = new AwaitedEffects()
   /** motion-pattern effect names for cancelAll → removeMotionPattern. */
   protected submittedMotionPatterns: Set<string> = new Set()
   /** Last submitted set-position payload per effect name (idempotency after transition ends). */
@@ -690,6 +692,7 @@ export abstract class BaseNodeExecutionEngine {
       }
     }
     this.submittedEffects.clear()
+    this.awaitedEffects.clear()
 
     for (const name of this.submittedMotionPatterns) {
       if (!skipEffectRemoval) {
@@ -703,10 +706,24 @@ export abstract class BaseNodeExecutionEngine {
   }
 
   /**
-   * Cancel the running contexts, or only those started from `eventNodeId`. Their effects stay up:
-   * cancelAll removes them itself, and a restarted run replaces them by name.
+   * Cancel the runs started from `eventNodeId` and remove the effects they wait on, so a new run of
+   * the event can submit under the same names. Waiters on those names are released with
+   * `cancelled = true`. Effects the runs submitted without waiting stay up.
    */
-  public cancelContexts(eventNodeId?: string): void {
+  public cancelEventRuns(eventNodeId: string): void {
+    const runs = [...this.activeContexts.values()].filter((c) => c.eventNode.id === eventNodeId)
+    const awaited = this.awaitedEffects.take(runs.map((c) => c.id))
+    this.cancelContexts(eventNodeId)
+    for (const [name, layer] of awaited) {
+      this.sequencer.removeEffect(name, layer)
+    }
+  }
+
+  /**
+   * Cancel the running contexts, or only those started from `eventNodeId`. Their effects stay up
+   * on the sequencer, and cancelAll removes them itself.
+   */
+  private cancelContexts(eventNodeId?: string): void {
     for (const [contextId, context] of this.activeContexts) {
       if (eventNodeId !== undefined && context.eventNode.id !== eventNodeId) continue
       this.onContextCancelled(contextId)
@@ -1133,6 +1150,7 @@ export abstract class BaseNodeExecutionEngine {
     const onComplete = (cancelled = false): void => {
       this.clearPendingCallbackEffect(name)
       this.submittedEffects.delete(name)
+      this.awaitedEffects.settle(context.id, name)
       settle(cancelled)
     }
     const accepted = useSetEffect
@@ -1144,6 +1162,7 @@ export abstract class BaseNodeExecutionEngine {
     }
     this.markPendingCallbackEffect(name)
     this.submittedEffects.set(name, layer)
+    this.awaitedEffects.add(context.id, name, layer)
   }
 
   protected abstract startListenerExecution(

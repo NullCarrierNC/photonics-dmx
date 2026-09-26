@@ -331,8 +331,9 @@ export class GraphExecutionEngine {
   }
 
   /**
-   * Cancel a lifecycle run that has held the slot past {@link LIFECYCLE_RUN_EXPIRY_MS}. Its effects
-   * stay up, and the frame waiting behind it gives way to the one arriving now.
+   * Cancel a lifecycle run that has held the slot past {@link LIFECYCLE_RUN_EXPIRY_MS} and remove
+   * the effects it waits on, so the arriving frame runs in its place and can submit under the same
+   * names. The frame waiting behind the stuck run is dropped.
    */
   private expireStuckLifecycleRun(): void {
     if (!this.isExecutingCueStarted || !this.nodeEngine) return
@@ -341,7 +342,7 @@ export class GraphExecutionEngine {
       ...this.compiled.eventMap.values(),
     ])
     for (const event of [...cueStartedNodes, ...cueCalledNodes]) {
-      this.nodeEngine.cancelContexts(event.id)
+      this.nodeEngine.cancelEventRuns(event.id)
     }
     this.isExecutingCueStarted = false
     this.pendingParameters = null
