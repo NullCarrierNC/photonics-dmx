@@ -17,34 +17,65 @@ export function bindConsoleModeToRenderer(
   webContents: WebContents,
   disableConsoleMode: () => Promise<unknown>,
 ): void {
-  let released = false
+  onRendererGone(webContents, (reason) => {
+    log.info(`Leaving console mode: the page ${reason}`)
+    disableConsoleMode().catch((err) => {
+      log.error('Error leaving console mode:', err)
+    })
+  })
+}
+
+/**
+ * Whether the page has gone since this call. A console entry waits its turn on the lifecycle queue,
+ * and the page that asked can close, crash or reload before the entry runs.
+ */
+export function watchRendererPresence(webContents: WebContents): {
+  hasGone: () => boolean
+  stop: () => void
+} {
+  let gone = false
+  const stop = onRendererGone(webContents, () => {
+    gone = true
+  })
+  return { hasGone: () => gone, stop }
+}
+
+/**
+ * Call `onGone` once, the first time the page reloads, navigates, closes or stops running. The
+ * returned function removes the listeners without calling it.
+ */
+function onRendererGone(webContents: WebContents, onGone: (reason: string) => void): () => void {
+  let settled = false
 
   const onNavigate = (details: { isMainFrame: boolean; isSameDocument: boolean }): void => {
     // A same-document navigation is the in-app router moving between pages, which the page itself
     // handles. Only a real document load takes the console's renderer state with it.
     if (details.isMainFrame && !details.isSameDocument) {
-      release('navigated')
+      settle('navigated')
     }
   }
+  const onDestroyed = (): void => settle('closed')
+  const onProcessGone = (): void => settle('stopped')
 
-  const onDestroyed = (): void => release('closed')
-  const onGone = (): void => release('stopped')
-
-  const release = (reason: string): void => {
-    if (released) {
-      return
-    }
-    released = true
+  const detach = (): void => {
     webContents.off('did-start-navigation', onNavigate)
     webContents.off('destroyed', onDestroyed)
-    webContents.off('render-process-gone', onGone)
-    log.info(`Leaving console mode: the page ${reason}`)
-    disableConsoleMode().catch((err) => {
-      log.error('Error leaving console mode:', err)
-    })
+    webContents.off('render-process-gone', onProcessGone)
+  }
+  const settle = (reason: string): void => {
+    if (settled) {
+      return
+    }
+    settled = true
+    detach()
+    onGone(reason)
   }
 
   webContents.once('destroyed', onDestroyed)
-  webContents.once('render-process-gone', onGone)
+  webContents.once('render-process-gone', onProcessGone)
   webContents.on('did-start-navigation', onNavigate)
+  return () => {
+    settled = true
+    detach()
+  }
 }
