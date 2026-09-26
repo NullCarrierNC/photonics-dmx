@@ -278,6 +278,28 @@ export function variableIssue(
   return warning(`'${name}' is a ${variable.type} variable, and this field takes ${expected}`)
 }
 
+/**
+ * The variable types a target's groups can read: a light-array names its own lights, and a string
+ * holds group names.
+ */
+export const GROUPS_VARIABLE_TYPES: readonly string[] = ['string', 'light-array']
+
+/**
+ * Whether a target's groups can read variable `name`, given the declared variables. A name none
+ * declares is taken on trust, as {@link variableIssue} takes it.
+ */
+export function groupsVariableIssue(
+  name: string,
+  variables: ReadonlyArray<{ name: string; type: string }>,
+): ValueIssue | null {
+  if (name === '') return error('Select a variable')
+  const variable = variables.find((v) => v.name === name)
+  if (!variable || GROUPS_VARIABLE_TYPES.includes(variable.type)) return null
+  return warning(
+    `'${name}' is a ${variable.type} variable, and this field takes a string or light-array variable`,
+  )
+}
+
 /** The ruled action fields each variable of a graph feeds directly, by variable name. */
 function variableRules(actions: readonly ActionNode[]): Map<string, ValueRule[]> {
   const rules = new Map<string, ValueRule[]>()
