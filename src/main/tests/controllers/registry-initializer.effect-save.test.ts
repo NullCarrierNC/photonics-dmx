@@ -3,6 +3,14 @@ import * as os from 'os'
 import * as path from 'path'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
+// A save reports its own change, so the loaders' file watchers stand in as inert emitters. Real
+// ones spend seconds scanning and closing on a busy machine.
+jest.mock('chokidar', () => {
+  const { EventEmitter } = jest.requireActual<typeof import('events')>('events')
+  const watch = () => Object.assign(new EventEmitter(), { close: () => Promise.resolve() })
+  return { __esModule: true, default: { watch }, watch }
+})
+
 let mockAppData = ''
 jest.mock('electron', () => ({
   app: { getPath: () => mockAppData },
