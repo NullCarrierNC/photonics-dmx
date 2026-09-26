@@ -72,6 +72,7 @@ describe('ConfirmModal', () => {
   it('cancels on a click outside the panel', () => {
     const { onCancel } = open()
 
+    fireEvent.mouseDown(screen.getByRole('presentation'))
     fireEvent.click(screen.getByRole('presentation'))
 
     expect(onCancel).toHaveBeenCalledTimes(1)

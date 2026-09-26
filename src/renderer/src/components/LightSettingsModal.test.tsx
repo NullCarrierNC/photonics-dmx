@@ -67,6 +67,7 @@ describe('LightSettingsModal', () => {
     fireEvent.click(screen.getByText('Cancel'))
     expect(onCancel).toHaveBeenCalledTimes(1)
 
+    fireEvent.mouseDown(screen.getByRole('presentation'))
     fireEvent.click(screen.getByRole('presentation'))
     expect(onCancel).toHaveBeenCalledTimes(2)
 

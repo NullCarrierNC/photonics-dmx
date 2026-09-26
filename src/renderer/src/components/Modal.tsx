@@ -5,6 +5,7 @@ import {
   type FC,
   type FocusEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
 
@@ -57,6 +58,8 @@ const Modal: FC<ModalProps> = ({
   const panelRef = useRef<HTMLDivElement>(null)
   // Read during the first render, before an autoFocus control in the panel can take focus.
   const [opener] = useState(() => document.activeElement as HTMLElement | null)
+  // Whether the press behind the current click began on the backdrop itself.
+  const pressedOnBackdrop = useRef(false)
 
   useEffect(() => {
     const panel = panelRef.current
@@ -113,10 +116,22 @@ const Modal: FC<ModalProps> = ({
     ;(event.shiftKey ? last : first).focus()
   }
 
+  // A click closes only when its press also began on the backdrop, so a text selection dragged out
+  // of the panel keeps the dialog. The second click of a double click is the tail end of whatever
+  // the first one opened, such as a prompt that covered the button under the pointer.
+  const handleBackdropClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (dismissible && pressedOnBackdrop.current && event.detail < 2) {
+      onClose()
+    }
+  }
+
   return (
     <div
       className={backdropClassName ? `${BACKDROP} ${backdropClassName}` : BACKDROP}
-      onClick={dismissible ? onClose : undefined}
+      onMouseDown={(event) => {
+        pressedOnBackdrop.current = event.target === event.currentTarget
+      }}
+      onClick={handleBackdropClick}
       role="presentation">
       <div
         ref={panelRef}

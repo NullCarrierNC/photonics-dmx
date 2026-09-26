@@ -94,10 +94,27 @@ describe('Modal', () => {
 
   it('closes on a click on the backdrop and not on one inside the panel', () => {
     const { onClose } = open()
-    fireEvent.click(screen.getByRole('dialog'))
+    clickOn(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('presentation'))
+    clickOn(screen.getByRole('presentation'))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays open when a press inside the panel is released on the backdrop', () => {
+    const { onClose } = open()
+    const backdrop = screen.getByRole('presentation')
+
+    fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Name' }))
+    fireEvent.mouseUp(backdrop)
+    fireEvent.click(backdrop)
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('stays open on the second click of a double click on the backdrop', () => {
+    const { onClose } = open()
+    clickOn(screen.getByRole('presentation'), 2)
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('keeps typed input through a backdrop click and Escape when it is not dismissible', () => {
