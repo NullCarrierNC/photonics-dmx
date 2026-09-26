@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 12,
+  "cueVersion": 13,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -2628,14 +2628,14 @@
             "id": "sk-harmony-yellow-off",
             "type": "logic",
             "logicType": "math",
-            "operator": "divide",
+            "operator": "wrap",
             "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
               "source": "literal",
               "value": 3
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
             },
             "assignTo": "yellowOffset"
           },
@@ -2643,14 +2643,14 @@
             "id": "sk-harmony-red-off",
             "type": "logic",
             "logicType": "math",
-            "operator": "divide",
+            "operator": "wrap",
             "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
               "source": "literal",
               "value": 4
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
             },
             "assignTo": "redOffset"
           },
