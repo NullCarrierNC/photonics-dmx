@@ -2,6 +2,7 @@ import { app } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { createLogger } from '../../shared/logger'
+import { isPlainObject } from '../ipc/validation/primitives'
 
 const log = createLogger('copyDefaultData')
 
@@ -47,7 +48,7 @@ async function writeJsonAtomic(destPath: string, data: Record<string, unknown>):
 }
 
 /**
- * Rename a file that will not parse out of the way, keeping a timestamped copy.
+ * Rename a file that holds no JSON object out of the way, keeping a timestamped copy.
  *
  * The same shape ConfigFile uses when it recovers a corrupt config: the bytes are kept, so a file
  * the user had edited is recoverable rather than gone.
@@ -57,7 +58,7 @@ async function quarantineCorruptFile(filePath: string): Promise<void> {
   const asideName = `${filePath}.corrupt-${stamp}`
   try {
     await fs.rename(filePath, asideName)
-    log.error(`Seeded file ${filePath} would not parse, kept as ${asideName} and seeded again`)
+    log.error(`Seeded file ${filePath} held no JSON object, kept as ${asideName} and seeded again`)
   } catch (err) {
     log.error(`Could not move the unparsable ${filePath} aside, seeding over it:`, err)
   }
@@ -93,10 +94,10 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
       await copyDirectory(sourcePath, destPath)
     } else if (entry.isFile()) {
       if (entry.name.toLowerCase().endsWith('.json')) {
-        let sourceObj: Record<string, unknown>
+        let sourceBody: unknown
         try {
           const sourceRaw = await fs.readFile(sourcePath, 'utf-8')
-          sourceObj = JSON.parse(sourceRaw) as Record<string, unknown>
+          sourceBody = JSON.parse(sourceRaw)
         } catch (error) {
           // One unreadable bundled file must not stop the rest from being seeded, which is what
           // an unguarded parse here did: it failed the whole controller init and left the engine
@@ -104,6 +105,11 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
           log.error(`Skipping unreadable bundled file ${sourcePath}:`, error)
           continue
         }
+        if (!isPlainObject(sourceBody)) {
+          log.error(`Skipping bundled file ${sourcePath}: its body is not a JSON object`)
+          continue
+        }
+        const sourceObj = sourceBody
         if (sourceObj.bundled !== true) sourceObj.bundled = true
 
         const destExists = await fs
@@ -114,10 +120,10 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
         if (!destExists) {
           await writeJsonAtomic(destPath, sourceObj)
         } else {
-          let destObj: Record<string, unknown>
+          let destBody: unknown
           try {
             const destRaw = await fs.readFile(destPath, 'utf-8')
-            destObj = JSON.parse(destRaw) as Record<string, unknown>
+            destBody = JSON.parse(destRaw)
           } catch (err) {
             // Unreadable is a different problem from unparsable. A permissions or IO failure will
             // fail the rewrite too, so leave it and say so.
@@ -133,6 +139,14 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
             await writeJsonAtomic(destPath, sourceObj)
             continue
           }
+          // A body that parses to something other than an object holds no cue and no ownership
+          // marker either, so it is kept aside and seeded again like one that will not parse.
+          if (!isPlainObject(destBody)) {
+            await quarantineCorruptFile(destPath)
+            await writeJsonAtomic(destPath, sourceObj)
+            continue
+          }
+          const destObj = destBody
           if (destObj.bundled !== true) {
             continue
           }
