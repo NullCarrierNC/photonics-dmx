@@ -10,8 +10,10 @@
  * where it meets its upstream or `development` when the remote has nothing for it yet. Without it
  * the working tree is also held to where HEAD meets its upstream or `development`. Either way, a
  * `COVERAGE_BASE_REF` adds where HEAD meets that ref as one more base, which is how CI names the
- * commit a push or pull request starts from. A base that cannot be found, as in a shallow clone, is
- * skipped with a note.
+ * commit a push or pull request starts from. The all-zero id a new branch or a tag push gives holds
+ * HEAD to where it meets `development`, or to the release tag before HEAD when HEAD is on
+ * `development`. A base that cannot be found fails the check, and a base commit with no
+ * jest.config.js is skipped with a note.
  *
  * The routes around the config are checked in the working tree: a coverage option passed to Jest
  * by an npm script, a git hook or a workflow, a test:coverage script that does not collect
@@ -64,6 +66,9 @@ function git(args) {
   }
 }
 
+/** @param {string} ref @returns {string | null} the commit it names */
+const commitOf = (ref) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
+
 /** @param {string} file @returns {Promise<Record<string, unknown>>} the config Jest reads there */
 async function evaluate(file) {
   const exported = (await import(pathToFileURL(file).href)).default
@@ -81,7 +86,7 @@ const evaluated = new Map()
  * @returns {Promise<Record<string, unknown> | null>} null when the commit has no jest.config.js
  */
 function configAt(commit) {
-  const sha = git(['rev-parse', '--verify', '--quiet', `${commit}^{commit}`])
+  const sha = commitOf(commit)
   if (sha === null) return Promise.resolve(null)
   if (!evaluated.has(sha)) {
     evaluated.set(
@@ -163,24 +168,47 @@ if (process.argv.includes('--pushed')) {
   })
 }
 
-const named = process.env.COVERAGE_BASE_REF
-if (named && !isMissingCommit(named)) {
-  comparisons.push({
-    what: 'the working tree',
-    current: workingTree,
-    base: mergeBase('HEAD', [named]),
-    against: 'where HEAD meets COVERAGE_BASE_REF',
-  })
+/**
+ * The base COVERAGE_BASE_REF gives. An all-zero id names no commit, so HEAD is held to where it
+ * meets `development`, and when HEAD is on `development` already, to the release tag before it.
+ * @param {string} named
+ * @returns {{ base: string | null, against: string }}
+ */
+function namedBase(named) {
+  if (!isMissingCommit(named)) {
+    return {
+      base: commitOf(named) === null ? null : mergeBase('HEAD', [named]),
+      against: 'where HEAD meets COVERAGE_BASE_REF',
+    }
+  }
+  const branchBase = mergeBase('HEAD', MAINLINE)
+  if (branchBase !== commitOf('HEAD')) {
+    return { base: branchBase, against: 'where HEAD meets development' }
+  }
+  const release = git(['describe', '--tags', '--abbrev=0', '--match', 'v*', 'HEAD^'])
+  return {
+    base: release === null ? null : commitOf(release),
+    against: `the release before HEAD${release ? ` (${release})` : ''}`,
+  }
 }
 
+const named = process.env.COVERAGE_BASE_REF
+if (named) comparisons.push({ what: 'the working tree', current: workingTree, ...namedBase(named) })
+
 let failed = false
+let unfound = false
 /** @type {string[]} */
 const compared = []
 try {
   for (const { what, current, base, against } of comparisons) {
-    const baseConfig = base === null ? null : await configAt(base)
+    if (!base) {
+      console.error(`${what}: found no commit at ${against} to compare with`)
+      unfound = true
+      continue
+    }
+    const baseConfig = await configAt(base)
     if (baseConfig === null) {
-      console.log(`Coverage settings: nothing to compare ${what} with at ${against}, skipped`)
+      console.log(`Coverage settings: ${against} has no ${CONFIG} to compare ${what} with, skipped`)
       continue
     }
     compared.push(against)
@@ -234,10 +262,13 @@ for (const line of routes) {
   failed = true
 }
 
+if (unfound) {
+  console.error('A check with no base holds nothing. Fetch the history that holds the base.')
+}
 if (failed) {
   console.error(
     'Coverage only ratchets up. Add tests rather than lowering a threshold or measuring less.',
   )
-  process.exit(1)
 }
+if (failed || unfound) process.exit(1)
 console.log(`Coverage settings: nothing loosened against ${[...new Set(compared)].join(', ')}`)
