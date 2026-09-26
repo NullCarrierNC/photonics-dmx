@@ -12,12 +12,11 @@ import {
 import { CueRegistry } from '../../registries/CueRegistry'
 import { AudioCueRegistry, type AudioCueGroup } from '../../registries/AudioCueRegistry'
 import { AudioCueType } from '../../types/audioCueTypes'
-import { EffectRegistry } from '../runtime/EffectRegistry'
-import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
 import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
-import type { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import type { EffectReference } from '../../types/nodeCueTypes'
+import { buildEffectRegistry, type EffectFilesByMode } from './effectRegistryBuilder'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { BaseNodeFileLoader, BaseListSummary, BaseLoadResult } from './BaseNodeFileLoader'
@@ -76,11 +75,6 @@ interface FileRegistration {
   /** The effect files the file's cues reference, so a change to one loads the file again. */
   effectFileIds: string[]
 }
-
-/**
- * Effect files by group id per effect mode, read once and shared by every cue file built from it.
- */
-type EffectFilesByMode = Map<EffectMode, Promise<Map<string, EffectFile>>>
 
 const effectFileIdsOf = (file: NodeCueFile): string[] => [
   ...new Set(
@@ -540,58 +534,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       runtimeBroadcaster: this.options.runtimeBroadcaster,
       nodeCueDebug: this.nodeCueDebug,
       getNodeRuntimeCallbacks: this.options.getNodeRuntimeCallbacks,
-      buildEffectRegistry: (effects, mode) => this.buildEffectRegistry(effects, mode, effectFiles),
+      buildEffectRegistry: (effects, mode) =>
+        buildEffectRegistry(this.options.effectLoader, effects, mode, effectFiles),
     }
-  }
-
-  private async buildEffectRegistry(
-    effectReferences: EffectReference[],
-    mode: NodeCueMode,
-    effectFiles: EffectFilesByMode,
-  ): Promise<EffectRegistry> {
-    const registry = new EffectRegistry()
-
-    if (!this.options.effectLoader || effectReferences.length === 0) {
-      return registry
-    }
-
-    // Which effect tree this mode raises from is the domain's to say, not the loader's: RB3 folds
-    // onto the yarg tree, and a mode added later brings its own answer with its descriptor.
-    const effectLoaderMode: EffectMode = getCueDomain(mode).effectMode
-    let filesForMode = effectFiles.get(effectLoaderMode)
-    if (!filesForMode) {
-      filesForMode = this.options.effectLoader.readEffectFilesByGroupId(effectLoaderMode)
-      effectFiles.set(effectLoaderMode, filesForMode)
-    }
-    const effectFilesById = await filesForMode
-
-    for (const effectRef of effectReferences) {
-      try {
-        const effectFile = effectFilesById.get(effectRef.effectFileId)
-
-        if (!effectFile) {
-          log.warn(
-            `Effect file ${effectRef.effectFileId} not found, skipping effect ${effectRef.effectId}`,
-          )
-          continue
-        }
-
-        const effect = effectFile.effects.find((e) => e.id === effectRef.effectId)
-
-        if (!effect) {
-          log.warn(
-            `Effect ${effectRef.effectId} not found in file ${effectRef.effectFileId}, skipping`,
-          )
-          continue
-        }
-
-        const compiledEffect = EffectCompiler.compile(effect)
-        registry.registerEffect(effectRef.effectId, compiledEffect)
-      } catch (error) {
-        log.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)
-      }
-    }
-
-    return registry
   }
 }
