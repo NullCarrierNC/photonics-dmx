@@ -20,6 +20,8 @@ import {
 } from './MovingHeadCalibrationWizard/WizardBeamPreview'
 import { enableConsole, disableConsole, sendConsoleDmx, setConsoleFixtureConfig } from '../ipcApi'
 import { leaveConsole } from '../utils/leaveConsole'
+import { registerIpcListener } from '../utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
@@ -69,6 +71,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   const [consoleBuffer, setConsoleBuffer] = useState<Record<number, number>>({})
   const [consoleReady, setConsoleReady] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
+  const [consoleLeftReason, setConsoleLeftReason] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [stepsConfirmed, setStepsConfirmed] = useState<Set<number>>(() => new Set())
@@ -144,6 +147,13 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-init console when rig or light instance id changes; full `light` would reset on every parent re-render.
   }, [rigId, light.id])
+
+  useEffect(() => {
+    return registerIpcListener(RENDERER_RECEIVE.CONSOLE_LEFT, ({ reason }) => {
+      setConsoleReady(false)
+      setConsoleLeftReason(reason)
+    })
+  }, [])
 
   const setPanDmx = useCallback(
     (dmx: number) => {
@@ -237,6 +247,8 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         Could not enable DMX console mode: {initError}
       </p>
     )
+  } else if (consoleLeftReason) {
+    body = <p className="text-red-600 dark:text-red-400 text-sm">{consoleLeftReason}</p>
   } else if (!consoleReady) {
     body = <p className="text-sm text-gray-600 dark:text-gray-400">Starting console…</p>
   } else {

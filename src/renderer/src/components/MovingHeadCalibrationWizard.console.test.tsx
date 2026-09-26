@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 import { StrictMode } from 'react'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import type { RenderWithProvidersResult } from '@renderer/tests/helpers/renderWithProviders'
 
 jest.mock(
@@ -15,6 +15,13 @@ jest.mock(
     jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
       '@renderer/tests/helpers/ipcApiMock',
     ).ipcApiMock,
+)
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
 )
 jest.mock('./LightsDmxPreview3D', () => ({ __esModule: true, default: () => null }))
 jest.mock('./MovingHeadCalibrationWizard/WizardBeamPreview', () => ({
@@ -25,6 +32,8 @@ jest.mock('@renderer/hooks/useIpcPreviewSender', () => ({ useIpcPreviewSender: (
 
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { emitIpc } from '@renderer/tests/helpers/ipcListenerStub'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcApi from '../ipcApi'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
 import {
@@ -73,6 +82,17 @@ describe('MovingHeadCalibrationWizard console mode', () => {
     await waitFor(() =>
       expect(screen.getByText(/Could not enable DMX console mode: channel gone/)).toBeTruthy(),
     )
+  })
+
+  it('stops driving the fixture and shows why when main leaves console mode', async () => {
+    renderWizard()
+    await screen.findByText(/Total degrees of pan travel/)
+
+    act(() => emitIpc(RENDERER_RECEIVE.CONSOLE_LEFT, { reason: 'The controllers stopped.' }))
+
+    expect(screen.getByText('The controllers stopped.')).toBeTruthy()
+    expect(screen.queryByText(/Total degrees of pan travel/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('hands DMX output back when the wizard closes before the console opens', async () => {
