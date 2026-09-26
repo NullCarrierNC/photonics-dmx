@@ -187,3 +187,57 @@ describe('MyLights editor modal', () => {
     expect(saveMyLights).not.toHaveBeenCalled()
   })
 })
+
+/** Whether closing the window now would bring up the Leave or Stay prompt. */
+function unloadIsRefused(): boolean {
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  return event.defaultPrevented
+}
+
+describe('MyLights unsaved changes on window close', () => {
+  const reportUnsavedChanges = jest.mocked(ipcApi.reportUnsavedChanges)
+
+  it('lets the window close while the open light is unchanged', () => {
+    renderPage()
+    fireEvent.click(screen.getByText('Front PAR'))
+    expect(unloadIsRefused()).toBe(false)
+    expect(reportUnsavedChanges).not.toHaveBeenCalledWith(true)
+  })
+
+  it('holds the window and tells main while the open light has edits', async () => {
+    renderPage()
+    fireEvent.click(screen.getByText('Front PAR'))
+    fireEvent.change(nameInput(), { target: { value: 'Renamed' } })
+
+    expect(unloadIsRefused()).toBe(true)
+    expect(reportUnsavedChanges).toHaveBeenLastCalledWith(true)
+
+    fireEvent.click(screen.getByText('Cancel'))
+    await answerPrompt('Discard')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(unloadIsRefused()).toBe(false)
+    expect(reportUnsavedChanges).toHaveBeenLastCalledWith(false)
+  })
+
+  it('counts a channel number typed and not yet committed as unsaved', () => {
+    renderPage()
+    fireEvent.click(screen.getByText('Front PAR'))
+    const red = within(screen.getByRole('dialog')).getByLabelText(/red/i)
+    fireEvent.change(red, { target: { value: '9' } })
+
+    expect(unloadIsRefused()).toBe(true)
+    expect(reportUnsavedChanges).toHaveBeenLastCalledWith(true)
+  })
+
+  it('lets the window close once the edited light is saved', async () => {
+    renderPage()
+    fireEvent.click(screen.getByText('Front PAR'))
+    fireEvent.change(nameInput(), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(unloadIsRefused()).toBe(false)
+    expect(reportUnsavedChanges).toHaveBeenLastCalledWith(false)
+  })
+})
