@@ -11,12 +11,12 @@ jest.mock('../../utils/windowUtils', () => ({
   mainRuntimeBroadcaster: { emit: jest.fn() },
 }))
 
-import { ControllerManager } from '../../controllers/ControllerManager'
+import { ControllerManager, LifecycleAbortedError } from '../../controllers/ControllerManager'
 import type { ControllerGraph } from '../../controllers/ControllerGraph'
 import type { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import type { ListenerLifecycleController } from '../../controllers/ListenerLifecycleController'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
-import { stubbedManager } from './lifecycleStub'
+import { restartGraph, senderLifecycleStub, stubbedManager } from './lifecycleStub'
 
 /** Preferences a freshly constructed manager reads while wiring its sub-controllers. */
 function stubConfig(): ConfigurationManager {
@@ -194,5 +194,41 @@ describe('ControllerManager.shutdown during an input enable', () => {
 
     expect(order).toEqual(['enabled', 'disabled'])
     expect(manager.getLifecyclePhase()).toBe('stopped')
+  })
+})
+
+describe('ControllerManager.shutdown with a sender op queued behind it', () => {
+  it('refuses the op and leaves no sender open after the shutdown', async () => {
+    const open = new Set<string>()
+    const senderManager = {
+      isSenderEnabled: (id: string) => open.has(id),
+      enableSender: async (id: string) => {
+        open.add(id)
+      },
+    }
+    const senders = senderLifecycleStub()
+    senders.getSenderManager.mockReturnValue(senderManager)
+    senders.shutdownSenderOnAppExit.mockImplementation(async () => {
+      open.clear()
+    })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const graph = restartGraph()
+    jest.mocked(graph.disposeLoaders).mockImplementation(() => held)
+    const { manager } = stubbedManager({ graph, senders })
+
+    const stopping = manager.shutdown()
+    const toggled = manager.runSenderOp(async (m) => {
+      if (!m.isSenderEnabled('ipc')) {
+        await m.enableSender('ipc', 'ipc', { sender: 'ipc' })
+      }
+    })
+    release()
+    await stopping
+
+    await expect(toggled).rejects.toThrow(LifecycleAbortedError)
+    expect([...open]).toEqual([])
   })
 })

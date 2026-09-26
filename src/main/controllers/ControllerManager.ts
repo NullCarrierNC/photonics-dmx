@@ -343,9 +343,19 @@ export class ControllerManager {
     return this.senderLifecycle.getSenderManager()
   }
 
-  /** Runs a sender op on the lifecycle queue, against the sender manager a restart ahead leaves. */
+  /**
+   * Runs a sender op on the lifecycle queue, against the sender manager a restart ahead leaves. Once
+   * a shutdown has begun the op is refused, since the shutdown stops every sender.
+   */
   public runSenderOp<T>(op: (senders: SenderManager) => Promise<T>): Promise<T> {
-    return this.lifecycle.runQueuedOp(() => op(this.getSenderManager()))
+    return this.lifecycle.runQueuedOp(() => {
+      if (this.lifecycle.isShuttingDown()) {
+        throw new LifecycleAbortedError(
+          `Sender change refused: shutdown in progress or already complete (phase=${this.lifecycle.phase})`,
+        )
+      }
+      return op(this.getSenderManager())
+    })
   }
 
   /** The sender lifecycle surface (status, error tracking, restore). */
