@@ -3,8 +3,20 @@
  * The shared draft fields: what reaches the caller, and when.
  */
 import { describe, expect, it, jest } from '@jest/globals'
+import type { ReactNode } from 'react'
 import { act, fireEvent, screen } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import * as ipcApi from '../../ipcApi'
+
+jest.mock(
+  '../../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
+
+import { useUnloadGuard } from '../../hooks/useUnloadGuard'
 import { DraftNumberField, DraftTextField } from './DraftField'
 
 function field(): HTMLInputElement {
@@ -221,5 +233,66 @@ describe('a draft field focused while its value changes elsewhere', () => {
     fireEvent.blur(input)
 
     expect(onCommit).toHaveBeenCalledWith('typed')
+  })
+})
+
+/** A page with no committed edits that guards its unsaved changes. */
+function GuardedPage({ children }: { children: ReactNode }) {
+  useUnloadGuard(false)
+  return <>{children}</>
+}
+
+/** Whether closing the window now would bring up the Leave or Stay prompt. */
+function unloadIsRefused(): boolean {
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  return event.defaultPrevented
+}
+
+describe('a draft field on a page that guards unsaved changes', () => {
+  it('counts a typed number as unsaved until it is committed', () => {
+    const view = renderWithProviders(
+      <GuardedPage>
+        <DraftNumberField value={5} onCommit={() => {}} />
+      </GuardedPage>,
+    )
+    expect(unloadIsRefused()).toBe(false)
+
+    fireEvent.change(field(), { target: { value: '9' } })
+    expect(unloadIsRefused()).toBe(true)
+    expect(jest.mocked(ipcApi.reportUnsavedChanges)).toHaveBeenLastCalledWith(true)
+
+    fireEvent.blur(field())
+    expect(unloadIsRefused()).toBe(false)
+    view.unmount()
+  })
+
+  it('counts typed text as unsaved until it is committed', () => {
+    const view = renderWithProviders(
+      <GuardedPage>
+        <DraftTextField value="old" onCommit={() => {}} />
+      </GuardedPage>,
+    )
+    const input = screen.getByRole('textbox')
+
+    fireEvent.change(input, { target: { value: 'new' } })
+    expect(unloadIsRefused()).toBe(true)
+
+    fireEvent.blur(input)
+    expect(unloadIsRefused()).toBe(false)
+    view.unmount()
+  })
+
+  it('does not count a typed number that commits to the value already held', () => {
+    const view = renderWithProviders(
+      <GuardedPage>
+        <DraftNumberField value={5} onCommit={() => {}} />
+      </GuardedPage>,
+    )
+
+    fireEvent.change(field(), { target: { value: '05' } })
+
+    expect(unloadIsRefused()).toBe(false)
+    view.unmount()
   })
 })
