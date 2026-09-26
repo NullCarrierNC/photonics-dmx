@@ -13,6 +13,7 @@ import {
   deriveExtraChannelsForMaster,
   highestChannelUsed,
   maxMasterDimmerForTemplate,
+  templatePlacesRigLights,
 } from '../../../../photonics-dmx/helpers/rigTemplateSync'
 
 export const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
@@ -24,6 +25,38 @@ export const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
 
 export function isTwoRowPrimaryLayout(layoutId: string): boolean {
   return layoutId === 'two-rows' || layoutId === 'front-back' || layoutId === 'stacked'
+}
+
+/** The positions of the lights built from one template, and that template's id and name. */
+export interface TemplateLightPositions {
+  templateId: string
+  name: string
+  positions: number[]
+}
+
+/**
+ * The lights whose template has no master dimmer channel, grouped by template. Such a light is
+ * unplaced and stays dark until the template has one ({@link templatePlacesRigLights}).
+ */
+export function lightsOfTemplatesWithoutMaster(
+  lights: DmxLight[],
+  templates: DmxFixture[],
+): TemplateLightPositions[] {
+  const byTemplate = new Map<string, TemplateLightPositions>()
+  for (const light of lights) {
+    const template = templates.find((t) => t.id === light.fixtureId)
+    if (!template || templatePlacesRigLights(template)) continue
+    const group = byTemplate.get(light.fixtureId) ?? {
+      templateId: light.fixtureId,
+      name: template.name,
+      positions: [],
+    }
+    group.positions.push(light.position)
+    byTemplate.set(light.fixtureId, group)
+  }
+  const groups = [...byTemplate.values()]
+  for (const { positions } of groups) positions.sort((a, b) => a - b)
+  return groups
 }
 
 export function splitLights(count: number, assignedBack: number | 'None') {
