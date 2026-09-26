@@ -108,7 +108,7 @@ describe('getTemplateAlignedChannels', () => {
     expect(channels.strobeChannel).toBe(14)
   })
 
-  it('keeps a number the light already carries', () => {
+  it('places every channel by the template offset from the light master dimmer', () => {
     const channels = getTemplateAlignedChannels(
       light({
         channels: { masterDimmer: 10, red: 99, green: 12, blue: 13 },
@@ -116,7 +116,33 @@ describe('getTemplateAlignedChannels', () => {
       [template()],
     )
 
-    expect(channels.red).toBe(99)
+    expect(channels).toEqual({ masterDimmer: 10, red: 11, green: 12, blue: 13 })
+  })
+
+  it('keeps an unassigned template channel at 0', () => {
+    const unsetStrobe = template({
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 0 },
+    })
+
+    expect(getTemplateAlignedChannels(light(), [unsetStrobe]).strobeChannel).toBe(0)
+  })
+
+  it('leaves a channel that lands past the end of the universe at 0', () => {
+    const channels = getTemplateAlignedChannels(
+      light({ channels: { masterDimmer: 510, red: 511, green: 512, blue: 0 } }),
+      [template()],
+    )
+
+    expect(channels).toEqual({ masterDimmer: 510, red: 511, green: 512, blue: 0 })
+  })
+
+  it('gives a light with no master address every channel at 0', () => {
+    const channels = getTemplateAlignedChannels(
+      light({ channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 } }),
+      [template()],
+    )
+
+    expect(channels).toEqual({ masterDimmer: 0, red: 0, green: 0, blue: 0 })
   })
 
   it('reads the master dimmer from the light', () => {

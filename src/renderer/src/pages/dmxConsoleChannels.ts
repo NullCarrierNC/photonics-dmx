@@ -3,8 +3,7 @@
  * channels the manual buffer seeds.
  *
  * The channel set comes from the live fixture template, so a channel added to a template appears
- * here without the light being re-picked. The numbers follow the offset-from-master model the rig
- * editor uses, with a number the light already carries winning over a derived one.
+ * here without the light being re-picked. The numbers come from the derivation template sync uses.
  */
 import {
   FixtureTypes,
@@ -14,7 +13,10 @@ import {
   type ExtraChannel,
   type LightingConfiguration,
 } from '../../../photonics-dmx/types'
-import { deriveExtraChannelsForMaster } from '../../../photonics-dmx/helpers/rigTemplateSync'
+import {
+  deriveChannelLayoutForMaster,
+  deriveExtraChannelsForMaster,
+} from '../../../photonics-dmx/helpers/rigTemplateSync'
 
 export function channelSortKey(name: string): number {
   const order = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel', 'pan', 'tilt']
@@ -25,12 +27,19 @@ export function channelSortKey(name: string): number {
   return i === -1 ? order.length : i
 }
 
+/** The numbered channels of a view, skipping any the fixture type leaves out. */
+function numberedChannels(view: ChannelView): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(view).filter((entry): entry is [string, number] => typeof entry[1] === 'number'),
+  )
+}
+
 /**
  * Resolves the channel set to display for a rig light. The shape (which channels exist) comes from
  * the live fixture template, so enabling "Strobe Channel?" on a template in MyLights surfaces the
  * new channel here immediately, without needing to re-pick the fixture in LightsLayout. The
- * channel NUMBERS are computed by applying the same offset-from-master-dimmer model used elsewhere
- * (e.g. {@link createDmxLightInstance}, {@link LightChannelsConfig}).
+ * channel numbers come from {@link deriveChannelLayoutForMaster}, the derivation template sync
+ * writes to the rig, applied to the light's master dimmer.
  *
  * Falls back to the light's persisted channels when no template is found (legacy / orphaned light).
  */
@@ -39,35 +48,10 @@ export function getTemplateAlignedChannels(
   templates: DmxFixture[],
 ): Record<string, number> {
   const template = templates.find((t) => t.id === light.fixtureId)
-  const persisted: ChannelView = light.channels
-  if (!template) {
-    return Object.fromEntries(
-      Object.entries(persisted).filter(
-        (entry): entry is [string, number] => typeof entry[1] === 'number',
-      ),
-    )
-  }
-  const templateChannels: ChannelView = template.channels
-  const templateMaster = templateChannels.masterDimmer ?? 0
-  const lightMaster = persisted.masterDimmer ?? templateMaster
-  const out: Record<string, number> = {}
-  for (const [name, templateValue] of Object.entries(templateChannels)) {
-    if (templateValue === undefined) continue
-    if (name === 'masterDimmer') {
-      out[name] = lightMaster
-    } else {
-      // Prefer the persisted offset if present (user may have nudged a single channel), otherwise
-      // derive from the template's offset relative to its master dimmer.
-      const persistedValue = persisted[name]
-      if (typeof persistedValue === 'number') {
-        out[name] = persistedValue
-      } else {
-        const offset = templateValue - templateMaster
-        out[name] = lightMaster + offset
-      }
-    }
-  }
-  return out
+  if (!template) return numberedChannels(light.channels)
+  return numberedChannels(
+    deriveChannelLayoutForMaster(template, light.channels.masterDimmer).channels,
+  )
 }
 
 /**
@@ -83,10 +67,13 @@ export function getTemplateAlignedExtraChannels(
   if (!template) {
     return light.extraChannels ?? []
   }
-  const templateChannels: ChannelView = template.channels
-  const templateMaster = templateChannels.masterDimmer ?? 0
-  const lightMaster = light.channels.masterDimmer ?? templateMaster
-  return deriveExtraChannelsForMaster(template.extraChannels, templateMaster, lightMaster) ?? []
+  return (
+    deriveExtraChannelsForMaster(
+      template.extraChannels,
+      template.channels.masterDimmer,
+      light.channels.masterDimmer,
+    ) ?? []
+  )
 }
 
 /**
