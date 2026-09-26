@@ -9,22 +9,73 @@ import {
   normalizeFixtureConfig,
   type DmxFixture,
   type FixtureChannelLayout,
+  type RgbDmxChannels,
+  type RgbMovingHeadDmxChannels,
+  type StrobeFixture,
 } from '../../../photonics-dmx/types'
 
-/** The channel map with one of its own channels set. A name it does not have leaves it as it is. */
-function setChannel<C extends object>(channels: C, name: string, value: number): C {
-  return Object.hasOwn(channels, name) ? { ...channels, [name]: value } : channels
+/**
+ * The RGB channel map with one of its own channels set. A name it does not have, including a
+ * strobe channel the map does not carry, leaves it as it is.
+ */
+function withRgbChannel(channels: RgbDmxChannels, name: string, value: number): RgbDmxChannels {
+  switch (name) {
+    case 'masterDimmer':
+      return { ...channels, masterDimmer: value }
+    case 'red':
+      return { ...channels, red: value }
+    case 'green':
+      return { ...channels, green: value }
+    case 'blue':
+      return { ...channels, blue: value }
+    case 'strobeChannel':
+      return channels.strobeChannel === undefined ? channels : { ...channels, strobeChannel: value }
+    default:
+      return channels
+  }
+}
+
+/** {@link withRgbChannel} for a moving head, which adds pan and tilt. */
+function withMovingHeadChannel(
+  channels: RgbMovingHeadDmxChannels,
+  name: string,
+  value: number,
+): RgbMovingHeadDmxChannels {
+  switch (name) {
+    case 'pan':
+      return { ...channels, pan: value }
+    case 'tilt':
+      return { ...channels, tilt: value }
+    default:
+      return { ...channels, ...withRgbChannel(channels, name, value) }
+  }
+}
+
+/** The dedicated strobe's channel map with one of its own channels set. */
+function withStrobeChannel(
+  channels: StrobeFixture['channels'],
+  name: string,
+  value: number,
+): StrobeFixture['channels'] {
+  switch (name) {
+    case 'masterDimmer':
+      return { ...channels, masterDimmer: value }
+    case 'strobeChannel':
+      return { ...channels, strobeChannel: value }
+    default:
+      return channels
+  }
 }
 
 /** The template with one of its channels set to a new DMX channel number. */
 export function withChannelNumber(fixture: DmxFixture, name: string, value: number): DmxFixture {
   switch (fixture.fixture) {
     case FixtureTypes.RGB:
-      return { ...fixture, channels: setChannel(fixture.channels, name, value) }
+      return { ...fixture, channels: withRgbChannel(fixture.channels, name, value) }
     case FixtureTypes.RGBMH:
-      return { ...fixture, channels: setChannel(fixture.channels, name, value) }
+      return { ...fixture, channels: withMovingHeadChannel(fixture.channels, name, value) }
     case FixtureTypes.STROBE:
-      return { ...fixture, channels: setChannel(fixture.channels, name, value) }
+      return { ...fixture, channels: withStrobeChannel(fixture.channels, name, value) }
   }
 }
 

@@ -24,6 +24,33 @@ describe('withChannelNumber', () => {
   it('leaves the fixture as it is for a channel its type does not have', () => {
     expect(withChannelNumber(strobeFixture(), 'red', 9)).toEqual(strobeFixture())
   })
+
+  it('sets pan and a colour channel on a moving head', () => {
+    const edited = withChannelNumber(
+      withChannelNumber(rgbMovingHeadFixture(), 'pan', 11),
+      'blue',
+      12,
+    )
+    expect(edited.channels).toEqual({
+      masterDimmer: 4,
+      red: 1,
+      green: 2,
+      blue: 12,
+      pan: 11,
+      tilt: 6,
+    })
+  })
+
+  it('sets the strobe channel of a dedicated strobe', () => {
+    expect(withChannelNumber(strobeFixture(), 'strobeChannel', 7).channels).toEqual({
+      masterDimmer: 1,
+      strobeChannel: 7,
+    })
+  })
+
+  it('adds no strobe channel to an RGB fixture without the option', () => {
+    expect(withChannelNumber(rgbFixture(), 'strobeChannel', 7)).toEqual(rgbFixture())
+  })
 })
 
 describe('withStrobeChannelOption', () => {
