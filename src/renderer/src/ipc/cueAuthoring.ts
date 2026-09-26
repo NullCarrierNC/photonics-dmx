@@ -57,6 +57,7 @@ export const saveNodeCueFile = (payload: {
   mode: NodeCueMode
   filename: string
   content: NodeCueFile
+  createOnly?: boolean
 }) => window.api.invoke(NODE_CUES.SAVE, payload)
 
 export const deleteNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.DELETE, filePath)
@@ -87,6 +88,7 @@ export const saveEffectFile = (payload: {
   mode: EffectMode
   filename: string
   content: EffectFile
+  createOnly?: boolean
 }) => window.api.invoke(EFFECTS.SAVE, payload)
 
 export const deleteEffectFile = (filePath: string) => window.api.invoke(EFFECTS.DELETE, filePath)

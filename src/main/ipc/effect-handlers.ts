@@ -47,8 +47,8 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     if (!validation.ok) {
       return { success: false, error: validation.error }
     }
-    const { mode, filename, content } = validation.value
-    return loader.saveFile(mode, filename, content)
+    const { mode, filename, content, createOnly } = validation.value
+    return loader.saveFile(mode, filename, content, { createOnly })
   })
 
   handleInvoke(ipcMain, EFFECTS.DELETE, log, async (_event, filePath: string) => {

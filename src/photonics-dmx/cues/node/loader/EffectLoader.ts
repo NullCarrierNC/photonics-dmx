@@ -67,10 +67,15 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return this.resolveExistingEffectFilePath(filePath)
   }
 
+  /**
+   * Write a file into a mode's folder and load it. A create-only save refuses a filename that is
+   * already taken, and any other save replaces the file at that path.
+   */
   public async saveFile(
     mode: EffectMode,
     filename: string,
     content: EffectFile,
+    options: { createOnly?: boolean } = {},
   ): Promise<{ success: boolean; path: string }> {
     if (content.mode !== mode) {
       throw new Error('File mode does not match payload mode.')
@@ -87,7 +92,11 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
 
     this.assertNoConflictingEffectGroupIdForPath(filePath, mode, content.group.id)
 
-    await this.writeSavedFile(filePath, JSON.stringify(content, null, 2))
+    await this.writeSavedFile(
+      filePath,
+      JSON.stringify(content, null, 2),
+      options.createOnly ?? false,
+    )
     await this.loadFile(mode, filePath)
 
     this.emit('changed', this.getSummary())

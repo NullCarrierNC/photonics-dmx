@@ -594,6 +594,18 @@ describe('NodeCueLoader', () => {
         success: true,
       })
     })
+
+    it('refuses a create-only save over an existing file and leaves it as it was', async () => {
+      await loader.saveFile('yarg', 'show.json', yargMotionOnlyFile())
+      const target = path.join(tmpDir, 'node-data', 'cues', 'yarg', 'show.json')
+      const before = fs.readFileSync(target, 'utf-8')
+      const other = { ...yargMotionOnlyFile(), group: { id: 'show', name: 'Scratch' } }
+
+      await expect(
+        loader.saveFile('yarg', 'show.json', other, { createOnly: true }),
+      ).rejects.toThrow(/already exists/)
+      expect(fs.readFileSync(target, 'utf-8')).toBe(before)
+    })
   })
 
   describe('RB3 cue mode', () => {

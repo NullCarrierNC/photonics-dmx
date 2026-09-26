@@ -81,7 +81,9 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: validation.error }
     }
     const payload = validation.value
-    const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
+    const result = await loader.saveFile(payload.mode, payload.filename, payload.content, {
+      createOnly: payload.createOnly,
+    })
     try {
       await persistGroupEnableAfterNodeCueSave(
         controllerManager,

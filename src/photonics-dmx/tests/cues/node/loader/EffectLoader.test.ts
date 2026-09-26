@@ -122,6 +122,17 @@ describe('EffectLoader.saveFile group id uniqueness', () => {
       success: true,
     })
   })
+
+  it('refuses a create-only save over an existing file and leaves it as it was', async () => {
+    await loader.saveFile('yarg', 'show.json', minimalYargEffectFixture('friday-show'))
+    const target = path.join(tmpDir, 'node-data', 'effects', 'yarg', 'show.json')
+    const before = fs.readFileSync(target, 'utf-8')
+
+    await expect(
+      loader.saveFile('yarg', 'show.json', minimalYargEffectFixture('show'), { createOnly: true }),
+    ).rejects.toThrow(/already exists/)
+    expect(fs.readFileSync(target, 'utf-8')).toBe(before)
+  })
 })
 
 describe('EffectLoader compile errors surface on the summary', () => {

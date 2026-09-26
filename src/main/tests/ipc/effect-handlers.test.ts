@@ -45,9 +45,16 @@ function makeLoader() {
     getSummary: jest.fn(() => ({ yarg: [], audio: [] })),
     reload: jest.fn(async () => ({ reloaded: true })),
     readFile: jest.fn(async (_path: string) => effectFile),
-    saveFile: jest.fn(async (mode: string, filename: string, _content: unknown) => ({
-      saved: `${mode}/${filename}`,
-    })),
+    saveFile: jest.fn(
+      async (
+        mode: string,
+        filename: string,
+        _content: unknown,
+        _options: { createOnly: boolean },
+      ) => ({
+        saved: `${mode}/${filename}`,
+      }),
+    ),
     deleteFile: jest.fn(async (_path: string) => ({ success: true })),
     getModes: jest.fn(() => ['yarg', 'audio']),
     resolveEffectFilePathForIpc: jest.fn((path: string) => `/root/effects/${path}`),
@@ -102,7 +109,9 @@ describe('setupEffectHandlers', () => {
     })
 
     expect(result).toEqual({ saved: 'audio/b.json' })
-    expect(loader!.saveFile).toHaveBeenCalledWith('audio', 'b.json', effectFile)
+    expect(loader!.saveFile).toHaveBeenCalledWith('audio', 'b.json', effectFile, {
+      createOnly: false,
+    })
   })
 
   it.each([
@@ -110,6 +119,10 @@ describe('setupEffectHandlers', () => {
     ['a mode the loader does not offer', { mode: 'rb3', filename: 'b.json', content: {} }],
     ['an empty filename', { mode: 'yarg', filename: '', content: {} }],
     ['non-object content', { mode: 'yarg', filename: 'b.json', content: 'x' }],
+    [
+      'a createOnly that is not a boolean',
+      { mode: 'yarg', filename: 'b.json', content: {}, createOnly: 'yes' },
+    ],
   ])('refuses to save %s', async (_label, payload) => {
     const result = await call(EFFECTS.SAVE, payload)
 
