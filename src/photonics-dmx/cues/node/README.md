@@ -37,6 +37,7 @@ Sequencer   (effects)
 
 ```
 node/
+  cueValueRules.ts    # Value rules the editor fields, the compilers and the migrations share
   compiler/           # Compilation from JSON to executable form
   loader/             # File loading, validation, file watching
   runtime/            # Execution engine, cue instances

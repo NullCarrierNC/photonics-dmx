@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 2,
+  "cueVersion": 4,
   "mode": "yarg",
   "group": {
     "id": "yarg-alt1",
@@ -6900,7 +6900,7 @@
               },
               "easing": {
                 "source": "literal",
-                "value": "sin-out"
+                "value": "sinInOut"
               },
               "level": {
                 "source": "literal",
@@ -6967,7 +6967,7 @@
               },
               "easing": {
                 "source": "literal",
-                "value": "sin-out"
+                "value": "sinInOut"
               },
               "level": {
                 "source": "literal",

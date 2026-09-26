@@ -90,6 +90,35 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
+  it('stores an unknown easing as the default, in a value source or a bare string', () => {
+    const file = {
+      effects: [
+        {
+          id: 'e1',
+          name: 'Swell',
+          nodes: {
+            actions: [
+              { id: 'a1', timing: { easing: { source: 'literal', value: 'sin-out' } } },
+              { id: 'a2', timing: { easing: 'bounce' } },
+              { id: 'a3', timing: { easing: { source: 'literal', value: 'cubicIn' } } },
+              { id: 'a4', timing: { easing: { source: 'variable', name: 'curve' } } },
+            ],
+          },
+        },
+      ],
+    }
+
+    const notes = migrateOlderNodeFile(file)
+
+    expect(file.effects[0].nodes.actions.map((a) => a.timing.easing)).toEqual([
+      { source: 'literal', value: 'sinInOut' },
+      'sinInOut',
+      { source: 'literal', value: 'cubicIn' },
+      { source: 'variable', name: 'curve' },
+    ])
+    expect(notes).toEqual(["Unknown easing 'sin-out', 'bounce' in 'Swell' now reads sinInOut."])
+  })
+
   it('changes nothing in a file already on the current rules', () => {
     const file = {
       group: { id: 'g', name: 'G', variables: [variable('speed', 'cue-group')] },

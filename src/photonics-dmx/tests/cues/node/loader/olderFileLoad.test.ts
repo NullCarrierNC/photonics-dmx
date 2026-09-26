@@ -28,8 +28,9 @@ interface GraphJson {
   cueType?: string
   nodes: {
     actions: Array<{
+      id: string
       color: { name: ValueSourceJson; blendMode: ValueSourceJson }
-      timing: { duration: ValueSourceJson }
+      timing: { duration: ValueSourceJson; easing?: ValueSourceJson }
     }>
   }
   variables?: VariableJson[]
@@ -61,11 +62,13 @@ function userCopyOfAlt1(groupId: string): LibraryJson {
   return file
 }
 
-const dischordOf = (file: LibraryJson): GraphJson => {
-  const cue = file.cues.find((c) => c.cueType === 'Dischord')
-  if (!cue) throw new Error('the library has no Dischord cue')
+const cueOf = (file: LibraryJson, cueType: string): GraphJson => {
+  const cue = file.cues.find((c) => c.cueType === cueType)
+  if (!cue) throw new Error(`the library has no ${cueType} cue`)
   return cue
 }
+
+const dischordOf = (file: LibraryJson): GraphJson => cueOf(file, 'Dischord')
 
 const effectOf = (file: LibraryJson, id: string): GraphJson => {
   const effect = file.effects.find((e) => e.id === id)
@@ -159,10 +162,28 @@ describe('loading cue and effect files older builds wrote', () => {
       expect(firstCues.migrations).toEqual([
         expect.stringMatching(/^user-legacy-one\.json: .*Dischord.*replace/),
         expect.stringMatching(/^user-legacy\.json: .*Dischord.*replace/),
+        expect.stringMatching(/^user-legacy\.json: .*'sin-out'.*Harmony/),
       ])
 
       expect((await effectLoader.loadAll()).migrations).toEqual([])
       expect((await loader.loadAll()).migrations).toEqual([])
+    })
+  })
+
+  describe('with an easing name no build offered', () => {
+    it('loads Harmony from v0.5.5 with its sin-out easing read as sinInOut', async () => {
+      writeJson(path.join(cuesDir, 'user-alt1.json'), userCopyOfAlt1('user-alt1'))
+
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-alt1')?.cues.has(CueType.Harmony)).toBe(true)
+      expect(result.migrations).toEqual([
+        expect.stringMatching(/^user-alt1\.json: .*'sin-out'.*Harmony.*sinInOut/),
+      ])
+      const harmony = cueOf(readJson(path.join(cuesDir, 'user-alt1.json')), 'Harmony')
+      const easings = harmony.nodes.actions.map((action) => action.timing.easing?.value)
+      expect(easings).toEqual(['sinInOut', 'sinInOut'])
     })
   })
 

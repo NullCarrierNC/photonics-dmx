@@ -1,9 +1,10 @@
 /**
  * Brings a parsed cue or effect file that an older build wrote onto what this build accepts, before
- * validation: a retired blend mode reads as replace, and a variable name the editor once accepted is
- * renamed along with every use of it in the file. Each change comes back as a note for the user.
+ * validation: a retired blend mode reads as replace, an unknown easing as the default, and a variable
+ * name the editor once accepted is renamed with every use of it. Each change becomes a note.
  */
 import { isVariableName } from '../../types/nodeCueTypes'
+import { DEFAULT_EASING, literalIssue } from '../cueValueRules'
 
 type JsonObject = Record<string, unknown>
 
@@ -48,25 +49,60 @@ function graphsOf(file: JsonObject): JsonObject[] {
 const labelOf = (graph: JsonObject): string =>
   `'${typeof graph.name === 'string' ? graph.name : String(graph.id)}'`
 
+/** The actions of every graph, each with the label of the graph it sits in. */
+function actionsOf(graphs: readonly JsonObject[]): { action: JsonObject; graph: string }[] {
+  return graphs.flatMap((graph) => {
+    const actions = isObject(graph.nodes) ? graph.nodes.actions : undefined
+    return Array.isArray(actions)
+      ? actions.filter(isObject).map((action) => ({ action, graph: labelOf(graph) }))
+      : []
+  })
+}
+
 function retireBlendModes(graphs: readonly JsonObject[]): string | null {
   const changed = new Set<string>()
-  for (const graph of graphs) {
-    const actions = isObject(graph.nodes) ? graph.nodes.actions : undefined
-    if (!Array.isArray(actions)) continue
-    for (const action of actions) {
-      const blendMode = isObject(action) && isObject(action.color) ? action.color.blendMode : null
-      if (
-        isObject(blendMode) &&
-        blendMode.source === 'literal' &&
-        RETIRED_BLEND_MODES.has(blendMode.value)
-      ) {
-        blendMode.value = 'replace'
-        changed.add(labelOf(graph))
-      }
+  for (const { action, graph } of actionsOf(graphs)) {
+    const blendMode = isObject(action.color) ? action.color.blendMode : null
+    if (
+      isObject(blendMode) &&
+      blendMode.source === 'literal' &&
+      RETIRED_BLEND_MODES.has(blendMode.value)
+    ) {
+      blendMode.value = 'replace'
+      changed.add(graph)
     }
   }
   return changed.size > 0
     ? `Retired blend mode multiply or overlay in ${[...changed].join(', ')} now reads replace.`
+    : null
+}
+
+/**
+ * An easing literal the runtime does not know plays as the default easing, so it is stored as that.
+ * The oldest files hold the easing as a bare string, which validation later wraps.
+ */
+function replaceUnknownEasings(graphs: readonly JsonObject[]): string | null {
+  const values = new Set<string>()
+  const changed = new Set<string>()
+  for (const { action, graph } of actionsOf(graphs)) {
+    const timing = isObject(action.timing) ? action.timing : null
+    if (!timing) continue
+    const easing = timing.easing
+    if (isObject(easing) && easing.source === 'literal') {
+      if (literalIssue('easing', easing.value) === null) continue
+      values.add(`'${String(easing.value)}'`)
+      easing.value = DEFAULT_EASING
+    } else if (typeof easing === 'string') {
+      if (literalIssue('easing', easing) === null) continue
+      values.add(`'${easing}'`)
+      timing.easing = DEFAULT_EASING
+    } else {
+      continue
+    }
+    changed.add(graph)
+  }
+  return changed.size > 0
+    ? `Unknown easing ${[...values].join(', ')} in ${[...changed].join(', ')} now reads ${DEFAULT_EASING}.`
     : null
 }
 
@@ -172,7 +208,9 @@ function renameVariables(file: JsonObject, graphs: readonly JsonObject[]): strin
 export function migrateOlderNodeFile(file: unknown): string[] {
   if (!isObject(file)) return []
   const graphs = graphsOf(file)
-  return [retireBlendModes(graphs), renameVariables(file, graphs)].filter(
-    (note): note is string => note !== null,
-  )
+  return [
+    retireBlendModes(graphs),
+    replaceUnknownEasings(graphs),
+    renameVariables(file, graphs),
+  ].filter((note): note is string => note !== null)
 }
