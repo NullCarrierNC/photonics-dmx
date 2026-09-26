@@ -285,9 +285,11 @@ const CueFlowCanvas: React.FC<Props> = ({
         <Controls />
         <Background gap={16} size={0.5} />
       </ReactFlow>
+      {/* The menus sit above the canvas and below the dialog layer (z-50), so an open dialog covers
+          them. */}
       {contextMenu && (
         <div
-          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg text-xs z-[9999]"
+          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg text-xs z-40"
           style={{ top: contextMenu.y, left: contextMenu.x }}>
           <button
             className="block w-full text-left px-3 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -299,7 +301,7 @@ const CueFlowCanvas: React.FC<Props> = ({
       {paneContextMenu && (
         <div
           ref={menuRef}
-          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg text-xs z-[9999] max-h-[80vh] overflow-y-auto"
+          className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg text-xs z-40 max-h-[80vh] overflow-y-auto"
           style={{ top: paneContextMenu.y, left: paneContextMenu.x }}>
           {editorMode === 'cue' && (
             <>
