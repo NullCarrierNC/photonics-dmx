@@ -102,6 +102,7 @@ export function resolveChainStep(
   const chainLights = ActionEffectFactory.resolveLights(
     lightManager,
     action.target,
+    context.unknownValues,
     resolveVariable,
   )
   if (!chainLights || chainLights.length === 0) return null

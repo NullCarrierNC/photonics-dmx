@@ -9,6 +9,7 @@ import type {
 import { defaultCueData } from '../../../../cues/types/cueTypes'
 import { createSequencerHarness, type SequencerHarness } from '../../../helpers/sequencerHarness'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
+import { UnknownValueWarnings } from '../../../../cues/node/runtime/valueResolver'
 
 const lit = (value: string | number): ValueSource => ({ source: 'literal', value })
 
@@ -78,7 +79,7 @@ describe('an effect action loop the sequencer refuses', () => {
       noopRuntimeBroadcaster(),
       {},
       { ...defaultCueData },
-      { callerMode: 'yarg' },
+      { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
     )
 
     try {

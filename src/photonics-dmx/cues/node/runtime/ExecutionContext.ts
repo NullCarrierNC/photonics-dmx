@@ -15,6 +15,7 @@ import { AudioCueData } from '../../types/audioCueTypes'
 import { VariableValue, NodeCompletionCallback, ContextCompletionCallback } from './executionTypes'
 import { monotonicNowMs } from '../../../../shared/time'
 import { clampTimerDelayMs } from './engineUtils'
+import type { UnknownValueWarnings } from './valueResolver'
 
 /**
  * A node that can hold the context open while it waits: an action (or the dummy one a delay
@@ -53,6 +54,9 @@ export class ExecutionContext {
   // Cue data reference for data nodes
   public readonly cueData: CueData | AudioCueData
 
+  /** The warnings of the loaded cue this chain runs for. */
+  public readonly unknownValues: UnknownValueWarnings
+
   // Callbacks
   private onNodeCompleteCallback?: NodeCompletionCallback
   private onContextCompleteCallback?: ContextCompletionCallback
@@ -62,6 +66,7 @@ export class ExecutionContext {
     cueData: CueData | AudioCueData,
     cueLevelVarStore: Map<string, VariableValue>,
     groupLevelVarStore: Map<string, VariableValue>,
+    unknownValues: UnknownValueWarnings,
   ) {
     this.id = `${eventNode.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     this.eventNode = eventNode
@@ -69,6 +74,7 @@ export class ExecutionContext {
     this.cueData = cueData
     this.cueLevelVarStore = cueLevelVarStore
     this.groupLevelVarStore = groupLevelVarStore
+    this.unknownValues = unknownValues
   }
 
   /**

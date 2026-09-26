@@ -42,7 +42,7 @@ import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { ContextLifecycleEvent } from './executionStateMachineLifecycle'
-import { resolveVariableValue } from './valueResolver'
+import { resolveVariableValue, UnknownValueWarnings } from './valueResolver'
 import { debugPreview } from './nodeDebugPreview'
 import { resolveActionTiming, resolveActionLayer, resolveMotionPattern } from './actionResolver'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -67,6 +67,8 @@ export interface NodeExecutionEngineOptions {
   revisitPolicy?: RevisitPolicy
   /** Turns debug logging on at runtime. */
   debug?: NodeCueDebugSwitch
+  /** The loaded cue's warnings. An engine given none keeps its own for its run. */
+  unknownValues?: UnknownValueWarnings
 }
 
 export class NodeExecutionEngine extends BaseNodeExecutionEngine {
@@ -84,6 +86,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
   private readonly debug?: NodeCueDebugSwitch
   /** When set (GraphExecutionEngine supplies it), invoked on each context start/complete/cancel/blocked/running so the owner can drive its ExecutionStateMachine. */
   private readonly onContextLifecycle?: (contextId: string, event: ContextLifecycleEvent) => void
+  private readonly unknownValues: UnknownValueWarnings
 
   constructor(
     compiledCue: CompiledNetCue | CompiledAudioCue,
@@ -113,6 +116,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     this.effectRegistry = effectRegistry
     this.onContextLifecycle = options.onContextLifecycle
     this.revisitPolicyValue = options.revisitPolicy ?? 'strict'
+    this.unknownValues = options.unknownValues ?? new UnknownValueWarnings(cueId)
 
     // Debug logging is opt-in to avoid noisy logs in normal operation.
     // Enable with either env var:
@@ -225,6 +229,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     const lights = ActionEffectFactory.resolveLights(
       this.lightManager,
       actionNode.target,
+      context.unknownValues,
       (varName: string) => this.lookupVar(varName, context),
     )
 
@@ -330,6 +335,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
         parameters,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
+        this.unknownValues,
       )
 
       const eventType =
@@ -523,6 +529,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
           consumeInitialClearPolicy: this.consumeInitialClearPolicy,
           // The raising cue's mode, so cue-data inside the effect reads the frame that raised it.
           callerMode: this.mode,
+          unknownValues: this.unknownValues,
         },
       )
 
@@ -603,6 +610,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
         cueData,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
+        this.unknownValues,
       )
 
       // Set up callbacks

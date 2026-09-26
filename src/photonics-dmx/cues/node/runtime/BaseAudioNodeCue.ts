@@ -18,6 +18,7 @@ import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { ExecutionContext } from './ExecutionContext'
 import { resolveActionColor, resolveActionLayer, resolveActionTiming } from './actionResolver'
+import { UnknownValueWarnings } from './valueResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import { VariableValue, variableValue, type NodeCueDebugSwitch } from './executionTypes'
@@ -121,6 +122,7 @@ export abstract class BaseAudioNodeCue {
   protected readonly groupId: string
   private readonly effectRegistry: EffectRegistry
   private readonly states = new Map<ILightingController, AudioCueRunState>()
+  private readonly unknownValues: UnknownValueWarnings
 
   constructor(
     groupId: string,
@@ -137,6 +139,7 @@ export abstract class BaseAudioNodeCue {
     this.description = definition.description || definition.name || 'Node-based audio cue'
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.groupId = groupId
+    this.unknownValues = new UnknownValueWarnings(this.id)
   }
 
   private getGroupVarStore(sequencer: ILightingController): Map<string, VariableValue> {
@@ -225,6 +228,7 @@ export abstract class BaseAudioNodeCue {
           firstSubmissionUsesSetEffectRef: state.firstSubmissionUsesSetEffectRef,
           onContextLifecycle: state.esmLifecycle.onContextLifecycle,
           debug: this.debug,
+          unknownValues: this.unknownValues,
         },
       )
     }
@@ -284,6 +288,7 @@ export abstract class BaseAudioNodeCue {
           cueData,
           state.cueLevelVarStore,
           state.groupLevelVarStore,
+          this.unknownValues,
         )
         let actionId: string | null = null
         try {
@@ -302,6 +307,7 @@ export abstract class BaseAudioNodeCue {
         const lights = ActionEffectFactory.resolveLights(
           lightManager,
           action.target,
+          this.unknownValues,
           (varName: string) => {
             const cueVar = state.cueLevelVarStore.get(varName)
             const groupVar = state.groupLevelVarStore.get(varName)

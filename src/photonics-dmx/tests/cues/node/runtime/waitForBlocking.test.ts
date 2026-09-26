@@ -21,6 +21,7 @@ import { CueType, defaultCueData, type CueData } from '../../../../cues/types/cu
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
+import { UnknownValueWarnings } from '../../../../cues/node/runtime/valueResolver'
 
 /** set-color action; pass timing overrides to set waitFor/waitUntil. */
 const colorAction = (
@@ -184,7 +185,7 @@ function makeEffectEngine(
     noopRuntimeBroadcaster(),
     {},
     cueData(),
-    { callerMode: 'yarg' },
+    { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
   )
 }
 

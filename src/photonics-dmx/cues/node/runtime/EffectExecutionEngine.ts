@@ -20,7 +20,7 @@ import { ExecutionContext } from './ExecutionContext'
 import { VariableValue, NodeRuntimeCallbacks, variableValue } from './executionTypes'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
-import { resolveNumber } from './valueResolver'
+import { resolveNumber, type UnknownValueWarnings } from './valueResolver'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
@@ -38,6 +38,8 @@ export interface EffectExecutionEngineOptions {
    * tree's own EffectMode.
    */
   callerMode: NodeCueMode
+  /** The warnings of the cue that raised this effect, which report under that cue. */
+  unknownValues: UnknownValueWarnings
 }
 
 export class EffectExecutionEngine extends BaseNodeExecutionEngine {
@@ -55,6 +57,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   private pendingCallbackEffects: Set<string> = new Set()
   private readonly revisitPolicyValue: RevisitPolicy
   private readonly callerMode: NodeCueMode
+  private readonly unknownValues: UnknownValueWarnings
 
   private maybeFireIdle(): void {
     if (
@@ -98,6 +101,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     this.callerCueData = callerCueData
     this.revisitPolicyValue = options.revisitPolicy ?? 'relaxed'
     this.callerMode = options.callerMode
+    this.unknownValues = options.unknownValues
 
     // Initialize effect-local variable store
     this.effectVarStore = new Map()
@@ -234,6 +238,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
         cueData, // Pass caller's cue data
         this.effectVarStore, // Use effect-local variables as "cue-level"
         new Map(), // No group-level variables for effects
+        this.unknownValues,
       )
 
       context.setOnContextComplete(() => {
@@ -308,7 +313,13 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     listener: EventListenerNode,
     cueData: CueData | AudioCueData,
   ): void {
-    const context = new ExecutionContext(listener, cueData, this.effectVarStore, new Map())
+    const context = new ExecutionContext(
+      listener,
+      cueData,
+      this.effectVarStore,
+      new Map(),
+      this.unknownValues,
+    )
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id)

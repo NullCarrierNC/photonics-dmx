@@ -7,10 +7,17 @@ import { resolveMotionPattern } from '../../../cues/node/runtime/actionResolver'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
 import type { CueData } from '../../../cues/types/cueTypes'
 import type { NodeMotionPatternSetting, NetEventNode } from '../../../cues/types/nodeCueTypes'
+import { UnknownValueWarnings } from '../../../cues/node/runtime/valueResolver'
 
 function makeContext(): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
-  return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
+  return new ExecutionContext(
+    ev,
+    {} as CueData,
+    new Map(),
+    new Map(),
+    new UnknownValueWarnings('test'),
+  )
 }
 
 function literalPattern(pattern: string): NodeMotionPatternSetting {

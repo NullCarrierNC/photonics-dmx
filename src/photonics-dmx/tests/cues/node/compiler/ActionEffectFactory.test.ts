@@ -16,12 +16,15 @@ import type {
 } from '../../../../cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { UnknownValueWarnings } from '../../../../cues/node/runtime/valueResolver'
 import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
 import {
   rgbLight,
   createMockLightingConfig,
   createMockTrackedLight,
 } from '../../../helpers/testFixtures'
+
+const unknownValues = new UnknownValueWarnings('test')
 
 describe('ActionEffectFactory', () => {
   let lightManager: DmxLightManager
@@ -268,7 +271,7 @@ describe('ActionEffectFactory', () => {
       groups: { source: 'literal', value: 'front' },
       filter: { source: 'literal', value: 'all' },
     }
-    const result = ActionEffectFactory.resolveLights(lightManager, target)
+    const result = ActionEffectFactory.resolveLights(lightManager, target, unknownValues)
     expect(Array.isArray(result)).toBe(true)
     expect(result.length).toBeGreaterThanOrEqual(0)
   })
@@ -282,7 +285,12 @@ describe('ActionEffectFactory', () => {
     const variableResolver = jest.fn((name: string) =>
       name === 'myLights' ? { type: 'light-array' as const, value: customLights } : undefined,
     )
-    const result = ActionEffectFactory.resolveLights(lightManager, target, variableResolver)
+    const result = ActionEffectFactory.resolveLights(
+      lightManager,
+      target,
+      unknownValues,
+      variableResolver,
+    )
     expect(result).toEqual(customLights)
     expect(variableResolver).toHaveBeenCalledWith('myLights')
   })
@@ -516,10 +524,14 @@ describe('ActionEffectFactory resolving an authored action', () => {
     const lightManager = new DmxLightManager(createMockLightingConfig())
     const getLights = jest.spyOn(lightManager, 'getLights')
 
-    ActionEffectFactory.resolveLights(lightManager, {
-      groups: literal('front, back'),
-      filter: literal('even'),
-    })
+    ActionEffectFactory.resolveLights(
+      lightManager,
+      {
+        groups: literal('front, back'),
+        filter: literal('even'),
+      },
+      unknownValues,
+    )
 
     expect(getLights).toHaveBeenCalledWith(['front', 'back'], 'even')
   })
@@ -532,6 +544,7 @@ describe('ActionEffectFactory resolving an authored action', () => {
     ActionEffectFactory.resolveLights(
       lightManager,
       { groups: variable('groupVar'), filter: variable('filterVar') },
+      unknownValues,
       (name) => ({ type: 'string', value: values[name] }),
     )
 
@@ -542,6 +555,7 @@ describe('ActionEffectFactory resolving an authored action', () => {
     const resolved = ActionEffectFactory.resolveLights(
       new DmxLightManager(createMockLightingConfig()),
       { groups: variable('groupVar'), filter: variable('filterVar') },
+      unknownValues,
     )
 
     expect(resolved).toEqual([])
@@ -623,28 +637,40 @@ describe('ActionEffectFactory resolving an authored action', () => {
       (name: string): VariableValue => ({ type: 'string', value: values[name] })
 
     it('targets no lights for a literal group it does not know', () => {
-      const resolved = ActionEffectFactory.resolveLights(rig(), {
-        groups: literal('frnt'),
-        filter: literal('all'),
-      })
+      const resolved = ActionEffectFactory.resolveLights(
+        rig(),
+        {
+          groups: literal('frnt'),
+          filter: literal('all'),
+        },
+        unknownValues,
+      )
 
       expect(ids(resolved)).toEqual([])
     })
 
     it('keeps the known groups of a list and drops the unknown one', () => {
-      const resolved = ActionEffectFactory.resolveLights(rig(), {
-        groups: literal('back, bak'),
-        filter: literal('all'),
-      })
+      const resolved = ActionEffectFactory.resolveLights(
+        rig(),
+        {
+          groups: literal('back, bak'),
+          filter: literal('all'),
+        },
+        unknownValues,
+      )
 
       expect(ids(resolved)).toEqual(['b1'])
     })
 
     it('targets all of the lights for a literal filter it does not know', () => {
-      const resolved = ActionEffectFactory.resolveLights(rig(), {
-        groups: literal('front'),
-        filter: literal('evens'),
-      })
+      const resolved = ActionEffectFactory.resolveLights(
+        rig(),
+        {
+          groups: literal('front'),
+          filter: literal('evens'),
+        },
+        unknownValues,
+      )
 
       expect(ids(resolved)).toEqual(['f1', 'f2'])
     })
@@ -653,6 +679,7 @@ describe('ActionEffectFactory resolving an authored action', () => {
       const resolved = ActionEffectFactory.resolveLights(
         rig(),
         { groups: variable('groupVar'), filter: variable('filterVar') },
+        unknownValues,
         stringVariables({ groupVar: 'frnt', filterVar: 'all' }),
       )
 
@@ -663,6 +690,7 @@ describe('ActionEffectFactory resolving an authored action', () => {
       const resolved = ActionEffectFactory.resolveLights(
         rig(),
         { groups: variable('groupVar'), filter: variable('filterVar') },
+        unknownValues,
         stringVariables({ groupVar: 'front', filterVar: 'evens' }),
       )
 
@@ -673,6 +701,7 @@ describe('ActionEffectFactory resolving an authored action', () => {
       const resolved = ActionEffectFactory.resolveLights(
         rig(),
         { groups: literal('front'), filter: variable('filterVar') },
+        unknownValues,
         stringVariables({ filterVar: 'odd' }),
       )
 

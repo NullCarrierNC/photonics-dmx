@@ -822,6 +822,7 @@ export abstract class BaseNodeExecutionEngine {
       const lights = ActionEffectFactory.resolveLights(
         this.lightManager,
         actionNode.target, // Pass the ORIGINAL target with ValueSource intact
+        context.unknownValues,
         (varName: string) => this.lookupVar(varName, context),
       )
 
@@ -1036,6 +1037,7 @@ export abstract class BaseNodeExecutionEngine {
     const lights = ActionEffectFactory.resolveLights(
       this.lightManager,
       actionNode.target,
+      context.unknownValues,
       (varName: string) => this.lookupVar(varName, context),
     )
 

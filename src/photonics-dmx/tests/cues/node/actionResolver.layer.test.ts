@@ -4,11 +4,12 @@ import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
 import type { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import type { CueData } from '../../../cues/types/cueTypes'
 import type { NetEventNode } from '../../../cues/types/nodeCueTypes'
+import { UnknownValueWarnings } from '../../../cues/node/runtime/valueResolver'
 
 function contextWithLayer(value: number): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
   const vars = new Map<string, VariableValue>([['lyr', { type: 'number', value }]])
-  return new ExecutionContext(ev, {} as CueData, vars, new Map())
+  return new ExecutionContext(ev, {} as CueData, vars, new Map(), new UnknownValueWarnings('test'))
 }
 
 describe('resolveActionLayer', () => {

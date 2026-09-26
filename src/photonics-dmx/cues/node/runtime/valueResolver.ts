@@ -153,32 +153,36 @@ export function inferVariableValue(value: number | string | boolean): VariableVa
 }
 
 /**
- * Unknown values already reported, keyed by what they were read as and their text. A cue re-reads
- * its values on every dispatch, so each text is reported once. The cap bounds a variable whose
- * text changes on every read.
+ * The unknown values one loaded cue has warned about. A cue re-reads its values on every dispatch,
+ * so each text warns once for each cue that reads it, and a cue loaded afresh warns again.
  */
-const reportedUnknownValues = new Set<string>()
-const MAX_REPORTED_UNKNOWN_VALUES = 256
+export class UnknownValueWarnings {
+  private readonly reported = new Set<string>()
 
-/**
- * Warns, once per text, that `value` is not a known `kind`. An undefined value is a source with
- * nothing to read, such as a variable the caller could not look up, and takes its fallback quietly.
- */
-function reportUnknownValue(kind: string, value: unknown, outcome: string): void {
-  if (value === undefined) return
-  const text = String(value)
-  const key = `${kind}:${text}`
-  if (reportedUnknownValues.has(key)) return
-  if (reportedUnknownValues.size >= MAX_REPORTED_UNKNOWN_VALUES) return
-  reportedUnknownValues.add(key)
-  log.warn(`Unknown ${kind} "${text}", ${outcome}`)
+  constructor(private readonly cueId: string) {}
+
+  /**
+   * Warns that `value` is not a known `kind`. An undefined value is a source with nothing to read,
+   * such as a variable the caller could not look up, and takes its fallback quietly.
+   */
+  report(kind: string, value: unknown, outcome: string): void {
+    if (value === undefined) return
+    const text = String(value)
+    const key = `${kind}:${text}`
+    if (this.reported.has(key)) return
+    this.reported.add(key)
+    log.warn(`Unknown ${kind} "${text}" in cue ${this.cueId}, ${outcome}`)
+  }
 }
 
 /**
  * Comma-separated group names ("front,back"), keeping the known ones. Text naming no known group
  * targets no lights, and warns.
  */
-export function parseLocationGroups(value: unknown): LocationGroup[] {
+export function parseLocationGroups(
+  value: unknown,
+  warnings: UnknownValueWarnings,
+): LocationGroup[] {
   const groups =
     typeof value === 'string'
       ? value
@@ -186,14 +190,14 @@ export function parseLocationGroups(value: unknown): LocationGroup[] {
           .map((g) => g.trim())
           .filter(isLocationGroup)
       : []
-  if (groups.length === 0) reportUnknownValue('light group', value, 'lighting nothing')
+  if (groups.length === 0) warnings.report('light group', value, 'lighting nothing')
   return groups
 }
 
 /** A light filter, or every light of the groups for text naming no filter, which warns. */
-export function parseLightTarget(value: unknown): LightTarget {
+export function parseLightTarget(value: unknown, warnings: UnknownValueWarnings): LightTarget {
   if (isLightTarget(value)) return value
-  reportUnknownValue('light filter', value, 'lighting every light of the groups')
+  warnings.report('light filter', value, 'lighting every light of the groups')
   return 'all'
 }
 
@@ -210,9 +214,9 @@ export function parseBlendMode(value: unknown): BlendMode {
 }
 
 /** A wait condition, or no wait for text naming no condition, which warns. */
-export function parseWaitCondition(value: unknown): WaitCondition {
+export function parseWaitCondition(value: unknown, warnings: UnknownValueWarnings): WaitCondition {
   if (isWaitCondition(value)) return value
-  reportUnknownValue('wait condition', value, 'waiting for nothing')
+  warnings.report('wait condition', value, 'waiting for nothing')
   return 'none'
 }
 
@@ -224,11 +228,11 @@ export function resolveLocationGroups(
   if (source.source === 'variable' && lookupVariable(source.name, context).type === 'light-array') {
     return []
   }
-  return parseLocationGroups(resolveString(source, context))
+  return parseLocationGroups(resolveString(source, context), context.unknownValues)
 }
 
 export function resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
-  return parseLightTarget(resolveString(source, context))
+  return parseLightTarget(resolveString(source, context), context.unknownValues)
 }
 
 export function resolveColor(source: ValueSource, context: ExecutionContext): Color {

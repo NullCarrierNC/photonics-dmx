@@ -13,6 +13,7 @@ import { getColor } from '../../../../helpers/dmxHelpers'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
+import { UnknownValueWarnings } from '../../../../cues/node/runtime/valueResolver'
 
 const createCueData = (overrides: Partial<CueData> = {}): CueData => ({
   ...defaultCueData,
@@ -112,7 +113,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       parameters,
       createCueData(),
-      { callerMode: 'yarg' },
+      { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
     )
     engine.triggerEffect(createCueData())
     harness.advanceBy(1)
