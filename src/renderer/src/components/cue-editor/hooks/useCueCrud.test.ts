@@ -64,6 +64,7 @@ const setup = (
       setSelectedCueId,
       setFilename,
       mode: 'yarg',
+      editorMode: doc.mode,
       cueKind,
       files: [],
       effectFiles: [],
@@ -159,7 +160,7 @@ const NEW_FILE = {
 }
 
 type CrudOverrides = Partial<
-  Pick<UseCueCrudParams, 'editorDoc' | 'selectedCueId' | 'files' | 'effectFiles'>
+  Pick<UseCueCrudParams, 'editorDoc' | 'editorMode' | 'selectedCueId' | 'files' | 'effectFiles'>
 >
 
 function renderCrud(overrides: CrudOverrides = {}) {
@@ -170,6 +171,7 @@ function renderCrud(overrides: CrudOverrides = {}) {
     setSelectedCueId: jest.fn(),
     setFilename: jest.fn(),
     mode: 'yarg' as const,
+    editorMode: 'cue' as const,
     cueKind: 'lighting' as const,
     files: [],
     effectFiles: [],
@@ -221,6 +223,7 @@ describe('useCueCrud new files', () => {
 
     const saved = jest.mocked(ipcApi.saveNodeCueFile).mock.calls[0]![0]
     expect(saved.filename).toBe('stage.json')
+    expect(saved.createOnly).toBe(true)
     expect(saved.content.group).toMatchObject({
       id: 'stage',
       name: 'Stage',
@@ -238,8 +241,8 @@ describe('useCueCrud new files', () => {
     expect(crud.refreshFiles).toHaveBeenCalled()
   })
 
-  it('saves a new effect file while effects are open', async () => {
-    const crud = renderCrud({ editorDoc: effectDoc() })
+  it('saves a new effect file from the Effects tab', async () => {
+    const crud = renderCrud({ editorMode: 'effect' })
     await act(async () => {
       await crud.result.current.handleCreateNewFile(NEW_FILE)
     })
@@ -252,13 +255,13 @@ describe('useCueCrud new files', () => {
   })
 
   it.each([
-    ['cue', null, '/cues/stage.json', 'yarg-cue'],
-    ['effect', effectDoc(), '/fx/stage.json', 'yarg-effect'],
+    ['cue', 'cue', '/cues/stage.json', 'yarg-cue'],
+    ['effect', 'effect', '/fx/stage.json', 'yarg-effect'],
   ] as const)(
     'remembers a new %s file as the one to reopen',
-    async (_kind, editorDoc, path, modeKey) => {
+    async (_kind, editorMode, path, modeKey) => {
       localStorage.clear()
-      const crud = renderCrud({ editorDoc })
+      const crud = renderCrud({ editorMode })
       await act(async () => {
         await crud.result.current.handleCreateNewFile(NEW_FILE)
       })
@@ -279,6 +282,31 @@ describe('useCueCrud new files', () => {
 
     expect(crud.onError).toHaveBeenCalledWith(
       'Cue group ID "stage" is already in use. Choose a different ID.',
+    )
+    expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
+  })
+
+  it('refuses a group id that names a file already in the folder', async () => {
+    const crud = renderCrud({
+      files: [
+        {
+          mode: 'yarg',
+          groupId: 'friday',
+          groupName: 'Friday',
+          path: '/cues/yarg/Stage.json',
+          cueCount: 1,
+          lightingCueCount: 1,
+          motionCueCount: 0,
+          updatedAt: 0,
+        },
+      ],
+    })
+    await act(async () => {
+      await crud.result.current.handleCreateNewFile(NEW_FILE)
+    })
+
+    expect(crud.onError).toHaveBeenCalledWith(
+      'A cue file named "stage.json" already exists. Choose a different ID.',
     )
     expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
   })
@@ -329,13 +357,16 @@ describe('useCueCrud new files', () => {
 })
 
 describe('useCueCrud additions and effect removal', () => {
-  it('starts an untitled file when a cue is added with nothing open', () => {
+  it('starts a one-cue document named after its group when a cue is added with nothing open', () => {
     const crud = renderCrud()
     act(() => crud.result.current.handleAddCue())
 
-    const cues = (lastDoc(crud.setEditorDoc).file as { cues: Array<{ id: string }> }).cues
-    const added = cues[cues.length - 1]!
-    expect(crud.setFilename).toHaveBeenCalledWith('untitled.json')
+    const doc = lastDoc(crud.setEditorDoc)
+    const cues = (doc.file as { cues: Array<{ id: string }> }).cues
+    const added = cues[0]!
+    expect(cues).toHaveLength(1)
+    expect(doc.path).toBeNull()
+    expect(crud.setFilename).toHaveBeenCalledWith(`${doc.file.group.id}.json`)
     expect(crud.setSelectedCueId).toHaveBeenCalledWith(added.id)
     expect(crud.loadCueIntoFlow).toHaveBeenCalledWith(added)
     expect(crud.setIsDirty).toHaveBeenCalledWith(true)

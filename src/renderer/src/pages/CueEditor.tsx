@@ -87,6 +87,7 @@ const CueEditor: React.FC = () => {
     handleModeChange,
     handleCreateNewFile,
     existingGroupIdsForNewFileModal,
+    existingFilenamesLowerForNewFileModal,
     updateGroupMeta,
     updateCueMetadata,
     updateEffectMetadata,
@@ -357,6 +358,7 @@ const CueEditor: React.FC = () => {
           isEffectMode={isEffectMode}
           mode={mode}
           existingGroupIds={existingGroupIdsForNewFileModal}
+          existingFilenamesLower={existingFilenamesLowerForNewFileModal}
           onCancel={() => setShowNewFileModal(false)}
           onSave={(metadata) => {
             void handleCreateNewFile(metadata)

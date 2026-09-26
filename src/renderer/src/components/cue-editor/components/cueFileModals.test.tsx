@@ -9,7 +9,7 @@ afterEach(() => {
   jest.restoreAllMocks()
 })
 
-function renderNewFile(existing: string[] = []) {
+function renderNewFile(existing: string[] = [], existingFiles: string[] = []) {
   const onSave = jest.fn()
   renderWithProviders(
     <NewFileModal
@@ -17,6 +17,7 @@ function renderNewFile(existing: string[] = []) {
       isEffectMode={false}
       mode="yarg"
       existingGroupIds={new Set(existing)}
+      existingFilenamesLower={new Set(existingFiles)}
       onCancel={jest.fn()}
       onSave={onSave}
     />,
@@ -65,6 +66,17 @@ describe('NewFileModal', () => {
     type('Cue Group ID', 'My-Cues')
 
     expect(screen.getByText(/already used by another cue file/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('says the file a group ID names exists and holds Save', () => {
+    renderNewFile(['friday-show'], ['show.json'])
+
+    type('Cue Group ID', 'Show')
+    type('Cue Group Name', 'Scratch')
+    type('First Cue Name', 'Opener')
+
+    expect(screen.getByText(/named Show\.json already exists/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 

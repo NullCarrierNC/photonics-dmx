@@ -8,6 +8,8 @@ type Props = {
   mode: NodeCueMode
   /** Lowercase group IDs already used for this mode (yarg vs audio) and document kind (cue vs effect). */
   existingGroupIds: ReadonlySet<string>
+  /** Lowercase basenames of the files in the folder the new file saves into. */
+  existingFilenamesLower: ReadonlySet<string>
   onCancel: () => void
   onSave: (metadata: {
     groupId: string
@@ -23,6 +25,7 @@ const NewFileModal: React.FC<Props> = ({
   isEffectMode,
   mode,
   existingGroupIds,
+  existingFilenamesLower,
   onCancel,
   onSave,
 }) => {
@@ -35,6 +38,8 @@ const NewFileModal: React.FC<Props> = ({
   const fileTypeLabel = isEffectMode ? 'Effect' : 'Cue'
   const groupLabel = isEffectMode ? 'Effect Group' : 'Cue Group'
   const groupIdTaken = isGroupIdTaken(groupId, existingGroupIds)
+  const filenameTaken =
+    groupId.trim().length > 0 && existingFilenamesLower.has(`${groupId}.json`.toLowerCase())
   const complete = Boolean(groupId.trim() && groupName.trim() && itemName.trim())
 
   if (!isOpen) return null
@@ -43,7 +48,7 @@ const NewFileModal: React.FC<Props> = ({
     <CueFileModal
       title={`Create New ${fileTypeLabel} File (${mode.toUpperCase()})`}
       actionLabel="Save"
-      canSubmit={complete && !groupIdTaken}
+      canSubmit={complete && !groupIdTaken && !filenameTaken}
       onSubmit={() => onSave({ groupId, groupName, groupDescription, itemName, itemDescription })}
       onCancel={onCancel}>
       <GroupIdField
@@ -51,6 +56,7 @@ const NewFileModal: React.FC<Props> = ({
         value={groupId}
         onChange={setGroupId}
         taken={groupIdTaken}
+        filenameTaken={filenameTaken}
         fileKind={fileTypeLabel.toLowerCase()}
         mode={mode}
         hint="Used as the filename (e.g., my-custom-effects.json)"

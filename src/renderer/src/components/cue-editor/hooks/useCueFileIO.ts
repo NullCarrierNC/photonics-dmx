@@ -12,7 +12,7 @@ import type {
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
-import { firstByName, savedAsUserFile } from '../lib/cueUtils'
+import { fileBasename, firstByName, savedAsUserFile } from '../lib/cueUtils'
 import {
   clearLastFilePathForMode,
   modeKeyFor,
@@ -233,11 +233,19 @@ export function useCueFileIO({
       if (!open || open.mode !== saved.mode || open.path !== saved.path) return
       const current = getUpdatedDocument() ?? open
       setEditorDoc(savedAsUserFile(current, path))
+      setFilename(fileBasename(path))
       rememberLastFilePath(path)
       setValidationErrors([])
       setIsDirty(!equal(current.file, snapshot.file))
     },
-    [getUpdatedDocument, rememberLastFilePath, setEditorDoc, setValidationErrors, setIsDirty],
+    [
+      getUpdatedDocument,
+      rememberLastFilePath,
+      setEditorDoc,
+      setFilename,
+      setValidationErrors,
+      setIsDirty,
+    ],
   )
 
   const handleSave = useCallback(async (): Promise<boolean> => {
@@ -251,6 +259,11 @@ export function useCueFileIO({
       return false
     }
 
+    // A document with no file yet creates one named after its group, and refuses a name already
+    // taken. An open file saves over itself.
+    const createOnly = editorDoc.path === null
+    const saveFilename = createOnly ? `${snapshot.file.group.id}.json` : filename
+
     // A saved file is the user's, so a newer shipped version never replaces it.
     if (snapshot.mode === 'effect') {
       const effectContent = { ...snapshot.file, bundled: false }
@@ -262,16 +275,17 @@ export function useCueFileIO({
         }
         const response = await saveEffectFile({
           mode: effectContent.mode,
-          filename,
+          filename: saveFilename,
           content: effectContent,
+          createOnly,
         })
         if (!response.success) {
-          onSaveError?.(`Failed to save effect: ${filename}`)
+          onSaveError?.(`Failed to save effect: ${response.error}`)
           return false
         }
         installSaved(editorDoc, snapshot, response.path)
         await refreshEffectFiles()
-        onSaveSuccess?.(`Effect saved: ${filename}`)
+        onSaveSuccess?.(`Effect saved: ${saveFilename}`)
         return true
       } catch (error) {
         log.error('Failed to save effect file', error)
@@ -288,11 +302,12 @@ export function useCueFileIO({
         }
         const response = await saveNodeCueFile({
           mode: cueContent.mode,
-          filename,
+          filename: saveFilename,
           content: cueContent,
+          createOnly,
         })
         if (!response.success) {
-          onSaveError?.(`Failed to save cue: ${filename}`)
+          onSaveError?.(`Failed to save cue: ${response.error}`)
           return false
         }
         installSaved(editorDoc, snapshot, response.path)
@@ -300,7 +315,7 @@ export function useCueFileIO({
         if (response.groupEnableError) {
           onSaveError?.(`Cue saved, but its group was not turned on: ${response.groupEnableError}`)
         } else {
-          onSaveSuccess?.(`Cue saved: ${filename}`)
+          onSaveSuccess?.(`Cue saved: ${saveFilename}`)
         }
         return true
       } catch (error) {

@@ -112,6 +112,8 @@ interface GroupIdFieldProps {
   value: string
   onChange: (value: string) => void
   taken: boolean
+  /** Whether the file this ID names already exists, for a dialog that names the file after it. */
+  filenameTaken?: boolean
   /** "cue" or "effect", for the message when the ID is taken. */
   fileKind: string
   mode: string
@@ -125,6 +127,7 @@ export const GroupIdField: React.FC<GroupIdFieldProps> = ({
   value,
   onChange,
   taken,
+  filenameTaken,
   fileKind,
   mode,
   hint,
@@ -135,8 +138,10 @@ export const GroupIdField: React.FC<GroupIdFieldProps> = ({
     required
     hint={hint}
     error={
-      taken &&
-      `This group ID is already used by another ${fileKind} file in ${mode.toUpperCase()} mode. Choose a different ID.`
+      (taken &&
+        `This group ID is already used by another ${fileKind} file in ${mode.toUpperCase()} mode. Choose a different ID.`) ||
+      (filenameTaken &&
+        `A ${fileKind} file named ${value}.json already exists in ${mode.toUpperCase()} mode. Choose a different ID.`)
     }>
     {(inputProps) => (
       <input
