@@ -82,7 +82,7 @@ YARG uses **node cue processing** where network cue events are routed through th
 ### RB3E Processing
 
 RB3E runs in one of two modes, set by the `processingMode` value in the RB3 preferences. The
-default is `direct`.
+default is `cue`.
 
 **Direct mode** maps the Stage Kit state straight onto the rig. The `Rb3StageKitDirectProcessor`:
 

@@ -51,7 +51,7 @@ export interface ProcessorManagerConfig {
  * Default configuration
  */
 export const DEFAULT_PROCESSOR_CONFIG: ProcessorManagerConfig = {
-  mode: 'direct',
+  mode: 'cue',
   stageKitConfig: {},
   debug: false,
 }
