@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "data": {
+    "numLights": 3,
+    "lightLayout": {
+      "id": "front-back",
+      "label": "Front and Back (back lights behind audience)"
+    },
+    "strobeType": "AllCapable",
+    "frontLights": [
+      {
+        "id": "3fd2e364-adf3-41a3-83be-25f7276af2ed",
+        "fixtureId": "701a406c-a444-43d1-b1ce-bdbc6248f98f",
+        "position": 1,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "masterDimmer": 1
+        },
+        "mount": "floor"
+      },
+      {
+        "id": "bf24e8b6-bd7c-4d63-af3c-2f8788c928bf",
+        "fixtureId": "fd0a1fa8-5a89-4338-a160-d84b93ee3aeb",
+        "position": 2,
+        "fixture": "rgb/mh",
+        "label": "An RGB Light",
+        "name": "Spot",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "red": 12,
+          "green": 13,
+          "blue": 14,
+          "masterDimmer": 11,
+          "pan": 15,
+          "tilt": 16
+        },
+        "config": {
+          "panHome": 50,
+          "panMin": 0,
+          "panMax": 255,
+          "panRangeDeg": 540,
+          "panDirectionCW": true,
+          "panStageDeg": 270,
+          "tiltHome": 50,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "tiltRangeDeg": 180,
+          "tiltStageDeg": 90,
+          "invertPan": false,
+          "invertTilt": false
+        },
+        "mount": "floor"
+      }
+    ],
+    "backLights": [
+      {
+        "id": "ab37b956-a58f-4da7-a2a9-f884193bb685",
+        "fixtureId": "81fcb775-ed47-4f3c-a177-f3407580af50",
+        "position": 3,
+        "fixture": "strobe",
+        "label": "An RGB Light",
+        "name": "Strobe",
+        "isStrobeEnabled": false,
+        "group": "back",
+        "channels": {
+          "masterDimmer": 21,
+          "strobeChannel": 22
+        },
+        "mount": "floor"
+      }
+    ],
+    "strobeLights": []
+  }
+}

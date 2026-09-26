@@ -1,0 +1,1071 @@
+{
+  "version": 1,
+  "cueVersion": 1,
+  "mode": "rb3",
+  "group": {
+    "id": "rb3-motion-default",
+    "name": "RB3 Default motion",
+    "description": "Time-driven motion programs for RB3 cue mode: the settable-value cues ported from the YARG motion library. Switched on a Light-1 change once the motion timer elapses.",
+    "isDefault": true
+  },
+  "cues": [
+    {
+      "id": "rb3-motion-wave",
+      "name": "Wave",
+      "description": "Horizontal linear sweep +/-20 deg from home.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-wave-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-wave-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "linear-sweep"
+              },
+              "linearSweepAxis": {
+                "source": "literal",
+                "value": "horizontal"
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.5
+              },
+              "size": {
+                "source": "literal",
+                "value": 20
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-wave-start",
+          "to": "rb3-motion-wave-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-wave-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-wave-motion": {
+            "x": -30.146633550303363,
+            "y": 77.1456355867669
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-nod",
+      "name": "Nod",
+      "description": "Vertical linear sweep +/-20 deg from home.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-nod-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-nod-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "linear-sweep"
+              },
+              "linearSweepAxis": {
+                "source": "literal",
+                "value": "vertical"
+              },
+              "speed": {
+                "source": "literal",
+                "value": 1
+              },
+              "size": {
+                "source": "literal",
+                "value": 20
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-nod-start",
+          "to": "rb3-motion-nod-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-nod-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-nod-motion": {
+            "x": -30.984040037811837,
+            "y": 76.30822909925843
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-cw-sync",
+      "name": "Clockwise Sync",
+      "description": "Synced clockwise orbit, 30 deg radius.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-cw-sync-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-cw-sync-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.25
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-cw-sync-start",
+          "to": "rb3-motion-cw-sync-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-cw-sync-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-cw-sync-motion": {
+            "x": -25.122194625252803,
+            "y": 103.10523669952812
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-ccw-sync",
+      "name": "Counter-Clockwise Sync",
+      "description": "Synced counter-clockwise orbit, 30 deg radius.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-ccw-sync-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-ccw-sync-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "reverse": {
+                "source": "literal",
+                "value": true
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.25
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-ccw-sync-start",
+          "to": "rb3-motion-ccw-sync-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-ccw-sync-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-ccw-sync-motion": {
+            "x": -32.658853012828615,
+            "y": 86.3571069493596
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-cw-fan",
+      "name": "Clockwise Fan Spread",
+      "description": "Clockwise orbit fanned 360 deg across the fixtures.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-cw-fan-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-cw-fan-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 360
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.25
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-cw-fan-start",
+          "to": "rb3-motion-cw-fan-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-cw-fan-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-cw-fan-motion": {
+            "x": -15.073316775151682,
+            "y": 90.54413938690169
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-ccw-fan",
+      "name": "Counter-Clockwise Fan Spread",
+      "description": "Counter-clockwise orbit fanned 360 deg across the fixtures.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-ccw-fan-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-ccw-fan-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 360
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "reverse": {
+                "source": "literal",
+                "value": true
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.25
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-ccw-fan-start",
+          "to": "rb3-motion-ccw-fan-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-ccw-fan-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-ccw-fan-motion": {
+            "x": -41.032917887912845,
+            "y": 86.3571069493596
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-pendulum",
+      "name": "Pendulum",
+      "description": "Pendulum swing, 25 deg amplitude.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-pendulum-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-pendulum-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "pendulum"
+              },
+              "size": {
+                "source": "literal",
+                "value": 25
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.5
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-pendulum-start",
+          "to": "rb3-motion-pendulum-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-pendulum-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-pendulum-motion": {
+            "x": -36.84588545037076,
+            "y": 79.65785504929215
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-figure8",
+      "name": "Figure-8",
+      "description": "Figure-8 sweep, 25 deg amplitude.",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-figure8-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-figure8-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "figure-8"
+              },
+              "size": {
+                "source": "literal",
+                "value": 25
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.5
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-figure8-start",
+          "to": "rb3-motion-figure8-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-figure8-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-figure8-motion": {
+            "x": -31.821446525320198,
+            "y": 77.1456355867669
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    },
+    {
+      "id": "rb3-motion-still",
+      "name": "Still",
+      "description": "Hold the fixtures at their home position (no motion).",
+      "kind": "motion",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-motion-still-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-motion-still-motion",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "position": {
+              "mode": "offset",
+              "pan": {
+                "source": "literal",
+                "value": 0
+              },
+              "tilt": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rb3-motion-still-start",
+          "to": "rb3-motion-still-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-motion-still-start": {
+            "x": 0,
+            "y": 0
+          },
+          "rb3-motion-still-motion": {
+            "x": -31.821446525320198,
+            "y": 72.12119666171634
+          }
+        },
+        "viewport": {
+          "x": 438.30764847309547,
+          "y": 230.97561655708668,
+          "zoom": 1.1941631870745895
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

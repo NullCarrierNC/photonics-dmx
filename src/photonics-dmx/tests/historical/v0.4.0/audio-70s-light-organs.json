@@ -1,0 +1,3669 @@
+{
+  "version": 1,
+  "mode": "audio",
+  "group": {
+    "id": "audio-70s-light-organs",
+    "name": "70's Light Organs",
+    "description": "Classic 70's colour organ effects driven by audio frequency analysis, spectral gates, and per-band onset detection",
+    "isDefault": true
+  },
+  "cues": [
+    {
+      "id": "cue-70s-three-band",
+      "name": "Three-Band Color Organ",
+      "description": "Bass, mid, and treble bands each drive a colour on a separate section (classic SCR colour organ), with spectral gates for tonal vs noise separation.",
+      "cueTypeId": "audio-70s-three-band",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        },
+        {
+          "name": "totalLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 4,
+          "description": "Configured light count for group targeting"
+        },
+        {
+          "name": "targetGroups",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "front",
+          "description": "Target groups (front only when ≤4 lights, front+back when >4)"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-tri-bass",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 300
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 150,
+            "smoothing": 0.82,
+            "color": "#ff0000",
+            "nodeLabel": "Bass",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Bass"
+          },
+          {
+            "id": "ev-70s-tri-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 300,
+              "maxHz": 2000
+            },
+            "threshold": 0.09,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.75,
+            "color": "#00ff00",
+            "nodeLabel": "Mid",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Mid"
+          },
+          {
+            "id": "ev-70s-tri-treble",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 2000,
+              "maxHz": 8000
+            },
+            "threshold": 0.07,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.68,
+            "color": "#0000ff",
+            "nodeLabel": "Treble",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Treble"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-tri-bass-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "targetGroups"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "third-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-tri-mid-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "targetGroups"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "third-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-tri-treble-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "targetGroups"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "third-3"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-tri-bass-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-tri-mid-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-tri-treble-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-tri-bass-total",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "totalLights"
+          },
+          {
+            "id": "logic-70s-tri-gt4",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">",
+            "left": {
+              "source": "variable",
+              "name": "totalLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            }
+          },
+          {
+            "id": "logic-70s-tri-set-frontback",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "targetGroups",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "front,back"
+            }
+          },
+          {
+            "id": "logic-70s-tri-set-frontonly",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "targetGroups",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "front"
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-tri-bass",
+          "to": "logic-70s-tri-bass-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-tri-bass-level",
+          "to": "logic-70s-tri-bass-total"
+        },
+        {
+          "from": "logic-70s-tri-bass-total",
+          "to": "logic-70s-tri-gt4"
+        },
+        {
+          "from": "logic-70s-tri-gt4",
+          "to": "logic-70s-tri-set-frontback",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-tri-gt4",
+          "to": "logic-70s-tri-set-frontonly",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-70s-tri-set-frontback",
+          "to": "act-70s-tri-bass-on"
+        },
+        {
+          "from": "logic-70s-tri-set-frontonly",
+          "to": "act-70s-tri-bass-on"
+        },
+        {
+          "from": "ev-70s-tri-mid",
+          "to": "logic-70s-tri-mid-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-tri-mid-level",
+          "to": "act-70s-tri-mid-on"
+        },
+        {
+          "from": "ev-70s-tri-treble",
+          "to": "logic-70s-tri-treble-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-tri-treble-level",
+          "to": "act-70s-tri-treble-on"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-tri-bass": {
+            "x": 502.6666666666667,
+            "y": 2.7787617842355985
+          },
+          "ev-70s-tri-mid": {
+            "x": 247.61954812146723,
+            "y": 0
+          },
+          "ev-70s-tri-treble": {
+            "x": 0,
+            "y": 0
+          },
+          "act-70s-tri-bass-on": {
+            "x": 517.7946515390066,
+            "y": 258.34971123437083
+          },
+          "act-70s-tri-mid-on": {
+            "x": 245.71651918254793,
+            "y": 263.9104072935879
+          },
+          "act-70s-tri-treble-on": {
+            "x": -73.33852209025258,
+            "y": 262.9344776480465
+          },
+          "logic-70s-tri-bass-level": {
+            "x": 507.73360282244784,
+            "y": 144.12949499736226
+          },
+          "logic-70s-tri-mid-level": {
+            "x": 259.43303836509585,
+            "y": 148.59934135898948
+          },
+          "logic-70s-tri-treble-level": {
+            "x": -4.75222016508593,
+            "y": 136.43673022071084
+          },
+          "logic-70s-tri-bass-total": {
+            "x": 507.73360282244784,
+            "y": 200
+          },
+          "logic-70s-tri-gt4": {
+            "x": 507.73360282244784,
+            "y": 256
+          },
+          "logic-70s-tri-set-frontback": {
+            "x": 400,
+            "y": 200
+          },
+          "logic-70s-tri-set-frontonly": {
+            "x": 620,
+            "y": 200
+          }
+        },
+        "viewport": {
+          "x": 253.16352883136142,
+          "y": 23.287328734430275,
+          "zoom": 0.9649936721805082
+        }
+      }
+    },
+    {
+      "id": "cue-70s-beat-strobe",
+      "name": "Beat Strobe",
+      "description": "White flash on every detected beat with a fast decay to black; onset gating reduces false triggers.",
+      "cueTypeId": "audio-70s-beat-strobe",
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-strobe-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.4
+          }
+        ],
+        "actions": [],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "er-70s-strobe-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 30
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 60
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 180
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-strobe-beat",
+          "to": "er-70s-strobe-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-strobe-beat": {
+            "x": -6.737757777795196,
+            "y": 4.541355203837156
+          },
+          "er-70s-strobe-flash": {
+            "x": -2.793959291651845,
+            "y": 99.11616273224354
+          }
+        },
+        "viewport": {
+          "x": 603.5743939010426,
+          "y": 161.12843077396974,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-70s-bass-cymbal",
+      "name": "Bass & Cymbal",
+      "description": "Warm red wash on bass energy with amber HFC flashes for cymbals and snares; spectral and onset gating for cleaner separation.",
+      "cueTypeId": "audio-70s-bass-cymbal",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-bc-bass",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 200
+            },
+            "threshold": 0.08,
+            "hysteresis": 0.03,
+            "holdMs": 200,
+            "smoothing": 0.84,
+            "color": "#aa2200",
+            "nodeLabel": "Bass",
+            "outputs": ["enter", "during", "exit"],
+            "spectralGates": {
+              "flatness": {
+                "max": 0.35
+              }
+            },
+            "label": "Bass"
+          },
+          {
+            "id": "ev-70s-bc-hfc",
+            "type": "event",
+            "eventType": "audio-hfc",
+            "triggerMode": "edge",
+            "label": "HFC accent",
+            "threshold": 0.15,
+            "cooldownMs": 120
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-bc-bass-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-bc-bass-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-482b8306-af1e-49a7-b7b3-ee7060971e5e",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "er-70s-bc-hfc-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 20
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 60
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 200
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-bc-hfc",
+          "to": "er-70s-bc-hfc-flash"
+        },
+        {
+          "from": "ev-70s-bc-bass",
+          "to": "logic-70s-bc-bass-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-bc-bass-level",
+          "to": "logic-482b8306-af1e-49a7-b7b3-ee7060971e5e"
+        },
+        {
+          "from": "logic-482b8306-af1e-49a7-b7b3-ee7060971e5e",
+          "to": "act-70s-bc-bass-on"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-bc-bass": {
+            "x": 242.80180105753243,
+            "y": 0
+          },
+          "ev-70s-bc-hfc": {
+            "x": 2.4051124211400747,
+            "y": 0
+          },
+          "act-70s-bc-bass-on": {
+            "x": 248.56615730163708,
+            "y": 329.4905472780964
+          },
+          "logic-70s-bc-bass-level": {
+            "x": 270.0356423949513,
+            "y": 117.70542281001599
+          },
+          "er-70s-bc-hfc-flash": {
+            "x": 0,
+            "y": 162.41736608371139
+          },
+          "logic-482b8306-af1e-49a7-b7b3-ee7060971e5e": {
+            "x": 293.2636157918522,
+            "y": 217.552288156111
+          }
+        },
+        "viewport": {
+          "x": 327.0744414921664,
+          "y": 75.35899595185384,
+          "zoom": 0.7911373011854507
+        }
+      }
+    },
+    {
+      "id": "cue-70s-quarter-chase",
+      "name": "Quarter Chase",
+      "description": "Each beat advances a lit quarter around the front array (disco chase sequencer); onset gating tightens beat following.",
+      "cueTypeId": "audio-70s-quarter-chase",
+      "variables": [
+        {
+          "name": "chasePos",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 3,
+          "description": "Beat counter (starts at 3 so first beat lands on quarter 1 / red)"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-chase-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.4
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-chase-blackout",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 80
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-70s-chase-q1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-chase-q2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-chase-q3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-3"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-chase-q4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 100
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-chase-add",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "chasePos"
+          },
+          {
+            "id": "logic-70s-chase-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "chasePos"
+          },
+          {
+            "id": "logic-70s-chase-eq0",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "logic-70s-chase-eq1",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "logic-70s-chase-eq2",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-chase-beat",
+          "to": "act-70s-chase-blackout"
+        },
+        {
+          "from": "act-70s-chase-blackout",
+          "to": "logic-70s-chase-add"
+        },
+        {
+          "from": "logic-70s-chase-add",
+          "to": "logic-70s-chase-mod"
+        },
+        {
+          "from": "logic-70s-chase-mod",
+          "to": "logic-70s-chase-eq0"
+        },
+        {
+          "from": "logic-70s-chase-eq0",
+          "to": "act-70s-chase-q1",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-chase-eq0",
+          "to": "logic-70s-chase-eq1",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-70s-chase-eq1",
+          "to": "act-70s-chase-q2",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-chase-eq1",
+          "to": "logic-70s-chase-eq2",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-70s-chase-eq2",
+          "to": "act-70s-chase-q3",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-chase-eq2",
+          "to": "act-70s-chase-q4",
+          "fromPort": "false"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-chase-beat": {
+            "x": 10.039369321054892,
+            "y": 15.41219030432228
+          },
+          "act-70s-chase-blackout": {
+            "x": -16.61939911809361,
+            "y": 95.65980909247821
+          },
+          "act-70s-chase-q1": {
+            "x": -207.333532788252,
+            "y": 576.0306126240486
+          },
+          "act-70s-chase-q2": {
+            "x": -109.56846227495447,
+            "y": 782.6289653523766
+          },
+          "act-70s-chase-q3": {
+            "x": 26.410289650998152,
+            "y": 949.5747555567671
+          },
+          "act-70s-chase-q4": {
+            "x": 324.3870327108692,
+            "y": 924.6306822857925
+          },
+          "logic-70s-chase-add": {
+            "x": 0,
+            "y": 235.40074936673045
+          },
+          "logic-70s-chase-mod": {
+            "x": 3.412372838705778,
+            "y": 348.3852688074112
+          },
+          "logic-70s-chase-eq0": {
+            "x": 1.4748965129256248,
+            "y": 449.34206695482135
+          },
+          "logic-70s-chase-eq1": {
+            "x": 88.81713694986672,
+            "y": 640.8100927460075
+          },
+          "logic-70s-chase-eq2": {
+            "x": 193.30104029385961,
+            "y": 788.1037328695652
+          }
+        },
+        "viewport": {
+          "x": 360.20279592432746,
+          "y": 33.93021922019466,
+          "zoom": 0.7323429873168543
+        }
+      }
+    },
+    {
+      "id": "cue-70s-quarter-chase-random",
+      "name": "Quarter Chase Random",
+      "description": "Each beat advances a lit quarter around the front array with a random colour per step (disco chase sequencer); onset gating tightens beat following.",
+      "cueTypeId": "audio-70s-quarter-chase-random",
+      "variables": [
+        {
+          "name": "chasePos",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 3,
+          "description": "Beat counter (starts at 3 so first beat lands on quarter 1 / red)"
+        },
+        {
+          "name": "chaseColor",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "red",
+          "description": "Random colour for the active quarter this beat"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-rchase-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.4
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-rchase-blackout",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 80
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-70s-rchase-q1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-rchase-q2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-rchase-q3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-3"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-rchase-q4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 100
+              },
+              "easing": { "source": "literal", "value": "easeIn" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-rchase-add",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "chasePos"
+          },
+          {
+            "id": "logic-70s-rchase-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "chasePos"
+          },
+          {
+            "id": "logic-70s-rchase-rand-color",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": ["red", "green", "blue", "amber", "purple", "cyan", "yellow", "orange"],
+            "assignTo": "chaseColor"
+          },
+          {
+            "id": "logic-70s-rchase-eq0",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "logic-70s-rchase-eq1",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "logic-70s-rchase-eq2",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-rchase-beat",
+          "to": "act-70s-rchase-blackout"
+        },
+        {
+          "from": "act-70s-rchase-blackout",
+          "to": "logic-70s-rchase-add"
+        },
+        {
+          "from": "logic-70s-rchase-add",
+          "to": "logic-70s-rchase-mod"
+        },
+        {
+          "from": "logic-70s-rchase-mod",
+          "to": "logic-70s-rchase-rand-color"
+        },
+        {
+          "from": "logic-70s-rchase-eq0",
+          "to": "act-70s-rchase-q1",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-rchase-eq0",
+          "to": "logic-70s-rchase-eq1",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-70s-rchase-eq1",
+          "to": "act-70s-rchase-q2",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-rchase-eq1",
+          "to": "logic-70s-rchase-eq2",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-70s-rchase-eq2",
+          "to": "act-70s-rchase-q3",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-70s-rchase-eq2",
+          "to": "act-70s-rchase-q4",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-70s-rchase-rand-color",
+          "to": "logic-70s-rchase-eq0"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-rchase-beat": {
+            "x": 10.039369321054892,
+            "y": 15.41219030432228
+          },
+          "act-70s-rchase-blackout": {
+            "x": -16.61939911809361,
+            "y": 95.65980909247821
+          },
+          "act-70s-rchase-q1": {
+            "x": -207.333532788252,
+            "y": 576.0306126240486
+          },
+          "act-70s-rchase-q2": {
+            "x": -109.56846227495447,
+            "y": 782.6289653523766
+          },
+          "act-70s-rchase-q3": {
+            "x": 26.410289650998152,
+            "y": 949.5747555567671
+          },
+          "act-70s-rchase-q4": {
+            "x": 324.3870327108692,
+            "y": 924.6306822857925
+          },
+          "logic-70s-rchase-add": {
+            "x": 0,
+            "y": 235.40074936673045
+          },
+          "logic-70s-rchase-mod": {
+            "x": 3.412372838705778,
+            "y": 348.3852688074112
+          },
+          "logic-70s-rchase-eq0": {
+            "x": 1.4748965129256248,
+            "y": 449.34206695482135
+          },
+          "logic-70s-rchase-eq1": {
+            "x": 88.81713694986672,
+            "y": 640.8100927460075
+          },
+          "logic-70s-rchase-eq2": {
+            "x": 193.30104029385961,
+            "y": 788.1037328695652
+          },
+          "logic-70s-rchase-rand-color": {
+            "x": 2,
+            "y": 400
+          }
+        },
+        "viewport": {
+          "x": 360.20279592432746,
+          "y": 33.93021922019466,
+          "zoom": 0.7323429873168543
+        }
+      }
+    },
+    {
+      "id": "cue-70s-eight-band",
+      "name": "Eight-Band Spectrum",
+      "description": "Eight fixed bands (Rhythm Game ranges) with EQ palette colours on front and back quarters.",
+      "cueTypeId": "audio-70s-eight-band",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-e8-sub",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 50
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 200,
+            "smoothing": 0.85,
+            "color": "#ff0000",
+            "nodeLabel": "Sub",
+            "outputs": ["enter", "during", "exit"],
+            "triggerPresetDirty": true,
+            "label": "Sub"
+          },
+          {
+            "id": "ev-70s-e8-kick",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 50,
+              "maxHz": 130
+            },
+            "threshold": 0.18,
+            "hysteresis": 0.04,
+            "holdMs": 180,
+            "smoothing": 0.85,
+            "color": "#ff7f00",
+            "nodeLabel": "Kick",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Kick"
+          },
+          {
+            "id": "ev-70s-e8-bass",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 130,
+              "maxHz": 250
+            },
+            "threshold": 0.14,
+            "hysteresis": 0.04,
+            "holdMs": 160,
+            "smoothing": 0.82,
+            "color": "#ffff00",
+            "nodeLabel": "Bass",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Bass"
+          },
+          {
+            "id": "ev-70s-e8-low-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 250,
+              "maxHz": 1000
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.78,
+            "color": "#00ff00",
+            "nodeLabel": "Low Mid",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Low Mid"
+          },
+          {
+            "id": "ev-70s-e8-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 1000,
+              "maxHz": 2500
+            },
+            "threshold": 0.08,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.75,
+            "color": "#00ffff",
+            "nodeLabel": "Mid",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Mid"
+          },
+          {
+            "id": "ev-70s-e8-presence",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 2500,
+              "maxHz": 5000
+            },
+            "threshold": 0.06,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.7,
+            "color": "#0000ff",
+            "nodeLabel": "Presence",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Presence"
+          },
+          {
+            "id": "ev-70s-e8-high",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 5000,
+              "maxHz": 10000
+            },
+            "threshold": 0.05,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.65,
+            "color": "#800080",
+            "nodeLabel": "High",
+            "outputs": ["enter", "during", "exit"],
+            "label": "High"
+          },
+          {
+            "id": "ev-70s-e8-air",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 10000,
+              "maxHz": 20000
+            },
+            "threshold": 0,
+            "hysteresis": 0.01,
+            "holdMs": 500,
+            "smoothing": 0.65,
+            "color": "#ff00ff",
+            "nodeLabel": "Air",
+            "outputs": ["enter", "during", "exit"],
+            "triggerPresetDirty": true,
+            "label": "Air"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-e8-sub-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-kick-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "orange"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-bass-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-3"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-low-mid-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-mid-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "cyan"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-presence-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-high-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-3"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "purple"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-e8-air-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "magenta"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-e8-sub-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-kick-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-bass-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-low-mid-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-mid-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-presence-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-high-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-e8-air-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-e8-sub",
+          "to": "logic-70s-e8-sub-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-sub-level",
+          "to": "act-70s-e8-sub-on"
+        },
+        {
+          "from": "ev-70s-e8-kick",
+          "to": "logic-70s-e8-kick-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-kick-level",
+          "to": "act-70s-e8-kick-on"
+        },
+        {
+          "from": "ev-70s-e8-bass",
+          "to": "logic-70s-e8-bass-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-bass-level",
+          "to": "act-70s-e8-bass-on"
+        },
+        {
+          "from": "ev-70s-e8-low-mid",
+          "to": "logic-70s-e8-low-mid-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-low-mid-level",
+          "to": "act-70s-e8-low-mid-on"
+        },
+        {
+          "from": "ev-70s-e8-mid",
+          "to": "logic-70s-e8-mid-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-mid-level",
+          "to": "act-70s-e8-mid-on"
+        },
+        {
+          "from": "ev-70s-e8-presence",
+          "to": "logic-70s-e8-presence-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-presence-level",
+          "to": "act-70s-e8-presence-on"
+        },
+        {
+          "from": "ev-70s-e8-high",
+          "to": "logic-70s-e8-high-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-high-level",
+          "to": "act-70s-e8-high-on"
+        },
+        {
+          "from": "ev-70s-e8-air",
+          "to": "logic-70s-e8-air-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-e8-air-level",
+          "to": "act-70s-e8-air-on"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-e8-sub": {
+            "x": 255.45268394611776,
+            "y": 880.9476328119636
+          },
+          "ev-70s-e8-kick": {
+            "x": 2.551268996670842,
+            "y": 880.9476328119636
+          },
+          "ev-70s-e8-bass": {
+            "x": 509.79081831499934,
+            "y": 0
+          },
+          "ev-70s-e8-low-mid": {
+            "x": 509.79081831499934,
+            "y": 440.4738164059818
+          },
+          "ev-70s-e8-mid": {
+            "x": 4.352432940155268,
+            "y": 0
+          },
+          "ev-70s-e8-presence": {
+            "x": 256.2193627487868,
+            "y": 440.4738164059818
+          },
+          "ev-70s-e8-high": {
+            "x": 254.89540915749967,
+            "y": 0
+          },
+          "ev-70s-e8-air": {
+            "x": 8.63204226839946,
+            "y": 440.4738164059818
+          },
+          "act-70s-e8-sub-on": {
+            "x": 254.89540915749967,
+            "y": 1143.8193907663226
+          },
+          "act-70s-e8-kick-on": {
+            "x": 2.232321973890066,
+            "y": 1147.9638921804726
+          },
+          "act-70s-e8-bass-on": {
+            "x": 519.2235981877893,
+            "y": 261.03801384940743
+          },
+          "act-70s-e8-low-mid-on": {
+            "x": 526.2040599901229,
+            "y": 694.9830688424408
+          },
+          "act-70s-e8-mid-on": {
+            "x": 7.885924749076366,
+            "y": 280.4738164059818
+          },
+          "act-70s-e8-presence-on": {
+            "x": 254.89540915749967,
+            "y": 696.1682388931513
+          },
+          "act-70s-e8-high-on": {
+            "x": 259.28322939760983,
+            "y": 266.7652985677123
+          },
+          "act-70s-e8-air-on": {
+            "x": 13.468061026185751,
+            "y": 698.3707492873073
+          },
+          "logic-70s-e8-sub-level": {
+            "x": 256.76386379636824,
+            "y": 1031.5425271205604
+          },
+          "logic-70s-e8-kick-level": {
+            "x": 0,
+            "y": 1029.6021636910737
+          },
+          "logic-70s-e8-bass-level": {
+            "x": 532.686227472499,
+            "y": 152.08942487090826
+          },
+          "logic-70s-e8-low-mid-level": {
+            "x": 522.192332778126,
+            "y": 582.1098669171333
+          },
+          "logic-70s-e8-mid-level": {
+            "x": 0,
+            "y": 158.3109258748591
+          },
+          "logic-70s-e8-presence-level": {
+            "x": 269.638587532565,
+            "y": 591.5607329681516
+          },
+          "logic-70s-e8-high-level": {
+            "x": 255.88631340302527,
+            "y": 159.66405396908522
+          },
+          "logic-70s-e8-air-level": {
+            "x": 0,
+            "y": 584.4682486653328
+          }
+        },
+        "viewport": {
+          "x": 293.7975636538633,
+          "y": -107.22727272727269,
+          "zoom": 0.5769962738160228
+        }
+      }
+    },
+    {
+      "id": "cue-70s-instrument-isolation",
+      "name": "Drum Isolation",
+      "description": "Kick, snare, and hi-hat triggers using instrument preset ranges and spectral gates.",
+      "cueTypeId": "audio-70s-instrument-isolation",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-inst-kick",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 30,
+              "maxHz": 120
+            },
+            "threshold": 0.07,
+            "hysteresis": 0.04,
+            "holdMs": 120,
+            "color": "#cc0000",
+            "nodeLabel": "Kick Drum",
+            "outputs": ["enter", "during", "exit"],
+            "spectralGates": {
+              "flatness": {
+                "max": 0.35
+              }
+            },
+            "appliedTriggerPreset": "kick",
+            "triggerPresetDirty": true,
+            "label": "Kick Drum"
+          },
+          {
+            "id": "ev-70s-inst-snare",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 150,
+              "maxHz": 400
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 100,
+            "color": "#ffff00",
+            "nodeLabel": "Snare",
+            "outputs": ["enter", "during", "exit"],
+            "useOnsetGating": true,
+            "onsetThreshold": 0.15,
+            "appliedTriggerPreset": "snare",
+            "triggerPresetDirty": true,
+            "label": "Snare"
+          },
+          {
+            "id": "ev-70s-inst-hihat",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 4000,
+              "maxHz": 16000
+            },
+            "threshold": 0,
+            "hysteresis": 0.04,
+            "holdMs": 100,
+            "color": "#00ffff",
+            "nodeLabel": "Hi-Hat / Cymbals",
+            "outputs": ["enter", "during", "exit"],
+            "appliedTriggerPreset": "hi-hat-cymbals",
+            "triggerPresetDirty": true,
+            "label": "Hi-Hat / Cymbals"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-inst-kick-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "half-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-inst-hihat-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "cyan"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "action-9d798107-e660-4e4a-8c2c-378a857f865a",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "half-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "orange"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-inst-kick-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-inst-hihat-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-f613af4f-2a6e-4403-ba03-30827bac46c7",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-ef82371b-639a-41ae-ac17-5df3dbbbf3ad",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-77cb17c2-4dc1-4e0a-be0d-785c7e827016",
+            "type": "logic",
+            "logicType": "cue-data",
+            "label": "cue-data",
+            "outputs": [],
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-7674e9d8-7e1a-4ba8-8ecd-2f83886f6bb1",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-inst-kick",
+          "to": "logic-70s-inst-kick-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "ev-70s-inst-hihat",
+          "to": "logic-70s-inst-hihat-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-inst-hihat-level",
+          "to": "logic-f613af4f-2a6e-4403-ba03-30827bac46c7"
+        },
+        {
+          "from": "logic-f613af4f-2a6e-4403-ba03-30827bac46c7",
+          "to": "act-70s-inst-hihat-on"
+        },
+        {
+          "from": "logic-70s-inst-kick-level",
+          "to": "logic-ef82371b-639a-41ae-ac17-5df3dbbbf3ad"
+        },
+        {
+          "from": "logic-ef82371b-639a-41ae-ac17-5df3dbbbf3ad",
+          "to": "act-70s-inst-kick-on"
+        },
+        {
+          "from": "ev-70s-inst-snare",
+          "to": "logic-77cb17c2-4dc1-4e0a-be0d-785c7e827016",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-77cb17c2-4dc1-4e0a-be0d-785c7e827016",
+          "to": "logic-7674e9d8-7e1a-4ba8-8ecd-2f83886f6bb1"
+        },
+        {
+          "from": "logic-7674e9d8-7e1a-4ba8-8ecd-2f83886f6bb1",
+          "to": "action-9d798107-e660-4e4a-8c2c-378a857f865a"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-inst-kick": {
+            "x": -391.50497451919125,
+            "y": -50.05571331371789
+          },
+          "ev-70s-inst-snare": {
+            "x": -106.00033407610863,
+            "y": -15.988674566602072
+          },
+          "ev-70s-inst-hihat": {
+            "x": 197.38944642033226,
+            "y": -17.12447314265944
+          },
+          "act-70s-inst-kick-on": {
+            "x": -413.0514092351042,
+            "y": 285.1348749307125
+          },
+          "act-70s-inst-hihat-on": {
+            "x": 183.3671653843353,
+            "y": 302.8970012780411
+          },
+          "logic-70s-inst-kick-level": {
+            "x": -412.86916241159895,
+            "y": 84.13632904196356
+          },
+          "logic-70s-inst-hihat-level": {
+            "x": 187.70111349652524,
+            "y": 98.0415735992583
+          },
+          "logic-f613af4f-2a6e-4403-ba03-30827bac46c7": {
+            "x": 198.97888687992958,
+            "y": 194.57304852786194
+          },
+          "logic-ef82371b-639a-41ae-ac17-5df3dbbbf3ad": {
+            "x": -384.77032263143303,
+            "y": 179.95458180589833
+          },
+          "logic-77cb17c2-4dc1-4e0a-be0d-785c7e827016": {
+            "x": -119.10725476291208,
+            "y": 91.5795815067761
+          },
+          "logic-7674e9d8-7e1a-4ba8-8ecd-2f83886f6bb1": {
+            "x": -109.4278568535637,
+            "y": 197.3433872493564
+          },
+          "action-9d798107-e660-4e4a-8c2c-378a857f865a": {
+            "x": -130.36283741077295,
+            "y": 304.36954808946575
+          }
+        },
+        "viewport": {
+          "x": 430.91970720681246,
+          "y": 186.95143454093898,
+          "zoom": 0.6792431422744739
+        }
+      }
+    },
+    {
+      "id": "cue-70s-layered-spectrum",
+      "name": "Layered Spectrum",
+      "description": "Kick and bass drive red on layer 0, low mid and mid drive green on layer 1, upper mid and high drive blue on layer 2. Additive blending; amplitude sets brightness; dark bands are transparent to layers below.",
+      "cueTypeId": "audio-70s-layered-spectrum",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-ls-low",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 250
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 180,
+            "smoothing": 0.82,
+            "color": "#ff0000",
+            "nodeLabel": "Kick & Bass",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Kick & Bass"
+          },
+          {
+            "id": "ev-70s-ls-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 250,
+              "maxHz": 2500
+            },
+            "threshold": 0.09,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.75,
+            "color": "#00ff00",
+            "nodeLabel": "Low Mid & Mid",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Low Mid & Mid"
+          },
+          {
+            "id": "ev-70s-ls-high",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 2500,
+              "maxHz": 20000
+            },
+            "threshold": 0.06,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.68,
+            "color": "#0000ff",
+            "nodeLabel": "Upper Mid & High",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Upper Mid & High"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-ls-low-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-70s-ls-mid-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-ls-high-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 2
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-ls-low-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-ls-mid-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-ls-high-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-ls-low",
+          "to": "logic-70s-ls-low-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-ls-low-level",
+          "to": "act-70s-ls-low-on"
+        },
+        {
+          "from": "ev-70s-ls-mid",
+          "to": "logic-70s-ls-mid-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-ls-mid-level",
+          "to": "act-70s-ls-mid-on"
+        },
+        {
+          "from": "ev-70s-ls-high",
+          "to": "logic-70s-ls-high-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-ls-high-level",
+          "to": "act-70s-ls-high-on"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-ls-low": {
+            "x": 400,
+            "y": 0
+          },
+          "ev-70s-ls-mid": {
+            "x": 200,
+            "y": 0
+          },
+          "ev-70s-ls-high": {
+            "x": 0,
+            "y": 0
+          },
+          "logic-70s-ls-low-level": {
+            "x": 400,
+            "y": 120
+          },
+          "logic-70s-ls-mid-level": {
+            "x": 200,
+            "y": 120
+          },
+          "logic-70s-ls-high-level": {
+            "x": 0,
+            "y": 120
+          },
+          "act-70s-ls-low-on": {
+            "x": 400,
+            "y": 260
+          },
+          "act-70s-ls-mid-on": {
+            "x": 200,
+            "y": 260
+          },
+          "act-70s-ls-high-on": {
+            "x": 0,
+            "y": 260
+          }
+        },
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.75
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

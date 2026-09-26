@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "data": {
+    "lights": [
+      {
+        "id": "77452f20-2024-4bc6-95fd-0124d2ef2b69",
+        "fixture": "rgb",
+        "name": "PAR",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      },
+      {
+        "id": "14656743-ca9d-465f-809e-5571d739bf72",
+        "fixture": "rgbw/mh",
+        "name": "Spot",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "white": 5,
+          "pan": 6,
+          "tilt": 7
+        },
+        "config": {
+          "panHome": 0,
+          "panMin": 0,
+          "panMax": 255,
+          "tiltHome": 0,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "invert": false
+        }
+      },
+      {
+        "id": "274ceb89-9bbf-4e0a-ab1a-5b38bb4ad7b4",
+        "fixture": "strobe",
+        "name": "Strobe",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 1,
+          "strobeSpeed": 2
+        }
+      }
+    ]
+  }
+}

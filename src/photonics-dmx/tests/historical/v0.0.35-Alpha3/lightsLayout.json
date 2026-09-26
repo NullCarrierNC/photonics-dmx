@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "data": {
+    "numLights": 3,
+    "lightLayout": {
+      "id": "front-back",
+      "label": "Front and Back"
+    },
+    "strobeType": "AllCapable",
+    "frontLights": [
+      {
+        "id": "11dc3e71-c816-4a83-82ba-99c4f1e98e6c",
+        "fixtureId": "77452f20-2024-4bc6-95fd-0124d2ef2b69",
+        "position": 1,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      },
+      {
+        "id": "ffd1a186-958b-4db9-820d-8706b4a9a672",
+        "fixtureId": "14656743-ca9d-465f-809e-5571d739bf72",
+        "position": 2,
+        "fixture": "rgbw/mh",
+        "label": "An RGB Light",
+        "name": "Spot",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "masterDimmer": 11,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "white": 5,
+          "pan": 6,
+          "tilt": 7
+        },
+        "config": {
+          "panHome": 0,
+          "panMin": 0,
+          "panMax": 255,
+          "tiltHome": 0,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "invert": false
+        }
+      }
+    ],
+    "backLights": [
+      {
+        "id": "73f7f96e-a3b2-408a-a5de-150eaf8dc57d",
+        "fixtureId": "77452f20-2024-4bc6-95fd-0124d2ef2b69",
+        "position": 3,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "back",
+        "channels": {
+          "masterDimmer": 21,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ],
+    "strobeLights": []
+  }
+}

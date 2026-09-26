@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "data": {
+    "numLights": 3,
+    "lightLayout": {
+      "id": "front-back",
+      "label": "Front and Back (back lights behind audience)"
+    },
+    "strobeType": "None",
+    "frontLights": [
+      {
+        "id": "f76b5598-537c-4c29-9471-2a3bdcb2611b",
+        "fixtureId": "9a11e490-6dc0-47d4-a78b-37a29bcbef1b",
+        "position": 1,
+        "fixture": "rgb",
+        "label": "An RGB Light",
+        "name": "PAR",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "masterDimmer": 1
+        },
+        "mount": "floor",
+        "strobeMode": "disabled"
+      },
+      {
+        "id": "a55d71c0-1f09-4262-acd6-42f024d4cec5",
+        "fixtureId": "ca25d594-91b1-45be-af6f-a39fe2e35c74",
+        "position": 2,
+        "fixture": "rgbw/mh",
+        "label": "An RGB Light",
+        "name": "Spot",
+        "isStrobeEnabled": false,
+        "group": "front",
+        "channels": {
+          "red": 12,
+          "green": 13,
+          "blue": 14,
+          "white": 15,
+          "masterDimmer": 11,
+          "pan": 16,
+          "tilt": 17
+        },
+        "config": {
+          "panHome": 50,
+          "panMin": 0,
+          "panMax": 255,
+          "panRangeDeg": 540,
+          "panDirectionCW": true,
+          "panStageDeg": 270,
+          "tiltHome": 50,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "tiltRangeDeg": 180,
+          "tiltStageDeg": 90,
+          "invertPan": false,
+          "invertTilt": false
+        },
+        "mount": "floor",
+        "strobeMode": "disabled"
+      }
+    ],
+    "backLights": [
+      {
+        "id": "775cfaf9-c148-47e5-9828-55fa76a436ef",
+        "fixtureId": "ac6a113b-8f23-4827-8b26-a783b90b8de3",
+        "position": 3,
+        "fixture": "strobe",
+        "label": "An RGB Light",
+        "name": "Strobe",
+        "isStrobeEnabled": false,
+        "group": "back",
+        "channels": {
+          "masterDimmer": 21,
+          "strobeSpeed": 22
+        },
+        "mount": "floor"
+      }
+    ],
+    "strobeLights": []
+  }
+}

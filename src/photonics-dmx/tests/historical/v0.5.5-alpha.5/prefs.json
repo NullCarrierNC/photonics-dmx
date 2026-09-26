@@ -1,0 +1,185 @@
+{
+  "version": 4,
+  "data": {
+    "effectDebounce": 100,
+    "complex": true,
+    "cueDomains": {
+      "yarg": {
+        "enabledGroups": ["stagekit", "yarg-alt1"],
+        "knownGroups": [],
+        "disabledCues": {},
+        "selectionMode": "oncePerSong"
+      },
+      "audio": {
+        "enabledGroups": [],
+        "knownGroups": [],
+        "disabledCues": {}
+      },
+      "yargMotion": {
+        "enabledGroups": [],
+        "knownGroups": [],
+        "disabledCues": {},
+        "selectionMode": "perCueChange",
+        "probabilityPercent": 100,
+        "minimumHoldMs": 5000,
+        "activeCueRef": null
+      },
+      "audioMotion": {
+        "enabledGroups": [],
+        "knownGroups": [],
+        "disabledCues": {},
+        "selectionMode": "perCueChange",
+        "probabilityPercent": 100,
+        "minimumHoldMs": 5000,
+        "activeCueRef": null
+      }
+    },
+    "cueConsistencyWindow": 60000,
+    "motionEnabled": true,
+    "clockRate": 10,
+    "activeAudioCueType": "",
+    "audioGameMode": {
+      "enabled": false,
+      "cueDurationMin": 5,
+      "cueDurationMax": 20
+    },
+    "brightness": {
+      "low": 40,
+      "medium": 100,
+      "high": 180,
+      "max": 255
+    },
+    "dmxOutputConfig": {
+      "sacnEnabled": true,
+      "artNetEnabled": false,
+      "enttecProEnabled": false,
+      "openDmxEnabled": false
+    },
+    "enttecProConfig": {
+      "port": ""
+    },
+    "openDmxConfig": {
+      "port": "",
+      "dmxSpeed": 20
+    },
+    "artNetConfig": {
+      "host": "",
+      "universe": 0,
+      "net": 0,
+      "subnet": 0,
+      "subuni": 0,
+      "port": 6454,
+      "refreshRateHz": 40
+    },
+    "sacnConfig": {
+      "universe": 1,
+      "useUnicast": false,
+      "unicastDestination": "",
+      "refreshRateHz": 40
+    },
+    "stageKitPrefs": {
+      "yargPriority": "prefer-for-tracked"
+    },
+    "dmxSettingsPrefs": {
+      "artNetExpanded": false,
+      "enttecProExpanded": false,
+      "sacnExpanded": false,
+      "openDmxExpanded": false
+    },
+    "allowMultipleActiveRigs": false,
+    "advancedModeEnabled": false,
+    "audioConfig": {
+      "fftSize": 4096,
+      "sensitivity": 2.5,
+      "noiseFloor": 60,
+      "bands": [
+        {
+          "id": "sub",
+          "name": "Sub",
+          "minHz": 20,
+          "maxHz": 50,
+          "gain": 1
+        },
+        {
+          "id": "kick",
+          "name": "Kick",
+          "minHz": 50,
+          "maxHz": 130,
+          "gain": 0.7
+        },
+        {
+          "id": "bass",
+          "name": "Bass",
+          "minHz": 130,
+          "maxHz": 250,
+          "gain": 0.9
+        },
+        {
+          "id": "low-mid",
+          "name": "Low Mid",
+          "minHz": 250,
+          "maxHz": 1000,
+          "gain": 2.8
+        },
+        {
+          "id": "mid",
+          "name": "Mid",
+          "minHz": 1000,
+          "maxHz": 2500,
+          "gain": 4.6
+        },
+        {
+          "id": "presence",
+          "name": "Presence",
+          "minHz": 2500,
+          "maxHz": 5000,
+          "gain": 4.8
+        },
+        {
+          "id": "high",
+          "name": "High",
+          "minHz": 5000,
+          "maxHz": 10000,
+          "gain": 5.4
+        },
+        {
+          "id": "air",
+          "name": "Air",
+          "minHz": 10000,
+          "maxHz": 20000,
+          "gain": 7
+        }
+      ],
+      "beatDetection": {
+        "threshold": 0.3,
+        "decayRate": 0.8,
+        "minInterval": 100
+      },
+      "smoothing": {
+        "enabled": true,
+        "alpha": 0.7
+      },
+      "enabled": false,
+      "linearResponse": true,
+      "strobeEnabled": false,
+      "strobeTriggerThreshold": 0.8,
+      "strobeProbability": 100,
+      "idleDetection": {
+        "enabled": true,
+        "thresholdPct": 20,
+        "minIdleSeconds": 5,
+        "resumeSeconds": 3,
+        "idleColor": "blue",
+        "idleBrightness": "low"
+      }
+    },
+    "cueEditorWindowState": {
+      "width": 1200,
+      "height": 900
+    },
+    "audioPreviewWindowState": {
+      "width": 560,
+      "height": 480
+    }
+  }
+}
