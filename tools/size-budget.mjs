@@ -1,10 +1,10 @@
 /**
  * Measures line counts of non-test sources under `src/` and compares them to
  * metrics/size-budget.txt so files at or over the limit cannot grow further and no new file
- * crosses it. Files already over the limit are listed with the size they may not exceed, and
- * that list only ever ratchets down, via `node tools/size-budget.mjs --write`. A file that has
- * shrunk below its entry fails the check too, so the baseline cannot go stale and leave the file
- * room to grow back.
+ * crosses it. Files already over the limit are listed with the size they may not exceed.
+ * `node tools/size-budget.mjs --write` only lowers or removes entries, and an entry is raised or
+ * added by hand, in a commit of its own. A file that has shrunk below its entry fails the check
+ * too, so the baseline cannot go stale and leave the file room to grow back.
  */
 import { readdirSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -141,7 +141,7 @@ const { overAllowance, overLimit, slack, removed } = compareBudget(sizes, baseli
 if (overAllowance.length > 0 || overLimit.length > 0) {
   fail(
     [...overAllowance, ...overLimit],
-    `Split the file or shrink it. Allowances only ratchet down, so if the growth is deliberate edit its entry in ${BUDGET_FILE}.`,
+    `Split the file or shrink it. If the growth is deliberate, raise its entry in ${BUDGET_FILE} by hand, in a commit of its own.`,
   )
 }
 
