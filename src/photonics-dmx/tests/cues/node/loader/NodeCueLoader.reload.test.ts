@@ -17,6 +17,9 @@ import { fakeLightingController } from '../../../helpers/fakeLightingController'
 const BUNDLED = path.join(__dirname, '../../../../../../resources/defaults/node-data')
 const KEEPALIVE_MS = 33
 
+// Each case loads the whole bundled YARG library from disk, and two then play cues in real time.
+jest.setTimeout(20_000)
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 function copyBundled(kind: 'cues' | 'effects', baseDir: string): void {
@@ -117,7 +120,6 @@ describe('NodeCueLoader reload', () => {
       expect([...ran].every((cue) => cue === heldBefore || cue === heldAfter)).toBe(true)
       expect(execute.mock.contexts[execute.mock.contexts.length - 1]).toBe(heldAfter)
     },
-    20000,
   )
 
   it('reads each effect file once for the whole reload', async () => {
