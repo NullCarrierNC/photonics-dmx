@@ -20,7 +20,7 @@ audio__audio-stagekit__audio-sk-cool-auto d0201decc8ab 5e88ed.c4d588.9c5b5a.09db
 audio__audio-stagekit__audio-sk-flare-fast 11c4d87981d1 455b85.455b85.455b85.455b85.455b85.455b85.455b85.455b85.d71b32.d71b32 d3f6.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 audio__audio-stagekit__audio-sk-flare-slow c3bceb68b57a 72655c.72655c.72655c.72655c.72655c.72655c.72655c.72655c.d71b32.d71b32 b5dc.e3b0.e3b0.f9c6.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 audio__audio-stagekit__audio-sk-frenzy f02f851d91f4 bf1bb2.bf1bb2.bf1bb2.bf1bb2.bf1bb2.bf1bb2.bf1bb2.bf1bb2.d71b32.d71b32 f6b5.e3b0.4cca.e3b0.6f15.e3b0.7514.e3b0.7ce3.e3b0.1987.e3b0.1573.e3b0.695c.e3b0.e3b0
-audio__audio-stagekit__audio-sk-harmony 364f5f676ff4 1b664b.4b75fb.9d4640.2378cf.2bae9b.f15dde.c6224e.0d9d40.d71b32.d71b32 871a.e3b0.2ea9.e3b0.7696.e3b0.b5f2.e3b0.28fe.e3b0.560d.e3b0.a1a7.e3b0.8ef2.e3b0.e3b0
+audio__audio-stagekit__audio-sk-harmony 0dff4b327be2 de640e.bc8c29.fca68f.d86d2c.0962e3.41bae9.762ea6.1f5bd1.d71b32.d71b32 8656.e3b0.9584.e3b0.df3f.e3b0.828e.e3b0.5fdf.e3b0.ee7d.e3b0.1272.e3b0.f48f.e3b0.e3b0
 audio__audio-stagekit__audio-sk-intro 62b5397815fa b80015.b80015.b80015.b80015.d71b32.d71b32.d71b32.d71b32.d71b32.d71b32 cf46.e3b0.e3b0.2901.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 audio__audio-stagekit__audio-sk-searchlights 678331322472 eee2c9.344efa.262342.20f913.c3b3e0.2e793c.635f28.4965b4.d71b32.d71b32 c3fa.c6b7.eff6.de1d.2081.a435.595d.80f3.4ed1.7a70.a756.8b31.39f3.69dd.969e.808d.e3b0
 audio__audio-stagekit__audio-sk-silhouettes e5a19ddcc238 f2405b.f2405b.f2405b.f2405b.f2405b.f2405b.f2405b.f2405b.d71b32.d71b32 7d43.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
@@ -98,7 +98,7 @@ yarg__yarg-stagekit__Fallback bd83a2a712e0 99f573.99f573.99f573.99f573.99f573.99
 yarg__yarg-stagekit__Flare_Fast f3ac84426f21 abe26b.abe26b.abe26b.abe26b.abe26b.abe26b.abe26b.abe26b.d71b32.d71b32 a44f.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 yarg__yarg-stagekit__Flare_Slow 164605b7f092 e64bc5.e64bc5.e64bc5.e64bc5.e64bc5.e64bc5.e64bc5.e64bc5.d71b32.d71b32 dcfe.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 yarg__yarg-stagekit__Frenzy 031916b0f65c 61dc8d.61dc8d.61dc8d.61dc8d.61dc8d.61dc8d.61dc8d.61dc8d.d71b32.d71b32 1eb1.9d4b.042e.caa6.2a05.9ba0.99ac.034c.1068.0053.9d19.b9f9.ee94.86b7.b5cc.c7f5.e3b0
-yarg__yarg-stagekit__Harmony d500c07b15f8 f50939.4b75fb.4b75fb.b509a5.b09f03.d5b083.b799dc.3717a0.d71b32.d71b32 871a.e3b0.e3b0.e3b0.e771.e3b0.5886.e3b0.5329.e3b0.717c.e3b0.be96.e3b0.810b.e3b0.e3b0
+yarg__yarg-stagekit__Harmony 0dff4b327be2 de640e.bc8c29.fca68f.d86d2c.0962e3.41bae9.762ea6.1f5bd1.d71b32.d71b32 8656.e3b0.9584.e3b0.df3f.e3b0.828e.e3b0.5fdf.e3b0.ee7d.e3b0.1272.e3b0.f48f.e3b0.e3b0
 yarg__yarg-stagekit__Intro e5a19ddcc238 f2405b.f2405b.f2405b.f2405b.f2405b.f2405b.f2405b.f2405b.d71b32.d71b32 7d43.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0.e3b0
 yarg__yarg-stagekit__Menu 9abbf7fc9198 7d2afc.a549a6.bc866b.d65aea.857a81.ae71d6.321f4b.e70bef.d71b32.d71b32 8c20.22b0.fe43.4e7c.1e63.4ea3.5c45.7ef4.e198.37f0.dc43.6401.98b5.654b.e11b.a87b.e3b0
 yarg__yarg-stagekit__Score 4d00de934a2d 801568.453ff8.dad826.5f4f83.e25763.a62e99.522791.37c5f6.d71b32.d71b32 9b31.afd9.f605.75a2.3aa9.a6cf.7b00.57d8.7a99.d459.a626.d758.cfa9.693a.80c7.3eba.e3b0
