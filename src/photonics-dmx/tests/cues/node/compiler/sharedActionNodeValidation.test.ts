@@ -207,7 +207,7 @@ const PARITY_CASES: ParityCase[] = [
       },
     },
     expectedMessageMatch:
-      /waitForCondition literal 'definitely-not-a-condition' is not a known wait condition/,
+      /waitForCondition 'definitely-not-a-condition' is not a known wait condition/,
   },
   {
     description: 'rejects a negative literal waitForTime',
@@ -253,6 +253,14 @@ const PARITY_CASES: ParityCase[] = [
     },
     expectedMessageMatch: /waitForConditionCount literal must be a positive finite number/,
   },
+  {
+    description: 'rejects an unknown easing literal',
+    action: {
+      ...baseValidAction(),
+      timing: { ...createDefaultActionTiming(), easing: { source: 'literal', value: 'sin-out' } },
+    },
+    expectedMessageMatch: /timing\.easing 'sin-out' is not a known easing/,
+  },
 ]
 
 describe('Cross-compiler action validation parity', () => {
@@ -260,6 +268,21 @@ describe('Cross-compiler action validation parity', () => {
     expect(() => NodeCueCompiler.compileCue(buildCue(baseValidAction()), 'yarg')).not.toThrow()
     expect(() => EffectCompiler.compileYargEffect(buildEffect(baseValidAction()))).not.toThrow()
   })
+
+  it.each(['front,back,', 'front,,back', ' front , back '])(
+    'compiles a group list %p with blank entries in both compilers',
+    (groups) => {
+      const action: ActionNode = {
+        ...baseValidAction(),
+        target: {
+          groups: { source: 'literal', value: groups },
+          filter: { source: 'literal', value: 'all' },
+        },
+      }
+      expect(() => NodeCueCompiler.compileCue(buildCue(action), 'yarg')).not.toThrow()
+      expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
+    },
+  )
 
   for (const testCase of PARITY_CASES) {
     it(`${testCase.description} → both compilers reject with the same message`, () => {

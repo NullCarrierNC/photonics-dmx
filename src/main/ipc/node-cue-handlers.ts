@@ -21,6 +21,7 @@ import {
   validateImportPickMode,
   validateNodeCueSavePayload,
 } from './inputValidation'
+import { migrateOlderNodeFile } from '../../photonics-dmx/cues/node/loader/migrateOlderNodeFile'
 
 const log = createLogger('node-cue-handlers')
 
@@ -165,6 +166,8 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     } catch {
       return { success: false, error: 'That file is not valid JSON.' }
     }
+    // A file an older build wrote comes in on the current rules, as it would when loaded.
+    migrateOlderNodeFile(parsed)
     const validation = validateNodeCueFile(parsed)
     if (!validation.valid) {
       return { success: false, error: validation.errors.join(', ') }

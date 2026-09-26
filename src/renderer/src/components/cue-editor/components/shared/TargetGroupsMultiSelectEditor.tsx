@@ -1,7 +1,9 @@
-import React from 'react'
+import React, { useId } from 'react'
 import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isLocationGroup, LOCATION_OPTIONS } from '../../../../../../photonics-dmx/types'
+import { groupNames, literalIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import { isVariableSource } from './nodeEditorUtils'
+import { issueAttributes } from './FieldIssue'
 
 interface TargetGroupsMultiSelectEditorProps {
   label: string
@@ -21,33 +23,29 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
     value: 'front',
   }
   const isLiteral = source.source === 'literal'
+  const issueId = useId()
 
-  // Split the comma-separated literal into known groups and names it does not know.
-  const literalGroups =
-    isLiteral && typeof source.value === 'string'
-      ? source.value
-          .split(',')
-          .map((g) => g.trim())
-          .filter((g) => g.length > 0)
-      : []
+  // The literal's group names, known and unknown. An unknown name stays in the value through every
+  // toggle and leaves only by its own Remove button.
+  const literalGroups = isLiteral ? groupNames(source.value) : []
   const selectedGroups = literalGroups.filter(isLocationGroup)
   const unknownGroups = literalGroups.filter((g) => !isLocationGroup(g))
+  const issue = isLiteral ? literalIssue('groups', source.value) : null
 
   // Check if group is selected
   const isSelected = (group: (typeof LOCATION_OPTIONS)[number]) => selectedGroups.includes(group)
 
+  /** Store the groups, keeping at least one. */
+  const commitGroups = (groups: string[]) => {
+    onChange({ source: 'literal', value: (groups.length > 0 ? groups : ['front']).join(',') })
+  }
+
   // Handle group toggle
   const handleGroupToggle = (group: (typeof LOCATION_OPTIONS)[number], checked: boolean) => {
-    const updated = checked
+    const known = checked
       ? [...selectedGroups.filter((g) => g !== group), group]
       : selectedGroups.filter((g) => g !== group)
-
-    // Ensure at least one group is selected
-    if (updated.length === 0) {
-      updated.push('front')
-    }
-
-    onChange({ source: 'literal', value: updated.join(',') })
+    commitGroups([...known, ...unknownGroups])
   }
 
   // Handle switch toggle
@@ -79,7 +77,11 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
               className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
             />
           </label>
-          <div className="flex items-center gap-4">
+          <div
+            role="group"
+            aria-label={label}
+            className="flex items-center gap-4"
+            {...issueAttributes(issue, issueId)}>
             {LOCATION_OPTIONS.map((group) => (
               <label key={group} className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -92,11 +94,22 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
               </label>
             ))}
           </div>
-          {unknownGroups.map((group) => (
-            <span key={group} className="block text-[10px] text-red-500">
-              '{group}' is not a known group
-            </span>
-          ))}
+          {issue && (
+            <div id={issueId} className="space-y-0.5 text-[10px] text-red-500">
+              {unknownGroups.length === 0 && <span className="block">{issue.message}</span>}
+              {unknownGroups.map((group, index) => (
+                <span key={`${index}:${group}`} className="flex items-center gap-2">
+                  {literalIssue('groups', group)?.message}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => commitGroups(literalGroups.filter((g) => g !== group))}>
+                    Remove
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         // Variable mode: switch on top, variable dropdown only

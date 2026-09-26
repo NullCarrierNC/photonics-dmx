@@ -15,7 +15,7 @@ import {
   triggerMatchesInstrumentPreset,
 } from '../../lib/audioTriggerPresets'
 import { AUDIO_TRIGGER_PROPERTY_DOCS, DOC_BLOCK_CLASS } from './eventNodeDocs'
-import { DraftNumberField } from '../../../controls/DraftField'
+import { DraftNumberField, DraftOptionalNumberField } from '../../../controls/DraftField'
 
 const DEFAULT_TRIGGER_COLOR = '#60a5fa'
 
@@ -274,19 +274,16 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       </label>
       <label className="flex flex-col font-medium">
         Attack (ms)
-        <input
-          type="number"
+        <DraftOptionalNumberField
+          aria-label="Attack (ms)"
           min={0}
           step={5}
+          // A time in ms keeps the fraction the author types.
+          decimals={3}
           placeholder="off"
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={trigger.attackMs ?? ''}
-          onChange={(e) =>
-            patchTrigger({
-              attackMs:
-                e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0),
-            })
-          }
+          value={trigger.attackMs}
+          onCommit={(attackMs) => patchTrigger({ attackMs })}
         />
         <div className={DOC_BLOCK_CLASS}>
           {AUDIO_TRIGGER_PROPERTY_DOCS.attackMs.description}
@@ -297,19 +294,16 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       </label>
       <label className="flex flex-col font-medium">
         Release (ms)
-        <input
-          type="number"
+        <DraftOptionalNumberField
+          aria-label="Release (ms)"
           min={0}
           step={10}
+          // A time in ms keeps the fraction the author types.
+          decimals={3}
           placeholder="off"
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={trigger.releaseMs ?? ''}
-          onChange={(e) =>
-            patchTrigger({
-              releaseMs:
-                e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0),
-            })
-          }
+          value={trigger.releaseMs}
+          onCommit={(releaseMs) => patchTrigger({ releaseMs })}
         />
         <div className={DOC_BLOCK_CLASS}>
           {AUDIO_TRIGGER_PROPERTY_DOCS.releaseMs.description}

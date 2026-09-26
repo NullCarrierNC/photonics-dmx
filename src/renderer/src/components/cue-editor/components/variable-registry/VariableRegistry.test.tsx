@@ -17,23 +17,23 @@ const groupVar: VariableDefinition = {
   initialValue: 1,
 }
 
-const cueDoc = (): EditorDocument =>
+const cueDoc = (variables: VariableDefinition[] = [groupVar]): EditorDocument =>
   ({
     mode: 'cue',
     path: '/cues/file.json',
     file: {
       mode: 'yarg',
-      group: { id: 'g', name: 'Group', variables: [groupVar] },
+      group: { id: 'g', name: 'Group', variables },
       cues: [],
     },
   }) as unknown as EditorDocument
 
-function renderRegistry() {
+function renderRegistry(variables?: VariableDefinition[]) {
   const onVariablesChange = jest.fn()
   renderWithProviders(
     <>
       <VariableRegistry
-        editorDoc={cueDoc()}
+        editorDoc={cueDoc(variables)}
         selectedCueId={null}
         onVariablesChange={onVariablesChange}
         getVariableReferences={() => []}
@@ -130,5 +130,16 @@ describe('VariableRegistry', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('variableName')).toHaveValue('speed')
+  })
+
+  it('refuses to save an initial value its type cannot hold', async () => {
+    const { onVariablesChange } = renderRegistry([
+      { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 'mauve' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText(/'mauve' is not a known Color/)).toBeTruthy()
+    expect(onVariablesChange).not.toHaveBeenCalled()
   })
 })

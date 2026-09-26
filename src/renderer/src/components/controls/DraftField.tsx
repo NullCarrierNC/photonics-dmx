@@ -111,8 +111,7 @@ export const DraftTextField: React.FC<DraftTextFieldProps> = ({
   )
 }
 
-interface DraftNumberFieldProps extends DraftFieldBaseProps {
-  value: number
+interface NumberEntryProps extends DraftFieldBaseProps {
   min?: number
   max?: number
   step?: number
@@ -124,8 +123,19 @@ interface DraftNumberFieldProps extends DraftFieldBaseProps {
    * that again. A field only focused and left reports nothing.
    */
   commitWhenUnchanged?: boolean
+}
+
+interface DraftNumberFieldProps extends NumberEntryProps {
+  value: number
   /** Given the typed number, held inside min and max. */
   onCommit: (value: number) => CommitOutcome
+}
+
+interface DraftOptionalNumberFieldProps extends NumberEntryProps {
+  /** Undefined shows an empty field, and the setting it stands for is off. */
+  value: number | undefined
+  /** Given the typed number, held inside min and max, or undefined when the user empties it. */
+  onCommit: (value: number | undefined) => CommitOutcome
 }
 
 /** Whole numbers unless the field asks for decimals, which the fractional audio fields do. */
@@ -137,19 +147,31 @@ function roundTo(value: number, decimals: number | undefined): number {
   return Math.round(value * factor) / factor
 }
 
-/** A number entry that clamps and reports when the user has finished, not as they type. */
-export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
+const shownText = (value: number | undefined): string => (value === undefined ? '' : String(value))
+
+/**
+ * The entry both number fields share. `onEmpty` is what emptying the field commits, and without
+ * one an empty field goes back to the committed value.
+ */
+const NumberDraftInput: React.FC<
+  NumberEntryProps & {
+    value: number | undefined
+    onNumber: (value: number) => CommitOutcome
+    onEmpty?: () => CommitOutcome
+  }
+> = ({
   value,
   min,
   max,
   step,
   decimals,
   commitWhenUnchanged = false,
-  onCommit,
+  onNumber,
+  onEmpty,
   className,
   ...rest
 }) => {
-  const [draft, setDraft] = useState(String(value))
+  const [draft, setDraft] = useState(shownText(value))
   const [seen, setSeen] = useState(value)
   // Whether the user has typed since the last commit, which decides if an external change may
   // replace the draft. A focused field left untyped follows it. It is state, since the render
@@ -159,7 +181,7 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
   if (value !== seen) {
     setSeen(value)
     if (!typed) {
-      setDraft(String(value))
+      setDraft(shownText(value))
     }
   }
 
@@ -173,19 +195,25 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
     return Math.max(min ?? -Infinity, Math.min(max ?? Infinity, roundTo(parsed, decimals)))
   }
   const pending = typed ? resolveDraft() : null
-  useUncommittedDraft(pending !== null && pending !== value)
+  // An emptied optional field commits as off, so it is unsaved while the setting is on.
+  const clearing = typed && onEmpty !== undefined && draft.trim() === '' && value !== undefined
+  useUncommittedDraft(clearing || (pending !== null && pending !== value))
 
   const commit = (): void => {
     const typedSinceCommit = typed
     setTyped(false)
+    if (draft.trim() === '' && onEmpty) {
+      if (value !== undefined) revertIfRefused(onEmpty(), '', shownText(value), setDraft)
+      return
+    }
     const clamped = resolveDraft()
     if (clamped === null) {
-      setDraft(String(value))
+      setDraft(shownText(value))
       return
     }
     setDraft(String(clamped))
     if (clamped !== value || (commitWhenUnchanged && typedSinceCommit)) {
-      revertIfRefused(onCommit(clamped), String(clamped), String(value), setDraft)
+      revertIfRefused(onNumber(clamped), String(clamped), shownText(value), setDraft)
     }
   }
 
@@ -211,3 +239,14 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
     />
   )
 }
+
+/** A number entry that clamps and reports when the user has finished, not as they type. */
+export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({ onCommit, ...props }) => (
+  <NumberDraftInput {...props} onNumber={onCommit} />
+)
+
+/** A {@link DraftNumberField} for a setting that is off when empty. */
+export const DraftOptionalNumberField: React.FC<DraftOptionalNumberFieldProps> = ({
+  onCommit,
+  ...props
+}) => <NumberDraftInput {...props} onNumber={onCommit} onEmpty={() => onCommit(undefined)} />

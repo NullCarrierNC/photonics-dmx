@@ -297,7 +297,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     )
     // Per-cue compile failures go on the file's summary, where the cue editor lists them.
     const compileErrors: string[] = []
-    await this.registerFile(filePath, mode, file, compileErrors)
+    const compileWarnings: string[] = []
+    await this.registerFile(filePath, mode, file, compileErrors, compileWarnings)
     if (migrations.length > 0) {
       await this.writeMigratedFile(filePath, parsed)
     }
@@ -310,7 +311,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       if (count !== undefined) kindCueCounts[strategy.kind] = count
     }
 
-    for (const warning of validation.warnings) {
+    const warnings = [...validation.warnings, ...compileWarnings]
+    for (const warning of warnings) {
       log.warn(`${filePath}: ${warning}`)
     }
 
@@ -326,7 +328,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
-      warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
       migrations: migrations.length > 0 ? migrations : undefined,
     }
 
@@ -339,6 +341,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     mode: NodeCueMode,
     file: NodeCueFile,
     compileErrors: string[],
+    compileWarnings: string[],
   ): Promise<void> {
     const effectFileIds = effectFileIdsOf(file)
     const strategy = strategyForFile(file)
@@ -365,14 +368,14 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       // because `cueTypeId` is the audio cue's identifier and the net cues have no such field.
       const audioFile = file as AudioNodeCueFile
       const group = await this.buildOrUnregister(filePath, () =>
-        buildAudioGroup(audioFile, compileErrors, context),
+        buildAudioGroup(audioFile, compileErrors, context, compileWarnings),
       )
       this.registerAudioGroup(filePath, audioFile, group)
     } else {
       // Both net modes compile through the same path and differ only in which registry instance
       // they load into, which the per-mode map supplies.
       const group = await this.buildOrUnregister(filePath, () =>
-        buildNetGroup(file as NetNodeCueFile, compileErrors, context),
+        buildNetGroup(file as NetNodeCueFile, compileErrors, context, compileWarnings),
       )
       const registry = this.options.registries[mode]
       if (this.holdsGroup(filePath, mode, group.id)) {

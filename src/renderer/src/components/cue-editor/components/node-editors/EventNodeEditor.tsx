@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 import { AUDIO_EVENT_EXECUTION_POLICIES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   NetEventNode,
@@ -22,6 +22,9 @@ import {
   AUDIO_EVENT_TYPE_DOCS,
   DOC_BLOCK_CLASS,
 } from './eventNodeDocs'
+import { unlistedIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import FieldIssue, { issueAttributes } from '../shared/FieldIssue'
+import { DraftNumberField } from '../../../controls/DraftField'
 
 interface EventNodeEditorProps {
   node: NetEventNode | AudioEventNodeUnion
@@ -50,14 +53,24 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
     eventType === 'cue-called' ||
     (eventType !== 'cue-started' && audioEvent.triggerMode !== 'level')
   const executionPolicy = audioEvent.executionPolicy ?? 'continuous'
+  const eventTypeIssueId = useId()
+  const offeredEventTypes =
+    activeMode === 'audio'
+      ? AUDIO_EVENT_OPTIONS.map((option) => option.value)
+      : (activeMode === 'rb3' ? RB3_EVENT_OPTIONS_CATEGORIZED : YARG_EVENT_OPTIONS_CATEGORIZED)
+          .flatMap((category) => category.events)
+          .map((event) => event.value)
+  const eventTypeIssue = unlistedIssue(eventType, offeredEventTypes)
 
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
         Event Type
         <select
+          aria-label="Event Type"
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={eventType}
+          {...issueAttributes(eventTypeIssue, eventTypeIssueId)}
           onChange={(event) => {
             if (activeMode !== 'audio') {
               updateYargNode({ eventType: event.target.value as NetEventType })
@@ -77,6 +90,11 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               }
             }
           }}>
+          {eventTypeIssue && (
+            <option value={eventType} disabled>
+              {eventType}
+            </option>
+          )}
           {activeMode === 'audio'
             ? AUDIO_EVENT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -96,6 +114,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                 </optgroup>
               ))}
         </select>
+        <FieldIssue issue={eventTypeIssue} id={eventTypeIssueId} />
         {activeMode === 'audio' && AUDIO_EVENT_TYPE_DOCS[eventType as AudioEventType] && (
           <div className="mt-1.5 mb-2.5 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-[10px] text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
             <p className="font-medium text-gray-700 dark:text-gray-300">What it does</p>
@@ -196,15 +215,15 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           </label>
           <label className="flex flex-col font-medium">
             Cooldown (ms)
-            <input
-              type="number"
+            <DraftNumberField
+              aria-label="Cooldown (ms)"
               min={0}
               step={10}
+              // A time in ms keeps the fraction the author types.
+              decimals={3}
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={(node as AudioEventNode).cooldownMs ?? 0}
-              onChange={(e) =>
-                updateAudioNode({ cooldownMs: Math.max(0, Number(e.target.value) || 0) })
-              }
+              onCommit={(cooldownMs) => updateAudioNode({ cooldownMs })}
             />
             <div className={DOC_BLOCK_CLASS}>
               Minimum time (ms) before this event can fire again after a trigger. 0 = no limit.

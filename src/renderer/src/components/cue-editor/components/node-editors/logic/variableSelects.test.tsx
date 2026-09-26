@@ -11,6 +11,7 @@ import ExpressionLogicEditor from './ExpressionLogicEditor'
 import MathLogicEditor from './MathLogicEditor'
 import PulseLogicEditor from './PulseLogicEditor'
 import VariableLogicEditor from './VariableLogicEditor'
+import SelectFromListLogicEditor from './SelectFromListLogicEditor'
 
 const variables = [
   { name: 'level', type: 'number', scope: 'cue' as const },
@@ -61,6 +62,7 @@ describe('logic editor variable selects', () => {
       expect(
         Array.from(select.options)
           .slice(1)
+          .filter((o) => !o.disabled)
           .map((o) => o.textContent),
       ).toEqual(['level (number, cue)', 'ring (light-array, cue-group)'])
       fireEvent.change(select, { target: { value: 'level' } })
@@ -81,5 +83,19 @@ describe('logic editor variable selects', () => {
     expect(updateNode).toHaveBeenLastCalledWith({ [field]: 'ring' })
     fireEvent.change(select, { target: { value: '' } })
     expect(updateNode).toHaveBeenLastCalledWith({ [field]: undefined })
+  })
+
+  it('shows the variable a new Math node writes, which no variable declares', () => {
+    renderEditor(MathLogicEditor, 'math')
+
+    expect(selectLabelled('Assign To (optional)')).toHaveDisplayValue('result (not declared here)')
+  })
+
+  it('keeps the lower-case placeholder on Select From List', () => {
+    renderEditor(SelectFromListLogicEditor, 'select-from-list')
+
+    expect(Array.from(selectLabelled('Assign To').options)[0].textContent).toBe(
+      '-- select variable --',
+    )
   })
 })

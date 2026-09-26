@@ -49,4 +49,45 @@ describe('AudioTriggerEditor', () => {
     expect(updateAudioNode).not.toHaveBeenCalled()
     expect(field).toHaveValue(250)
   })
+
+  it('writes an attack once the author leaves the field', () => {
+    const updateAudioNode = jest.fn()
+    renderWithProviders(<AudioTriggerEditor trigger={trigger} updateAudioNode={updateAudioNode} />)
+    const field = screen.getByLabelText('Attack (ms)')
+
+    fireEvent.change(field, { target: { value: '1' } })
+    fireEvent.change(field, { target: { value: '15' } })
+    expect(updateAudioNode).not.toHaveBeenCalled()
+
+    fireEvent.blur(field)
+    expect(updateAudioNode).toHaveBeenCalledTimes(1)
+    expect(updateAudioNode).toHaveBeenCalledWith(expect.objectContaining({ attackMs: 15 }))
+  })
+
+  it('turns the release off when the field is cleared', () => {
+    const updateAudioNode = jest.fn()
+    renderWithProviders(
+      <AudioTriggerEditor
+        trigger={{ ...trigger, releaseMs: 80 }}
+        updateAudioNode={updateAudioNode}
+      />,
+    )
+    const field = screen.getByLabelText('Release (ms)')
+
+    fireEvent.change(field, { target: { value: '' } })
+    fireEvent.blur(field)
+
+    expect(updateAudioNode).toHaveBeenCalledWith(expect.objectContaining({ releaseMs: undefined }))
+  })
+
+  it('keeps an attack at or above zero', () => {
+    const updateAudioNode = jest.fn()
+    renderWithProviders(<AudioTriggerEditor trigger={trigger} updateAudioNode={updateAudioNode} />)
+    const field = screen.getByLabelText('Attack (ms)')
+
+    fireEvent.change(field, { target: { value: '-20' } })
+    fireEvent.blur(field)
+
+    expect(updateAudioNode).toHaveBeenCalledWith(expect.objectContaining({ attackMs: 0 }))
+  })
 })

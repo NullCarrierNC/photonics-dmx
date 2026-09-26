@@ -14,7 +14,10 @@ export interface VariableSelectProps {
   hint?: string
 }
 
-/** The labelled variable select the logic editors pick their inputs and outputs with. */
+/**
+ * The labelled variable select the logic editors pick their inputs and outputs with. A stored name
+ * the list leaves out, such as a scratch variable a node writes, stays selected under its own name.
+ */
 const VariableSelect: React.FC<VariableSelectProps> = ({
   label,
   value,
@@ -31,6 +34,11 @@ const VariableSelect: React.FC<VariableSelectProps> = ({
       value={value}
       onChange={(event) => onChange(event.target.value)}>
       <option value="">{placeholder}</option>
+      {value && !variables.some((v) => v.name === value) && (
+        <option value={value} disabled>
+          {value} (not declared here)
+        </option>
+      )}
       {variables.map((v) => (
         <option key={v.name} value={v.name}>
           {v.name} ({showType ? `${v.type}, ${v.scope}` : v.scope})

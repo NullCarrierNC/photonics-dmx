@@ -187,3 +187,74 @@ describe('the built-in cue-called execution policy check', () => {
     expect(validateAudioNodeCueFile(cueCalledFile('beat', 'sometimes')).valid).toBe(false)
   })
 })
+
+describe('the built-in action literal check', () => {
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  /** Give the first action of a bundled library a wait-until condition. */
+  const withWaitUntil = (
+    mode: string,
+    file: string,
+    condition: string,
+  ): Record<string, unknown> => {
+    const parsed = JSON.parse(fs.readFileSync(path.join(CUE_ROOT, mode, file), 'utf8'))
+    const cue = (
+      parsed.cues as { nodes: { actions?: { timing: Record<string, unknown> }[] } }[]
+    ).find((c) => (c.nodes.actions ?? []).length > 0)
+    cue!.nodes.actions![0].timing.waitUntilCondition = { source: 'literal', value: condition }
+    return parsed
+  }
+
+  it('warns when an rb3 action waits until a YARG song event', () => {
+    const result = validateRb3NodeCueFile(withWaitUntil('rb3', 'rb3-stagekit.json', 'measure'))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "timing.waitUntilCondition 'measure' never fires in rb3 mode",
+    )
+  })
+
+  it('leaves a condition the mode raises alone', () => {
+    const result = validateYargNodeCueFile(withWaitUntil('yarg', 'yarg-alt1.json', 'measure'))
+
+    expect(result.valid && result.warnings).toEqual([])
+  })
+})
+
+describe('the built-in array compare check', () => {
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  const withCompare = (left: Record<string, unknown>): Record<string, unknown> => {
+    const file = JSON.parse(
+      fs.readFileSync(path.join(CUE_ROOT, 'yarg', 'yarg-stagekit.json'), 'utf8'),
+    ) as { cues: { name: string; nodes: { logic?: unknown[] } }[] }
+    const cue = file.cues.find((c) => c.name === 'Searchlights')!
+    cue.nodes.logic = [
+      ...(cue.nodes.logic ?? []),
+      {
+        id: 'gate',
+        type: 'logic',
+        logicType: 'conditional',
+        comparator: '>',
+        left,
+        right: { source: 'literal', value: 0 },
+      },
+    ]
+    return file
+  }
+
+  it('warns when a conditional compares a light-array variable', () => {
+    const result = validateYargNodeCueFile(withCompare({ source: 'variable', name: 'allLights' }))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "cue 'Searchlights': conditional 'gate': 'allLights' is a light-array variable",
+    )
+  })
+
+  it('leaves a number variable alone', () => {
+    const result = validateYargNodeCueFile(withCompare({ source: 'variable', name: 'numLights' }))
+
+    expect(result.valid && result.warnings).toEqual([])
+  })
+})

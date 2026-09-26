@@ -3,11 +3,6 @@ import type {
   ActionNode,
   NodeEffectType,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import {
-  BLEND_MODE_OPTIONS,
-  BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS,
-} from '../../../../../../../photonics-dmx/types'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
 const EFFECT_TYPES_WITH_COLOR: NodeEffectType[] = ['set-color']
@@ -37,7 +32,7 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
           })
         }
         expected="string"
-        validLiterals={COLOR_OPTIONS}
+        rule="color"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
@@ -49,7 +44,7 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
           })
         }
         expected="string"
-        validLiterals={BRIGHTNESS_OPTIONS}
+        rule="brightness"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
@@ -61,7 +56,8 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
           })
         }
         expected="string"
-        validLiterals={BLEND_MODE_OPTIONS}
+        rule="blend-mode"
+        optional
         availableVariables={availableVariables}
       />
       <ValueSourceEditor

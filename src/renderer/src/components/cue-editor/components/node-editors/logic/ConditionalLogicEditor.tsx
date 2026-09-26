@@ -4,6 +4,7 @@ import type {
   LogicComparator,
   ValueSource,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { compareOperandIssue } from '../../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
@@ -118,6 +119,7 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
         availableVariables={availableVariables}
         expected={expectedLeft}
         validLiterals={validLiteralsLeft}
+        issue={compareOperandIssue(node.left, availableVariables) ?? undefined}
       />
       <ValueSourceEditor
         label="Right"
@@ -126,6 +128,7 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
         availableVariables={availableVariables}
         expected={expectedRight}
         validLiterals={validLiteralsRight}
+        issue={compareOperandIssue(node.right, availableVariables) ?? undefined}
       />
       <p className="text-[10px] text-gray-500">
         First outgoing edge becomes TRUE branch, second becomes FALSE.

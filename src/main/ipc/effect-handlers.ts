@@ -13,6 +13,7 @@ import {
   validateEffectSavePayload,
   validateImportPickMode,
 } from './inputValidation'
+import { migrateOlderNodeFile } from '../../photonics-dmx/cues/node/loader/migrateOlderNodeFile'
 
 const log = createLogger('effect-handlers')
 
@@ -103,6 +104,8 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     } catch {
       return { success: false, error: 'That file is not valid JSON.' }
     }
+    // A file an older build wrote comes in on the current rules, as it would when loaded.
+    migrateOlderNodeFile(parsed)
     const validation = validateEffectFile(parsed)
     if (!validation.valid || !validation.data) {
       return { success: false, error: validation.errors.join(', ') || 'Invalid effect file' }

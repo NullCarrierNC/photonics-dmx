@@ -99,3 +99,26 @@ describe('EventNodeEditor execution policy', () => {
     expect(policySelect()).toBeNull()
   })
 })
+
+describe('EventNodeEditor cooldown', () => {
+  it('writes the cooldown when the author leaves the field, held at or above zero', () => {
+    const updateAudioNode = jest.fn()
+    render(
+      <EventNodeEditor
+        node={{ id: 'ev', type: 'event', eventType: 'beat', triggerMode: 'edge' } as AudioEventNode}
+        activeMode="audio"
+        updateYargNode={jest.fn()}
+        updateAudioNode={updateAudioNode}
+      />,
+    )
+    const field = screen.getByLabelText(/Cooldown \(ms\)/)
+
+    fireEvent.change(field, { target: { value: '2' } })
+    fireEvent.change(field, { target: { value: '250' } })
+    expect(updateAudioNode).not.toHaveBeenCalled()
+
+    fireEvent.blur(field)
+    expect(updateAudioNode).toHaveBeenCalledTimes(1)
+    expect(updateAudioNode).toHaveBeenCalledWith({ cooldownMs: 250 })
+  })
+})

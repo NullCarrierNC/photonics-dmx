@@ -1,20 +1,15 @@
-import type { ActionNode, NodeColorSetting, ValueSource } from '../../types/nodeCueTypes'
-import {
-  isBlendMode,
-  isBrightness,
-  isColor,
-  isLightTarget,
-  isLocationGroup,
-  isWaitCondition,
-} from '../../../types'
+import type { ActionNode, ValueSource } from '../../types/nodeCueTypes'
 import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
+import { actionLiteralIssues } from '../cueValueRules'
 
 /**
  * Structural validation shared by node cue and effect compilers for physically
  * equivalent action payloads (targets, set-position, set-color, motion-pattern,
  * timing config). Cue and effect compilers wrap thrown errors in their own error
  * type so callers can distinguish source files; the message text is identical
- * across both compilers (asserted by the parametrised parity test).
+ * across both compilers (asserted by the parametrised parity test). Literal values
+ * are judged by the cue value rules the editor fields also ask, and a rule's
+ * warning does not stop a compile.
  */
 export function validateSharedActionNodePayload(
   action: ActionNode,
@@ -22,7 +17,9 @@ export function validateSharedActionNodePayload(
 ): void {
   const label = action.label ?? action.id
 
-  validateTargetGroups(action, label, createError)
+  if (!action.target.groups) {
+    throw createError(`Action '${label}' must target at least one group.`)
+  }
   validateTargetFilter(action, label, createError)
 
   if (action.effectType === 'set-position') {
@@ -31,14 +28,17 @@ export function validateSharedActionNodePayload(
   if (action.effectType === 'set-color' && !action.color) {
     throw createError(`Action '${label}' (set-color) must include color.`)
   }
-  if (action.color) {
-    validateColorLiterals(action.color, label, createError)
-  }
   if (action.effectType === 'motion-pattern' && !action.motionPattern) {
     throw createError(`Action '${label}' (motion-pattern) must include motionPattern.`)
   }
 
   validateTiming(action, label, createError)
+
+  const refused = actionLiteralIssues(action).find(({ issue }) => issue.severity === 'error')
+  if (refused) {
+    throw createError(`Action '${label}' ${refused.field} ${refused.issue.message}.`)
+  }
+
   validateLayer(action, label, createError)
 }
 
@@ -56,54 +56,6 @@ function validateLayer(
   }
 }
 
-function validateTargetGroups(
-  action: ActionNode,
-  label: string,
-  createError: (message: string) => Error,
-): void {
-  if (!action.target.groups) {
-    throw createError(`Action '${label}' must target at least one group.`)
-  }
-  if (action.target.groups.source === 'literal') {
-    const v = action.target.groups.value as unknown
-    if (
-      v == null ||
-      v === '' ||
-      (Array.isArray(v) && v.length === 0) ||
-      (!Array.isArray(v) && !v)
-    ) {
-      throw createError(`Action '${label}' must target at least one group.`)
-    }
-    for (const group of String(v).split(',')) {
-      const name = group.trim()
-      if (!isLocationGroup(name)) {
-        throw createError(`Action '${label}' target.groups '${name}' is not a known LocationGroup.`)
-      }
-    }
-  }
-}
-
-function validateColorLiterals(
-  color: NodeColorSetting,
-  label: string,
-  createError: (message: string) => Error,
-): void {
-  const { name, brightness, blendMode } = color
-  if (name.source === 'literal' && !isColor(name.value)) {
-    throw createError(`Action '${label}' color.name '${String(name.value)}' is not a known Color.`)
-  }
-  if (brightness.source === 'literal' && !isBrightness(brightness.value)) {
-    throw createError(
-      `Action '${label}' color.brightness '${String(brightness.value)}' is not a known Brightness.`,
-    )
-  }
-  if (blendMode?.source === 'literal' && !isBlendMode(blendMode.value)) {
-    throw createError(
-      `Action '${label}' color.blendMode '${String(blendMode.value)}' is not a known BlendMode.`,
-    )
-  }
-}
-
 function validateTargetFilter(
   action: ActionNode,
   label: string,
@@ -115,15 +67,6 @@ function validateTargetFilter(
   }
   if (!isValueSource(filter)) {
     throw createError(`Action '${label}' target.filter must be a ValueSource.`)
-  }
-  if (filter.source === 'literal') {
-    const value = filter.value
-    if (typeof value !== 'string' || value.length === 0) {
-      throw createError(`Action '${label}' target.filter literal must be a non-empty string.`)
-    }
-    if (!isLightTarget(value)) {
-      throw createError(`Action '${label}' target.filter '${value}' is not a known LightTarget.`)
-    }
   }
 }
 
@@ -179,9 +122,6 @@ function validateTiming(
   )
   validateRequiredTimingValueSource(timing.waitUntilTime, label, 'waitUntilTime', createError)
 
-  validateConditionLiteral(timing.waitForCondition, label, 'waitForCondition', createError)
-  validateConditionLiteral(timing.waitUntilCondition, label, 'waitUntilCondition', createError)
-
   validateNonNegativeNumberLiteral(timing.waitForTime, label, 'waitForTime', createError)
   validateNonNegativeNumberLiteral(timing.waitUntilTime, label, 'waitUntilTime', createError)
   validateNonNegativeNumberLiteral(timing.duration, label, 'duration', createError)
@@ -213,9 +153,6 @@ function validateTiming(
 
   if (timing.easing !== undefined) {
     validateOptionalValueSource(timing.easing, label, 'easing', createError)
-    if (timing.easing.source === 'literal' && typeof timing.easing.value !== 'string') {
-      throw createError(`Action '${label}' timing.easing literal must be a string.`)
-    }
   }
 }
 
@@ -253,21 +190,6 @@ function validateOptionalValueSource(
 ): void {
   if (!isValueSource(value)) {
     throw createError(`Action '${label}' timing.${field} must be a ValueSource.`)
-  }
-}
-
-function validateConditionLiteral(
-  value: ValueSource,
-  label: string,
-  field: string,
-  createError: (message: string) => Error,
-): void {
-  if (value.source !== 'literal') return
-  const v = value.value
-  if (!isWaitCondition(v)) {
-    throw createError(
-      `Action '${label}' timing.${field} literal '${String(v)}' is not a known wait condition.`,
-    )
   }
 }
 

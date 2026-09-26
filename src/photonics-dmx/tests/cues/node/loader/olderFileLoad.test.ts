@@ -10,6 +10,10 @@ import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { CueType } from '../../../../cues/types/cueTypes'
 
 const HISTORICAL = path.join(__dirname, '../../../historical')
+const BUNDLED_EFFECTS = path.resolve(
+  __dirname,
+  '../../../../../../resources/defaults/node-data/effects/yarg',
+)
 
 interface ValueSourceJson {
   source: string
@@ -28,8 +32,9 @@ interface GraphJson {
   cueType?: string
   nodes: {
     actions: Array<{
+      id: string
       color: { name: ValueSourceJson; blendMode: ValueSourceJson }
-      timing: { duration: ValueSourceJson }
+      timing: { duration: ValueSourceJson; easing?: ValueSourceJson }
     }>
   }
   variables?: VariableJson[]
@@ -61,11 +66,13 @@ function userCopyOfAlt1(groupId: string): LibraryJson {
   return file
 }
 
-const dischordOf = (file: LibraryJson): GraphJson => {
-  const cue = file.cues.find((c) => c.cueType === 'Dischord')
-  if (!cue) throw new Error('the library has no Dischord cue')
+const cueOf = (file: LibraryJson, cueType: string): GraphJson => {
+  const cue = file.cues.find((c) => c.cueType === cueType)
+  if (!cue) throw new Error(`the library has no ${cueType} cue`)
   return cue
 }
+
+const dischordOf = (file: LibraryJson): GraphJson => cueOf(file, 'Dischord')
 
 const effectOf = (file: LibraryJson, id: string): GraphJson => {
   const effect = file.effects.find((e) => e.id === id)
@@ -159,10 +166,82 @@ describe('loading cue and effect files older builds wrote', () => {
       expect(firstCues.migrations).toEqual([
         expect.stringMatching(/^user-legacy-one\.json: .*Dischord.*replace/),
         expect.stringMatching(/^user-legacy\.json: .*Dischord.*replace/),
+        expect.stringMatching(/^user-legacy\.json: .*'sin-out'.*Harmony/),
       ])
 
       expect((await effectLoader.loadAll()).migrations).toEqual([])
       expect((await loader.loadAll()).migrations).toEqual([])
+    })
+  })
+
+  describe('with an easing name no build offered', () => {
+    it('loads Harmony from v0.5.5 with its sin-out easing read as sinInOut', async () => {
+      writeJson(path.join(cuesDir, 'user-alt1.json'), userCopyOfAlt1('user-alt1'))
+
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-alt1')?.cues.has(CueType.Harmony)).toBe(true)
+      expect(result.migrations).toEqual([
+        expect.stringMatching(/^user-alt1\.json: .*'sin-out'.*Harmony.*sinInOut/),
+      ])
+      const harmony = cueOf(readJson(path.join(cuesDir, 'user-alt1.json')), 'Harmony')
+      const easings = harmony.nodes.actions.map((action) => action.timing.easing?.value)
+      expect(easings).toEqual(['sinInOut', 'sinInOut'])
+    })
+  })
+
+  describe('with initial values that do not fit their variable type', () => {
+    it('loads every cue and stores each value as the runtime reads it', async () => {
+      const file = userCopyOfAlt1('user-initials')
+      dischordOf(file).variables = [
+        ...(dischordOf(file).variables ?? []),
+        { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['red', 'Bleu'] },
+        { name: 'accent', type: 'color', scope: 'cue', initialValue: 'mauve' },
+        { name: 'armed', type: 'boolean', scope: 'cue', initialValue: 'true' },
+        { name: 'steps', type: 'number', scope: 'cue', initialValue: '4' },
+      ]
+      writeJson(path.join(cuesDir, 'user-initials.json'), file)
+
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-initials')?.cues.size).toBe(24)
+      expect(result.migrations).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/^user-initials\.json: .*'palette'.*'accent'.*'armed'.*'steps'/),
+        ]),
+      )
+      const stored = dischordOf(readJson(path.join(cuesDir, 'user-initials.json'))).variables
+      expect(Object.fromEntries((stored ?? []).map((v) => [v.name, v.initialValue]))).toEqual(
+        expect.objectContaining({
+          palette: ['red', 'blue'],
+          accent: 'blue',
+          armed: true,
+          steps: 4,
+        }),
+      )
+    })
+  })
+
+  describe('with a raiser parameter bound to a variable of another type', () => {
+    it('keeps a v0.5.5 Dischord raising the core effects this build ships, and warns', async () => {
+      writeJson(path.join(cuesDir, 'user-alt1.json'), userCopyOfAlt1('user-alt1'))
+      fs.mkdirSync(effectsDir, { recursive: true })
+      fs.copyFileSync(
+        path.join(BUNDLED_EFFECTS, 'yarg-core-effects.json'),
+        path.join(effectsDir, 'yarg-core-effects.json'),
+      )
+
+      await effectLoader.loadAll()
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-alt1')?.cues.has(CueType.Dischord)).toBe(true)
+      const [summary] = loader.getSummary().yarg
+      expect(summary.warnings).toEqual([
+        "cue 'Dischord': effect raiser 'y1-dischord-blue' parameter 'lights': 'allLights' is a light-array variable, and this field takes string.",
+      ])
     })
   })
 

@@ -8,6 +8,7 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isVariableName } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { initialValueIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import type { EditorDocument } from '../../lib/types'
 import VariableList from './VariableList'
 import VariableFormDialog from './VariableFormDialog'
@@ -101,6 +102,11 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
         `"${formData.name}" is not a valid variable name. Use letters, digits and underscores, starting with a letter or underscore.`,
         'error',
       )
+      return
+    }
+    const initialIssue = initialValueIssue(formData.type, formData.initialValue)
+    if (initialIssue) {
+      showToast(`Initial value: ${initialIssue.message}.`, 'error')
       return
     }
 
