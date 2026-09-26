@@ -8,6 +8,7 @@ import type { VariableValue } from '../../../../cues/node/runtime/executionTypes
 import type { CueData } from '../../../../cues/types/cueTypes'
 import type { NetEventNode, ValueSource } from '../../../../cues/types/nodeCueTypes'
 import { createMockTrackedLight } from '../../../helpers/testFixtures'
+import { resetLogConfiguration, setLogSink, setMinLogLevel } from '../../../../../shared/logger'
 
 function contextWith(variables: Record<string, VariableValue> = {}): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
@@ -38,6 +39,24 @@ describe('resolveVariableValue', () => {
       type: 'light-array',
       value: lights,
     })
+  })
+
+  it('reads a light-array variable as no text, and says so', () => {
+    const warnings: string[] = []
+    setMinLogLevel('warn')
+    setLogSink((entry) => warnings.push(entry.message))
+    try {
+      const context = contextWith({
+        rig: { type: 'light-array', value: [createMockTrackedLight()] },
+      })
+      expect(resolveVariableValue('string', variable('rig'), context)).toEqual({
+        type: 'string',
+        value: '',
+      })
+      expect(warnings).toEqual([expect.stringContaining("Light-array variable 'rig' read as text")])
+    } finally {
+      resetLogConfiguration()
+    }
   })
 
   it('reads a variable of another type as no lights', () => {
