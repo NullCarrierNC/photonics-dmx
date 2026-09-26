@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAtom } from 'jotai'
-import { lightingPrefsAtom, rb3eListenerEnabledAtom } from '../atoms'
+import { lightingPrefsAtom } from '../atoms'
 import { persistPrefs } from '../ipc/persistPrefs'
 import type { ProcessingMode } from '../../../photonics-dmx/processors/ProcessorManager'
 
@@ -20,7 +20,6 @@ const getModeDescription = (mode: string): string => {
 
 const StageKitRb3EnhancedSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
-  const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const mode = prefs.rb3Prefs?.processingMode ?? 'direct'
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -80,11 +79,6 @@ const StageKitRb3EnhancedSettings: React.FC = () => {
             {saveError && (
               <p className="text-sm text-red-600 dark:text-red-400 mt-2" role="alert">
                 {saveError}
-              </p>
-            )}
-            {isRb3Enabled && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                Toggle RB3E off and on again to apply a mode change.
               </p>
             )}
           </div>

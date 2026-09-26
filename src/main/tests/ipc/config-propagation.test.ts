@@ -55,6 +55,7 @@ const mockControllerManager = withCollaboratorGetters({
   getDmxPublisher: jest.fn().mockReturnValue(mockPublisher),
   getVenueFrameProcessor: jest.fn().mockReturnValue(mockVenueFrameProcessor),
   getMasterOutput: jest.fn().mockReturnValue(mockMasterOutput),
+  applyRb3ProcessingMode: jest.fn(async () => {}),
 })
 
 const mockSendToAllWindows = jest.fn()
@@ -280,6 +281,17 @@ describe('SAVE_PREFS publisher hot-swap', () => {
     expect(result).toEqual({ success: true })
     expect(mockPublisher.setWhiteChannelMixMode).not.toHaveBeenCalled()
     expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
+  })
+
+  it('applies an RB3 processing mode change to the running session', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!(
+      {},
+      { rb3Prefs: { processingMode: 'cue' } },
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(mockControllerManager.applyRb3ProcessingMode).toHaveBeenCalledTimes(1)
+    expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
   })
 
   it('persists a venue post-processing change and applies it without a restart', async () => {

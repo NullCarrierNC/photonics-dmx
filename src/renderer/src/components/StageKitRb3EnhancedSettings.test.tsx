@@ -8,7 +8,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
-import { lightingPrefsAtom, rb3eListenerEnabledAtom } from '../atoms'
+import { lightingPrefsAtom } from '../atoms'
 import StageKitRb3EnhancedSettings from './StageKitRb3EnhancedSettings'
 
 jest.mock(
@@ -25,7 +25,6 @@ function renderPanel() {
   return renderWithProviders(<StageKitRb3EnhancedSettings />, {
     seed: (set) => {
       set(lightingPrefsAtom, { rb3Prefs: { processingMode: 'direct' } })
-      set(rb3eListenerEnabledAtom, false)
     },
   }).store
 }
