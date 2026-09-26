@@ -8,16 +8,18 @@ import { NodeCueLoader } from '../cues/node/loader/NodeCueLoader'
 import { EffectLoader } from '../cues/node/loader/EffectLoader'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { IAudioCue } from '../cues/interfaces/IAudioCue'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import { getCueRegistry } from '../cues/registries/cueRegistries'
 import { CueHandler } from '../cueHandlers/CueHandler'
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
-import { CueStyle } from '../cues/interfaces/INetCue'
+import { CueStyle, type INetCue } from '../cues/interfaces/INetCue'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import {
   CueType,
   DRUM_NOTE_MAP,
   INSTRUMENT_NOTE_MAP,
   getCueTypeFromId,
+  isHandlerOwnedCueType,
 } from '../cues/types/cueTypes'
 import { VirtualTime } from './VirtualTime'
 import { buildSimRig } from './simRig'
@@ -264,15 +266,18 @@ export class CueSimulator {
   }
 
   /**
-   * Select the cue to simulate: any {@link CueType} value (e.g. `Menu`, `Strobe_Fast`), or an audio
-   * cue id the audio library carries.
+   * Select the cue to simulate: a {@link CueType} value the library carries (e.g. `Menu`,
+   * `Strobe_Fast`) or one the cue handler acts on itself, or an audio cue id the audio library
+   * carries.
    */
   public setCue(cue: string): void {
     if (this.opts.domain === 'audio') {
       this.audioCue(cue)
       this.currentCue = cue
     } else {
-      this.currentCue = this.resolveCueType(cue)
+      const cueType = this.resolveCueType(cue)
+      if (!isHandlerOwnedCueType(cueType)) this.libraryCue(this.opts.domain, cue, cueType)
+      this.currentCue = cueType
     }
   }
 
@@ -450,10 +455,7 @@ export class CueSimulator {
       else this.secondaryCue = name
     } else {
       const cueType = this.resolveCueType(name)
-      const registry = getCueRegistry(this.opts.domain)
-      if (
-        registry.getCueImplementationFromGroup(cueType, this.groupId)?.style !== CueStyle.Secondary
-      ) {
+      if (this.libraryCue(this.opts.domain, name, cueType).style !== CueStyle.Secondary) {
         throw new Error(`'${name}' is not a secondary cue in '${this.groupId}'.`)
       }
       this.secondaryCue = cueType
@@ -559,6 +561,15 @@ export class CueSimulator {
    * The cue from the library under test only. The registry's default-group fallback is skipped,
    * since the simulator runs one library.
    */
+  private libraryCue(domain: NetCueMode, name: string, cueType: CueType): INetCue {
+    const found = getCueRegistry(domain).getGroup(this.groupId)?.cues.get(cueType)
+    if (!found) {
+      throw new Error(`Unknown cue '${name}' in '${this.groupId}'.`)
+    }
+    return found
+  }
+
+  /** The audio cue from the library under test only, as {@link libraryCue} is for YARG and RB3. */
   private audioCue(cue: string): IAudioCue {
     const found = AudioCueRegistry.getInstance().getGroup(this.groupId)?.cues.get(cue)
     if (!found) {

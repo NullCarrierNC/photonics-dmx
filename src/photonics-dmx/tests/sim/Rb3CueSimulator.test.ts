@@ -51,6 +51,26 @@ describe('CueSimulator (RB3)', () => {
     }
   })
 
+  it('refuses a cue its RB3 library does not carry', async () => {
+    const sim = await CueSimulator.create({ library: LIBRARY, domain: 'rb3', bpm: 0 })
+    try {
+      expect(() => sim.setCue('Menu')).toThrow(/Unknown cue 'Menu' in 'rb3-mirror'/)
+    } finally {
+      sim.dispose()
+    }
+  })
+
+  it('refuses a strobe secondary that only the default RB3 library carries', async () => {
+    const sim = await CueSimulator.create({ library: LIBRARY, domain: 'rb3', bpm: 0 })
+    try {
+      sim.setCue('RB3')
+      sim.schedule({ at: 100, secondary: 'Strobe_Fast' })
+      await expect(sim.run(300)).rejects.toThrow(/Unknown cue 'Strobe_Fast' in 'rb3-mirror'/)
+    } finally {
+      sim.dispose()
+    }
+  })
+
   it('rejects a library that is not in the RB3 domain', async () => {
     await expect(
       CueSimulator.create({ library: 'yarg-stagekit', domain: 'rb3', bpm: 0 }),
