@@ -178,6 +178,31 @@ describe('getTemplateAlignedChannels', () => {
       blue: 13,
     })
   })
+
+  it('gives an unplaced light every channel at 0 when its template is gone', () => {
+    const orphan = light({ fixtureId: 'missing', unplaced: true })
+
+    expect(getTemplateAlignedChannels(orphan, [template()])).toEqual({
+      masterDimmer: 0,
+      red: 0,
+      green: 0,
+      blue: 0,
+    })
+  })
+
+  it('gives a light with no master every channel at 0 when its template is gone', () => {
+    const orphan = light({
+      fixtureId: 'missing',
+      channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 },
+    })
+
+    expect(getTemplateAlignedChannels(orphan, [template()])).toEqual({
+      masterDimmer: 0,
+      red: 0,
+      green: 0,
+      blue: 0,
+    })
+  })
 })
 
 describe('getTemplateAlignedExtraChannels', () => {
@@ -197,6 +222,18 @@ describe('getTemplateAlignedExtraChannels', () => {
     const orphan = light({ fixtureId: 'missing', extraChannels: white })
 
     expect(getTemplateAlignedExtraChannels(orphan, [template()])).toEqual(white)
+  })
+
+  it('gives a light with no master its extras at 0 when its template is gone', () => {
+    const orphan = light({
+      fixtureId: 'missing',
+      channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 },
+      extraChannels: [{ type: 'fixed', channel: 4, value: 200 }],
+    })
+
+    expect(getTemplateAlignedExtraChannels(orphan, [template()])).toEqual([
+      { type: 'fixed', channel: 0, value: 200 },
+    ])
   })
 })
 

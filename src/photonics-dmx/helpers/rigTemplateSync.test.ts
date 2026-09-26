@@ -49,10 +49,22 @@ const baseRgbTemplate: RgbFixture = {
 }
 
 describe('syncDmxLightWithTemplate', () => {
-  it('returns the input unchanged when no template is found (orphaned light)', () => {
+  it('returns an orphaned light with a master unchanged', () => {
     const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, undefined)
     expect(changed).toBe(false)
     expect(light).toBe(baseRgbLight)
+  })
+
+  it('leaves every channel of an orphaned light with no master at 0', () => {
+    const orphan: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, strobeChannel: 4 },
+      extraChannels: [{ type: 'fixed', channel: 5, value: 200 }],
+    }
+    const { light, changed } = syncDmxLightWithTemplate(orphan, undefined)
+    expect(changed).toBe(true)
+    expect(light.channels).toEqual({ masterDimmer: 0, red: 0, green: 0, blue: 0, strobeChannel: 0 })
+    expect(light.extraChannels).toEqual([{ type: 'fixed', channel: 0, value: 200 }])
   })
 
   it('returns same reference when rig already matches template', () => {

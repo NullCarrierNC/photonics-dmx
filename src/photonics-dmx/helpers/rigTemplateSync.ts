@@ -51,7 +51,8 @@ import type {
  *  - `isStrobeEnabled` — this is a layout-level toggle (LightChannelsConfig's "Use as strobe"),
  *    not a template property after creation
  *
- * Orphaned rig lights (whose `fixtureId` no longer resolves to a template) are returned unchanged.
+ * Orphaned rig lights (whose `fixtureId` resolves to no template) keep their stored channels and
+ * `unplaced` flag while their master is an address, and have every channel at 0 without one.
  */
 
 /**
@@ -183,15 +184,32 @@ export function deriveChannelLayoutForMaster(
 }
 
 /**
+ * A rig light whose template is gone. With a master it keeps its stored channels and `unplaced`
+ * flag, and with none it has no place in the universe, so every channel, added ones included, is 0.
+ */
+function syncOrphanedLight(light: DmxLight): { light: DmxLight; changed: boolean } {
+  if (isValidDmxChannel(light.channels.masterDimmer)) {
+    return { light, changed: false }
+  }
+  const synced: DmxLight = { ...light, ...deriveChannelLayoutForMaster(light, 0) }
+  const extraChannels = deriveExtraChannelsForMaster(light.extraChannels, 0, 0)
+  if (extraChannels !== undefined) {
+    synced.extraChannels = extraChannels
+  }
+  return equal(light, synced) ? { light, changed: false } : { light: synced, changed: true }
+}
+
+/**
  * Aligns a single rig light to its current template. Returns the input unchanged (same reference,
- * `changed: false`) when the rig already matches the template OR when no template is found.
+ * `changed: false`) when the rig already matches the template, or when no template is found and
+ * the light has a master ({@link syncOrphanedLight}).
  */
 export function syncDmxLightWithTemplate(
   light: DmxLight,
   template: DmxFixture | undefined,
 ): { light: DmxLight; changed: boolean } {
   if (!template) {
-    return { light, changed: false }
+    return syncOrphanedLight(light)
   }
 
   const rigChannels = light.channels

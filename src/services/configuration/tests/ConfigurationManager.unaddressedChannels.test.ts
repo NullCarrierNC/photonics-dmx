@@ -189,6 +189,22 @@ describe('rig lights with an unassigned channel or no address, loaded and publis
     expect(frame).toEqual({ 1: 90 })
   })
 
+  it('keeps a light whose template is gone dark when it has no master', () => {
+    const orphan = {
+      ...rigLight('B', { masterDimmer: 0, red: 1, green: 2, blue: 3 }),
+      fixtureId: 'deleted-template',
+    }
+    const manager = boot(PAR, orphan)
+    const rig = manager.getDmxRigs()[0]
+
+    const frame = publishOnce(rig, {
+      A: rgbio({ intensity: 90 }),
+      B: rgbio({ red: 200, green: 100, blue: 50, intensity: 255 }),
+    })
+
+    expect(frame).toEqual({ 1: 90 })
+  })
+
   it('reports a master it cannot use as a repair of the rigs file', () => {
     const manager = boot(PAR, rigLight('B', { masterDimmer: 600, red: 601, green: 602, blue: 603 }))
 
