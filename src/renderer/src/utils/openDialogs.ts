@@ -15,3 +15,7 @@ export function innermostOpenDialog(): HTMLElement | null {
   const open = document.querySelectorAll<HTMLElement>('[aria-modal="true"]')
   return open.length > 0 ? open[open.length - 1] : null
 }
+
+export function isDialogOpen(): boolean {
+  return document.querySelector('[aria-modal="true"]') !== null
+}
