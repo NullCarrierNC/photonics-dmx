@@ -73,13 +73,23 @@ async function addCue<K, V>(args: {
   }
 }
 
-/** The group a file must produce, or the file is not usable. */
-function assertHasCues(lighting: number, motion: number, what: string): void {
-  if (lighting === 0 && motion === 0) {
-    throw new NodeCueCompilationError(
-      `Group must contain at least one lighting or motion ${what} definition.`,
-    )
-  }
+/**
+ * The group a file must produce, or the file is not usable. When every cue failed to compile, the
+ * first cue's failure is the reason given.
+ */
+function assertHasCues(
+  lighting: number,
+  motion: number,
+  what: string,
+  compileErrors: readonly string[],
+): void {
+  if (lighting > 0 || motion > 0) return
+  const [firstCause] = compileErrors
+  throw new NodeCueCompilationError(
+    firstCause !== undefined
+      ? `No ${what} in the group compiled. ${firstCause}`
+      : `Group must contain at least one lighting or motion ${what} definition.`,
+  )
 }
 
 /** Build the YARG or RB3 group a net cue file describes. */
@@ -144,7 +154,7 @@ export async function buildNetGroup(
     }
   }
 
-  assertHasCues(cues.size, motionCues.size, 'cue')
+  assertHasCues(cues.size, motionCues.size, 'cue', compileErrors)
 
   const result: ICueGroup = {
     id: file.group.id,
@@ -218,7 +228,7 @@ export async function buildAudioGroup(
     }
   }
 
-  assertHasCues(cues.size, motionCues.size, 'audio cue')
+  assertHasCues(cues.size, motionCues.size, 'audio cue', compileErrors)
 
   const result: AudioCueGroup = {
     id: file.group.id,
