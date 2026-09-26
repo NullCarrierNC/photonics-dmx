@@ -2,6 +2,7 @@ import { jest } from '@jest/globals'
 import { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import type { ControllerGraph } from '../../controllers/ControllerGraph'
+import type { TestEffectRunner } from '../../controllers/TestEffectRunner'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import type { LifecyclePhase } from '../../../shared/ipcTypes'
 
@@ -125,6 +126,8 @@ export interface StubbedManagerOptions {
   consoleMode?: ReturnType<typeof consoleModeStub>
   /** Let the manager build its own console controller over the stub listeners. */
   ownConsoleMode?: boolean
+  /** The YARG test-effect runner, when a suite drives a real one. */
+  testEffectRunner?: TestEffectRunner
   /**
    * Stands in for the graph build. Brings the lifecycle to running unless a suite says otherwise.
    */
@@ -165,7 +168,7 @@ export function stubbedManager(options: StubbedManagerOptions = {}): StubbedMana
       senderLifecycle: senders,
       ...(options.ownConsoleMode ? {} : { consoleMode }),
       motionCueSimulator: { reset: jest.fn() },
-      testEffectRunner: testEffects(),
+      testEffectRunner: options.testEffectRunner ?? testEffects(),
       rb3TestEffectRunner: testEffects(),
       registryInit: options.ownInit?.registryInit ?? {},
     } as never,
