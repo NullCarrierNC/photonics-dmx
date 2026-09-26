@@ -308,7 +308,11 @@ export async function applyAllEnabledGroupsFromConfig(
 ): Promise<void> {
   for (const binding of CUE_DOMAIN_BINDINGS) {
     try {
-      const reconciled = await reconcileAndApplyGroups(binding, config)
+      // On the domain's queue, so a group selection save already under way lands before the
+      // reconcile reads the stored selection.
+      const reconciled = await serializeCueDomainOp(binding.domain, () =>
+        reconcileAndApplyGroups(binding, config),
+      )
       log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
     } catch (error) {
       // A refused save leaves the reconciled groups applied, and the next reconcile retries it, so

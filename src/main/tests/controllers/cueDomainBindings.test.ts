@@ -5,6 +5,7 @@ import {
   cueDomainBinding,
   reconcileAndApplyGroups,
   registerCueDomainBinding,
+  serializeCueDomainOp,
   type CueDomainRegistryBinding,
 } from '../../controllers/cueDomainBindings'
 import { CUE_DOMAINS } from '../../../services/configuration/cueDomainTypes'
@@ -154,5 +155,39 @@ describe('applyAllEnabledGroupsFromConfig', () => {
     expect(refused.applied.enabled).toEqual(['a', 'b'])
     expect(later.applied.enabled).toEqual(['c'])
     expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('reconciles after a group selection save already queued for the domain', async () => {
+    const binding = makeBinding('yarg', {
+      registered: ['a', 'b', 'c'],
+      enabled: ['a', 'b'],
+      known: ['a', 'b'],
+    })
+    const stored = binding.readStored(config)
+    // Writes land in order and only once the store has saved them, as ConfigFile's do.
+    let release!: () => void
+    const saving = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let writes: Promise<void> = Promise.resolve()
+    binding.persist = (_config, patch) => {
+      writes = writes.then(async () => {
+        await saving
+        Object.assign(stored, patch)
+      })
+      return writes
+    }
+
+    const userDisablesB = serializeCueDomainOp('yarg', async () => {
+      await binding.persist(config, { enabledGroups: ['a'] })
+      binding.setEnabled(['a'])
+    })
+    await new Promise((resolve) => setImmediate(resolve))
+    const startup = applyAllOver([binding], () => {})
+    release()
+    await Promise.all([userDisablesB, startup])
+
+    expect(stored.enabledGroups).toEqual(['a', 'c'])
+    expect(binding.applied.enabled).toEqual(['a', 'c'])
   })
 })
