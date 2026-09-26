@@ -209,6 +209,48 @@ describe('ConfigurationManager fixture loading', () => {
     ])
   })
 
+  it('gives a layout light stored without an id one new id in each list that holds it', () => {
+    const light = template({ id: null, fixtureId: 'tpl-1', group: 'front', mount: 'floor' })
+    const cm = boot({
+      layoutLights: [light],
+      layout: { strobeType: ConfigStrobeType.AllCapable, strobeLights: [light] },
+    })
+
+    const { frontLights, strobeLights } = cm.getLightingLayout()
+    expect(frontLights[0].id).toEqual(expect.any(String))
+    expect(strobeLights[0].id).toBe(frontLights[0].id)
+  })
+
+  it('gives a rig light stored without an id one new id in each list that holds it', () => {
+    const light = (fields: Record<string, unknown>) =>
+      template({ id: null, fixtureId: 'tpl-1', mount: 'floor', ...fields })
+    const front = light({ group: 'front', position: 1 })
+    const back = light({ group: 'back', position: 2 })
+    const rigsText = JSON.stringify({
+      version: 1,
+      data: {
+        rigs: [
+          {
+            id: 'rig-1',
+            name: 'Rig 1',
+            active: true,
+            config: {
+              ...layoutWith([front]),
+              strobeType: ConfigStrobeType.AllCapable,
+              backLights: [back],
+              strobeLights: [front, back],
+            },
+          },
+        ],
+      },
+    })
+    const cm = boot({ rigsText, lights: [template({})] })
+
+    const { frontLights, backLights, strobeLights } = cm.getDmxRigs()[0].config
+    expect(strobeLights.map((l) => l.id)).toEqual([frontLights[0].id, backLights[0].id])
+    expect(frontLights[0].id).not.toBe(backLights[0].id)
+  })
+
   it('boots on the rigs file the strobe-None layout editor saved, and reports nothing', () => {
     const rigsText = readRealFile(nodePath.join(HISTORICAL, 'f3f851db', 'dmxRigs.json'), 'utf-8')
     const cm = boot({ rigsText, lights: [template({ id: 'tpl-rgb' })] })

@@ -193,6 +193,31 @@ describe('loadRigExportFixtures', () => {
     expect(faults).toEqual([])
   })
 
+  it('gives a rig light stored without an id one new id in each list that holds it', () => {
+    const { id: _id, ...stored } = lightFrom(rgbTemplate, 'unused', 1, 'front')
+    const file = buildRigExportFile(rig, [rgbTemplate])
+    const loaded = loadRigExportFixtures(
+      {
+        ...file,
+        rig: {
+          ...file.rig,
+          config: {
+            ...file.rig.config,
+            strobeType: ConfigStrobeType.AllCapable,
+            frontLights: [stored],
+            strobeLights: [stored],
+          },
+        },
+      },
+      [],
+    )
+    if (!loaded.ok) throw new Error(loaded.error)
+
+    const config = loaded.rig.config as Record<'frontLights' | 'strobeLights', DmxLight[]>
+    expect(config.frontLights[0].id).toEqual(expect.any(String))
+    expect(config.strobeLights[0].id).toBe(config.frontLights[0].id)
+  })
+
   it('loads a file on the current schema as it is', () => {
     const file = buildRigExportFile(rig, [rgbTemplate, rgbwTemplate])
     const faults: string[] = []

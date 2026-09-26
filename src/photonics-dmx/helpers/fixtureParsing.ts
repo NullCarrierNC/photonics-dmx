@@ -3,6 +3,7 @@
  * payload) field by field against its fixture type. A fault with a safe reading is repaired and
  * reported, and a fixture of a type this build does not know comes back as null.
  */
+import equal from 'fast-deep-equal'
 import {
   DEFAULT_STROBE_CHANNEL_VALUES,
   DMX_CHANNEL_MAX,
@@ -401,14 +402,42 @@ export function parseDmxFixture(
   return fixture
 }
 
+/** A rig light as it was stored, before a light stored without an id is given one. */
+type StoredDmxLight = DmxFixture & { fixtureId: string }
+
+/** Gives a rig light stored without an id its new id. */
+type LightIdMint = (stored: StoredDmxLight) => string
+
+const mintRandomLightId = (): string => globalThis.crypto.randomUUID()
+
+/**
+ * Mints the new ids for the lights of one lighting config stored without one. A stored light
+ * copied into more than one of the config's lists, as the strobe list holds front and back lights,
+ * gets one id in all of them. Each list asks for its own mint by name.
+ */
+export function storedLightIdMint(): (list: string) => LightIdMint {
+  const minted: Array<{ stored: StoredDmxLight; id: string; lists: Set<string> }> = []
+  return (list) => (stored) => {
+    const copy = minted.find((entry) => !entry.lists.has(list) && equal(entry.stored, stored))
+    if (copy) {
+      copy.lists.add(list)
+      return copy.id
+    }
+    const id = mintRandomLightId()
+    minted.push({ stored, id, lists: new Set([list]) })
+    return id
+  }
+}
+
 /**
  * A rig light: a fixture plus the id of the template it came from. Cues and the publisher find a
- * light by its id, so a light stored without one is reported and given a new one.
+ * light by its id, so a light stored without one is reported and given the id `mintId` answers.
  */
 export function parseDmxLight(
   raw: unknown,
   path: string,
   report: FixtureFaultReport,
+  mintId: LightIdMint = mintRandomLightId,
 ): DmxLight | null {
   if (!isPlainObject(raw)) {
     report(`${path} must be an object`, 'reset')
@@ -417,14 +446,14 @@ export function parseDmxLight(
   const { fixtureId, ...fields } = raw
   const fixture = parseDmxFixture(fields, path, report)
   if (!fixture) return null
-  let id = fixture.id
-  if (id === null) {
+  if (fixture.id === null) {
     report(`${path}.id is missing`, 'reset')
-    id = globalThis.crypto.randomUUID()
   }
-  if (typeof fixtureId === 'string') return { ...fixture, id, fixtureId }
-  report(`${path}.fixtureId must be a string`, 'reset')
-  return { ...fixture, id, fixtureId: '' }
+  if (typeof fixtureId !== 'string') {
+    report(`${path}.fixtureId must be a string`, 'reset')
+  }
+  const stored = { ...fixture, fixtureId: typeof fixtureId === 'string' ? fixtureId : '' }
+  return { ...stored, id: fixture.id ?? mintId(stored) }
 }
 
 /** Brings a fixture any build may have written onto the current schema before it is parsed. */
@@ -447,8 +476,9 @@ export function loadDmxLight(
   raw: unknown,
   path: string,
   report: FixtureFaultReport,
+  mintId?: LightIdMint,
 ): DmxLight | null {
-  return parseDmxLight(migrateStored(raw), path, report)
+  return parseDmxLight(migrateStored(raw), path, report, mintId)
 }
 
 /**
