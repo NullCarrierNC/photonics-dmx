@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import * as realFs from 'fs'
+import * as path from 'path'
 import { EFFECTS } from '../../../shared/ipcChannels'
 
 type DialogResult = { canceled: boolean; filePaths?: string[]; filePath?: string }
@@ -141,6 +143,23 @@ describe('setupEffectHandlers', () => {
       sourceBasename: 'fx.json',
       mode: 'yarg',
     })
+  })
+
+  it('imports an effect file an older build wrote, brought onto the current rules', async () => {
+    const older = realFs.readFileSync(
+      path.join(__dirname, '../../../photonics-dmx/tests/historical/f3f851db/my-effects.json'),
+      'utf-8',
+    )
+    mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/picked/my.json'] })
+    mockReadFile.mockResolvedValue(older)
+
+    const result = await call(EFFECTS.IMPORT_PICK)
+
+    expect(result).toMatchObject({ success: true, mode: 'yarg' })
+    const names = (
+      result as { content: { effects: { variables?: { name: string }[] }[] } }
+    ).content.effects.flatMap((effect) => (effect.variables ?? []).map((v) => v.name))
+    expect(names).toContain('beat_count')
   })
 
   it('answers a cancelled import and refuses a file that is not JSON', async () => {

@@ -1043,6 +1043,29 @@ describe('Node cue validation', () => {
       expect(validateNodeCueFile(withVariable('light-array', initialValue)).valid).toBe(false)
     })
 
+    it.each([
+      ['color', 'mauve'],
+      ['color', 5],
+      ['boolean', 1],
+      ['boolean', 'true'],
+      ['number', 'abc'],
+      ['number', true],
+      ['string', true],
+    ])('rejects a %s variable that starts as %p', (type, initialValue) => {
+      expect(validateNodeCueFile(withVariable(type, initialValue)).valid).toBe(false)
+    })
+
+    it.each([
+      ['color', 'amber'],
+      ['boolean', false],
+      ['number', 2.5],
+      ['string', 'front'],
+      ['cue-type', 'Default'],
+      ['event', 'beat'],
+    ])('accepts a %s variable that starts as %p', (type, initialValue) => {
+      expect(validateNodeCueFile(withVariable(type, initialValue)).valid).toBe(true)
+    })
+
     it.each(['number', 'boolean', 'string', 'color', 'cue-type', 'event'])(
       'rejects an array initial value on %s variables',
       (type) => {

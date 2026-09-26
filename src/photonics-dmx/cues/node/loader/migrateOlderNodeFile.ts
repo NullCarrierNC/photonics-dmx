@@ -1,10 +1,16 @@
 /**
  * Brings a parsed cue or effect file that an older build wrote onto what this build accepts, before
- * validation: a retired blend mode reads as replace, an unknown easing as the default, and a variable
- * name the editor once accepted is renamed with every use of it. Each change becomes a note.
+ * validation: a retired blend mode reads as replace, an unknown easing as the default, a variable name
+ * the editor once accepted is renamed with every use of it, and an initial value takes its type.
  */
-import { isVariableName } from '../../types/nodeCueTypes'
-import { DEFAULT_EASING, literalIssue } from '../cueValueRules'
+import { VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
+import type { VariableType } from '../../types/nodeCueTypes'
+import {
+  DEFAULT_EASING,
+  initialValueAsRead,
+  initialValueIssue,
+  literalIssue,
+} from '../cueValueRules'
 
 type JsonObject = Record<string, unknown>
 
@@ -125,6 +131,26 @@ function declarationsOf(file: JsonObject, graphs: readonly JsonObject[]): JsonOb
   return lists.flatMap((list) => (Array.isArray(list) ? list.filter(isObject) : []))
 }
 
+const isVariableType = (value: unknown): value is VariableType =>
+  (VARIABLE_TYPES as readonly unknown[]).includes(value)
+
+/**
+ * An initial value its variable's type cannot hold is read by the runtime as something else, so it
+ * is stored as what the runtime reads: an unknown colour as blue, an unreadable number as 0.
+ */
+function conformInitialValues(declarations: readonly JsonObject[]): string | null {
+  const changed: string[] = []
+  for (const declaration of declarations) {
+    const { type, initialValue, name } = declaration
+    if (!isVariableType(type) || initialValueIssue(type, initialValue) === null) continue
+    declaration.initialValue = initialValueAsRead(type, initialValue)
+    changed.push(`'${String(name)}' is now ${JSON.stringify(declaration.initialValue)}`)
+  }
+  return changed.length > 0
+    ? `Initial values their type cannot hold now hold what the cue reads: ${changed.join(', ')}.`
+    : null
+}
+
 /** Renames every variable use under `node`: variable value sources and logic node name fields. */
 function renameUses(node: unknown, renames: ReadonlyMap<string, string>): void {
   if (Array.isArray(node)) {
@@ -212,5 +238,6 @@ export function migrateOlderNodeFile(file: unknown): string[] {
     retireBlendModes(graphs),
     replaceUnknownEasings(graphs),
     renameVariables(file, graphs),
+    conformInitialValues(declarationsOf(file, graphs)),
   ].filter((note): note is string => note !== null)
 }

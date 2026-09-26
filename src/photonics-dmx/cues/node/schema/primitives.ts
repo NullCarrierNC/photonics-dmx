@@ -218,8 +218,8 @@ export const variableDefinitionSchema = {
     isParameter: { type: 'boolean', nullable: true },
     validValues: { type: 'array', items: { type: 'string' }, nullable: true },
   },
-  // Only an array variable starts as an array. A colour array starts as known colours, and a light
-  // array starts empty.
+  // Each type starts as a value of that type, the same rule the editor applies before saving. An
+  // older file that breaks it is brought onto it as it loads.
   allOf: [
     {
       if: { properties: { type: { const: 'color-array' } } },
@@ -234,8 +234,20 @@ export const variableDefinitionSchema = {
       then: { properties: { initialValue: { type: 'array', maxItems: 0 } } },
     },
     {
-      if: { properties: { type: { enum: ['color-array', 'light-array'] } } },
-      else: { properties: { initialValue: { type: ['number', 'boolean', 'string'] } } },
+      if: { properties: { type: { const: 'color' } } },
+      then: { properties: { initialValue: { type: 'string', enum: COLOR_OPTIONS } } },
+    },
+    {
+      if: { properties: { type: { const: 'number' } } },
+      then: { properties: { initialValue: { type: 'number' } } },
+    },
+    {
+      if: { properties: { type: { const: 'boolean' } } },
+      then: { properties: { initialValue: { type: 'boolean' } } },
+    },
+    {
+      if: { properties: { type: { enum: ['string', 'cue-type', 'event'] } } },
+      then: { properties: { initialValue: { type: 'string' } } },
     },
   ],
 } as unknown as JSONSchemaType<VariableDefinition>

@@ -323,3 +323,42 @@ export function raiserParameterIssue(
   }
   return null
 }
+
+/** An initial value as a variable of `type` reads it, which is the value a file should hold. */
+export function initialValueAsRead(type: VariableType, raw: unknown): unknown {
+  switch (type) {
+    case 'number': {
+      if (typeof raw === 'boolean') return raw ? 1 : 0
+      const n = typeof raw === 'string' ? parseFloat(raw) : raw
+      return typeof n === 'number' && Number.isFinite(n) ? n : 0
+    }
+    case 'boolean':
+      return raw === true || raw === 'true'
+    case 'color':
+      return isColor(raw) ? raw : 'blue'
+    case 'color-array':
+      return Array.isArray(raw) ? raw.map((entry) => (isColor(entry) ? entry : 'blue')) : []
+    case 'light-array':
+      return []
+    default:
+      return typeof raw === 'string' ? raw : String(raw)
+  }
+}
+
+/**
+ * Whether a variable of `type` may start as `value`: it must be the value it reads as, so a file
+ * never says one thing while the cue runs another.
+ */
+export function initialValueIssue(type: VariableType, value: unknown): ValueIssue | null {
+  const read = initialValueAsRead(type, value)
+  if (JSON.stringify(read) === JSON.stringify(value)) return null
+  const shown = (v: unknown) => (typeof v === 'string' ? `'${v}'` : JSON.stringify(v))
+  if (type === 'color' || type === 'color-array') {
+    const entries = Array.isArray(value) ? value : [value]
+    const unknown = entries.find((entry) => !isColor(entry))
+    if (unknown !== undefined && (type === 'color' || Array.isArray(value))) {
+      return error(`${shown(unknown)} is not a known Color`)
+    }
+  }
+  return error(`${shown(value)} is not a ${type} value, it reads as ${shown(read)}`)
+}

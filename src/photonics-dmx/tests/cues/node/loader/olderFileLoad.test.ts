@@ -191,6 +191,39 @@ describe('loading cue and effect files older builds wrote', () => {
     })
   })
 
+  describe('with initial values that do not fit their variable type', () => {
+    it('loads every cue and stores each value as the runtime reads it', async () => {
+      const file = userCopyOfAlt1('user-initials')
+      dischordOf(file).variables = [
+        ...(dischordOf(file).variables ?? []),
+        { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['red', 'Bleu'] },
+        { name: 'accent', type: 'color', scope: 'cue', initialValue: 'mauve' },
+        { name: 'armed', type: 'boolean', scope: 'cue', initialValue: 'true' },
+        { name: 'steps', type: 'number', scope: 'cue', initialValue: '4' },
+      ]
+      writeJson(path.join(cuesDir, 'user-initials.json'), file)
+
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-initials')?.cues.size).toBe(24)
+      expect(result.migrations).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/^user-initials\.json: .*'palette'.*'accent'.*'armed'.*'steps'/),
+        ]),
+      )
+      const stored = dischordOf(readJson(path.join(cuesDir, 'user-initials.json'))).variables
+      expect(Object.fromEntries((stored ?? []).map((v) => [v.name, v.initialValue]))).toEqual(
+        expect.objectContaining({
+          palette: ['red', 'blue'],
+          accent: 'blue',
+          armed: true,
+          steps: 4,
+        }),
+      )
+    })
+  })
+
   describe('with a raiser parameter bound to a variable of another type', () => {
     it('keeps a v0.5.5 Dischord raising the core effects this build ships, and warns', async () => {
       writeJson(path.join(cuesDir, 'user-alt1.json'), userCopyOfAlt1('user-alt1'))
