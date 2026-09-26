@@ -14,7 +14,11 @@ import { ipcError, validationRefusal } from './ipcResult'
 import { NODE_CUES } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
-import { validateCueTypesPayload, validateNodeCueSavePayload } from './inputValidation'
+import {
+  validateCueTypesPayload,
+  validateImportPickMode,
+  validateNodeCueSavePayload,
+} from './inputValidation'
 
 const log = createLogger('node-cue-handlers')
 
@@ -133,7 +137,11 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return loader.getAvailableCueTypes(validation.value.mode, validation.value.kind)
   })
 
-  handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: NodeCueMode) => {
+  handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: unknown) => {
+    const tab = validateImportPickMode(preferredMode, ensureLoader(controllerManager).getModes())
+    if (!tab.ok) {
+      return { success: false, error: tab.error }
+    }
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
@@ -156,7 +164,8 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: validation.errors.join(', ') }
     }
 
-    const mode = preferredMode ?? validation.mode
+    // The file lands in its own mode's folder, except on the rb3 tab, which re-stamps it as rb3.
+    const mode: NodeCueMode = tab.value === 'rb3' ? 'rb3' : validation.mode
     return {
       success: true,
       sourceBasename: path.basename(sourcePath),

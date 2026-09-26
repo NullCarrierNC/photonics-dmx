@@ -61,6 +61,7 @@ export interface CueAuthoringInvokeMap {
     response: string[] | IpcErrorResult
   }
   [NODE_CUES.IMPORT_PICK]: {
+    /** The tab the import is picked from. The response's `mode` is the folder it saves into. */
     request: NodeCueMode | undefined
     response:
       | { success: true; sourceBasename: string; mode: NodeCueMode; content: NodeCueFile }
@@ -100,6 +101,7 @@ export interface CueAuthoringInvokeMap {
       | { valid: false; errors: string[] }
   }
   [EFFECTS.IMPORT_PICK]: {
+    /** The tab the import is picked from. The response's `mode` is the folder it saves into. */
     request: EffectMode | undefined
     response:
       | { success: true; sourceBasename: string; mode: EffectMode; content: EffectFile }

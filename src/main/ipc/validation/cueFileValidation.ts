@@ -90,3 +90,14 @@ export function validateCueTypesPayload(
   }
   return { ok: true, value: { mode: mode.value, kind: kind.value } }
 }
+
+/** The tab an import is picked from: absent, or one of the modes the loader offers. */
+export function validateImportPickMode<Mode extends string>(
+  value: unknown,
+  modes: readonly Mode[],
+): ValidationResult<Mode | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined }
+  }
+  return validateStringUnion(value, modes, 'mode')
+}
