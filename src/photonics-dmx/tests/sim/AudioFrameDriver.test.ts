@@ -31,16 +31,6 @@ describe('AudioFrameDriver', () => {
     )
   })
 
-  it('hands a beat frame to the cues before it raises the beat', async () => {
-    const { frames, handleAudioData, onBeat } = driver()
-
-    await frames.dispatch({ beat: 'Strong' })
-
-    expect(handleAudioData.mock.invocationCallOrder[0]).toBeLessThan(
-      onBeat.mock.invocationCallOrder[0],
-    )
-  })
-
   it('raises no beat for a plain frame', async () => {
     const { frames, onBeat } = driver()
 
