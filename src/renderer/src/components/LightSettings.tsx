@@ -17,6 +17,7 @@ import {
 import { isStorableBrightnessScale } from '../../../photonics-dmx/helpers/brightnessScaling'
 import { extraChannelDisplayLabel } from './lightChannelDisplay'
 import { withChannelNumber, withFixtureType, withStrobeChannelOption } from './fixtureTemplateEdits'
+import { DraftNumberField } from './controls/DraftField'
 
 function isFixtureConfigKey(name: string): name is keyof FixtureConfig {
   return name in DEFAULT_MOVING_HEAD_FIXTURE_CONFIG
@@ -105,13 +106,6 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     setCurrentLight(withStrobeChannelOption(currentLight, e.target.checked))
   }
 
-  /** Clamps to 0-100; anything unreadable reads as unscaled. */
-  const parseScalePercent = (raw: string): number => {
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed)) return DEFAULT_BRIGHTNESS_SCALE_PERCENT
-    return Math.max(0, Math.min(100, Math.round(parsed)))
-  }
-
   const handleScalingToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked
     setScalingRevealed(checked)
@@ -128,8 +122,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     setCurrentLight(next)
   }
 
-  const handleBaseScaleChange = (key: keyof BrightnessScaling, raw: string) => {
-    const percent = parseScalePercent(raw)
+  const handleBaseScaleChange = (key: keyof BrightnessScaling, percent: number) => {
     const nextScaling: BrightnessScaling = { ...currentLight.brightnessScaling }
     // 100 is never stored; absence is how every layer spells "unscaled".
     if (isStorableBrightnessScale(percent)) nextScaling[key] = percent
@@ -141,8 +134,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     setCurrentLight(next)
   }
 
-  const handleExtraScaleChange = (index: number, raw: string) => {
-    const percent = parseScalePercent(raw)
+  const handleExtraScaleChange = (index: number, percent: number) => {
     const nextExtras = (currentLight.extraChannels ?? []).map((ec, i) => {
       if (i !== index) return ec
       const { scale: _scale, ...rest } = ec
@@ -250,13 +242,12 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
                 className="text-sm w-1/3 text-gray-700 dark:text-gray-300">
                 {label}:
               </label>
-              <input
+              <DraftNumberField
                 id={`brightness-scale-${key}`}
-                type="number"
                 min={0}
                 max={100}
                 value={currentLight.brightnessScaling?.[key] ?? DEFAULT_BRIGHTNESS_SCALE_PERCENT}
-                onChange={(e) => handleBaseScaleChange(key, e.target.value)}
+                onCommit={(percent) => handleBaseScaleChange(key, percent)}
                 className="p-2 border border-gray-300 rounded w-[100px] text-black"
               />
               <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
@@ -271,13 +262,12 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
                   className="text-sm w-1/3 text-gray-700 dark:text-gray-300">
                   {label}:
                 </label>
-                <input
+                <DraftNumberField
                   id={`brightness-scale-extra-${index}`}
-                  type="number"
                   min={0}
                   max={100}
                   value={extra.scale ?? DEFAULT_BRIGHTNESS_SCALE_PERCENT}
-                  onChange={(e) => handleExtraScaleChange(index, e.target.value)}
+                  onCommit={(percent) => handleExtraScaleChange(index, percent)}
                   className="p-2 border border-gray-300 rounded w-[100px] text-black"
                 />
                 <span className="text-sm text-gray-600 dark:text-gray-400">%</span>

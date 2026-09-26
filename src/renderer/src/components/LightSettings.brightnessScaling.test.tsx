@@ -81,9 +81,11 @@ describe('LightSettings brightness scaling', () => {
     fireEvent.click(toggle())
 
     fireEvent.change(scaleInput('Green'), { target: { value: '80' } })
+    fireEvent.blur(scaleInput('Green'))
     expect(latest().brightnessScaling).toEqual({ green: 80 })
 
     fireEvent.change(scaleInput('Green'), { target: { value: '100' } })
+    fireEvent.blur(scaleInput('Green'))
     expect('brightnessScaling' in latest()).toBe(false)
   })
 
@@ -92,10 +94,33 @@ describe('LightSettings brightness scaling', () => {
     fireEvent.click(toggle())
 
     fireEvent.change(scaleInput('Red'), { target: { value: '250' } })
+    fireEvent.blur(scaleInput('Red'))
     expect('brightnessScaling' in latest()).toBe(false) // clamped to 100, which is never stored
 
     fireEvent.change(scaleInput('Red'), { target: { value: '-40' } })
+    fireEvent.blur(scaleInput('Red'))
     expect(latest().brightnessScaling).toEqual({ red: 0 })
+  })
+
+  it('keeps the stored percent when a colour box is emptied', () => {
+    const { latest } = renderEditor(fixture({ brightnessScaling: { green: 80 } }))
+
+    fireEvent.change(scaleInput('Green'), { target: { value: '' } })
+    fireEvent.blur(scaleInput('Green'))
+
+    expect(latest().brightnessScaling).toEqual({ green: 80 })
+    expect(scaleInput('Green').value).toBe('80')
+  })
+
+  it('keeps the stored percent when an extra channel box is emptied', () => {
+    const { latest } = renderEditor(
+      fixture({ extraChannels: [{ type: 'amber', channel: 5, scale: 60 }] }),
+    )
+
+    fireEvent.change(screen.getByLabelText('Amber:'), { target: { value: '' } })
+    fireEvent.blur(screen.getByLabelText('Amber:'))
+
+    expect(latest().extraChannels).toEqual([{ type: 'amber', channel: 5, scale: 60 }])
   })
 
   it('offers a row per colour extra and none for a fixed channel', () => {
@@ -108,6 +133,7 @@ describe('LightSettings brightness scaling', () => {
 
     expect(screen.queryByLabelText('Fixed value:')).toBeNull()
     fireEvent.change(screen.getByLabelText('Amber:'), { target: { value: '60' } })
+    fireEvent.blur(screen.getByLabelText('Amber:'))
     expect(latest().extraChannels).toEqual([
       { type: 'amber', channel: 5, scale: 60 },
       { type: 'fixed', channel: 6, value: 200 },
