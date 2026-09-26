@@ -121,7 +121,10 @@ describe('an uncaught exception while the DMX console is open', () => {
     manager.getConsoleModeController().sendConsoleDmx({ 1: 255, 4: 255 })
     await run(3)
 
-    expect(reopened.success).toBe(false)
+    expect(reopened).toEqual({
+      success: false,
+      error: expect.stringMatching(/stopped after an error.*Retry/),
+    })
     expect(universe[1]).toBe(0)
   })
 })

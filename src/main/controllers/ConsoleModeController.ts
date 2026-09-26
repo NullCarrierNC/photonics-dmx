@@ -22,8 +22,17 @@ type ListenerChannelSnapshot = { yarg: boolean; rb3: boolean }
 type ConsoleListenerSnapshot = { yarg: boolean; rb3: boolean; audio: boolean }
 
 /** The console page's answer when the controllers are between phases and cannot take the wire. */
-export const CONSOLE_UNAVAILABLE_MESSAGE =
+const CONSOLE_UNAVAILABLE_MESSAGE =
   'The lighting controllers are restarting or shutting down. Try the console again in a moment.'
+
+/**
+ * Why a console entry that has brought the graph up cannot open in `phase`, or null when it can.
+ * A graph that is up and `failed` holds an uncaught fault, which only a restart clears.
+ */
+export function consoleEntryRefusal(phase: LifecyclePhase): string | null {
+  if (phase === 'running' || phase === 'consoleMode') return null
+  return phase === 'failed' ? FAULT_HELD_MESSAGE : CONSOLE_UNAVAILABLE_MESSAGE
+}
 
 export interface ConsoleModeControllerDeps {
   getConfig: () => ConfigurationManager

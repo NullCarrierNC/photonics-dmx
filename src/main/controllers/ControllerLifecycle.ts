@@ -20,7 +20,7 @@ export class LifecycleAbortedError extends Error {
  * an uncaught fault is held.
  */
 export const FAULT_HELD_MESSAGE =
-  'The lighting controllers stopped after an error. Restart them first.'
+  'The lighting controllers stopped after an error. Press Retry on the banner to restart them.'
 
 /**
  * The transitions each phase may move to. A transition outside this table is still performed (the

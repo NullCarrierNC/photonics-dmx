@@ -13,6 +13,7 @@ jest.mock('../../utils/windowUtils', () => ({
 }))
 
 import { ControllerManager } from '../../controllers/ControllerManager'
+import { FAULT_HELD_MESSAGE } from '../../controllers/ControllerLifecycle'
 import {
   listenerStub,
   restartGraph,
@@ -243,7 +244,7 @@ describe('the uncaught-fault hold against work already under way', () => {
 
       expect(manager.getLifecyclePhase()).toBe('failed')
       expect(on.yarg).toBe(false)
-      expect(refusal).toMatch(/restart them first/i)
+      expect(refusal).toBe(FAULT_HELD_MESSAGE)
       await expect(manager.enableYarg()).rejects.toThrow(/restart/i)
     },
   )
@@ -271,7 +272,7 @@ describe('the uncaught-fault hold against work already under way', () => {
 
     expect(manager.getLifecyclePhase()).toBe('failed')
     expect(on.yarg).toBe(false)
-    expect(refusal).toMatch(/restart them first/i)
+    expect(refusal).toBe(FAULT_HELD_MESSAGE)
   })
 
   it('lifts the hold for a restart asked for after the fault that joins one still queued', async () => {
