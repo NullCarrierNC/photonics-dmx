@@ -18,6 +18,7 @@ describe('migrateOlderNodeFile', () => {
         {
           id: 'c1',
           name: 'One',
+          kind: 'lighting',
           variables: [variable('beat-count'), variable('beat_count'), variable('2x')],
           nodes: {
             events: [],
@@ -117,6 +118,22 @@ describe('migrateOlderNodeFile', () => {
       { source: 'variable', name: 'curve' },
     ])
     expect(notes).toEqual(["Unknown easing 'sin-out', 'bounce' in 'Swell' now reads sinInOut."])
+  })
+
+  it('reads a cue stored with no kind as a lighting cue', () => {
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        { id: 'c1', name: 'One', cueType: 'Intro', nodes: {} },
+        { id: 'c2', name: 'Two', kind: 'motion', cueType: 'Sweep', nodes: {} },
+        { id: 'c3', name: 'Three', kind: 'lighting', cueType: 'Verse', nodes: {} },
+      ],
+    }
+
+    const notes = migrateOlderNodeFile(file)
+
+    expect(file.cues.map((cue) => cue.kind)).toEqual(['lighting', 'motion', 'lighting'])
+    expect(notes).toEqual(['Cues stored with no kind now read as lighting cues.'])
   })
 
   it('changes nothing in a file already on the current rules', () => {

@@ -1,7 +1,8 @@
 /**
- * Brings a parsed cue or effect file that an older build wrote onto what this build accepts, before
- * validation: a retired blend mode reads as replace, an unknown easing as the default, a variable name
- * the editor once accepted is renamed with every use of it, and an initial value takes its type.
+ * Brings a parsed cue or effect file an older build wrote onto what this build accepts, before
+ * validation: a cue with no kind reads as lighting, a retired blend mode as replace, an unknown
+ * easing as the default, a variable name the editor once accepted is renamed with every use of
+ * it, and an initial value takes its type.
  */
 import { VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { VariableType } from '../../types/nodeCueTypes'
@@ -63,6 +64,14 @@ function actionsOf(graphs: readonly JsonObject[]): { action: JsonObject; graph: 
       ? actions.filter(isObject).map((action) => ({ action, graph: labelOf(graph) }))
       : []
   })
+}
+
+/** Builds before v0.5.3 stored a cue with no kind, and every cue they had was a lighting cue. */
+function defaultCueKinds(file: JsonObject): string | null {
+  const cues = Array.isArray(file.cues) ? file.cues.filter(isObject) : []
+  const changed = cues.filter((cue) => !('kind' in cue))
+  for (const cue of changed) cue.kind = 'lighting'
+  return changed.length > 0 ? 'Cues stored with no kind now read as lighting cues.' : null
 }
 
 function retireBlendModes(graphs: readonly JsonObject[]): string | null {
@@ -235,6 +244,7 @@ export function migrateOlderNodeFile(file: unknown): string[] {
   if (!isObject(file)) return []
   const graphs = graphsOf(file)
   return [
+    defaultCueKinds(file),
     retireBlendModes(graphs),
     replaceUnknownEasings(graphs),
     renameVariables(file, graphs),
