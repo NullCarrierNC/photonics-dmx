@@ -351,6 +351,16 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     this.onIdleCallback = callback
   }
 
+  /**
+   * Cancel every run as {@link cancelAll} with `skipEffectRemoval` does, and return the effects
+   * left showing, by name and layer, for the caller to remove once their lights are taken over.
+   */
+  public cancelLeavingEffects(): Map<string, number> {
+    const showing = new Map(this.submittedEffects)
+    this.cancelAll(true)
+    return showing
+  }
+
   /** Clear effect-only idle/pending state on cancel. */
   protected override onCancelFinish(): void {
     this.pendingCallbackEffects.clear()
