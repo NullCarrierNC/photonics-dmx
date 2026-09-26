@@ -20,7 +20,7 @@ const getModeDescription = (mode: string): string => {
 
 const StageKitRb3EnhancedSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
-  const mode = prefs.rb3Prefs?.processingMode ?? 'direct'
+  const mode = prefs.rb3Prefs?.processingMode ?? 'cue'
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleModeChange = async (processingMode: ProcessingMode) => {

@@ -173,10 +173,10 @@ export interface AppPreferences {
 
 /**
  * Normalizes a persisted RB3 processing mode. Prefs loaded from disk bypass IPC validation, so
- * anything other than the literal 'cue' (missing, null, or garbage) runs direct mode.
+ * anything other than the literal 'direct' (missing, null, or garbage) runs cue mode.
  */
 export function normalizeRb3ProcessingMode(value: unknown): ProcessingMode {
-  return value === 'cue' ? 'cue' : 'direct'
+  return value === 'direct' ? 'direct' : 'cue'
 }
 
 /**
@@ -279,7 +279,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
     yargPriority: 'random',
   },
   rb3Prefs: {
-    processingMode: 'direct',
+    processingMode: 'cue',
   },
   dmxSettingsPrefs: {
     artNetExpanded: false,

@@ -179,7 +179,7 @@ const Preferences: React.FC = () => {
             <StageKitRb3EnhancedSettings />
             {/* The cue-group pickers only apply to RB3 cue mode; direct mode drives the rig
                 straight from LED state with no cue selection. */}
-            {prefs.rb3Prefs?.processingMode === 'cue' && (
+            {prefs.rb3Prefs?.processingMode !== 'direct' && (
               <>
                 <Rb3EnabledCueGroups />
                 {motionMasterEnabled && <MotionEnabledCueGroups platform="rb3" />}
