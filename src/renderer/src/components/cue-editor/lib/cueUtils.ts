@@ -2,7 +2,9 @@ import type {
   AudioEventNode,
   AudioNodeCueDefinition,
   EffectFile,
+  EffectMode,
   NodeCueFile,
+  NodeCueMode,
   ValueSource,
   NetNodeCueDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -75,6 +77,10 @@ export const groupIdsLower = (summaries: readonly { groupId: string }[]): Set<st
 /** The basenames of some files, lowercased for a case-insensitive name check. */
 export const basenamesLower = (summaries: readonly { path: string }[]): Set<string> =>
   new Set(summaries.map((f) => fileBasename(f.path).toLowerCase()))
+
+/** The effect library a platform's cues use. RB3 cues reference the YARG effects. */
+export const effectModeFor = (mode: NodeCueMode): EffectMode =>
+  mode === 'audio' ? 'audio' : 'yarg'
 
 // Helper to display ValueSource as text
 const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = ''): string => {

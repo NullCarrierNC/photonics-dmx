@@ -18,6 +18,7 @@ import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import type { UseCueCrudParams } from './useCueCrud'
 import type { EffectFile, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getLastActiveMode, getLastFilePathForMode } from './useLastCueFilePath'
+import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
 
 const cueDoc = (cues?: Array<Record<string, unknown>>): EditorDocument =>
   ({
@@ -160,7 +161,10 @@ const NEW_FILE = {
 }
 
 type CrudOverrides = Partial<
-  Pick<UseCueCrudParams, 'editorDoc' | 'editorMode' | 'selectedCueId' | 'files' | 'effectFiles'>
+  Pick<
+    UseCueCrudParams,
+    'editorDoc' | 'editorMode' | 'mode' | 'selectedCueId' | 'files' | 'effectFiles'
+  >
 >
 
 function renderCrud(overrides: CrudOverrides = {}) {
@@ -170,7 +174,7 @@ function renderCrud(overrides: CrudOverrides = {}) {
     selectedCueId: null,
     setSelectedCueId: jest.fn(),
     setFilename: jest.fn(),
-    mode: 'yarg' as const,
+    mode: 'yarg' as UseCueCrudParams['mode'],
     editorMode: 'cue' as const,
     cueKind: 'lighting' as const,
     files: [],
@@ -386,6 +390,37 @@ describe('useCueCrud additions and effect removal', () => {
     const effects = (lastDoc(crud.setEditorDoc).file as { effects: Array<{ id: string }> }).effects
     expect(effects).toHaveLength(3)
     expect(crud.setSelectedCueId).toHaveBeenCalledWith(effects[2]!.id)
+  })
+
+  it('adds a cue shaped for the open file while the tab shows another platform', () => {
+    const file = createDefaultFile('yarg', 'lighting')
+    const crud = renderCrud({
+      mode: 'audio',
+      editorDoc: { mode: 'cue', path: '/cues/yarg/show.json', file },
+    })
+    act(() => crud.result.current.handleAddCue())
+
+    const doc = lastDoc(crud.setEditorDoc)
+    const added = doc.mode === 'cue' ? doc.file.cues[1] : null
+    expect(doc.file.mode).toBe('yarg')
+    expect(added).toMatchObject({
+      cueType: 'Chorus',
+      nodes: { events: [{ eventType: 'cue-started' }] },
+    })
+    expect(crud.loadCueIntoFlow).toHaveBeenCalledWith(added)
+  })
+
+  it('adds an effect shaped for the open file while the tab shows another platform', () => {
+    const file = createDefaultEffectFile('yarg')
+    const crud = renderCrud({
+      mode: 'audio',
+      editorDoc: { mode: 'effect', path: '/fx/yarg/core.json', file },
+    })
+    act(() => crud.result.current.handleAddEffect())
+
+    const doc = lastDoc(crud.setEditorDoc)
+    const modes = doc.mode === 'effect' ? doc.file.effects.map((effect) => effect.mode) : null
+    expect(modes).toEqual(['yarg', 'yarg'])
   })
 
   it.each([
