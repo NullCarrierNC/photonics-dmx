@@ -452,6 +452,31 @@ export function loadDmxLight(
 }
 
 /**
+ * {@link loadDmxLight} for a rig light whose template, found by its `fixtureId` in `templates`,
+ * owns its fixture type and channel layout. A light stored as another fixture type is read as the
+ * template's type, so its faults name the channels that type keeps and drops.
+ */
+export function rigLightLoader(
+  templates: readonly DmxFixture[],
+): (raw: unknown, path: string, report: FixtureFaultReport) => DmxLight | null {
+  return (raw, path, report) => {
+    const stored = migrateStored(raw)
+    if (!isPlainObject(stored) || !isFixtureType(stored.fixture)) {
+      return parseDmxLight(stored, path, report)
+    }
+    const template = templates.find((t) => t.id !== null && t.id === stored.fixtureId)
+    if (!template || template.fixture === stored.fixture) {
+      return parseDmxLight(stored, path, report)
+    }
+    report(
+      `${path}.fixture '${stored.fixture}' is now its template's '${template.fixture}'`,
+      'reset',
+    )
+    return parseDmxLight({ ...stored, fixture: template.fixture }, path, report)
+  }
+}
+
+/**
  * Parses every entry of a fixture list with `parse`, collecting the faults in `faults`. A list
  * holding a fixture that cannot be parsed fails with that fixture's faults.
  */

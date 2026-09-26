@@ -134,17 +134,21 @@ const noKind = (file: string): string =>
 
 const harmonyEasing = "yarg-alt1.json: Unknown easing 'sin-out' in 'Harmony' now reads sinInOut."
 
-/** A dedicated strobe row the layout editor gave the channels of an RGB template. */
-const strobeRowRepairs = (at: string, withoutStrobeChannel: boolean): string[] => [
-  ...(withoutStrobeChannel ? [`repaired: ${at}.channels.strobeChannel is missing`] : []),
-  `keysDropped: ${['red', 'green', 'blue']
-    .map((channel) => `${at}.channels.${channel} is not a channel of a strobe fixture`)
-    .join(', ')}`,
-]
-
-const inLayout = (reports: string[]): string[] =>
-  reports.map((report) => `lightsLayout.json: ${report}`)
-const inRigs = (reports: string[]): string[] => reports.map((report) => `dmxRigs.json: ${report}`)
+/**
+ * A dedicated strobe row the layout editor gave the channels of an RGB template. The layout reads
+ * it as a strobe light, and the rig as its template's RGB light.
+ */
+const strobeRowRepairs = {
+  layout: (withoutStrobeChannel: boolean): string[] => [
+    ...(withoutStrobeChannel
+      ? ['lightsLayout.json: repaired: strobeLights[0].channels.strobeChannel is missing']
+      : []),
+    `lightsLayout.json: keysDropped: ${['red', 'green', 'blue']
+      .map((channel) => `strobeLights[0].channels.${channel} is not a channel of a strobe fixture`)
+      .join(', ')}`,
+  ],
+  rig: "dmxRigs.json: repaired: rigs[0].config.strobeLights[0].fixture 'strobe' is now its template's 'rgb'",
+}
 
 const PAR = 'PAR: rgb masterDimmer=1 red=2 green=3 blue=4'
 const STROBE = 'Strobe: strobe masterDimmer=1 strobeChannel=2'
@@ -180,10 +184,7 @@ const lightsFromV062 = [
   'back[0] strobe masterDimmer=21 strobeChannel=22',
 ]
 
-/**
- * A dedicated strobe row the layout editor gave an RGB template. The layout reads it as a strobe
- * light, and the rig as its template's RGB light on the channels its master places.
- */
+/** The strobe row of {@link strobeRowRepairs}, with its RGB on the channels its master places. */
 const strobeRow = {
   layout: 'strobe[0] strobe masterDimmer=31 strobeChannel=0',
   rig: 'strobe[0] rgb masterDimmer=31 red=32 green=33 blue=34',
@@ -206,7 +207,7 @@ const EXPECTED: Record<string, Expected> = {
       layout: [...layoutToV042, strobeRow.layout],
       rigs: { 'Default Rig': [...rigToV042, strobeRow.rig] },
     },
-    config: inLayout(strobeRowRepairs('strobeLights[0]', true)),
+    config: strobeRowRepairs.layout(true),
   },
   'v0.0.35-Alpha3': {
     settings: v5Defaults,
@@ -223,10 +224,7 @@ const EXPECTED: Record<string, Expected> = {
       layout: [...layoutToV042, strobeRow.layout],
       rigs: { Stage: [...rigToV042, strobeRow.rig] },
     },
-    config: [
-      ...inLayout(strobeRowRepairs('strobeLights[0]', true)),
-      ...inRigs(strobeRowRepairs('rigs[0].config.strobeLights[0]', true)),
-    ],
+    config: [...strobeRowRepairs.layout(true), strobeRowRepairs.rig],
     cues: [
       noKind('yarg-alt1.json'),
       harmonyEasing,
@@ -274,10 +272,7 @@ const EXPECTED: Record<string, Expected> = {
       rigs: { Stage: [...lightsFromV062, `${strobeRow.rig} strobeChannel=35`] },
     },
     retired: ['audio-motion-fast.json'],
-    config: [
-      ...inLayout(strobeRowRepairs('strobeLights[0]', false)),
-      ...inRigs(strobeRowRepairs('rigs[0].config.strobeLights[0]', false)),
-    ],
+    config: [...strobeRowRepairs.layout(false), strobeRowRepairs.rig],
     cues: [harmonyEasing],
   },
   'v0.7.0-alpha.7': {
