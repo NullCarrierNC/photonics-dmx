@@ -3,6 +3,9 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import { realPathOf } from '../../../helpers/realPath'
+import { createLogger } from '../../../../shared/logger'
+
+const log = createLogger('BaseNodeFileLoader')
 
 /**
  * Shared file-system plumbing for the node-cue and effect loaders.
@@ -160,6 +163,10 @@ export abstract class BaseNodeFileLoader<
       }
 
       const filePath = path.join(dir, file)
+      if (!this.isPathWithinDir(filePath, dir)) {
+        log.warn(`Skipping ${filePath}: it links outside ${dir}.`)
+        continue
+      }
       currentPaths.add(filePath)
       try {
         const summary = await this.loadFile(mode, filePath)
