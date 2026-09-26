@@ -359,12 +359,29 @@ export class ControllerLifecycle {
   }
 
   /**
-   * Run an input enable as a queued op, refused while an uncaught fault is held. An enable that
+   * Run a change that starts something as a queued op, refused once a shutdown has begun, since
+   * the shutdown owns every input and sender from then on. `what` names the change in the refusal.
+   */
+  public runQueuedChange<T>(what: string, op: () => Promise<T>): Promise<T> {
+    return this.runQueuedOp(() => {
+      if (this.isShuttingDown()) {
+        return Promise.reject(
+          new LifecycleAbortedError(
+            `${what} refused: shutdown in progress or already complete (phase=${this.phaseValue})`,
+          ),
+        )
+      }
+      return op()
+    })
+  }
+
+  /**
+   * Run an input enable as a queued change, refused while an uncaught fault is held. An enable that
    * lands after a fault arose is refused too, and the fault response stops the input it started
    * once the op settles.
    */
   public runQueuedEnable<T>(op: () => Promise<T>): Promise<T> {
-    return this.runQueuedOp(async () => {
+    return this.runQueuedChange('Input enable', async () => {
       if (this.faulted) {
         throw new Error(FAULT_HELD_MESSAGE)
       }

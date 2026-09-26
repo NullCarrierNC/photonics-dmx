@@ -10,10 +10,14 @@ jest.mock('../../utils/windowUtils', () => ({
   mainRuntimeBroadcaster: { emit: jest.fn() },
 }))
 
-import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import {
+  LifecycleAbortedError,
+  type ControllerLifecycle,
+} from '../../controllers/ControllerLifecycle'
 import {
   lifecycleAt,
   lifecycleBlockedOn,
+  lifecycleShuttingDownOn,
   listenerStub,
   stubbedManager,
   stubConfig,
@@ -96,5 +100,34 @@ describe('ControllerManager.applyRb3ProcessingMode', () => {
 
     expect(listeners.yargRb3.disableRb3).toHaveBeenCalledTimes(1)
     expect(listeners.yargRb3.enableRb3).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a mode change queued behind a shutdown that failed', async () => {
+    let fail!: (error: Error) => void
+    const teardown = new Promise<void>((_resolve, reject) => {
+      fail = reject
+    })
+    const { manager, listeners } = rb3Manager('direct', 'cue', lifecycleShuttingDownOn(teardown))
+    const rb3 = { on: true, mode: 'direct' }
+    listeners.yargRb3.getIsRb3Enabled.mockImplementation(() => rb3.on)
+    listeners.yargRb3.getRb3Mode.mockImplementation(() => (rb3.on ? rb3.mode : 'none'))
+    listeners.yargRb3.disableRb3.mockImplementation(async () => {
+      rb3.on = false
+    })
+    listeners.yargRb3.enableRb3.mockImplementation(async () => {
+      rb3.on = true
+      rb3.mode = 'cue'
+    })
+
+    const applied = manager.applyRb3ProcessingMode()
+    fail(new Error('loader dispose failed'))
+
+    const refusal = await applied.then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    expect(rb3).toEqual({ on: true, mode: 'direct' })
+    expect(refusal).toBeInstanceOf(LifecycleAbortedError)
   })
 })

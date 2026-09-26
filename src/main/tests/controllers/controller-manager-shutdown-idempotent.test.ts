@@ -16,7 +16,7 @@ import type { ControllerGraph } from '../../controllers/ControllerGraph'
 import type { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import type { ListenerLifecycleController } from '../../controllers/ListenerLifecycleController'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
-import { restartGraph, senderLifecycleStub, stubbedManager } from './lifecycleStub'
+import { listenerStub, restartGraph, senderLifecycleStub, stubbedManager } from './lifecycleStub'
 
 /** Preferences a freshly constructed manager reads while wiring its sub-controllers. */
 function stubConfig(): ConfigurationManager {
@@ -231,4 +231,38 @@ describe('ControllerManager.shutdown with a sender op queued behind it', () => {
     await expect(toggled).rejects.toThrow(LifecycleAbortedError)
     expect([...open]).toEqual([])
   })
+})
+
+describe('ControllerManager.shutdown that fails with an input enable queued behind it', () => {
+  it.each(['enableYarg', 'enableRb3', 'enableAudio'] as const)(
+    'refuses %s and leaves the input off',
+    async (enable) => {
+      const on = { yarg: false, rb3: false, audio: false }
+      const listeners = listenerStub()
+      listeners.yargRb3.enableYarg.mockImplementation(async () => {
+        on.yarg = true
+      })
+      listeners.yargRb3.enableRb3.mockImplementation(async () => {
+        on.rb3 = true
+      })
+      listeners.audio.enableAudio.mockImplementation(async () => {
+        on.audio = true
+      })
+      const graph = restartGraph()
+      jest.mocked(graph.disposeLoaders).mockRejectedValue(new Error('loader dispose failed'))
+      const { manager } = stubbedManager({ graph, listeners })
+
+      const stopping = manager.shutdown()
+      const enabling = manager[enable]()
+
+      await expect(stopping).rejects.toThrow('loader dispose failed')
+      const refusal = await enabling.then(
+        () => null,
+        (error: unknown) => error,
+      )
+
+      expect(on).toEqual({ yarg: false, rb3: false, audio: false })
+      expect(refusal).toBeInstanceOf(LifecycleAbortedError)
+    },
+  )
 })
