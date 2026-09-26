@@ -168,6 +168,23 @@ function actionLiteralFields(action: ActionNode): ActionLiteralField[] {
   ]
 }
 
+/**
+ * Each ruled field of an action that reads a light-array variable as text, which it reads as none.
+ * A light array in the groups field targets its own lights.
+ */
+export function actionLightArrayReads(
+  action: ActionNode,
+  variables: ReadonlyArray<{ name: string; type: string }>,
+): { field: string; issue: ValueIssue }[] {
+  return actionLiteralFields(action).flatMap(({ rule, field, source }) => {
+    if (rule === 'groups' || source?.source !== 'variable') return []
+    const variable = variables.find((v) => v.name === source.name)
+    const issue =
+      variable?.type === 'light-array' ? variableIssue(source.name, 'string', variables) : null
+    return issue ? [{ field, issue }] : []
+  })
+}
+
 /** Each issue the rules find in an action's literals, for a cue of `mode` when it is known. */
 export function actionLiteralIssues(
   action: ActionNode,

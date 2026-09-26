@@ -258,3 +258,102 @@ describe('the built-in array compare check', () => {
     expect(result.valid && result.warnings).toEqual([])
   })
 })
+
+describe('the built-in light-array text check', () => {
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  interface DischordJson {
+    name: string
+    variables?: unknown[]
+    nodes: {
+      actions: { id: string; target: Record<string, unknown> }[]
+      logic?: unknown[]
+    }
+  }
+
+  /** The bundled alt1 library, with its Dischord cue handed to `edit`. */
+  const withDischord = (edit: (cue: DischordJson) => void): Record<string, unknown> => {
+    const file = JSON.parse(fs.readFileSync(path.join(CUE_ROOT, 'yarg', 'yarg-alt1.json'), 'utf8'))
+    edit((file.cues as DischordJson[]).find((c) => c.name === 'Dischord')!)
+    return file
+  }
+  const allLights = { source: 'variable', name: 'allLights' }
+
+  it('warns when an action reads a light-array variable as its filter', () => {
+    const result = validateYargNodeCueFile(
+      withDischord((cue) => {
+        cue.nodes.actions[0].target.filter = allLights
+      }),
+    )
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings).toEqual([
+      "cue 'Dischord': action 'y1-dischord-action-red-on' target.filter: 'allLights' is a light-array variable, and this field takes string.",
+    ])
+  })
+
+  it('warns when a variable node stores a light-array variable as text', () => {
+    const result = validateYargNodeCueFile(
+      withDischord((cue) => {
+        cue.nodes.logic = [
+          ...(cue.nodes.logic ?? []),
+          {
+            id: 'store',
+            type: 'logic',
+            logicType: 'variable',
+            mode: 'set',
+            varName: 'venueSize',
+            valueType: 'string',
+            value: allLights,
+          },
+        ]
+      }),
+    )
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings).toEqual([
+      "cue 'Dischord': variable node 'store': 'allLights' is a light-array variable, and this field takes string.",
+    ])
+  })
+
+  it('warns when a groups variable starts as text naming no group', () => {
+    const result = validateYargNodeCueFile(
+      withDischord((cue) => {
+        cue.variables = [
+          ...(cue.variables ?? []),
+          { name: 'aim', type: 'string', scope: 'cue', initialValue: 'fromt' },
+        ]
+        cue.nodes.actions[0].target.groups = { source: 'variable', name: 'aim' }
+      }),
+    )
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings).toEqual([
+      "cue 'Dischord': action 'y1-dischord-action-red-on' target.groups reads 'aim', which can hold 'fromt': 'fromt' is not a known LocationGroup.",
+    ])
+  })
+
+  it('leaves a light-array variable in the groups field alone', () => {
+    const result = validateYargNodeCueFile(
+      withDischord((cue) => {
+        cue.nodes.actions[0].target.groups = allLights
+      }),
+    )
+
+    expect(result.valid && result.warnings).toEqual([])
+  })
+
+  it('leaves every bundled library clean', () => {
+    for (const [mode, validate] of [
+      ['yarg', validateYargNodeCueFile],
+      ['rb3', validateRb3NodeCueFile],
+      ['audio', validateAudioNodeCueFile],
+    ] as const) {
+      const dir = path.join(CUE_ROOT, mode)
+      for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+        const result = validate(JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')))
+        expect({ name, warnings: result.valid && result.warnings }).toEqual({ name, warnings: [] })
+      }
+    }
+  })
+})

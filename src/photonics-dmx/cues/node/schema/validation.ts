@@ -27,6 +27,7 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 import { getCueDomain } from '../../domains'
 import { checkContinuousCueCalledWaits } from './audioEventPolicyCheck'
+import { checkLightArrayAndGroupTexts } from './lightArrayTextCheck'
 import { actionLiteralIssues, compareOperandIssue } from '../cueValueRules'
 
 export type { StructuredValidationError } from './helpers'
@@ -91,6 +92,7 @@ export function __resetCueSemanticChecksForTests(): void {
   registerCueSemanticCheck(checkContinuousCueCalledWaits)
   registerCueSemanticCheck(checkActionLiteralWarnings)
   registerCueSemanticCheck(checkArrayCompares)
+  registerCueSemanticCheck(checkLightArrayAndGroupTexts)
 }
 
 /**
@@ -154,6 +156,7 @@ registerCueSemanticCheck(checkEventVocabulary)
 registerCueSemanticCheck(checkContinuousCueCalledWaits)
 registerCueSemanticCheck(checkActionLiteralWarnings)
 registerCueSemanticCheck(checkArrayCompares)
+registerCueSemanticCheck(checkLightArrayAndGroupTexts)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,
