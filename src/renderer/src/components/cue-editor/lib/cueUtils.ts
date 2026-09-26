@@ -9,7 +9,6 @@ import type {
 import type { NetEventType } from '../../../../../photonics-dmx/types'
 import { AUDIO_EVENT_OPTIONS, YARG_EVENT_OPTIONS } from './options'
 import { createId } from './cueDefaults'
-import type { EditorDocument } from './types'
 
 /**
  * Run `update` over the cue with id `cueId`, keeping the file's own net-or-audio shape.
@@ -76,13 +75,6 @@ export const groupIdsLower = (summaries: readonly { groupId: string }[]): Set<st
 /** The basenames of some files, lowercased for a case-insensitive name check. */
 export const basenamesLower = (summaries: readonly { path: string }[]): Set<string> =>
   new Set(summaries.map((f) => fileBasename(f.path).toLowerCase()))
-
-/** The document as the user's own file at `path`, which a newer shipped version never replaces. */
-export function savedAsUserFile(doc: EditorDocument, path: string): EditorDocument {
-  return doc.mode === 'cue'
-    ? { mode: 'cue', file: { ...doc.file, bundled: false }, path }
-    : { mode: 'effect', file: { ...doc.file, bundled: false }, path }
-}
 
 // Helper to display ValueSource as text
 const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = ''): string => {

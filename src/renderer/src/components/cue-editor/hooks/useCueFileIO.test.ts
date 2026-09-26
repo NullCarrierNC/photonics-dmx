@@ -19,6 +19,7 @@ import { useCueFileIO, type UseCueFileIOParams } from './useCueFileIO'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
+import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
 
 const fileSummary = (): NodeCueFileSummary =>
   ({
@@ -317,7 +318,6 @@ describe('useCueFileIO handleSave', () => {
         mode: docMode,
         path: '/cues/motion-cues.json',
         file: expect.objectContaining({
-          bundled: false,
           cues: expect.arrayContaining([expect.objectContaining({ id: 'cue-new' })]),
         }),
       })
@@ -425,7 +425,7 @@ describe('useCueFileIO handleSave', () => {
     ['cue', 'saveNodeCueFile', 'validateNodeCue'],
     ['effect', 'saveEffectFile', 'validateEffect'],
   ] as const)(
-    "saves a shipped %s file as the user's own and keeps it clean",
+    'keeps the shipped marker when a %s file saves in place',
     async (docMode, save, validate) => {
       jest.mocked(ipcApi[validate]).mockResolvedValue({ valid: true, errors: [] } as never)
       jest
@@ -442,12 +442,53 @@ describe('useCueFileIO handleSave', () => {
         await rendered.result.current.handleSave()
       })
 
-      const sent = jest.mocked(ipcApi[save]).mock.calls[0][0] as { content: { bundled?: boolean } }
-      expect(sent.content.bundled).toBe(false)
+      const sent = jest.mocked(ipcApi[save]).mock.calls[0][0] as { content: object }
+      expect(sent.content).toMatchObject({ bundled: true, cueVersion: 4 })
       expect(setEditorDoc).toHaveBeenLastCalledWith(
-        expect.objectContaining({ file: expect.objectContaining({ bundled: false }) }),
+        expect.objectContaining({ file: expect.objectContaining({ bundled: true }) }),
       )
       expect(setIsDirty).toHaveBeenLastCalledWith(false)
+    },
+  )
+
+  it.each([
+    [
+      'cue',
+      'saveNodeCueFile',
+      'validateNodeCue',
+      (): EditorDocument => ({
+        mode: 'cue',
+        path: null,
+        file: createDefaultFile('yarg', 'lighting'),
+      }),
+    ],
+    [
+      'effect',
+      'saveEffectFile',
+      'validateEffect',
+      (): EditorDocument => ({ mode: 'effect', path: null, file: createDefaultEffectFile('yarg') }),
+    ],
+  ] as const)(
+    "saves a new %s document as the user's file",
+    async (_mode, save, validate, create) => {
+      jest.mocked(ipcApi[validate]).mockResolvedValue({ valid: true, errors: [] } as never)
+      jest
+        .mocked(ipcApi[save])
+        .mockResolvedValue({ success: true, path: '/cues/new.json' } as never)
+      const doc = create()
+      const { rendered } = setup({
+        editorDoc: doc,
+        filename: `${doc.file.group.id}.json`,
+        getUpdatedDocument: () => doc,
+      })
+
+      await act(async () => {
+        await rendered.result.current.handleSave()
+      })
+
+      const [sent] = jest.mocked(ipcApi[save]).mock.calls[0]
+      expect(sent.createOnly).toBe(true)
+      expect(sent.content).toMatchObject({ bundled: false })
     },
   )
 

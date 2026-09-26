@@ -14,7 +14,8 @@ import { isCueTypeSelectable, suggestNonConflictingGroupId } from '../lib/cueUti
 import type { EditorDocument } from '../lib/types'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
-import type { NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EffectFile, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { createDefaultEffectFile } from '../lib/cueDefaults'
 import { useCueFiles } from './useCueFiles'
 import {
   emitIpc,
@@ -264,6 +265,32 @@ describe('useCueFiles import', () => {
     expect(saved.content).not.toHaveProperty('cueVersion')
     expect(view.onSaveSuccess).toHaveBeenCalledWith('Cue imported: new.json')
     expect(view.result.current.pendingImport).toBeNull()
+  })
+
+  it('saves an effect import without bundled markers', async () => {
+    const shipped: EffectFile = { ...createDefaultEffectFile('yarg'), bundled: true, cueVersion: 3 }
+    setLastActiveMode('yarg-effect')
+    jest.mocked(ipcApi.pickEffectImportFile).mockResolvedValue({
+      success: true,
+      sourceBasename: 'core.json',
+      mode: 'yarg',
+      content: shipped,
+    })
+    jest
+      .mocked(ipcApi.validateEffect)
+      .mockResolvedValue({ valid: true, data: shipped, errors: [], mode: 'yarg' })
+    jest
+      .mocked(ipcApi.saveEffectFile)
+      .mockResolvedValue({ success: true, path: '/fx/yarg/mine.json' })
+    const view = await renderLoaded()
+    await run(view, (h) => h.handleImport())
+    await run(view, (h) => h.commitPendingImport('mine.json', 'mine'))
+
+    const saved = jest.mocked(ipcApi.saveEffectFile).mock.calls[0]![0]
+    expect(saved.createOnly).toBe(true)
+    expect(saved.content.group.id).toBe('mine')
+    expect(saved.content).not.toHaveProperty('bundled')
+    expect(saved.content).not.toHaveProperty('cueVersion')
   })
 
   it('keeps an import that fails validation and says why', async () => {
