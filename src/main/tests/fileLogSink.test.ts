@@ -204,6 +204,31 @@ describe('createFileLogSink', () => {
     expect(written.length).toBeLessThan(1200)
   })
 
+  it('says on the console that only errors are kept past the cap, then that they stop too', async () => {
+    const said = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
+    const { sink, close } = createFileLogSink({
+      logsDir: tmpDir,
+      clock: () => t,
+      maxBytesPerDay: 200,
+      errorReserveBytes: 400,
+    })
+
+    for (let i = 0; i < 20; i++) {
+      sink(entry({ message: `chatter ${i} with enough text to pass the cap quickly` }))
+    }
+    const atCap = said.mock.calls.map((c) => String(c[0]))
+    for (let i = 0; i < 40; i++) {
+      sink(entry({ level: 'error', message: `error ${i} with enough text to spend the reserve` }))
+    }
+    await close()
+    const afterReserve = said.mock.calls.map((c) => String(c[0]))
+    said.mockRestore()
+
+    expect(atCap).toEqual([expect.stringMatching(/keeping only errors/)])
+    expect(afterReserve).toEqual([atCap[0], expect.stringMatching(/dropping every further line/)])
+  })
+
   describe('after a write stream error', () => {
     const createWriteStreamMock = jest.mocked(fs.createWriteStream)
 
