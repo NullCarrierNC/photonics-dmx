@@ -181,6 +181,18 @@ describe('CueConsistencySettings consistency window', () => {
     expect(mocks.setCueConsistencyWindow).toHaveBeenCalledWith(25000)
   })
 
+  it('keeps the saved window when the field is cleared', async () => {
+    await renderPanel()
+
+    fireEvent.change(control('consistency-window'), { target: { value: '' } })
+    await act(async () => {
+      fireEvent.blur(control('consistency-window'))
+    })
+
+    expect(mocks.setCueConsistencyWindow).not.toHaveBeenCalled()
+    expect(control<HTMLInputElement>('consistency-window').value).toBe('10000')
+  })
+
   it.each([
     ['above the ceiling', '999999', 300000],
     ['below the floor', '-5', 0],

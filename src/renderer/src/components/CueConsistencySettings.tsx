@@ -248,17 +248,6 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     })
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0
-    // Only update the local state immediately, don't save on every keystroke
-    setConsistencyWindow(clampCueConsistencyWindowMs(value))
-  }
-
-  /** Saves when the user finishes editing, rather than on every keystroke. */
-  const handleInputBlur = async (): Promise<void> => {
-    await handleConsistencyWindowChange(consistencyWindow)
-  }
-
   const handleMotionMinHoldChange = useCallback(
     (value: number) => {
       const newValue = Math.max(0, Math.min(600000, value))
@@ -379,15 +368,13 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
             Consistency Window
           </label>
           <div className="flex items-center space-x-4">
-            <input
-              type="number"
+            <DraftNumberField
               id="consistency-window"
               min={CUE_CONSISTENCY_WINDOW_MS_MIN}
               max={CUE_CONSISTENCY_WINDOW_MS_MAX}
-              step="100"
+              step={100}
               value={consistencyWindow}
-              onChange={handleInputChange}
-              onBlur={() => void handleInputBlur()}
+              onCommit={handleConsistencyWindowChange}
               className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving}
               placeholder="10000"
