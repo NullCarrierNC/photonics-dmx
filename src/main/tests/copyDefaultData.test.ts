@@ -100,6 +100,26 @@ describe('copyDefaultData', () => {
     expect(written.marker).toBe('new')
   })
 
+  it('replaces a shipped library saved from the editor with the newer shipped one', async () => {
+    const shipped = { cueVersion: 4, group: { id: 'disco' }, cues: [{ id: 'strobe' }] }
+    seedSource({ 'disco.json': JSON.stringify(shipped) })
+    const edited = JSON.stringify(
+      { cueVersion: 3, bundled: true, group: { id: 'disco' }, cues: [{ id: 'my-strobe' }] },
+      null,
+      2,
+    )
+    fs.writeFileSync(path.join(appData, 'disco.json'), edited)
+
+    await copyDefaultData(appRoot, appData)
+
+    const written = JSON.parse(fs.readFileSync(path.join(appData, 'disco.json'), 'utf-8'))
+    expect(written).toEqual({ ...shipped, bundled: true })
+    const [kept, ...others] = fs.readdirSync(appData).filter((f) => f !== 'disco.json')
+    expect(others).toEqual([])
+    expect(kept).toMatch(/^disco\.json\.v3-/)
+    expect(fs.readFileSync(path.join(appData, kept), 'utf-8')).toBe(edited)
+  })
+
   it('keeps no copy when the shipped version is not newer', async () => {
     seedSource({ 'cue.json': JSON.stringify({ cueVersion: 2, marker: 'shipped' }) })
     fs.writeFileSync(
