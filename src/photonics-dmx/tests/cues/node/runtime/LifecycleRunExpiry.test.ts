@@ -72,6 +72,7 @@ function cueDefinition(
     variables: [
       { name: 'shade', type: 'color', scope: 'cue', initialValue: 'red' },
       { name: 'nextShade', type: 'color', scope: 'cue', initialValue: 'red' },
+      { name: 'venue', type: 'string', scope: 'cue', initialValue: '' },
     ],
     nodes,
     connections,
@@ -134,6 +135,47 @@ const raisesAndWaits: NetNodeCueDefinition = cueDefinition(
     { from: 'called', to: 'pick' },
     { from: 'pick', to: 'raise' },
     { from: 'raise', to: 'after' },
+  ],
+)
+
+/**
+ * One keyframe-held red on the front lights, reached from cue-called and from beat. A run that
+ * gets past it on a frame from a large venue paints the back lights green.
+ */
+const sharedHold: NetNodeCueDefinition = cueDefinition(
+  {
+    events: [
+      { id: 'called', type: 'event', eventType: 'cue-called' },
+      { id: 'beat', type: 'event', eventType: 'beat' },
+    ],
+    actions: [
+      paint('hold', 'front', { source: 'literal', value: 'red' }, 'keyframe'),
+      paint('mark', 'back', { source: 'literal', value: 'green' }, 'none'),
+    ],
+    logic: [
+      {
+        id: 'venue',
+        type: 'logic',
+        logicType: 'cue-data',
+        dataProperty: 'venue-size',
+        assignTo: 'venue',
+      },
+      {
+        id: 'large',
+        type: 'logic',
+        logicType: 'conditional',
+        comparator: '==',
+        left: { source: 'variable', name: 'venue' },
+        right: { source: 'literal', value: 'Large' },
+      },
+    ],
+  },
+  [
+    { from: 'called', to: 'hold' },
+    { from: 'beat', to: 'hold' },
+    { from: 'hold', to: 'venue' },
+    { from: 'venue', to: 'large' },
+    { from: 'large', to: 'mark', fromPort: 'true' },
   ],
 )
 
@@ -225,5 +267,26 @@ describe('a lifecycle run that never completes', () => {
     send()
     expect(Math.min(...frontShown(harness, 12))).toBeGreaterThanOrEqual(250)
     expect(harness.getLightState(harness.frontLightIds[0])?.blue).toBe(255)
+  })
+
+  it.each([
+    ['the run it parked on', [{ beat: 'Strong', venueSize: 'Large' }]],
+    [
+      'a run parked on its effect',
+      [{ venueSize: 'Small' }, { beat: 'Strong', venueSize: 'Large' }],
+    ],
+  ])('leaves a shared effect to %s, which goes on at the keyframe', (_, early) => {
+    const harness = start(sharedHold)
+
+    for (const data of early) send({ ...frame, ...data } as CueData)
+    harness.advanceBy(200)
+    harness.advanceBy(LIFECYCLE_RUN_EXPIRY_MS)
+    send({ ...frame, venueSize: 'Small' } as CueData)
+    harness.advanceBy(200)
+    expect(harness.getLightState(harness.backLightIds[0])?.green ?? 0).toBe(0)
+
+    harness.sequencer.onKeyframe()
+    harness.advanceBy(200)
+    expect(harness.getLightState(harness.backLightIds[0])?.green).toBe(255)
   })
 })

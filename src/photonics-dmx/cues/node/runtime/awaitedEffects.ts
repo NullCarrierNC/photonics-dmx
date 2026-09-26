@@ -26,16 +26,20 @@ export class AwaitedEffects {
    * Hand over what the contexts `runIds` wait on, call `cancel`, which cancels them and returns the
    * effects their raisers leave showing, and then `startAgain`. The runs it starts claim the names
    * they submit again. Every entry left unclaimed after that, and every effect `cancel` returned,
-   * is removed.
+   * is removed. A name another context also waits on stays up for it, with its waiter.
    */
   restart(
     runIds: ReadonlySet<string>,
     cancel: () => Map<string, number>,
     startAgain: () => void,
   ): void {
+    const waitedOnElsewhere = new Set<string>()
+    for (const [contextId, awaited] of this.byContext) {
+      if (!runIds.has(contextId)) for (const name of awaited.keys()) waitedOnElsewhere.add(name)
+    }
     for (const contextId of runIds) {
       for (const [name, layer] of this.byContext.get(contextId) ?? []) {
-        this.handedOver.set(name, layer)
+        if (!waitedOnElsewhere.has(name)) this.handedOver.set(name, layer)
       }
       this.byContext.delete(contextId)
     }
