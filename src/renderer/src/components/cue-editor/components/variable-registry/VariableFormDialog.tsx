@@ -162,7 +162,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
     <Modal
       onClose={onCancel}
       labelledBy={titleId}
-      closeOnBackdrop={false}
+      dismissible={false}
       panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
       <h3 id={titleId} className="font-semibold text-lg mb-4">
         {title}

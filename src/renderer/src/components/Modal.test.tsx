@@ -1,7 +1,8 @@
 /** @jest-environment jsdom */
-import { afterEach, describe, expect, it, jest } from '@jest/globals'
-import type { KeyboardEvent, ReactNode } from 'react'
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals'
+import { StrictMode, type KeyboardEvent, type ReactNode } from 'react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import ReactFlow, { ReactFlowProvider, type Node, type NodeChange } from 'reactflow'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import Modal, { type ModalProps } from './Modal'
 
@@ -28,6 +29,13 @@ function open(props: Partial<ModalProps> = {}, children: ReactNode = form) {
   return { onClose, ...view }
 }
 
+/** A press and release on one element, which is what a click on it takes. */
+function clickOn(element: HTMLElement, detail = 1): void {
+  fireEvent.mouseDown(element, { detail })
+  fireEvent.mouseUp(element, { detail })
+  fireEvent.click(element, { detail })
+}
+
 describe('Modal', () => {
   it.each(['dialog', 'alertdialog'] as const)('is a modal %s named by its title', (role) => {
     open({ role })
@@ -52,6 +60,35 @@ describe('Modal', () => {
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
   })
 
+  it('leaves focus on a control that took it as the dialog opened, under StrictMode', () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+
+    render(
+      <StrictMode>
+        <Modal onClose={() => {}} panelClassName="panel">
+          <input aria-label="Name" autoFocus />
+        </Modal>
+      </StrictMode>,
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+    opener.remove()
+  })
+
+  it('takes focus back when a control inside blurs to the page body', async () => {
+    open()
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    name.focus()
+
+    await act(async () => {
+      name.blur()
+    })
+
+    expect(screen.getByRole('dialog')).toHaveFocus()
+  })
+
   it('closes on Escape from inside the panel', () => {
     const { onClose } = open()
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Name' }), { key: 'Escape' })
@@ -74,16 +111,39 @@ describe('Modal', () => {
 
   it('closes on a click on the backdrop and not on one inside the panel', () => {
     const { onClose } = open()
-    fireEvent.click(screen.getByRole('dialog'))
+    clickOn(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('presentation'))
+    clickOn(screen.getByRole('presentation'))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('stays open on a backdrop click when closeOnBackdrop is off', () => {
-    const { onClose } = open({ closeOnBackdrop: false })
-    fireEvent.click(screen.getByRole('presentation'))
+  it('stays open when a press inside the panel is released on the backdrop', () => {
+    const { onClose } = open()
+    const backdrop = screen.getByRole('presentation')
+
+    fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Name' }))
+    fireEvent.mouseUp(backdrop)
+    fireEvent.click(backdrop)
+
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('stays open on the second click of a double click on the backdrop', () => {
+    const { onClose } = open()
+    clickOn(screen.getByRole('presentation'), 2)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('keeps typed input through a backdrop click and Escape when it is not dismissible', () => {
+    const { onClose } = open({ dismissible: false })
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    fireEvent.change(name, { target: { value: 'typed' } })
+
+    clickOn(screen.getByRole('presentation'))
+    fireEvent.keyDown(name, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(name).toHaveValue('typed')
   })
 
   it('keeps Tab inside the panel and skips disabled controls', () => {
@@ -97,5 +157,47 @@ describe('Modal', () => {
 
     fireEvent.keyDown(name, { key: 'Tab', shiftKey: true })
     expect(save).toHaveFocus()
+  })
+})
+
+describe('Modal over a React Flow graph', () => {
+  beforeAll(() => {
+    // React Flow measures its pane, and jsdom has no ResizeObserver.
+    globalThis.ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+  })
+
+  const nodes: Node[] = [
+    { id: 'a', position: { x: 0, y: 0 }, data: { label: 'A' }, selected: true },
+  ]
+
+  it('keeps Backspace pressed inside the dialog away from the selected node', async () => {
+    const onNodesChange = jest.fn<(changes: NodeChange[]) => void>()
+    render(
+      <>
+        <div style={{ width: 800, height: 600 }}>
+          <ReactFlowProvider>
+            <ReactFlow nodes={nodes} edges={[]} onNodesChange={onNodesChange} />
+          </ReactFlowProvider>
+        </div>
+        <Modal onClose={() => {}} panelClassName="panel">
+          <button type="button">Delete</button>
+        </Modal>
+      </>,
+    )
+    const panel = screen.getByRole('dialog')
+
+    await act(async () => {
+      fireEvent.keyDown(panel, { key: 'Backspace', code: 'Backspace' })
+    })
+    await act(async () => {
+      fireEvent.keyUp(panel, { key: 'Backspace', code: 'Backspace' })
+    })
+
+    const removed = onNodesChange.mock.calls.flat(2).filter((change) => change.type === 'remove')
+    expect(removed).toEqual([])
   })
 })

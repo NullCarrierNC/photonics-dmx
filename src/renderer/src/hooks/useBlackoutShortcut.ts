@@ -35,6 +35,12 @@ function matchesKey(event: KeyboardEvent, key: BlackoutShortcutKey): boolean {
   return event.code === 'Backquote' || event.key === '`' || event.key === '~'
 }
 
+/** Whether a key landed inside a modal dialog that closes on Escape. */
+function isInsideEscapeDialog(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return target.closest('[aria-modal="true"]')?.hasAttribute('data-escape-closes') === true
+}
+
 /**
  * Reads the blackout shortcut preferences for this window.
  *
@@ -115,9 +121,11 @@ export function useBlackoutShortcut(): void {
       // A typed key leaves the field alone. Escape is not typed anywhere in this app, so it keeps
       // working with the focus in a text box, which is where an operator's hands often are.
       if (key === 'backquote' && isTypingTarget(event.target)) return
-      // An open dialog keeps Escape: it closes, and output is left alone. A dialog has no use for
-      // a backquote, so it does not get to swallow it.
-      if (key === 'escape' && document.querySelector('[aria-modal="true"]')) return
+      // Escape pressed inside a dialog that closes on it closes that dialog. Pressed anywhere else
+      // it blacks out: on the page body, in a form that keeps its typed input, and in a dialog
+      // that holds live output, such as calibration. A dialog has no use for a backquote, so it
+      // does not get to swallow it.
+      if (key === 'escape' && isInsideEscapeDialog(event.target)) return
       // A drag in flight keeps Escape, so it can cancel rather than commit. With any other key
       // bound, Escape still reaches the drag and blackout stays available mid-rearrangement.
       if (key === 'escape' && isEscapeClaimed()) return

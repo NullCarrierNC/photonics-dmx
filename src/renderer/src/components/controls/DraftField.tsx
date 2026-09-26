@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useUncommittedDraft } from '../../hooks/useUnloadGuard'
 
 /**
  * Text and number entry that reports a value when the user has finished with it, not per keystroke.
@@ -81,6 +82,8 @@ export const DraftTextField: React.FC<DraftTextFieldProps> = ({
     }
   }
 
+  useUncommittedDraft(typed && draft !== value)
+
   const commit = (): void => {
     setTyped(false)
     if (draft !== value) {
@@ -160,18 +163,26 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
     }
   }
 
+  // The number the draft commits as, or null for an entry that leaves the committed value standing.
+  const resolveDraft = (): number | null => {
+    const parsed = Number(draft)
+    // An unreadable or empty entry means the user cleared it and chose nothing.
+    if (draft.trim() === '' || !Number.isFinite(parsed)) {
+      return null
+    }
+    return Math.max(min ?? -Infinity, Math.min(max ?? Infinity, roundTo(parsed, decimals)))
+  }
+  const pending = typed ? resolveDraft() : null
+  useUncommittedDraft(pending !== null && pending !== value)
+
   const commit = (): void => {
     const typedSinceCommit = typed
     setTyped(false)
-    const parsed = Number(draft)
-    // An unreadable or empty entry means the user cleared it rather than chose something, so the
-    // committed value stands and the field shows it again.
-    if (draft.trim() === '' || !Number.isFinite(parsed)) {
+    const clamped = resolveDraft()
+    if (clamped === null) {
       setDraft(String(value))
       return
     }
-    const rounded = roundTo(parsed, decimals)
-    const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, rounded))
     setDraft(String(clamped))
     if (clamped !== value || (commitWhenUnchanged && typedSinceCommit)) {
       revertIfRefused(onCommit(clamped), String(clamped), String(value), setDraft)

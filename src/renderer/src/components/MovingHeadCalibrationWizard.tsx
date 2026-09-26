@@ -491,6 +491,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   return (
     <Modal
       onClose={() => void handleCancel()}
+      drivesOutput
       labelledBy="mh-cal-title"
       backdropClassName="p-4"
       panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
