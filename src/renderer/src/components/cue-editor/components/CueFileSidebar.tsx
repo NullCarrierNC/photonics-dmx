@@ -78,13 +78,16 @@ const CueFileSidebar: React.FC<Props> = ({
     )
   }, [editorDoc, cueKind])
 
-  // Use the appropriate file list based on editor mode, sorted alphabetically by group name
+  // Use the appropriate file list based on editor mode, sorted alphabetically by group name. A cue
+  // file that failed to load has no cues of either kind, and is listed under both with its reason.
   const displayFileList = useMemo(() => {
     const base = isEffectMode ? effectFileList : fileList
     const filtered = isEffectMode
       ? base
-      : (base as NodeCueFileSummary[]).filter((file) =>
-          cueKind === 'lighting' ? file.lightingCueCount > 0 : file.motionCueCount > 0,
+      : (base as NodeCueFileSummary[]).filter(
+          (file) =>
+            (cueKind === 'lighting' ? file.lightingCueCount > 0 : file.motionCueCount > 0) ||
+            (file.cueCount === 0 && (file.errors?.length ?? 0) > 0),
         )
     return [...filtered].sort((a, b) =>
       (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, {
@@ -130,6 +133,18 @@ const CueFileSidebar: React.FC<Props> = ({
                   : (file as NodeCueFileSummary).motionCueCount}{' '}
               {itemCountLabel}
             </div>
+            {file.errors?.map((message) => (
+              <div key={message} className="text-[10px] text-red-600 dark:text-red-400 break-words">
+                {message}
+              </div>
+            ))}
+            {file.migrations?.map((message) => (
+              <div
+                key={message}
+                className="text-[10px] text-amber-600 dark:text-amber-400 break-words">
+                {message}
+              </div>
+            ))}
           </button>
         ))}
       </div>

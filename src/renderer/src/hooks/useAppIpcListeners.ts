@@ -11,7 +11,11 @@ import {
   getPrefs,
   getValidationErrors,
 } from '../ipcApi'
-import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../../shared/ipcTypes'
+import type {
+  CueFileLoadReport,
+  CueStateUpdatePayload,
+  NodeCueRuntimeErrorPayload,
+} from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import {
   ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ,
@@ -40,9 +44,7 @@ export interface UseAppIpcListenersParams {
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
   handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
   handleSenderStartFailure: (data: { sender: string; error: string }) => void
-  handleCueValidationErrors: (
-    errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>,
-  ) => void
+  handleCueValidationErrors: (errors: CueFileLoadReport[]) => void
   handleConfigCorruptRecovered: (payload: { files: ConfigRecoveryFile[] }) => void
   handleAudioEnable: (config: AudioConfig) => void | Promise<void>
   handleAudioDisable: (payload: undefined) => void

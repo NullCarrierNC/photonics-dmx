@@ -18,6 +18,16 @@ export const VARIABLE_TYPES = [
 
 export type VariableType = (typeof VARIABLE_TYPES)[number]
 
+/**
+ * What a variable or event name may be: letters, digits and underscores, not starting with a digit.
+ * The schemas, the variable editor and the load-time rename of older variable names all apply it.
+ */
+export const VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+
+export function isVariableName(name: string): boolean {
+  return VARIABLE_NAME_PATTERN.test(name)
+}
+
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | Color[] }
   | { source: 'variable'; name: string }

@@ -32,6 +32,22 @@ describe('configRecoveryMessages', () => {
     expect(messages[0]).not.toContain('backup')
   })
 
+  it('reports dropped keys as unused by this version, apart from reset values', () => {
+    const messages = configRecoveryMessages([
+      { fileName: 'lightsLayout.json', reason: 'keysDropped', message: 'frontLights[0].spin' },
+      {
+        fileName: 'lightsLayout.json',
+        reason: 'repaired',
+        message: 'frontLights[1].channels.red',
+      },
+    ])
+    expect(messages).toEqual([
+      expect.stringContaining('went back to their defaults'),
+      expect.stringMatching(/this version does not use.*frontLights\[0\]\.spin/),
+    ])
+    expect(messages[1]).not.toContain('defaults')
+  })
+
   it('reports a file from a newer version as in use and not saved to', () => {
     const messages = configRecoveryMessages([{ fileName: 'prefs.json', reason: 'newerVersion' }])
     expect(messages).toHaveLength(1)

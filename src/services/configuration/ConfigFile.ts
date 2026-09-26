@@ -7,6 +7,7 @@ import {
   repairedCopyFilePath,
   type ConfigCorruptInfo,
   type ConfigCorruptReason,
+  type ConfigRepairReport,
 } from './configCorruptTypes'
 import { migrateStepwise, readEnvelope, type ConfigWithVersion } from './configFileEnvelope'
 import { renameSyncWithRetry, renameWithRetry } from './configFileRename'
@@ -38,9 +39,10 @@ export type ConfigFileHooks<T> = {
    * predates them passes validation instead of triggering corrupt-recovery.
    *
    * `reportRepair` tells the corrupt-recovery hook that stored values were put back to their
-   * defaults, with a message naming them.
+   * defaults, or that keys were dropped, with a message naming them. It is passed on only once the
+   * repaired data passes `validate`, since a file that fails is set aside whole.
    */
-  normalizeLoaded?: (data: T, reportRepair: (message: string) => void) => T
+  normalizeLoaded?: (data: T, reportRepair: ConfigRepairReport) => T
 }
 
 type RecoveryDetail = { parseOrMigrateError?: unknown; schemaText?: string }
@@ -67,9 +69,7 @@ export class ConfigFile<T> {
   private readonly defaultData: T
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
-  private readonly normalizeLoaded:
-    | ((data: T, reportRepair: (message: string) => void) => T)
-    | undefined
+  private readonly normalizeLoaded: ((data: T, reportRepair: ConfigRepairReport) => T) | undefined
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
@@ -286,6 +286,7 @@ export class ConfigFile<T> {
 
     let data: T
     let migratedNeedsPersist = false
+    const repairs: ConfigCorruptInfo[] = []
     try {
       if (envelope.versioned) {
         data = envelope.data
@@ -299,11 +300,11 @@ export class ConfigFile<T> {
       if (this.normalizeLoaded) {
         // Repair shape additions that a same-version file may predate (e.g. new required keys),
         // so validation below never fails on them. Persist only when it actually changed the data.
-        const normalized = this.normalizeLoaded(data, (message) =>
-          this.onCorruptRecovery?.({
+        const normalized = this.normalizeLoaded(data, (message, kind = 'reset') =>
+          repairs.push({
             fileName: path.basename(this.filePath),
             filePath: this.filePath,
-            reason: 'repaired',
+            reason: kind === 'dropped' ? 'keysDropped' : 'repaired',
             message,
           }),
         )
@@ -329,6 +330,7 @@ export class ConfigFile<T> {
       }
     }
 
+    for (const repair of repairs) this.onCorruptRecovery?.(repair)
     return { ok: true, data, version, needsPersist: migratedNeedsPersist }
   }
 

@@ -6,6 +6,7 @@ import {
   NodeActionConfig,
   NodeMotionPatternSetting,
   NodePositionSetting,
+  VARIABLE_NAME_PATTERN,
   ValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
@@ -197,7 +198,7 @@ export const variableDefinitionSchema = {
   required: ['name', 'type', 'scope', 'initialValue'],
   additionalProperties: false,
   properties: {
-    name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
+    name: { type: 'string', minLength: 1, pattern: VARIABLE_NAME_PATTERN.source },
     type: {
       type: 'string',
       enum: [
@@ -244,7 +245,7 @@ export const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
   required: ['name'],
   additionalProperties: false,
   properties: {
-    name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
+    name: { type: 'string', minLength: 1, pattern: VARIABLE_NAME_PATTERN.source },
     description: { type: 'string', nullable: true },
   },
 }

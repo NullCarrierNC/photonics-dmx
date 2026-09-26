@@ -4,7 +4,8 @@ import * as path from 'path'
  * Report from ConfigFile when a stored file could not be used as it was. For 'read', 'parse' and
  * 'schema' the original file is preserved under a `.corrupt-*` name and defaults are used. For
  * 'repaired' only the named fields went back to their defaults, and the rest of the file was kept.
- * For 'newerVersion' the file came from a newer build and nothing is saved over it: it is used as
+ * For 'keysDropped' the named keys meant nothing to this build and were removed, with every value
+ * kept. For 'newerVersion' the file came from a newer build and nothing is saved over it: it is used as
  * it is, or with `leftInPlace` set, this build cannot read it and defaults are used. For
  * 'repairCopied' a hand repair of a corrupt file was replaced by a whole-file save, and the repair
  * is kept under a `.repaired-*` name.
@@ -14,8 +15,18 @@ export type ConfigCorruptReason =
   | 'parse'
   | 'schema'
   | 'repaired'
+  | 'keysDropped'
   | 'newerVersion'
   | 'repairCopied'
+
+/**
+ * What a load-time repair did: `reset` put stored values back to their defaults, and `dropped`
+ * removed keys this build gives no meaning to.
+ */
+type ConfigRepairKind = 'reset' | 'dropped'
+
+/** Tells ConfigFile what a load-time repair changed, as one message per kind of change. */
+export type ConfigRepairReport = (message: string, kind?: ConfigRepairKind) => void
 
 export interface ConfigCorruptInfo {
   fileName: string

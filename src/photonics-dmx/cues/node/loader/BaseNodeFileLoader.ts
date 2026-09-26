@@ -35,6 +35,8 @@ export interface BaseFileSummary<TMode extends string> {
   mode: TMode
   updatedAt: number
   errors?: string[]
+  /** What the load changed in a file an older build wrote, which it then saved. */
+  migrations?: string[]
 }
 
 /** One summary bucket per mode, keyed by the mode discriminant. */
@@ -44,6 +46,8 @@ export interface BaseLoadResult {
   loaded: number
   failed: number
   errors: string[]
+  /** One line per change made to a file an older build wrote, led by the file's name. */
+  migrations: string[]
 }
 
 export const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
@@ -113,8 +117,9 @@ export abstract class BaseNodeFileLoader<
         loaded: acc.loaded + curr.loaded,
         failed: acc.failed + curr.failed,
         errors: acc.errors.concat(curr.errors),
+        migrations: acc.migrations.concat(curr.migrations),
       }),
-      { loaded: 0, failed: 0, errors: [] },
+      { loaded: 0, failed: 0, errors: [], migrations: [] },
     )
 
     this.emit('changed', this.getSummary())
@@ -155,6 +160,7 @@ export abstract class BaseNodeFileLoader<
     let loaded = 0
     let failed = 0
     const errors: string[] = []
+    const migrations: string[] = []
     const summaries: TSummary[] = []
 
     for (const file of files) {
@@ -172,6 +178,7 @@ export abstract class BaseNodeFileLoader<
         const summary = await this.loadFile(mode, filePath)
         if (summary) {
           summaries.push(summary)
+          for (const note of summary.migrations ?? []) migrations.push(`${file}: ${note}`)
         }
         loaded++
       } catch (error) {
@@ -190,7 +197,7 @@ export abstract class BaseNodeFileLoader<
     }
 
     this.summaries[mode] = summaries
-    return { loaded, failed, errors }
+    return { loaded, failed, errors, migrations }
   }
 
   // ---- watching -------------------------------------------------------------
@@ -254,6 +261,18 @@ export abstract class BaseNodeFileLoader<
     await fs.mkdir(path.dirname(filePath), { recursive: true })
     await fs.writeFile(filePath, contents, 'utf-8')
     this.savedContents.set(path.resolve(filePath), contents)
+  }
+
+  /**
+   * Write back a file a load brought forward from an older build, so the change is made and
+   * reported once. A failed write is logged, and the next load brings the file forward again.
+   */
+  protected async writeMigratedFile(filePath: string, data: unknown): Promise<void> {
+    try {
+      await this.writeSavedFile(filePath, JSON.stringify(data, null, 2))
+    } catch (error) {
+      log.warn('Could not save the brought-forward file', filePath, error)
+    }
   }
 
   /** Whether the file on disk is still exactly what the last save of it wrote and loaded. */

@@ -59,6 +59,7 @@ export type {
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
 export type { Rb3GameModeSchedulePayload } from '../photonics-dmx/processors/Rb3GameModeManager'
+export type { CueFileLoadReport } from './ipc/configTypes'
 
 // ---------------------------------------------------------------------------
 // Shared response shapes and cross-domain payloads

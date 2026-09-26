@@ -2,6 +2,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { validateEffectFile } from '../schema/validation'
 import { EffectCompiler } from '../compiler/EffectCompiler'
+import { migrateOlderNodeFile } from './migrateOlderNodeFile'
 import { EffectFile, EffectMode } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import {
@@ -20,6 +21,8 @@ export interface EffectFileSummary {
   mode: EffectMode
   updatedAt: number
   errors?: string[]
+  /** What the load changed in a file an older build wrote, which it then saved. */
+  migrations?: string[]
   bundled?: boolean
 }
 
@@ -44,7 +47,8 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     }
 
     const data = await fs.readFile(resolvedPath, 'utf-8')
-    const parsed = JSON.parse(data)
+    const parsed: unknown = JSON.parse(data)
+    migrateOlderNodeFile(parsed)
     const validation = validateEffectFile(parsed)
 
     if (!validation.valid) {
@@ -135,7 +139,8 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
 
   protected async loadFile(mode: EffectMode, filePath: string): Promise<EffectFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
-    const parsed = JSON.parse(contents)
+    const parsed: unknown = JSON.parse(contents)
+    const migrations = migrateOlderNodeFile(parsed)
     const validation = validateEffectFile(parsed)
 
     if (!validation.valid) {
@@ -166,6 +171,10 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       }
     }
 
+    if (migrations.length > 0) {
+      await this.writeMigratedFile(filePath, parsed)
+    }
+
     const summary: EffectFileSummary = {
       path: filePath,
       groupId: file.group.id,
@@ -175,6 +184,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
+      migrations: migrations.length > 0 ? migrations : undefined,
     }
 
     this.updateSummary(summary)

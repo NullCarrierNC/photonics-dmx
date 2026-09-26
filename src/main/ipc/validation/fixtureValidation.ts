@@ -5,11 +5,12 @@
 
 import type { DmxRig, LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types'
 import type { ValidationResult } from './primitives'
-import { ConfigStrobeType } from '../../../photonics-dmx/types'
+import { ConfigStrobeType, isSavedFixture } from '../../../photonics-dmx/types'
 import {
   parseDmxFixture,
   parseDmxLight,
   parseFixtureList,
+  type FixtureFault,
   type FixtureFaultReport,
 } from '../../../photonics-dmx/helpers/fixtureParsing'
 import { isNonEmptyString, isPlainObject } from './primitives'
@@ -30,9 +31,9 @@ function parseSavedList<T>(
   path: string,
   parse: (raw: unknown, path: string, report: FixtureFaultReport) => T | null,
 ): ValidationResult<T[]> {
-  const faults: string[] = []
+  const faults: FixtureFault[] = []
   const parsed = parseFixtureList(list, path, parse, faults)
-  return parsed.ok && faults.length > 0 ? { ok: false, error: faults[0] } : parsed
+  return parsed.ok && faults.length > 0 ? { ok: false, error: faults[0].message } : parsed
 }
 
 export function validateLightingConfiguration(
@@ -167,5 +168,12 @@ export function validateDmxFixturesArray(
   if (!Array.isArray(value)) {
     return { ok: false, error: `${fieldName} must be an array` }
   }
-  return parseSavedList(value, fieldName, parseDmxFixture)
+  const parsed = parseSavedList(value, fieldName, parseDmxFixture)
+  if (!parsed.ok) return parsed
+  // Rig lights reference a saved template by id, so every template in the library carries one.
+  const unsaved = parsed.value.findIndex((fixture) => !isSavedFixture(fixture))
+  if (unsaved >= 0) {
+    return { ok: false, error: `${fieldName}[${unsaved}].id must be a non-empty string` }
+  }
+  return parsed
 }

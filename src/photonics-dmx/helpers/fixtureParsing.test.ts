@@ -62,11 +62,43 @@ describe('parseDmxFixture', () => {
     ])
   })
 
-  it('drops unusable strobe values', () => {
+  it('keeps the usable strobe values and puts only the bad one back to its default', () => {
     const { fixture, faults } = parse(rgb({ strobeValues: { slow: 1, medium: 2, fast: 3 } }))
 
-    expect(fixture).not.toHaveProperty('strobeValues')
+    expect(fixture?.strobeValues).toEqual({
+      slow: 1,
+      medium: 2,
+      fast: 3,
+      fastest: DEFAULT_STROBE_CHANNEL_VALUES.fastest,
+    })
     expect(faults).toEqual(['lights[0].strobeValues.fastest must be an integer between 0 and 255'])
+  })
+
+  it('reports a config key no fixture config has', () => {
+    const { fixture, faults } = parse(
+      rgb({
+        fixture: 'rgb/mh',
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, pan: 5, tilt: 6 },
+        config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG, spin: true },
+      }),
+    )
+
+    expect(fixture?.config).toEqual(DEFAULT_MOVING_HEAD_FIXTURE_CONFIG)
+    expect(faults).toEqual(['lights[0].config.spin is not a fixture config field'])
+  })
+
+  it('tells a dropped key apart from a value put back to its default', () => {
+    const reports: Array<[string, string]> = []
+    parseDmxFixture(
+      rgb({ hasStrobeChannel: true, channels: { masterDimmer: 1, red: 2, green: 700, blue: 4 } }),
+      'lights[0]',
+      (message, kind) => reports.push([message, kind]),
+    )
+
+    expect(reports).toEqual([
+      ['lights[0].channels.green must be an integer DMX channel between 0 and 512', 'reset'],
+      ['lights[0].hasStrobeChannel is not a fixture field', 'dropped'],
+    ])
   })
 
   it('drops an unusable extra channel and keeps the rest', () => {
@@ -100,8 +132,9 @@ describe('parseDmxFixture', () => {
     expect(faults).toEqual(['lights[0].config.invertPan must be true or false'])
   })
 
-  it('reads a null id as a template with no id, and any other kind as a fault', () => {
+  it('reads a null or empty id as a template with no id, and any other kind as a fault', () => {
     expect(parse(rgb({ id: null }))).toEqual({ fixture: rgb({ id: null }), faults: [] })
+    expect(parse(rgb({ id: '' }))).toEqual({ fixture: rgb({ id: null }), faults: [] })
     expect(parse(rgb({ id: 7 })).faults).toEqual(['lights[0].id must be a string or null'])
   })
 })
@@ -119,6 +152,18 @@ describe('parseDmxLight', () => {
 })
 
 describe('loading a stored fixture', () => {
+  it('drops the strobeMode key older layout editors wrote, without a fault', () => {
+    const faults: string[] = []
+    const light = loadDmxLight(
+      rgb({ fixtureId: 'tpl-1', strobeMode: 'disabled' }),
+      'frontLights[0]',
+      (m) => faults.push(m),
+    )
+
+    expect(light).toEqual(rgb({ fixtureId: 'tpl-1' }))
+    expect(faults).toEqual([])
+  })
+
   it('brings a legacy rgb/s rig light onto rgb with a strobe channel and default speeds', () => {
     const faults: string[] = []
     const light = loadDmxLight(

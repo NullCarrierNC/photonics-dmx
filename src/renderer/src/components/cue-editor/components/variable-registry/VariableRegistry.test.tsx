@@ -95,6 +95,20 @@ describe('VariableRegistry', () => {
     expect(onVariablesChange).not.toHaveBeenCalled()
   })
 
+  it.each(['beat-count', 'my var', '2x'])(
+    'refuses the name %s and keeps the form open',
+    async (name) => {
+      const { onVariablesChange } = renderRegistry()
+      addGroupVariable(name)
+
+      expect(
+        await screen.findByText(new RegExp(`"${name}" is not a valid variable name`)),
+      ).toBeTruthy()
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(onVariablesChange).not.toHaveBeenCalled()
+    },
+  )
+
   it('adds a variable with a free name', () => {
     const { onVariablesChange } = renderRegistry()
     addGroupVariable('speed')
