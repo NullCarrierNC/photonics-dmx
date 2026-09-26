@@ -23,7 +23,7 @@ import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import type { RuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
-import type { TrackedLight } from '../../../../types'
+import type { Effect, TrackedLight } from '../../../../types'
 import { fakeLightingController } from '../../../helpers/fakeLightingController'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 
@@ -417,6 +417,87 @@ describe('AudioNodeCue level mode', () => {
       cue.stopAndClearEffects()
       h.cleanup()
     }
+  })
+
+  it('draws the colour a variable holds', async () => {
+    const action = setColor('sc1', { source: 'literal', value: 'front' })
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-var-colour',
+      cueTypeId: 'level-var-colour',
+      name: 'Level var colour',
+      style: 'primary',
+      variables: [{ name: 'shade', type: 'color', scope: 'cue', initialValue: 'green' }],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [
+          {
+            ...action,
+            color: { ...action.color, name: { source: 'variable', name: 'shade' } },
+          } as ActionNode,
+        ],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    }
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+
+    try {
+      await cue.execute(audioCueData(0.8), h.sequencer, h.lightManager)
+      for (let t = 0; t < 300; t += 10) h.advanceBy(10)
+
+      const state = h.getLightState(h.frontLightIds[0])
+      expect(state?.green ?? 0).toBeGreaterThan(0)
+      expect(state?.blue ?? 0).toBe(0)
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
+  })
+
+  it('submits on the layer and with the duration variables hold', async () => {
+    const action = setColor('sc1', { source: 'literal', value: 'front' })
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-var-layer',
+      cueTypeId: 'level-var-layer',
+      name: 'Level var layer',
+      style: 'secondary',
+      variables: [
+        { name: 'onLayer', type: 'number', scope: 'cue', initialValue: 30 },
+        { name: 'fade', type: 'number', scope: 'cue', initialValue: 750 },
+      ],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [
+          {
+            ...action,
+            layer: { source: 'variable', name: 'onLayer' },
+            timing: { ...action.timing, duration: { source: 'variable', name: 'fade' } },
+          } as ActionNode,
+        ],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    }
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+
+    await cue.execute(audioCueData(0.8), sequencer, lightManager)
+
+    const effect = (sequencer.addEffect as jest.Mock).mock.calls[0][1] as Effect
+    expect(effect.transitions.map((t) => [t.layer, t.transform.duration])).toEqual(
+      effect.transitions.map(() => [30, 750]),
+    )
+    expect(effect.transitions.length).toBeGreaterThan(0)
   })
 
   it.each([
