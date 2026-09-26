@@ -8,11 +8,14 @@
 import type {
   AudioEventNodeUnion,
   AudioNodeCueFile,
+  EffectRaiserNode,
   EffectReference,
   NetEventNode,
   NetNodeCueFile,
   NodeCueMode,
+  VariableDefinition,
 } from '../../types/nodeCueTypes'
+import { raiserParameterIssue } from '../cueValueRules'
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
 import type { AudioCueGroup } from '../../registries/AudioCueRegistry'
 import type { ICueGroup } from '../../interfaces/INetCueGroup'
@@ -92,11 +95,42 @@ function assertHasCues(
   )
 }
 
+/**
+ * What the cue value rules warn about in the parameters each effect raiser passes, checked against
+ * the parameters the raised effect declares and the action fields each one feeds.
+ */
+function raiserWarnings(
+  label: string,
+  raisers: readonly EffectRaiserNode[],
+  effects: EffectRegistry,
+  variables: readonly VariableDefinition[],
+  mode: NodeCueMode,
+): string[] {
+  return raisers.flatMap((raiser) => {
+    const effect = effects.getEffect(raiser.effectId)
+    if (!effect) return []
+    const effectActions = effect.definition.nodes.actions ?? []
+    return [...effect.parameters.values()].flatMap((parameter) => {
+      const issue = raiserParameterIssue(parameter, raiser.parameterValues?.[parameter.name], {
+        effectActions,
+        variables,
+        mode,
+      })
+      return issue
+        ? [
+            `${label}: effect raiser '${raiser.label ?? raiser.id}' parameter '${parameter.name}': ${issue.message}.`,
+          ]
+        : []
+    })
+  })
+}
+
 /** Build the YARG or RB3 group a net cue file describes. */
 export async function buildNetGroup(
   file: NetNodeCueFile,
   compileErrors: string[],
   ctx: CueGroupBuildContext,
+  compileWarnings: string[] = [],
 ): Promise<ICueGroup> {
   const cues = new Map<CueType, INetCue>()
   const motionCues = new Map<string, INetCue>()
@@ -108,7 +142,17 @@ export async function buildNetGroup(
     }> => {
       const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
       compiled.groupVariables = file.group.variables ?? []
-      return { compiled, effects: await ctx.buildEffectRegistry(cue.effects ?? [], file.mode) }
+      const effects = await ctx.buildEffectRegistry(cue.effects ?? [], file.mode)
+      compileWarnings.push(
+        ...raiserWarnings(
+          `cue '${cue.kind === 'lighting' ? cue.cueType : cue.id}'`,
+          cue.nodes.effectRaisers ?? [],
+          effects,
+          [...compiled.groupVariables, ...(cue.variables ?? [])],
+          file.mode,
+        ),
+      )
+      return { compiled, effects }
     }
 
     if (cue.kind === 'lighting') {
@@ -173,6 +217,7 @@ export async function buildAudioGroup(
   file: AudioNodeCueFile,
   compileErrors: string[],
   ctx: CueGroupBuildContext,
+  compileWarnings: string[] = [],
 ): Promise<AudioCueGroup> {
   const cues = new Map<AudioCueType, IAudioCue>()
   const motionCues = new Map<string, IAudioCue>()
@@ -184,7 +229,17 @@ export async function buildAudioGroup(
     }> => {
       const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')
       compiled.groupVariables = file.group.variables ?? []
-      return { compiled, effects: await ctx.buildEffectRegistry(cue.effects ?? [], 'audio') }
+      const effects = await ctx.buildEffectRegistry(cue.effects ?? [], 'audio')
+      compileWarnings.push(
+        ...raiserWarnings(
+          `audio cue '${cue.kind === 'lighting' ? cue.cueTypeId : cue.id}'`,
+          cue.nodes.effectRaisers ?? [],
+          effects,
+          [...compiled.groupVariables, ...(cue.variables ?? [])],
+          'audio',
+        ),
+      )
+      return { compiled, effects }
     }
 
     if (cue.kind === 'lighting') {

@@ -4,20 +4,12 @@ import type {
   EffectDefinition,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { WAIT_CONDITIONS_WITH_NONE_DELAY } from '../../../../../../photonics-dmx/constants/options'
-import { BRIGHTNESS_OPTIONS, BLEND_MODE_OPTIONS } from '../../../../../../photonics-dmx/types'
+import {
+  literalChoices,
+  parameterRules,
+  raiserParameterIssue,
+} from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
-
-const WELL_KNOWN_PARAM_OPTIONS: Record<string, readonly string[]> = {
-  waitUntilCondition: WAIT_CONDITIONS_WITH_NONE_DELAY,
-  waitForCondition: WAIT_CONDITIONS_WITH_NONE_DELAY,
-  brightness: BRIGHTNESS_OPTIONS,
-  colorBrightness: BRIGHTNESS_OPTIONS,
-  lowBrightness: BRIGHTNESS_OPTIONS,
-  startBrightness: BRIGHTNESS_OPTIONS,
-  endBrightness: BRIGHTNESS_OPTIONS,
-  blendMode: BLEND_MODE_OPTIONS,
-}
 
 interface EffectRaiserEditorProps {
   node: EffectRaiserNode
@@ -37,6 +29,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
 }) => {
   const selectedEffect = availableEffects.find((e) => e.id === node.effectId)
   const parameterVars = selectedEffect?.definition?.variables?.filter((v) => v.isParameter) ?? []
+  const effectActions = selectedEffect?.definition?.nodes?.actions ?? []
 
   return (
     <div className="space-y-2 text-xs">
@@ -87,11 +80,17 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
           {parameterVars.map((param) => {
             const currentValue = node.parameterValues?.[param.name]
             const integerOnly = param.type === 'number' && param.name === 'paramLayer'
+            // The choices of the first rule the parameter meets that has a list of its own.
+            const listedRule = parameterRules(param, effectActions).find(
+              (rule) => rule !== 'groups',
+            )
             const validLiterals =
-              param.validValues ??
-              (WELL_KNOWN_PARAM_OPTIONS[param.name] != null
-                ? [...WELL_KNOWN_PARAM_OPTIONS[param.name]]
-                : undefined)
+              param.validValues ?? (listedRule ? literalChoices(listedRule, activeMode) : undefined)
+            const issue = raiserParameterIssue(param, currentValue, {
+              effectActions,
+              variables: availableVariables,
+              mode: activeMode,
+            })
             return (
               <div key={param.name} className="space-y-1">
                 <ValueSourceEditor
@@ -114,6 +113,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                       | 'event'
                   }
                   validLiterals={validLiterals}
+                  issue={issue}
                   activeMode={activeMode}
                   integerOnly={integerOnly}
                   availableVariables={availableVariables}

@@ -22,6 +22,7 @@ const ColorFromIndexLogicEditor: React.FC<ColorFromIndexLogicEditorProps> = ({
         value={node.colors}
         onChange={(next) => updateNode({ colors: next })}
         expected="color-array"
+        listLiteral
         availableVariables={availableVariables}
       />
 

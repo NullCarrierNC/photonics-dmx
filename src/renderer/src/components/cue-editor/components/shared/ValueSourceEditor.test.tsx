@@ -79,3 +79,30 @@ describe('ValueSourceEditor flags', () => {
     )
   })
 })
+
+describe('ValueSourceEditor for a colour-array value', () => {
+  const renderPalette = (listLiteral: boolean) =>
+    renderWithProviders(
+      <ValueSourceEditor
+        label="palette (color-array)"
+        value={undefined}
+        onChange={jest.fn()}
+        expected="color-array"
+        listLiteral={listLiteral}
+        availableVariables={[{ name: 'warm', type: 'color-array', scope: 'cue' }]}
+      />,
+    )
+
+  it('offers only a color-array variable where a file cannot hold a colour list', () => {
+    renderPalette(false)
+
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'palette (color-array) variable' })).toBeTruthy()
+  })
+
+  it('offers the colour list where a file holds one', () => {
+    renderPalette(true)
+
+    expect(screen.getByRole('checkbox')).toBeTruthy()
+  })
+})

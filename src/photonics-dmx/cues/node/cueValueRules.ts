@@ -223,3 +223,103 @@ export function variableIssue(
   if (variableTypeFits(expected, variable.type)) return null
   return warning(`'${name}' is a ${variable.type} variable, and this field takes ${expected}`)
 }
+
+/** The ruled action fields each variable of a graph feeds directly, by variable name. */
+function variableRules(actions: readonly ActionNode[]): Map<string, LiteralRule[]> {
+  const rules = new Map<string, LiteralRule[]>()
+  for (const action of actions) {
+    for (const { rule, source } of actionLiteralFields(action)) {
+      if (source?.source !== 'variable') continue
+      const fed = rules.get(source.name) ?? []
+      if (!fed.includes(rule)) fed.push(rule)
+      rules.set(source.name, fed)
+    }
+  }
+  return rules
+}
+
+/** Effect parameters named for the field they conventionally carry, whatever they feed. */
+const PARAMETER_NAME_RULES: Readonly<Record<string, LiteralRule>> = {
+  waitUntilCondition: 'wait-condition',
+  waitForCondition: 'wait-condition',
+  brightness: 'brightness',
+  colorBrightness: 'brightness',
+  lowBrightness: 'brightness',
+  startBrightness: 'brightness',
+  endBrightness: 'brightness',
+  blendMode: 'blend-mode',
+}
+
+/** What an effect declares about one of its parameters. */
+export interface EffectParameter {
+  name: string
+  type: VariableType
+  validValues?: string[]
+}
+
+/**
+ * The rules a raiser's literal for `parameter` must meet: those of the action fields it feeds in the
+ * effect, and the one its name conventionally carries.
+ */
+export function parameterRules(
+  parameter: EffectParameter,
+  effectActions: readonly ActionNode[],
+): LiteralRule[] {
+  const rules = [...(variableRules(effectActions).get(parameter.name) ?? [])]
+  const named = PARAMETER_NAME_RULES[parameter.name]
+  if (named && !rules.includes(named)) rules.push(named)
+  return rules
+}
+
+const asWarning = (issue: ValueIssue | null): ValueIssue | null =>
+  issue && { severity: 'warning', message: issue.message }
+
+function parameterTypeIssue(type: VariableType, value: unknown): ValueIssue | null {
+  switch (type) {
+    case 'number': {
+      const n = typeof value === 'string' ? parseFloat(value) : value
+      return typeof n === 'number' && Number.isFinite(n)
+        ? null
+        : warning(`'${String(value)}' is not a number`)
+    }
+    case 'boolean':
+      return typeof value === 'boolean' || value === 'true' || value === 'false'
+        ? null
+        : warning(`'${String(value)}' is not true or false`)
+    case 'color':
+      return asWarning(literalIssue('color', value))
+    case 'light-array':
+      return warning('A light array comes only from a light-array variable')
+    case 'color-array':
+      return warning('A colour list comes only from a color-array variable')
+    default:
+      return null
+  }
+}
+
+/**
+ * Whether a raiser passes `parameter` a value the effect can use. The effect falls back to a default
+ * for one it cannot, so every finding is a warning and an older file keeps loading.
+ */
+export function raiserParameterIssue(
+  parameter: EffectParameter,
+  source: ValueSource | undefined,
+  context: {
+    effectActions: readonly ActionNode[]
+    variables: ReadonlyArray<{ name: string; type: string }>
+    mode?: NodeCueMode
+  },
+): ValueIssue | null {
+  if (!source) return null
+  if (source.source === 'variable') {
+    return asWarning(variableIssue(source.name, parameter.type, context.variables))
+  }
+  const typeIssue = parameterTypeIssue(parameter.type, source.value)
+  if (typeIssue) return typeIssue
+  if (parameter.validValues) return asWarning(choiceIssue(source.value, parameter.validValues))
+  for (const rule of parameterRules(parameter, context.effectActions)) {
+    const issue = literalIssue(rule, source.value, context.mode)
+    if (issue) return asWarning(issue)
+  }
+  return null
+}

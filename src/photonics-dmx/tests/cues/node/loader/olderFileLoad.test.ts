@@ -10,6 +10,10 @@ import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { CueType } from '../../../../cues/types/cueTypes'
 
 const HISTORICAL = path.join(__dirname, '../../../historical')
+const BUNDLED_EFFECTS = path.resolve(
+  __dirname,
+  '../../../../../../resources/defaults/node-data/effects/yarg',
+)
 
 interface ValueSourceJson {
   source: string
@@ -184,6 +188,27 @@ describe('loading cue and effect files older builds wrote', () => {
       const harmony = cueOf(readJson(path.join(cuesDir, 'user-alt1.json')), 'Harmony')
       const easings = harmony.nodes.actions.map((action) => action.timing.easing?.value)
       expect(easings).toEqual(['sinInOut', 'sinInOut'])
+    })
+  })
+
+  describe('with a raiser parameter bound to a variable of another type', () => {
+    it('keeps a v0.5.5 Dischord raising the core effects this build ships, and warns', async () => {
+      writeJson(path.join(cuesDir, 'user-alt1.json'), userCopyOfAlt1('user-alt1'))
+      fs.mkdirSync(effectsDir, { recursive: true })
+      fs.copyFileSync(
+        path.join(BUNDLED_EFFECTS, 'yarg-core-effects.json'),
+        path.join(effectsDir, 'yarg-core-effects.json'),
+      )
+
+      await effectLoader.loadAll()
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-alt1')?.cues.has(CueType.Dischord)).toBe(true)
+      const [summary] = loader.getSummary().yarg
+      expect(summary.warnings).toEqual([
+        "cue 'Dischord': effect raiser 'y1-dischord-blue' parameter 'lights': 'allLights' is a light-array variable, and this field takes string.",
+      ])
     })
   })
 

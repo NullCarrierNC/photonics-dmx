@@ -46,6 +46,13 @@ interface ValueSourceEditorProps {
   rule?: LiteralRule
   /** The field may be left out of the file, and the runtime then uses the rule's default. */
   optional?: boolean
+  /** An issue the caller judged from the cue value rules, shown in place of the field's own. */
+  issue?: ValueIssue | null
+  /**
+   * A colour-array field that can hold an inline colour list. Only a colour-from-index palette can,
+   * so any other colour-array field takes a color-array variable.
+   */
+  listLiteral?: boolean
   validLiterals?: readonly string[]
   /** When set, constrained literal dropdown uses these labels instead of repeating the stored value as the label (takes precedence over {@link validLiterals}). */
   validLiteralOptions?: ReadonlyArray<{ value: string; label: string }>
@@ -69,6 +76,8 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   expected = 'either',
   rule,
   optional = false,
+  issue: callerIssue,
+  listLiteral = false,
   validLiterals,
   validLiteralOptions,
   availableVariables,
@@ -143,7 +152,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   const variableProblem = isLiteral
     ? null
     : variableIssue(selectedName, expected, availableVariables)
-  const issue = isLiteral ? literalShown : variableProblem
+  const issue = callerIssue !== undefined ? callerIssue : isLiteral ? literalShown : variableProblem
 
   /** The variable select, keeping a stored name the list leaves out as its selected entry. */
   const variableSelect = (candidates: typeof availableVariables, placeholder: string) => {
@@ -174,7 +183,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     )
   }
 
-  if (isLightArray) {
+  if (isLightArray || (isColorArray && !listLiteral)) {
     const arrayVars = availableVariables.filter((v) => v.type === expected)
 
     return (
@@ -187,7 +196,11 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
           {variableSelect(arrayVars, `-- Select ${expected} --`)}
         </label>
         <FieldIssue issue={issue} id={issueId} />
-        <p className="text-[10px] text-gray-500">Light arrays must be provided by variables.</p>
+        <p className="text-[10px] text-gray-500">
+          {isLightArray
+            ? 'Light arrays must be provided by variables.'
+            : 'A colour list here must come from a color-array variable.'}
+        </p>
       </div>
     )
   }
