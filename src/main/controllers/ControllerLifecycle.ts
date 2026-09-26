@@ -15,7 +15,10 @@ export class LifecycleAbortedError extends Error {
   }
 }
 
-/** The refusal an input enable or console entry gets while an uncaught fault is held. */
+/**
+ * The refusal an input enable, a console entry or a restart asked for before the fault gets while
+ * an uncaught fault is held.
+ */
 export const FAULT_HELD_MESSAGE =
   'The lighting controllers stopped after an error. Restart them first.'
 
@@ -49,6 +52,9 @@ const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
  *   waits out only the op already running past that wait (`awaitActiveOp`).
  * - A restart request joins the one in flight until that restart starts rebuilding. After that the
  *   rebuild has read its configuration, so the request gets one follow-up restart instead.
+ * - A restart is judged from the fault count at its latest request, so one asked for before a
+ *   fault that is still held refuses to start. A request after the fault joins a restart only
+ *   while that restart waits its turn, or tears down with no fault held since its own request.
  */
 export class ControllerLifecycle {
   private phaseValue: LifecyclePhase = 'initializing'
@@ -60,10 +66,13 @@ export class ControllerLifecycle {
   private shutdownCompleted = false
   /** Set while a restart is in flight so overlapping callers share the one attempt. */
   private restartInFlight: Promise<void> | null = null
-  /** Set once the in-flight restart has started rebuilding from the configuration. */
-  private restartRebuildStarted = false
-  /** The restart queued behind the in-flight one, until it starts. */
-  private followUpRestart: Promise<void> | null = null
+  /** Where the in-flight restart is: waiting its turn on the queue, tearing down, or rebuilding. */
+  private restartStage: 'queued' | 'tearingDown' | 'rebuilding' = 'queued'
+  /**
+   * The restart queued behind the in-flight one, until it starts, with the fault count at its
+   * latest request.
+   */
+  private followUpRestart: { run: Promise<void>; mark: number } | null = null
   /** Set while an initialisation is in flight so overlapping callers share the one attempt. */
   private initInFlight: Promise<void> | null = null
   /** The queued op or restart running now, past any wait on a shutdown. */
@@ -72,7 +81,10 @@ export class ControllerLifecycle {
   private faulted = false
   /** How many faults have been marked. Work reads it as it starts, see {@link faultMark}. */
   private faultCount = 0
-  /** The fault count the running restart read as it started, so its rebuild is judged from then. */
+  /**
+   * The fault count the in-flight restart is judged from: the count at its latest request while it
+   * waits its turn, and fixed from when it starts.
+   */
   private restartFaultMark: number | null = null
 
   /**
@@ -100,9 +112,9 @@ export class ControllerLifecycle {
   }
 
   /**
-   * Hold the graph `failed` after an uncaught fault, refusing input enables until a restart or
-   * init that starts after the fault moves the phase on. Returns false, and changes nothing, once a
-   * shutdown has begun or while a fault is already held.
+   * Hold the graph `failed` after an uncaught fault, refusing input enables until a restart asked
+   * for after the fault, or an init started after it, moves the phase on. Returns false, and
+   * changes nothing, once a shutdown has begun or while a fault is already held.
    */
   public markFaulted(): boolean {
     if (this.isShuttingDown() || this.faulted) return false
@@ -115,10 +127,13 @@ export class ControllerLifecycle {
   /**
    * The mark work reads as it starts and hands to {@link settlePhase} or {@link faultedSince} when
    * it lands. Inside a running restart it is the restart's own mark, so a reinit the restart runs
-   * is judged from when the restart started.
+   * is judged from when the restart was asked for.
    */
   public faultMark(): number {
-    return this.restartFaultMark ?? this.faultCount
+    if (this.restartFaultMark !== null && this.restartStage !== 'queued') {
+      return this.restartFaultMark
+    }
+    return this.faultCount
   }
 
   /** Whether an uncaught fault is held. */
@@ -254,51 +269,71 @@ export class ControllerLifecycle {
    * Run a restart as a queued lifecycle op, memoized so overlapping callers share the one attempt
    * and the off-queue audio toggles can wait on it. The memo is assigned synchronously so a
    * same-tick second call shares it, and cleared when the attempt settles either way. A caller
-   * that arrives once the in-flight restart has started rebuilding gets the follow-up restart.
+   * that arrives once the in-flight restart has started rebuilding gets the follow-up restart, and
+   * so does one that arrives after a fault the tearing-down restart will hold.
    */
   public runSharedRestart(work: () => Promise<void>): Promise<void> {
-    if (this.restartInFlight) {
-      return this.restartRebuildStarted ? this.queueFollowUpRestart(work) : this.restartInFlight
-    }
-    this.restartRebuildStarted = false
-    const marked = (): Promise<void> => {
-      this.restartFaultMark = this.faultCount
-      return this.runActive(work)
-    }
-    this.restartInFlight = this.runOp(marked).finally(() => {
-      this.restartInFlight = null
-      this.restartRebuildStarted = false
-      this.restartFaultMark = null
-    })
-    return this.restartInFlight
+    return this.requestRestart(work, this.faultCount)
   }
 
   /** The in-flight restart is rebuilding, so it has read the configuration it will run with. */
   public markRestartRebuildStarted(): void {
     if (this.restartInFlight) {
-      this.restartRebuildStarted = true
+      this.restartStage = 'rebuilding'
     }
+  }
+
+  /** Ask for a restart on behalf of a request made when the fault count was `mark`. */
+  private requestRestart(work: () => Promise<void>, mark: number): Promise<void> {
+    if (this.restartInFlight && this.restartFaultMark !== null) {
+      if (this.restartStage === 'queued') {
+        this.restartFaultMark = Math.max(this.restartFaultMark, mark)
+        return this.restartInFlight
+      }
+      if (this.restartStage === 'tearingDown' && !this.faultedSince(this.restartFaultMark)) {
+        return this.restartInFlight
+      }
+      return this.queueFollowUpRestart(work, mark)
+    }
+    this.restartStage = 'queued'
+    this.restartFaultMark = mark
+    const start = (): Promise<void> => {
+      this.restartStage = 'tearingDown'
+      if (this.restartFaultMark !== null && this.faultedSince(this.restartFaultMark)) {
+        return Promise.reject(new Error(FAULT_HELD_MESSAGE))
+      }
+      return this.runActive(work)
+    }
+    this.restartInFlight = this.runOp(start).finally(() => {
+      this.restartInFlight = null
+      this.restartStage = 'queued'
+      this.restartFaultMark = null
+    })
+    return this.restartInFlight
   }
 
   /**
    * One restart behind the in-flight one, shared by every caller until it starts. It clears its
    * slot as it starts, so a caller arriving during its own rebuild opens the next follow-up.
    */
-  private queueFollowUpRestart(work: () => Promise<void>): Promise<void> {
+  private queueFollowUpRestart(work: () => Promise<void>, mark: number): Promise<void> {
     if (this.followUpRestart) {
-      return this.followUpRestart
+      this.followUpRestart.mark = Math.max(this.followUpRestart.mark, mark)
+      return this.followUpRestart.run
     }
     const current = this.restartInFlight
-    this.followUpRestart = (async () => {
+    const run = (async () => {
       try {
         await current
       } catch {
         // The in-flight restart's owner reports its failure. This one still runs.
       }
+      const latest = this.followUpRestart?.mark ?? mark
       this.followUpRestart = null
-      await this.runSharedRestart(work)
+      await this.requestRestart(work, latest)
     })()
-    return this.followUpRestart
+    this.followUpRestart = { run, mark }
+    return run
   }
 
   /**
