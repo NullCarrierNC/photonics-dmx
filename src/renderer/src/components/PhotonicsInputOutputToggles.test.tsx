@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
@@ -10,6 +10,7 @@ import {
   dmxRigsLoadedAtom,
   lightingPrefsAtom,
   myDmxLightsAtom,
+  senderSacnEnabledAtom,
 } from '../atoms'
 import type { DmxFixture, DmxRig } from '../../../photonics-dmx/types'
 import { ConfigStrobeType, FixtureTypes } from '../../../photonics-dmx/types'
@@ -62,6 +63,8 @@ interface Seed {
   rigsLoaded?: boolean
   advanced?: boolean
   audioRunning?: boolean
+  lights?: DmxFixture[]
+  sacnRunning?: boolean
 }
 
 async function renderToggles({
@@ -69,14 +72,25 @@ async function renderToggles({
   rigsLoaded = true,
   advanced = false,
   audioRunning = false,
+  lights = [validLight],
+  sacnRunning = false,
 }: Seed = {}) {
   renderWithProviders(<DmxSettingsAccordion startOpen />, {
     seed: (set) => {
-      set(myDmxLightsAtom, [validLight])
+      set(myDmxLightsAtom, lights)
       set(dmxRigsAtom, rigs)
       set(dmxRigsLoadedAtom, rigsLoaded)
-      set(lightingPrefsAtom, { advancedModeEnabled: advanced })
+      set(lightingPrefsAtom, {
+        advancedModeEnabled: advanced,
+        dmxOutputConfig: {
+          sacnEnabled: true,
+          artNetEnabled: false,
+          enttecProEnabled: false,
+          openDmxEnabled: false,
+        },
+      })
       set(audioListenerEnabledAtom, audioRunning)
+      set(senderSacnEnabledAtom, sacnRunning)
     },
   })
   await waitFor(() => expect(ipcApi.getLifecyclePhase).toHaveBeenCalled())
@@ -124,6 +138,24 @@ describe('DmxSettingsAccordion', () => {
     await renderToggles({ rigs: [rig(true)], audioRunning: true })
 
     expect(screen.getByRole('switch', { name: 'Enable Audio' })).toBeTruthy()
+  })
+
+  it('holds a stopped sender off while no lights are set up', async () => {
+    await renderToggles({ lights: [] })
+
+    const button = screen.getByRole('switch', { name: 'sACN Out' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+
+  it('stops a running sender while no lights are set up', async () => {
+    await renderToggles({ lights: [], sacnRunning: true })
+
+    // The switch is locked until the lifecycle phase read lands as running.
+    const button = screen.getByRole('switch', { name: 'sACN Out' }) as HTMLButtonElement
+    await waitFor(() => expect(button.disabled).toBe(false))
+    fireEvent.click(button)
+
+    await waitFor(() => expect(ipcApi.disableSender).toHaveBeenCalledWith({ sender: 'sacn' }))
   })
 
   it('says nothing about rigs before they have been read', async () => {

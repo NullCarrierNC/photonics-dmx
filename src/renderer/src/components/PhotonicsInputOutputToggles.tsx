@@ -71,10 +71,10 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
               DMX Output
             </h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
-              <SacnToggle disabled={togglesDisabled} />
-              <ArtNetToggle disabled={togglesDisabled} />
-              <EnttecProToggle disabled={togglesDisabled} />
-              <OpenDmxToggle disabled={togglesDisabled} />
+              <SacnToggle notReady={hasInvalidConfig} disabled={lifecycleLocked} />
+              <ArtNetToggle notReady={hasInvalidConfig} disabled={lifecycleLocked} />
+              <EnttecProToggle notReady={hasInvalidConfig} disabled={lifecycleLocked} />
+              <OpenDmxToggle notReady={hasInvalidConfig} disabled={lifecycleLocked} />
             </div>
           </div>
           {lifecyclePhase === 'failed' && (
