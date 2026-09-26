@@ -158,17 +158,40 @@ export function migrateFixtureWhiteToExtraChannel(fixture: LegacyDmxFixture): {
 }
 
 /**
- * Every one-time fixture-shape migration, in order: the strobe-channel schema first (which can land
- * a `rgbw/s` template on the legacy `rgbw` identifier), then the RGBW white-channel collapse.
- * Loading a template or a rig light runs these before parsing it (see `fixtureParsing`).
+ * Fixture keys older builds wrote that nothing reads. The layout editor added `strobeMode` to every
+ * light on a rig with strobe type None.
+ */
+const RETIRED_FIXTURE_KEYS = ['strobeMode'] as const
+
+/** Removes the {@link RETIRED_FIXTURE_KEYS}, which carry no setting to keep. */
+function dropRetiredFixtureKeys(fixture: LegacyDmxFixture): {
+  fixture: LegacyDmxFixture
+  changed: boolean
+} {
+  if (!RETIRED_FIXTURE_KEYS.some((key) => key in fixture)) {
+    return { fixture, changed: false }
+  }
+  const next: LegacyDmxFixture = { ...fixture }
+  for (const key of RETIRED_FIXTURE_KEYS) delete next[key]
+  return { fixture: next, changed: true }
+}
+
+/**
+ * Every one-time fixture-shape migration, in order: retired keys dropped, the strobe-channel schema
+ * (which can land a `rgbw/s` template on the legacy `rgbw` identifier), then the RGBW white-channel
+ * collapse. Loading a template or a rig light runs these before parsing it (see `fixtureParsing`).
  */
 export function migrateFixtureSchema(fixture: LegacyDmxFixture): {
   fixture: LegacyDmxFixture
   changed: boolean
 } {
-  const strobe = migrateFixtureToStrobeChannelSchema(fixture)
+  const retired = dropRetiredFixtureKeys(fixture)
+  const strobe = migrateFixtureToStrobeChannelSchema(retired.fixture)
   const white = migrateFixtureWhiteToExtraChannel(strobe.fixture)
-  return { fixture: white.fixture, changed: strobe.changed || white.changed }
+  return {
+    fixture: white.fixture,
+    changed: retired.changed || strobe.changed || white.changed,
+  }
 }
 
 function isMovingHeadFixture(light: DmxFixture): boolean {

@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "data": {
+    "rigs": [
+      {
+        "id": "rig-1",
+        "name": "Main",
+        "active": true,
+        "config": {
+          "numLights": 6,
+          "lightLayout": {
+            "id": "front",
+            "label": "Front only"
+          },
+          "strobeType": "None",
+          "frontLights": [
+            {
+              "id": "l0",
+              "fixtureId": "tpl-rgb",
+              "position": 1,
+              "fixture": "rgb",
+              "label": "An RGB Light",
+              "name": "PAR",
+              "isStrobeEnabled": false,
+              "group": "front",
+              "channels": {
+                "masterDimmer": 1,
+                "red": 2,
+                "green": 3,
+                "blue": 4
+              },
+              "mount": "floor",
+              "strobeMode": "disabled"
+            },
+            {
+              "id": "l1",
+              "fixtureId": "tpl-rgb",
+              "position": 11,
+              "fixture": "rgb",
+              "label": "An RGB Light",
+              "name": "PAR",
+              "isStrobeEnabled": false,
+              "group": "front",
+              "channels": {
+                "masterDimmer": 11,
+                "red": 12,
+                "green": 13,
+                "blue": 14
+              },
+              "mount": "floor",
+              "strobeMode": "disabled"
+            },
+            {
+              "id": "l2",
+              "fixtureId": "tpl-rgb",
+              "position": 21,
+              "fixture": "rgb",
+              "label": "An RGB Light",
+              "name": "PAR",
+              "isStrobeEnabled": false,
+              "group": "front",
+              "channels": {
+                "masterDimmer": 21,
+                "red": 22,
+                "green": 23,
+                "blue": 24
+              },
+              "mount": "floor",
+              "strobeMode": "disabled"
+            },
+            {
+              "id": "l3",
+              "fixtureId": "tpl-rgb",
+              "position": 31,
+              "fixture": "rgb",
+              "label": "An RGB Light",
+              "name": "PAR",
+              "isStrobeEnabled": false,
+              "group": "front",
+              "channels": {
+                "masterDimmer": 31,
+                "red": 32,
+                "green": 33,
+                "blue": 34
+              },
+              "mount": "floor",
+              "strobeMode": "disabled"
+            },
+            {
+              "id": "l4",
+              "fixtureId": "tpl-rgb",
+              "position": 41,
+              "fixture": "rgb",
+              "label": "An RGB Light",
+              "name": "PAR",
+              "isStrobeEnabled": false,
+              "group": "front",
+              "channels": {
+                "masterDimmer": 41,
+                "red": 42,
+                "green": 43,
+                "blue": 44
+              },
+              "mount": "floor",
+              "strobeMode": "disabled"
+            },
+            {
+              "id": "l5",
+              "fixtureId": "tpl-rgb",
+              "position": 51,
+              "fixture": "rgb",
+              "label": "An RGB Light",
+              "name": "PAR",
+              "isStrobeEnabled": false,
+              "group": "front",
+              "channels": {
+                "masterDimmer": 51,
+                "red": 52,
+                "green": 53,
+                "blue": 54
+              },
+              "mount": "floor",
+              "strobeMode": "disabled"
+            }
+          ],
+          "backLights": [],
+          "strobeLights": []
+        }
+      }
+    ],
+    "schemaVersion": 8
+  }
+}

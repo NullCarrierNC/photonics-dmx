@@ -119,6 +119,18 @@ describe('parseDmxLight', () => {
 })
 
 describe('loading a stored fixture', () => {
+  it('drops the strobeMode key older layout editors wrote, without a fault', () => {
+    const faults: string[] = []
+    const light = loadDmxLight(
+      rgb({ fixtureId: 'tpl-1', strobeMode: 'disabled' }),
+      'frontLights[0]',
+      (m) => faults.push(m),
+    )
+
+    expect(light).toEqual(rgb({ fixtureId: 'tpl-1' }))
+    expect(faults).toEqual([])
+  })
+
   it('brings a legacy rgb/s rig light onto rgb with a strobe channel and default speeds', () => {
     const faults: string[] = []
     const light = loadDmxLight(

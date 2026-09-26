@@ -1,5 +1,9 @@
+import * as nodePath from 'path'
 import { ConfigurationManager } from '../ConfigurationManager'
 import { ConfigStrobeType, FixtureTypes } from '../../../photonics-dmx/types'
+
+const HISTORICAL = nodePath.join(__dirname, '../../../photonics-dmx/tests/historical')
+const { readFileSync: readRealFile } = jest.requireActual<typeof import('fs')>('fs')
 
 jest.mock('electron', () => ({
   app: {
@@ -45,13 +49,15 @@ const layoutWith = (frontLights: unknown[]) => ({
 
 /**
  * Boots a manager against the given stored files, with empty defaults for the rest. `lightsFile` is
- * the whole of lights.json, and `lights` the list inside an unversioned one.
+ * the whole of lights.json, and `lights` the list inside an unversioned one. `rigsText` is the text
+ * of dmxRigs.json.
  */
 function boot(files: {
   lights?: unknown[]
   lightsFile?: unknown
   layoutLights?: unknown[]
   layout?: Record<string, unknown>
+  rigsText?: string
 }): ConfigurationManager {
   ;(fs.existsSync as jest.Mock).mockReturnValue(true)
   ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
@@ -62,6 +68,7 @@ function boot(files: {
     if (path.includes('lightsLayout.json')) {
       return JSON.stringify({ ...layoutWith(files.layoutLights ?? []), ...files.layout })
     }
+    if (path.includes('dmxRigs.json') && files.rigsText !== undefined) return files.rigsText
     return '{}'
   })
   return new ConfigurationManager()
@@ -173,6 +180,16 @@ describe('ConfigurationManager fixture loading', () => {
       blue: 0,
     })
     expect(reportsFor(cm, 'lightsLayout.json')[0]?.message).toContain('frontLights[0].channels')
+  })
+
+  it('boots on the rigs file the strobe-None layout editor saved, and reports nothing', () => {
+    const rigsText = readRealFile(nodePath.join(HISTORICAL, 'f3f851db', 'dmxRigs.json'), 'utf-8')
+    const cm = boot({ rigsText, lights: [template({ id: 'tpl-rgb' })] })
+
+    const [rig] = cm.getDmxRigs()
+    expect(rig.config.frontLights).toHaveLength(6)
+    for (const light of rig.config.frontLights) expect(light).not.toHaveProperty('strobeMode')
+    expect(reportsFor(cm, 'dmxRigs.json')).toEqual([])
   })
 
   it('reports only the set-aside when a repaired file then fails its check', () => {
