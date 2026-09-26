@@ -1,7 +1,8 @@
 /** @jest-environment jsdom */
-import { afterEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals'
 import type { KeyboardEvent, ReactNode } from 'react'
-import { act, cleanup, fireEvent, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import ReactFlow, { ReactFlowProvider, type Node, type NodeChange } from 'reactflow'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import Modal, { type ModalProps } from './Modal'
 
@@ -122,5 +123,47 @@ describe('Modal', () => {
 
     fireEvent.keyDown(name, { key: 'Tab', shiftKey: true })
     expect(save).toHaveFocus()
+  })
+})
+
+describe('Modal over a React Flow graph', () => {
+  beforeAll(() => {
+    // React Flow measures its pane, and jsdom has no ResizeObserver.
+    globalThis.ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+  })
+
+  const nodes: Node[] = [
+    { id: 'a', position: { x: 0, y: 0 }, data: { label: 'A' }, selected: true },
+  ]
+
+  it('keeps Backspace pressed inside the dialog away from the selected node', async () => {
+    const onNodesChange = jest.fn<(changes: NodeChange[]) => void>()
+    render(
+      <>
+        <div style={{ width: 800, height: 600 }}>
+          <ReactFlowProvider>
+            <ReactFlow nodes={nodes} edges={[]} onNodesChange={onNodesChange} />
+          </ReactFlowProvider>
+        </div>
+        <Modal onClose={() => {}} panelClassName="panel">
+          <button type="button">Delete</button>
+        </Modal>
+      </>,
+    )
+    const panel = screen.getByRole('dialog')
+
+    await act(async () => {
+      fireEvent.keyDown(panel, { key: 'Backspace', code: 'Backspace' })
+    })
+    await act(async () => {
+      fireEvent.keyUp(panel, { key: 'Backspace', code: 'Backspace' })
+    })
+
+    const removed = onNodesChange.mock.calls.flat(2).filter((change) => change.type === 'remove')
+    expect(removed).toEqual([])
   })
 })

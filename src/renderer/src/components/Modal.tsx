@@ -40,7 +40,8 @@ export interface ModalProps {
 /**
  * The overlay a dialog sits in. It takes focus as it opens unless a control inside already has it,
  * keeps Tab inside the panel, closes on Escape, and gives focus back to whatever opened it when it
- * goes. Enter is left to the controls, so it activates whichever one has focus.
+ * goes. Enter is left to the controls, so it activates whichever one has focus. The panel carries
+ * React Flow's `nokey` class, so Backspace and Delete pressed in it leave the graph behind alone.
  */
 const Modal: FC<ModalProps> = ({
   onClose,
@@ -124,7 +125,7 @@ const Modal: FC<ModalProps> = ({
         aria-labelledby={labelledBy}
         data-escape-closes={dismissible && !drivesOutput ? '' : undefined}
         tabIndex={-1}
-        className={panelClassName}
+        className={`${panelClassName} nokey`}
         onClick={(event) => event.stopPropagation()}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}>
