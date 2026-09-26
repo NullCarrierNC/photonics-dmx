@@ -73,8 +73,12 @@ export class TransitionEngine implements ITransitionEngine {
     transition: EffectTransition,
     currentTime: number,
   ): void {
-    applyWaitUntil(activeEffect, transition, currentTime, (effect, next, time) =>
-      this.prepareTransition(effect, next, time),
+    applyWaitUntil(
+      activeEffect,
+      transition,
+      currentTime,
+      this.lightTransitionController.getPublishedFrameCount(),
+      (effect, next, time) => this.prepareTransition(effect, next, time),
     )
   }
 
@@ -207,11 +211,7 @@ export class TransitionEngine implements ITransitionEngine {
     effectsToRemove: Array<{ layer: number; lightId: string }>,
     options?: { deferLayerRemovalOneFrame?: boolean },
   ): void {
-    const finished: Array<{
-      layer: number
-      lightId: string
-      effect: LightEffectState
-    }> = []
+    const finished: Array<{ layer: number; lightId: string; effect: LightEffectState }> = []
     for (const { layer, lightId } of effectsToRemove) {
       const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId)
       if (!justFinishedEffect) continue
@@ -292,9 +292,7 @@ export class TransitionEngine implements ITransitionEngine {
 
     if (effectsToRemove.length === 0) return
 
-    this.finalizeCompletedEffects(effectsToRemove, {
-      deferLayerRemovalOneFrame: true,
-    })
+    this.finalizeCompletedEffects(effectsToRemove, { deferLayerRemovalOneFrame: true })
   }
 
   /**

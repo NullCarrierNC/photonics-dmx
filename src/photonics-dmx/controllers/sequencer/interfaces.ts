@@ -34,6 +34,11 @@ export interface LightEffectState {
   state: 'idle' | 'waitingFor' | 'transitioning' | 'waitingUntil'
   transitionStartTime: number
   waitEndTime: number
+  /**
+   * The light transition controller's published frame count when the current transition began
+   * holding until a beat or measure. Unset for any other hold.
+   */
+  holdSinceFrame?: number
   lastEndState?: RGBIO
   isPersistent?: boolean
   /**

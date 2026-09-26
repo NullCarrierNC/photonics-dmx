@@ -211,6 +211,7 @@ export class SongEventHandler implements ISongEventHandler {
     // decides what actually finished rather than each landing site here.
     let released = false
 
+    const publishedFrames = ltc.getPublishedFrameCount()
     const prepare: PrepareTransition = (effect, next, time) =>
       this.transitionEngine.prepareTransition(effect, next, time)
 
@@ -238,7 +239,9 @@ export class SongEventHandler implements ISongEventHandler {
           activeEffect.state === 'waitingUntil' &&
           currentTransition.waitUntilCondition === eventType
         ) {
-          if (countHoldEvent(activeEffect, currentTransition, currentTime, prepare)) {
+          if (
+            countHoldEvent(activeEffect, currentTransition, currentTime, publishedFrames, prepare)
+          ) {
             released = true
           }
         }

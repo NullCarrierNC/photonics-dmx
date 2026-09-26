@@ -65,6 +65,7 @@ describe('TransitionEngine', () => {
     // Create mock dependencies
     lightTransitionController = {
       setTransition: jest.fn(),
+      getPublishedFrameCount: jest.fn().mockReturnValue(0),
       removeTransitionsByLayer: jest.fn(),
       getFinalLightState: jest.fn(),
       getLightState: jest.fn().mockReturnValue({

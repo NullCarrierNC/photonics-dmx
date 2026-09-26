@@ -78,6 +78,7 @@ describe('EffectScheduler', () => {
       getLightState: jest.fn(),
       setTransition: jest.fn(),
       removeLightLayer: jest.fn(),
+      getPublishedFrameCount: jest.fn().mockReturnValue(0),
     } as unknown as LightTransitionController
 
     persistentRuns = new PersistentRunRegistry()

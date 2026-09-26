@@ -62,6 +62,8 @@ export class LightTransitionController {
    * sets the publisher keeps.
    */
   private _faultReported = false
+  /** How many frames have published. See {@link getPublishedFrameCount}. */
+  private _publishedFrames = 0
 
   // Monitoring fields
   private lastStateValidation: number = 0
@@ -497,6 +499,15 @@ export class LightTransitionController {
 
     // Phase 5: Publish all buffered light state updates atomically
     this._lightStateManager.publishLightStates()
+    this._publishedFrames += 1
+  }
+
+  /**
+   * How many frames have published. A transition held until a beat or measure records this, so
+   * one arriving in the frame the transition began in leaves the hold in place.
+   */
+  public getPublishedFrameCount(): number {
+    return this._publishedFrames
   }
 
   /**
@@ -536,23 +547,12 @@ export class LightTransitionController {
     log.info('LightTransitionController has been shut down.')
   }
 
-  /**
-   * Gets the final light state from the LightStateManager
-   * This is the fully merged/flattened state of all layers
-   *
-   * @param lightId The ID of the light to get the state for
-   * @returns The final light state or null if not found
-   */
+  /** The light's colour with every layer blended, or null for a light the manager does not track. */
   public getFinalLightState(lightId: string): RGBIO | null {
     return this._lightStateManager.getLightState(lightId)
   }
 
-  /**
-   * Gets all tracked light IDs directly from the LightStateManager
-   * Helpful for debugging when no lights appear in the table
-   *
-   * @returns Array of light IDs tracked by the LightStateManager
-   */
+  /** Every light id the LightStateManager holds a colour for. */
   public getLightStateManagerTrackedLights(): string[] {
     return this._lightStateManager.getTrackedLightIds()
   }
