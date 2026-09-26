@@ -87,7 +87,8 @@ export function fakeLightingController(
 export type CompletingLightingController = FakeLightingController & {
   /**
    * Ends a pending blackout fade, cancelling every held effect as the fade's closing wipe does.
-   * With no fade pending it finishes every held effect, oldest first.
+   * With no fade pending it finishes every running effect at once, telling their waiters oldest
+   * first.
    */
   tick(): void
   /** The names whose completion callbacks are held, oldest first. */
@@ -96,37 +97,60 @@ export type CompletingLightingController = FakeLightingController & {
 
 /**
  * A fake that holds every completion callback and blackout until the suite calls `tick`, so a
- * suite can order a completion against a cue change. It answers waiters as the real sequencer does,
- * which lightingControllerContract.test.ts checks against both, and `removeAllEffects` also tells
- * the motion-wipe subscribers.
+ * suite can order a completion against a cue change. Each effect runs on the layer and light slots
+ * its transitions name, and takes those slots from any other name, as in the real sequencer. Queues
+ * are not modelled, so a name submitted onto slots it already holds keeps them.
+ * lightingControllerContract.test.ts runs each case it lists against this fake and the real
+ * sequencer. `removeAllEffects` also tells the motion-wipe subscribers.
  */
 export function completingLightingController(
   overrides: Partial<ILightingController> = {},
 ): CompletingLightingController {
-  /** A submission still running: its layer, and the completion callbacks waiting on it. */
-  type Run = { name: string; layer: number; waiters: Array<(cancelled: boolean) => void> }
-  let runs: Run[] = []
+  /** The name running on each slot, keyed by layer and light id. */
+  const slots = new Map<string, { name: string; layer: number }>()
+  /** Completion callbacks held per name, in the order they were registered. */
+  const waiters = new Map<string, Array<(cancelled: boolean) => void>>()
   let blackouts: Array<() => void> = []
+  let lastLayer0Name = ''
   const wipeListeners = new Set<() => void>()
-  const layerOf = (effect: Effect): number => effect.transitions[0]?.layer ?? 0
-  const start = (name: string, effect: Effect, onComplete?: (cancelled: boolean) => void): void => {
-    runs.push({ name, layer: layerOf(effect), waiters: onComplete ? [onComplete] : [] })
+
+  const isRunning = (name: string): boolean =>
+    Array.from(slots.values()).some((slot) => slot.name === name)
+  const hold = (name: string, onComplete: (cancelled: boolean) => void): void => {
+    waiters.set(name, [...(waiters.get(name) ?? []), onComplete])
   }
-  const end = (matches: (run: Run) => boolean, cancelled: boolean): void => {
-    const due = runs.filter(matches)
-    runs = runs.filter((run) => !matches(run))
-    for (const run of due) for (const waiter of run.waiters) waiter(cancelled)
+  const fire = (name: string, cancelled: boolean): void => {
+    const held = waiters.get(name) ?? []
+    waiters.delete(name)
+    for (const waiter of held) waiter(cancelled)
   }
-  const cancelAll = (): void => end(() => true, true)
-  const named =
-    (name: string) =>
-    (run: Run): boolean =>
-      run.name === name
-  /** Adds a waiter to the oldest run of `name`, reporting whether one was running. */
-  const park = (name: string, onComplete: (cancelled: boolean) => void): boolean => {
-    const running = runs.find(named(name))
-    running?.waiters.push(onComplete)
-    return running !== undefined
+  /** Tells the waiters of each name that no longer holds a slot that its run was cancelled. */
+  const fireUnscheduled = (names: Iterable<string>): void => {
+    for (const name of names) if (!isRunning(name)) fire(name, true)
+  }
+  /** Frees the slots that match, then tells the waiters of the names left with none. */
+  const vacate = (matches: (name: string, layer: number) => boolean): void => {
+    const evicted = new Set<string>()
+    for (const [key, slot] of Array.from(slots)) {
+      if (!matches(slot.name, slot.layer)) continue
+      slots.delete(key)
+      evicted.add(slot.name)
+    }
+    fireUnscheduled(evicted)
+  }
+  /** Runs `name` on the effect's slots, displacing any other name running there. */
+  const place = (name: string, effect: Effect): void => {
+    const displaced = new Set<string>()
+    for (const transition of effect.transitions) {
+      if (transition.layer === 0) lastLayer0Name = name
+      for (const light of transition.lights) {
+        const key = `${transition.layer}:${light.id}`
+        const current = slots.get(key)
+        if (current && current.name !== name) displaced.add(current.name)
+        slots.set(key, { name, layer: transition.layer })
+      }
+    }
+    fireUnscheduled(displaced)
   }
   const blackoutPending = (): boolean => blackouts.length > 0
   const settleBlackouts = (): void => {
@@ -134,57 +158,86 @@ export function completingLightingController(
     blackouts = []
     for (const resolve of due) resolve()
   }
+  /** Drops every effect and cancels every held waiter, as a wipe or a set's clearing step does. */
+  const wipe = (): void => {
+    slots.clear()
+    lastLayer0Name = ''
+    const held = Array.from(waiters.values()).flat()
+    waiters.clear()
+    for (const waiter of held) waiter(true)
+  }
+  const clearForSet = (): void => {
+    settleBlackouts()
+    wipe()
+  }
+  const belowSystemLayer = (effect: Effect): boolean => effect.transitions[0].layer < 255
   /** An add or replace below the system layer cancels a fading blackout. */
   const cancelFadeBelowSystemLayer = (effect: Effect): void => {
-    if (layerOf(effect) < 255) settleBlackouts()
+    if (belowSystemLayer(effect)) settleBlackouts()
   }
+  /** Whether an unblocked-name submission is refused before the duplicate-name check. */
+  const refusedUnblocked = (effect: Effect): boolean =>
+    effect.transitions.length === 0 || (blackoutPending() && belowSystemLayer(effect))
+  const add = (name: string, effect: Effect): void => {
+    if (effect.transitions.length === 0) return
+    cancelFadeBelowSystemLayer(effect)
+    place(name, effect)
+  }
+
   const fake = fakeLightingController({
-    addEffect: (name, effect) => {
-      cancelFadeBelowSystemLayer(effect)
-      start(name, effect)
-    },
+    addEffect: add,
+    replaceEffect: add,
     setEffect: (name, effect) => {
       settleBlackouts()
-      cancelAll()
-      start(name, effect)
+      if (effect.transitions.length === 0) return
+      const onLayer0 = effect.transitions.some((transition) => transition.layer === 0)
+      if (onLayer0 && lastLayer0Name === name) {
+        vacate((running, layer) => running === name && layer === 0)
+      } else {
+        wipe()
+      }
+      place(name, effect)
     },
     replaceEffectWithCallback: (name, effect, onComplete) => {
-      cancelFadeBelowSystemLayer(effect)
-      end(named(name), true)
-      start(name, effect, onComplete)
+      if (effect.transitions.length === 0) return false
+      add(name, effect)
+      fire(name, true)
+      hold(name, onComplete)
       return true
     },
     addEffectUnblockedName: (name, effect) => {
-      if (blackoutPending() || runs.some(named(name))) return false
-      start(name, effect)
+      if (refusedUnblocked(effect) || isRunning(name)) return false
+      place(name, effect)
       return true
     },
     setEffectUnblockedName: (name, effect) => {
-      if (blackoutPending() || runs.some(named(name))) return false
-      cancelAll()
-      start(name, effect)
+      if (refusedUnblocked(effect) || isRunning(name)) return false
+      clearForSet()
+      place(name, effect)
       return true
     },
     addEffectUnblockedNameWithCallback: (name, effect, onComplete) => {
-      if (blackoutPending()) return false
-      if (park(name, onComplete)) return true
-      start(name, effect, onComplete)
+      if (refusedUnblocked(effect)) return false
+      if (!isRunning(name)) place(name, effect)
+      hold(name, onComplete)
       return true
     },
     setEffectUnblockedNameWithCallback: (name, effect, onComplete) => {
-      if (blackoutPending()) return false
-      if (park(name, onComplete)) return true
-      cancelAll()
-      start(name, effect, onComplete)
+      if (refusedUnblocked(effect)) return false
+      if (!isRunning(name)) {
+        clearForSet()
+        place(name, effect)
+      }
+      hold(name, onComplete)
       return true
     },
-    removeEffect: (name, layer) => end((run) => run.name === name && run.layer === layer, true),
+    removeEffect: (name, layer) => vacate((running, at) => running === name && at === layer),
+    removeEffectByLayer: (layer) => vacate((_name, at) => at === layer),
     removeEffectCallback: (name) => {
-      for (const run of runs.filter(named(name))) run.waiters = []
+      waiters.delete(name)
     },
     removeAllEffects: () => {
-      settleBlackouts()
-      cancelAll()
+      clearForSet()
       for (const listener of Array.from(wipeListeners)) listener()
     },
     onMotionPatternsCleared: (listener) => {
@@ -195,8 +248,7 @@ export function completingLightingController(
     },
     blackout: (duration) => {
       if (duration <= 0) {
-        settleBlackouts()
-        cancelAll()
+        clearForSet()
         return Promise.resolve()
       }
       if (blackoutPending()) return Promise.resolve()
@@ -209,12 +261,16 @@ export function completingLightingController(
   return Object.assign(fake, {
     tick: () => {
       if (blackoutPending()) {
-        cancelAll()
+        wipe()
         settleBlackouts()
-      } else {
-        end(() => true, false)
+        return
+      }
+      const finished = new Set(Array.from(slots.values(), (slot) => slot.name))
+      slots.clear()
+      for (const name of Array.from(waiters.keys())) {
+        if (finished.has(name) && !isRunning(name)) fire(name, false)
       }
     },
-    heldCompletions: () => runs.filter((run) => run.waiters.length > 0).map((run) => run.name),
+    heldCompletions: () => Array.from(waiters.keys()),
   })
 }
