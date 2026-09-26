@@ -162,6 +162,34 @@ describe('parseDmxLight', () => {
     expect(light).toEqual(rgb({ fixtureId: 'tpl-1' }))
     expect(faults).toEqual([])
   })
+
+  it('reads a rig light template sync left unplaced', () => {
+    const faults: string[] = []
+    const raw = rgb({ fixtureId: 'tpl-1', unplaced: true })
+    const light = parseDmxLight(raw, 'frontLights[0]', (m) => faults.push(m))
+
+    expect(light).toEqual(raw)
+    expect(faults).toEqual([])
+  })
+
+  it('drops an unplaced flag that is not true, and reports it', () => {
+    const faults: string[] = []
+    const light = parseDmxLight(
+      rgb({ fixtureId: 'tpl-1', unplaced: 'yes' }),
+      'frontLights[0]',
+      (m) => faults.push(m),
+    )
+
+    expect(light).toEqual(rgb({ fixtureId: 'tpl-1' }))
+    expect(faults).toEqual(['frontLights[0].unplaced must be true'])
+  })
+
+  it('drops an unplaced flag from a template, which has no placement of its own', () => {
+    expect(parse(rgb({ unplaced: true }))).toEqual({
+      fixture: rgb(),
+      faults: ['lights[0].unplaced is not a fixture field'],
+    })
+  })
 })
 
 describe('loading a stored fixture', () => {

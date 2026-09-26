@@ -37,6 +37,19 @@ describe('resolveMasterDimmer', () => {
     })
   })
 
+  it('places nothing but the master for a template with no master, anywhere in the universe', () => {
+    const noMaster = template({
+      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 },
+      extraChannels: [{ type: 'white', channel: 5 }],
+    })
+    const { master, cappedMessage, layout, extraChannels } = resolveMasterDimmer(noMaster, 512)
+
+    expect(master).toBe(512)
+    expect(cappedMessage).toBeNull()
+    expect(layout.channels).toEqual({ masterDimmer: 512, red: 0, green: 0, blue: 0 })
+    expect(extraChannels).toEqual([{ type: 'white', channel: 0 }])
+  })
+
   it('reports no cap for a master that fits', () => {
     expect(resolveMasterDimmer(template(), 100).cappedMessage).toBeNull()
   })

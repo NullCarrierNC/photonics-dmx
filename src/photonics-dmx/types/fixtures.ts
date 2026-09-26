@@ -255,7 +255,16 @@ export function isMovingHead(fixture: DmxFixture): fixture is RgbMovingHeadFixtu
 }
 
 /** What a rig light adds to its fixture: an id of its own and the id of its template. */
-type RigLightFields = { id: string; fixtureId: string }
+type RigLightFields = {
+  id: string
+  fixtureId: string
+  /**
+   * Set by template sync while the template has no master dimmer channel. The light keeps its own
+   * master as its address, but has no place in the universe, so nothing is written for it until
+   * the template has a master.
+   */
+  unplaced?: true
+}
 
 /** A rig light: a fixture plus the id of the template it came from. */
 export type DmxLight = DmxFixture & RigLightFields

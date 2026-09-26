@@ -16,6 +16,7 @@ import {
 import {
   deriveChannelLayoutForMaster,
   deriveExtraChannelsForMaster,
+  templatePlacesRigLights,
 } from '../../../photonics-dmx/helpers/rigTemplateSync'
 
 export function channelSortKey(name: string): number {
@@ -39,7 +40,8 @@ function numberedChannels(view: ChannelView): Record<string, number> {
  * the live fixture template, so enabling "Strobe Channel?" on a template in MyLights surfaces the
  * new channel here immediately, without needing to re-pick the fixture in LightsLayout. The
  * channel numbers come from {@link deriveChannelLayoutForMaster}, the derivation template sync
- * writes to the rig, applied to the light's master dimmer.
+ * writes to the rig, applied to the light's master dimmer. A light whose template has no master is
+ * unplaced and drives nothing, so every channel, its master included, reads 0.
  *
  * Falls back to the light's persisted channels when no template is found (legacy / orphaned light).
  */
@@ -49,9 +51,8 @@ export function getTemplateAlignedChannels(
 ): Record<string, number> {
   const template = templates.find((t) => t.id === light.fixtureId)
   if (!template) return numberedChannels(light.channels)
-  return numberedChannels(
-    deriveChannelLayoutForMaster(template, light.channels.masterDimmer).channels,
-  )
+  const master = templatePlacesRigLights(template) ? light.channels.masterDimmer : 0
+  return numberedChannels(deriveChannelLayoutForMaster(template, master).channels)
 }
 
 /**

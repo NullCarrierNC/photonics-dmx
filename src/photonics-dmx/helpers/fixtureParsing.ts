@@ -402,8 +402,9 @@ export function parseDmxFixture(
 }
 
 /**
- * A rig light: a fixture plus the id of the template it came from. Cues and the publisher find a
- * light by its id, so a light stored without one is reported and given a new one.
+ * A rig light: a fixture plus the id of the template it came from, and the `unplaced` flag template
+ * sync sets. Cues and the publisher find a light by its id, so a light stored without one is
+ * reported and given a new one.
  */
 export function parseDmxLight(
   raw: unknown,
@@ -414,7 +415,7 @@ export function parseDmxLight(
     report(`${path} must be an object`, 'reset')
     return null
   }
-  const { fixtureId, ...fields } = raw
+  const { fixtureId, unplaced, ...fields } = raw
   const fixture = parseDmxFixture(fields, path, report)
   if (!fixture) return null
   let id = fixture.id
@@ -422,9 +423,15 @@ export function parseDmxLight(
     report(`${path}.id is missing`, 'reset')
     id = globalThis.crypto.randomUUID()
   }
-  if (typeof fixtureId === 'string') return { ...fixture, id, fixtureId }
-  report(`${path}.fixtureId must be a string`, 'reset')
-  return { ...fixture, id, fixtureId: '' }
+  if (typeof fixtureId !== 'string') report(`${path}.fixtureId must be a string`, 'reset')
+  const light: DmxLight = {
+    ...fixture,
+    id,
+    fixtureId: typeof fixtureId === 'string' ? fixtureId : '',
+  }
+  if (unplaced === true) light.unplaced = true
+  else if (unplaced != null) report(`${path}.unplaced must be true`, 'dropped')
+  return light
 }
 
 /** Brings a fixture any build may have written onto the current schema before it is parsed. */

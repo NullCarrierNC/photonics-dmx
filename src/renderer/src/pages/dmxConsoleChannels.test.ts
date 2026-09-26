@@ -145,6 +145,18 @@ describe('getTemplateAlignedChannels', () => {
     expect(channels).toEqual({ masterDimmer: 0, red: 0, green: 0, blue: 0 })
   })
 
+  it('gives a light every channel at 0, its master included, when the template has no master', () => {
+    const noMaster = template({ channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 } })
+    const at = light({ channels: { masterDimmer: 5, red: 7, green: 8, blue: 9 } })
+
+    expect(getTemplateAlignedChannels(at, [noMaster])).toEqual({
+      masterDimmer: 0,
+      red: 0,
+      green: 0,
+      blue: 0,
+    })
+  })
+
   it('reads the master dimmer from the light', () => {
     const channels = getTemplateAlignedChannels(
       // A light with no red channel of its own, as when its template changed fixture type.
