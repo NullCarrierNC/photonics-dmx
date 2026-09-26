@@ -17,6 +17,7 @@ const AudioDeviceSelector: React.FC = () => {
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const shownError = error ?? (audio.loadFailed ? 'Failed to load audio configuration' : null)
 
   const loadDevices = useCallback(async (): Promise<void> => {
     setIsLoading(true)
@@ -93,15 +94,15 @@ const AudioDeviceSelector: React.FC = () => {
         </button>
       </div>
 
-      {error && (
+      {shownError && (
         <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <p className="text-sm text-red-700 dark:text-red-300">{shownError}</p>
         </div>
       )}
 
       {audio.isSaving && <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">Saving...</p>}
 
-      {devices.length === 0 && !isLoading && !error && (
+      {devices.length === 0 && !isLoading && !shownError && (
         <p className="text-xs text-yellow-500 dark:text-yellow-400 mt-2">
           No audio devices found. Click "Refresh" to try again, or check that your microphone is
           connected and permissions are granted.

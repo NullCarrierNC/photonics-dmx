@@ -26,6 +26,8 @@ export interface AudioConfigFields<T> {
   saveError: string | null
   /** Whether the stored config has been read yet. */
   loaded: boolean
+  /** The read of the stored config failed, so the values shown are the defaults. */
+  loadFailed: boolean
   /** Apply a change locally and persist it, putting the old values back if the save fails. */
   save: (patch: Partial<T>) => Promise<AudioSaveOutcome>
   /**
@@ -55,6 +57,7 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   // The values every callback works from, so none of them depend on the render they were made in.
   const latest = useRef<T>(defaults)
   // The defaults are a literal at the call site, so a new object arrives on every render. The
@@ -90,6 +93,7 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
         if (!cancelled) apply(owned(config))
       } catch (error) {
         log.error('Failed to load audio settings:', error)
+        if (!cancelled) setLoadFailed(true)
       } finally {
         if (!cancelled) setLoaded(true)
       }
@@ -188,5 +192,5 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     return persist(latest.current, takeRevert(Object.keys(unsaved.current) as K[]))
   }, [persist, takeRevert])
 
-  return { values, isSaving, saveError, loaded, save, set, commit }
+  return { values, isSaving, saveError, loaded, loadFailed, save, set, commit }
 }
