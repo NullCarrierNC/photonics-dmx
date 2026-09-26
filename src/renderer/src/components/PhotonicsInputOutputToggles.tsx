@@ -80,8 +80,8 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
           {lifecyclePhase === 'failed' && (
             <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                The lighting controllers failed to reinitialize after their last restart. Make a
-                configuration change and restart, or restart the application.
+                The lighting controllers stopped after an error, so these switches are locked. Press
+                Retry on the banner to restart them.
               </p>
             </div>
           )}
