@@ -485,7 +485,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       }
       if (reg.groupId.trim().toLowerCase() === key) {
         throw new Error(
-          `Another ${mode} cue file already uses group id '${groupId}'. Choose a different group ID.`,
+          `The ${mode} cue file ${path.basename(registeredPath)} already uses group id '${groupId}'. Choose a different group ID.`,
         )
       }
     }

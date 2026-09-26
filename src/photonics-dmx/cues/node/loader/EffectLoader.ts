@@ -208,7 +208,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       }
       if (s.groupId.trim().toLowerCase() === key) {
         throw new Error(
-          `Another ${mode} effect file already uses group id '${groupId}'. Choose a different group ID.`,
+          `The ${mode} effect file ${path.basename(s.path)} already uses group id '${groupId}'. Choose a different group ID.`,
         )
       }
     }

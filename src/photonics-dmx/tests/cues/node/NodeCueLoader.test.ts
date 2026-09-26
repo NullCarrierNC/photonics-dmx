@@ -583,7 +583,7 @@ describe('NodeCueLoader', () => {
       const file = yargMotionOnlyFile()
       await loader.saveFile('yarg', 'first.json', file)
       await expect(loader.saveFile('yarg', 'second.json', file)).rejects.toThrow(
-        /already uses group id/,
+        `The yarg cue file first.json already uses group id '${file.group.id}'.`,
       )
     })
 

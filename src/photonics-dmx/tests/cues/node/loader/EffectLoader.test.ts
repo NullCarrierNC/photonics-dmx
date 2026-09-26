@@ -111,7 +111,7 @@ describe('EffectLoader.saveFile group id uniqueness', () => {
     const minimal = minimalYargEffectFixture('dup-effect-group')
     await loader.saveFile('yarg', 'a.json', minimal)
     await expect(loader.saveFile('yarg', 'b.json', minimal)).rejects.toThrow(
-      /already uses group id/,
+      "The yarg effect file a.json already uses group id 'dup-effect-group'.",
     )
   })
 
