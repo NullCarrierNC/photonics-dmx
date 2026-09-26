@@ -23,7 +23,7 @@ export function extractCueDataValue(
   cueData: CueData | AudioCueData,
   cueId: string,
   mode: NodeCueMode,
-): number | string | boolean {
+): number | string | boolean | undefined {
   return getCueDomain(mode).extractCueData(property, cueData, cueId)
 }
 

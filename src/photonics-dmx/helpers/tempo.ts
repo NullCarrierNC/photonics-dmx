@@ -17,8 +17,11 @@ const MS_PER_MINUTE = 60000
  * Callers reach this with values off a wire or an audio analyser, so a non-finite or non-positive
  * tempo is treated as absent rather than propagated into timing maths.
  */
-export function beatDurationMs(bpm: number, fallbackMs: number = DEFAULT_BEAT_MS): number {
-  if (!Number.isFinite(bpm) || bpm <= 0) {
+export function beatDurationMs(
+  bpm: number | undefined,
+  fallbackMs: number = DEFAULT_BEAT_MS,
+): number {
+  if (bpm === undefined || !Number.isFinite(bpm) || bpm <= 0) {
     return fallbackMs
   }
   const beatMs = Math.round(MS_PER_MINUTE / bpm)

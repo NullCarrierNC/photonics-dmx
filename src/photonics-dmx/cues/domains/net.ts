@@ -100,13 +100,13 @@ export function isNetEventTriggered(
 }
 
 /**
- * Extract YARG-specific cue data.
+ * One cue-data property of a net frame, or undefined for a frame field the frame does not carry.
  */
 export function extractNetCueDataValue(
   property: NetCueDataProperty,
-  cueData: CueData,
+  cueData: Partial<CueData>,
   cueId: string,
-): number | string | boolean {
+): number | string | boolean | undefined {
   // The per-position LED families (`led-{1-8}-on` / `led-{1-8}-color`) parse to one 0-based index, so the
   // hand-numbered switch arms collapse to a single regex — no per-property index arithmetic to mis-copy.
   const ledMatch = /^led-([1-8])-(on|color)$/.exec(property)
@@ -138,13 +138,13 @@ export function extractNetCueDataValue(
     case 'venue-size':
       return cueData.venueSize
     case 'guitar-note-count':
-      return cueData.guitarNotes.length
+      return cueData.guitarNotes?.length
     case 'bass-note-count':
-      return cueData.bassNotes.length
+      return cueData.bassNotes?.length
     case 'drum-note-count':
-      return cueData.drumNotes.length
+      return cueData.drumNotes?.length
     case 'keys-note-count':
-      return cueData.keysNotes.length
+      return cueData.keysNotes?.length
     case 'total-score':
       return cueData.totalScore ?? 0
     case 'performer':

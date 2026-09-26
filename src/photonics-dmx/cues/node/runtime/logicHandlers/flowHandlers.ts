@@ -142,7 +142,8 @@ export const tempoHandler: LogicHandler<'tempo'> = (logicNode, ctx) => {
     return Number.isFinite(n) ? n : dflt
   }
 
-  const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId, mode))
+  const reportedBpm = extractCueDataValue('bpm', context.cueData, cueId, mode)
+  const bpm = typeof reportedBpm === 'number' ? reportedBpm : undefined
   const beatMsRaw = beatDurationMs(
     bpm,
     numOr(logicNode.fallbackBeatMs, TEMPO_DEFAULTS.fallbackBeatMs),
@@ -178,7 +179,7 @@ export const tempoHandler: LogicHandler<'tempo'> = (logicNode, ctx) => {
     // mirroring the chain's independent "if bpm >= band" set nodes.
     let cycles = values[0] ?? 0
     for (let i = 0; i < bands.length; i++) {
-      if (bpm >= bands[i]) cycles = values[i + 1] ?? cycles
+      if (bpm !== undefined && bpm >= bands[i]) cycles = values[i + 1] ?? cycles
     }
     getVarStore(logicNode.assignCycles).set(logicNode.assignCycles, {
       type: 'number',

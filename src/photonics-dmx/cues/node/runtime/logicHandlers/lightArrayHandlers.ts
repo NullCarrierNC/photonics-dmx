@@ -70,12 +70,9 @@ export const lightsFromIndexHandler: LogicHandler<'lights-from-index'> = (logicN
         // Single number variable
         indices = [Math.floor(varValue.value)]
       } else if (varValue.type === 'string') {
-        // String variable - could be a single number or comma-separated list. A cue-data read of
-        // a field the frame lacks stores undefined under the string tag, which yields no indices.
-        const strValue: unknown = varValue.value
-        if (typeof strValue !== 'string') {
-          indices = []
-        } else if (strValue.includes(',')) {
+        // String variable - could be a single number or comma-separated list
+        const strValue = varValue.value
+        if (strValue.includes(',')) {
           // Comma-separated list
           indices = strValue
             .split(',')
