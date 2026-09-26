@@ -33,7 +33,8 @@ export function readEnvelope<T>(parsed: unknown): StoredEnvelope<T> {
       schemaText: `version must be a whole number of 0 or more, got ${JSON.stringify(parsed.version)}`,
     }
   }
-  // The data is unchecked here. ConfigFile migrates, repairs and validates it before it is used.
+  // Typed T before anything has checked it. ConfigFile.decode hands it to the migrations and
+  // the normalizeLoaded hook as T, and its `validate` hook is what checks the shape.
   return { ok: true, versioned: true, version: parsed.version, data: parsed.data as T }
 }
 
