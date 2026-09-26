@@ -22,6 +22,7 @@ export {
   STROBE_CUE_TYPES,
   cueTypeToStrobeSlot,
   isCueType,
+  isHandlerOwnedCueType,
   isMenuSideCueType,
   isNonDrivingCueType,
   isStrobeCueType,

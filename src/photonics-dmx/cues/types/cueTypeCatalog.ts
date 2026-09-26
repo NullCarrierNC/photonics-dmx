@@ -104,6 +104,30 @@ export function isMenuSideCueType(cueType: CueType): boolean {
 }
 
 /**
+ * Cues the cue handler acts on itself (blackouts, the strobe off signal, keyframes). No library
+ * implementation runs for them, so every library can play them.
+ */
+const HANDLER_OWNED_CUE_TYPES = [
+  CueType.Blackout_Fast,
+  CueType.Blackout_Spotlight,
+  CueType.NoCue,
+  CueType.Blackout_Slow,
+  CueType.Strobe_Off,
+  CueType.Keyframe_First,
+  CueType.Keyframe_Next,
+  CueType.Keyframe_Previous,
+] as const
+
+type HandlerOwnedCueType = (typeof HANDLER_OWNED_CUE_TYPES)[number]
+
+const HANDLER_OWNED_CUE_TYPE_SET: ReadonlySet<CueType> = new Set(HANDLER_OWNED_CUE_TYPES)
+
+/** True for cues the cue handler acts on itself (see HANDLER_OWNED_CUE_TYPES). */
+export function isHandlerOwnedCueType(cueType: CueType): cueType is HandlerOwnedCueType {
+  return HANDLER_OWNED_CUE_TYPE_SET.has(cueType)
+}
+
+/**
  * Maps a strobe CueType to its speed slot. Returns null for {@link CueType.Strobe_Off} and any
  * non-strobe cue type.
  */
