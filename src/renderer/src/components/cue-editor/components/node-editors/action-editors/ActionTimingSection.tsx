@@ -107,6 +107,7 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
             value={currentTiming.waitForTime}
             onChange={(next) => updateTiming({ waitForTime: next })}
             expected="number"
+            rule="time"
             availableVariables={availableVariables}
           />
           <ValueSourceEditor
@@ -114,6 +115,8 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
             value={currentTiming.waitForConditionCount}
             onChange={(next) => updateTiming({ waitForConditionCount: next })}
             expected="number"
+            rule="count"
+            optional
             availableVariables={availableVariables}
           />
         </>
@@ -125,6 +128,7 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
       value={currentTiming.duration}
       onChange={(next) => updateTiming({ duration: next })}
       expected="number"
+      rule="time"
       availableVariables={availableVariables}
     />
 
@@ -155,6 +159,7 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
             value={currentTiming.waitUntilTime}
             onChange={(next) => updateTiming({ waitUntilTime: next })}
             expected="number"
+            rule="time"
             availableVariables={availableVariables}
           />
           <ValueSourceEditor
@@ -162,6 +167,8 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
             value={currentTiming.waitUntilConditionCount}
             onChange={(next) => updateTiming({ waitUntilConditionCount: next })}
             expected="number"
+            rule="count"
+            optional
             availableVariables={availableVariables}
           />
         </>

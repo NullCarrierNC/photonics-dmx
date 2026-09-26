@@ -20,6 +20,7 @@ import {
 import type { WaitCondition } from '../../types'
 import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
+import { MAX_NODE_LAYER } from '../../constants/nodeConstants'
 import type { ActionNode, NodeCueMode, ValueSource, VariableType } from '../types/nodeCueTypes'
 
 export interface ValueIssue {
@@ -30,7 +31,7 @@ export interface ValueIssue {
 const error = (message: string): ValueIssue => ({ severity: 'error', message })
 const warning = (message: string): ValueIssue => ({ severity: 'warning', message })
 
-/** The kinds of literal a rule here knows how to check. */
+/** The kinds of text literal a rule here knows how to check. */
 export type LiteralRule =
   | 'groups'
   | 'filter'
@@ -40,19 +41,32 @@ export type LiteralRule =
   | 'easing'
   | 'wait-condition'
 
+/**
+ * The kinds of number literal a rule here knows how to check: a time in ms, a wait count, a level
+ * from 0 to 1 and a layer.
+ */
+export type NumberRule = 'time' | 'count' | 'level' | 'layer'
+
+/** Any kind of literal a rule here knows how to check. */
+export type ValueRule = LiteralRule | NumberRule
+
+export function isNumberRule(rule: ValueRule): rule is NumberRule {
+  return rule === 'time' || rule === 'count' || rule === 'level' || rule === 'layer'
+}
+
 /** Every easing an action may name. */
 const EASING_OPTIONS: readonly EasingType[] = Object.values(EasingType)
 
 /** The easing an action plays with when it names none. */
 export const DEFAULT_EASING = EasingType.SIN_IN_OUT
 
-const LITERAL_DEFAULTS: Partial<Record<LiteralRule, string>> = {
+const LITERAL_DEFAULTS: Partial<Record<ValueRule, string>> = {
   'easing': DEFAULT_EASING,
   'blend-mode': 'replace',
 }
 
 /** What the runtime uses for a literal of this kind left out of the file, when it may be. */
-export function literalDefault(rule: LiteralRule): string | undefined {
+export function literalDefault(rule: ValueRule): string | undefined {
   return LITERAL_DEFAULTS[rule]
 }
 
@@ -113,15 +127,34 @@ function waitConditionIssue(value: unknown, mode: NodeCueMode | undefined): Valu
   return null
 }
 
+/** Whether a number literal of this kind is one the file may hold, as the compilers read it. */
+function numberIssue(rule: NumberRule, value: unknown): ValueIssue | null {
+  const n = Number(value)
+  const finite = Number.isFinite(n)
+  switch (rule) {
+    case 'time':
+      return finite && n >= 0 ? null : error('must be a non-negative finite number')
+    case 'count':
+      return finite && n > 0 ? null : error('must be a positive finite number')
+    case 'level':
+      return finite && n >= 0 && n <= 1 ? null : error('must be a number between 0 and 1')
+    case 'layer':
+      return finite && n >= 0 && n <= MAX_NODE_LAYER
+        ? null
+        : error(`must be a number from 0 to ${MAX_NODE_LAYER}`)
+  }
+}
+
 /**
  * Whether a literal of this kind is one the file may hold. `mode` narrows the wait conditions to
  * those that fire in it, and a condition from another mode is a warning.
  */
 export function literalIssue(
-  rule: LiteralRule,
+  rule: ValueRule,
   value: unknown,
   mode?: NodeCueMode,
 ): ValueIssue | null {
+  if (isNumberRule(rule)) return numberIssue(rule, value)
   switch (rule) {
     case 'groups':
       return groupsIssue(value)
@@ -144,14 +177,14 @@ export function literalIssue(
 
 /** A field of an action whose literal a rule here judges, named by its path in the action. */
 interface ActionLiteralField {
-  rule: LiteralRule
+  rule: ValueRule
   field: string
   source: ValueSource | undefined
 }
 
 /** The fields of an action that hold a ruled literal, in the order the compilers check them. */
 function actionLiteralFields(action: ActionNode): ActionLiteralField[] {
-  const { target, color, timing } = action
+  const { target, color, timing, layer } = action
   return [
     { rule: 'groups', field: 'target.groups', source: target?.groups },
     { rule: 'filter', field: 'target.filter', source: target?.filter },
@@ -159,12 +192,23 @@ function actionLiteralFields(action: ActionNode): ActionLiteralField[] {
     { rule: 'brightness', field: 'color.brightness', source: color?.brightness },
     { rule: 'blend-mode', field: 'color.blendMode', source: color?.blendMode },
     { rule: 'wait-condition', field: 'timing.waitForCondition', source: timing?.waitForCondition },
+    { rule: 'time', field: 'timing.waitForTime', source: timing?.waitForTime },
+    { rule: 'count', field: 'timing.waitForConditionCount', source: timing?.waitForConditionCount },
+    { rule: 'time', field: 'timing.duration', source: timing?.duration },
     {
       rule: 'wait-condition',
       field: 'timing.waitUntilCondition',
       source: timing?.waitUntilCondition,
     },
+    { rule: 'time', field: 'timing.waitUntilTime', source: timing?.waitUntilTime },
+    {
+      rule: 'count',
+      field: 'timing.waitUntilConditionCount',
+      source: timing?.waitUntilConditionCount,
+    },
     { rule: 'easing', field: 'timing.easing', source: timing?.easing },
+    { rule: 'level', field: 'timing.level', source: timing?.level },
+    { rule: 'layer', field: 'layer', source: layer },
   ]
 }
 
@@ -225,12 +269,12 @@ export function variableIssue(
   return warning(`'${name}' is a ${variable.type} variable, and this field takes ${expected}`)
 }
 
-/** The ruled action fields each variable of a graph feeds directly, by variable name. */
+/** The ruled text fields of an action each variable of a graph feeds directly, by variable name. */
 function variableRules(actions: readonly ActionNode[]): Map<string, LiteralRule[]> {
   const rules = new Map<string, LiteralRule[]>()
   for (const action of actions) {
     for (const { rule, source } of actionLiteralFields(action)) {
-      if (source?.source !== 'variable') continue
+      if (source?.source !== 'variable' || isNumberRule(rule)) continue
       const fed = rules.get(source.name) ?? []
       if (!fed.includes(rule)) fed.push(rule)
       rules.set(source.name, fed)

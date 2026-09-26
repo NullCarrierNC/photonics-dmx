@@ -5,16 +5,14 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   choiceIssue,
+  isNumberRule,
   literalChoices,
   literalDefault,
   literalIssue,
   variableIssue,
   variableTypeFits,
 } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
-import type {
-  LiteralRule,
-  ValueIssue,
-} from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import type { ValueIssue, ValueRule } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import { isVariableSource } from './nodeEditorUtils'
 import ColorListEditor from './ColorListEditor'
 import FieldIssue, { issueAttributes } from './FieldIssue'
@@ -42,8 +40,8 @@ interface ValueSourceEditorProps {
     | 'color-array'
     | 'event'
     | 'either'
-  /** The cue value rule a literal here must meet, which also supplies the choices. */
-  rule?: LiteralRule
+  /** The cue value rule a literal here must meet, which also gives a text rule its choices. */
+  rule?: ValueRule
   /** The field may be left out of the file, and the runtime then uses the rule's default. */
   optional?: boolean
   /** An issue the caller judged from the cue value rules, shown in place of the field's own. */
@@ -89,7 +87,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   const isColorArray = expected === 'color-array'
   const effectiveValidLiterals = (() => {
     if (validLiterals) return validLiterals
-    if (rule) return literalChoices(rule, activeMode)
+    if (rule && !isNumberRule(rule)) return literalChoices(rule, activeMode)
     if (expected === 'color') return COLOR_OPTIONS
     if (expected === 'cue-type') return CUE_TYPE_VALUES
     if (expected === 'event' && activeMode) {
@@ -322,10 +320,13 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               value={
                 allowTextInput
                   ? String(source.value ?? '')
-                  : typeof source.value === 'number'
-                    ? source.value
-                    : 0
+                  : isDefaulted
+                    ? ''
+                    : typeof source.value === 'number'
+                      ? source.value
+                      : 0
               }
+              placeholder={isDefaulted ? 'Default' : undefined}
               onChange={(event) => {
                 if (allowTextInput) {
                   // For string or either type, store as string (allows comma-separated values)
