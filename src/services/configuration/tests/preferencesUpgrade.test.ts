@@ -248,6 +248,24 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.effectDebounce).toBe(64)
   })
 
+  it('keeps the direct mode a user chose in a stored v7 file, launch after launch', () => {
+    const appData = freshAppData()
+    seedPrefs(appData, 7, {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 65,
+      rb3Prefs: { processingMode: 'direct' },
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const first = new PreferencesConfigFile({ onCorruptRecovery }).get()
+    const second = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(first.rb3Prefs?.processingMode).toBe('direct')
+    expect(second.rb3Prefs?.processingMode).toBe('direct')
+    expect(second.effectDebounce).toBe(65)
+  })
+
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

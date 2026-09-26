@@ -264,12 +264,6 @@ describe('migratePrefsV6ToV7', () => {
     const out = migratePrefsV6ToV7(v6)
     expect(out.rb3Prefs).toEqual({ processingMode: 'cue' })
   })
-
-  it('is idempotent once already at v7', () => {
-    const once = migratePrefsV6ToV7(DEFAULT_PREFERENCES)
-    const again = migratePrefsV6ToV7(once)
-    expect(again).toEqual(once)
-  })
 })
 
 describe('healStoredSenderConfigs', () => {
