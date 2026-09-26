@@ -4,11 +4,8 @@ import type {
   NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { WaitCondition, NetEventType } from '../../../../../photonics-dmx/types'
-import { RB3_SONG_EVENTS } from '../../../../../photonics-dmx/types'
-import {
-  AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
-  WAIT_CONDITIONS_WITH_NONE_DELAY,
-} from '../../../../../photonics-dmx/constants/options'
+import { AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE } from '../../../../../photonics-dmx/constants/options'
+import { waitConditionsFor } from '../../../../../photonics-dmx/cues/node/cueValueRules'
 import {
   getYargEventCategories,
   getRb3EventCategories,
@@ -16,29 +13,6 @@ import {
 
 const withDefaultLabels = <T extends string>(values: T[]) =>
   values.map((value) => ({ value, label: value }))
-
-const EASING_OPTIONS = [
-  'linear',
-  'ease',
-  'easeIn',
-  'easeOut',
-  'easeInOut',
-  'sinIn',
-  'sinOut',
-  'sinInOut',
-  'quadraticIn',
-  'quadraticOut',
-  'quadraticInOut',
-  'cubicIn',
-  'cubicOut',
-  'cubicInOut',
-] as const
-
-// RB3 StageKit LED / fog conditions only ever fire in RB3 cue mode (from the StageKit packet
-// stream), so they are excluded from the YARG action-timing vocabulary — a YARG cue can never
-// receive them. Event nodes need no such filter: they read the domain descriptor, which already
-// splits the two.
-const RB3_CONDITIONS: ReadonlySet<string> = new Set(RB3_SONG_EVENTS)
 
 // Categorized event options, straight off each mode's domain descriptor.
 const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()
@@ -71,40 +45,17 @@ const RB3_EVENT_OPTIONS = RB3_EVENT_OPTIONS_CATEGORIZED.flatMap((c) => c.events)
   label: e.label,
 }))
 
-/** Audio analysis only fires discrete beat edges today (no measure/keyframe). */
-const AUDIO_ACTION_WAIT_CONDITIONS: WaitCondition[] = ['beat']
+const WAIT_LABELS: Partial<Record<WaitCondition, string>> = { none: 'None', delay: 'Delay' }
 
-// Wait options for ACTION TIMING - song events only (no system events). RB3 LED/fog conditions are
-// excluded from the YARG set (they never fire from a normal song).
-const ACTION_WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
-const ACTION_WAIT_OPTIONS_YARG = [
-  { value: 'none', label: 'None' },
-  { value: 'delay', label: 'Delay' },
-  ...ACTION_WAIT_CONDITIONS.filter(
-    (c) => c !== 'none' && c !== 'delay' && !RB3_CONDITIONS.has(c),
-  ).map((value) => ({
-    value,
-    label: value,
-  })),
-] as const
+/** A mode's action wait conditions, as the cue value rules list them. */
+const waitOptionsFor = (mode: NodeCueMode) =>
+  waitConditionsFor(mode).map((value) => ({ value, label: WAIT_LABELS[value] ?? value }))
 
-const ACTION_WAIT_OPTIONS_AUDIO = [
-  { value: 'none', label: 'None' },
-  { value: 'delay', label: 'Delay' },
-  ...withDefaultLabels(AUDIO_ACTION_WAIT_CONDITIONS),
-] as const
-
-// RB3 action timing: only the LED/fog edges actually fire under RB3, so the beat/keyframe/instrument
-// conditions are omitted (an author picking one would wait forever) and the "(RB3)" suffix is dropped
-// (it exists to warn YARG authors; here every listed condition IS an RB3 one).
-const ACTION_WAIT_OPTIONS_RB3 = [
-  { value: 'none', label: 'None' },
-  { value: 'delay', label: 'Delay' },
-  ...ACTION_WAIT_CONDITIONS.filter((c) => RB3_CONDITIONS.has(c)).map((value) => ({
-    value,
-    label: value,
-  })),
-] as const
+// Wait options for ACTION TIMING: song events only, no system events. Each mode offers the
+// conditions that fire in it, so RB3 lists its LED and fog edges and YARG leaves them out.
+const ACTION_WAIT_OPTIONS_YARG = waitOptionsFor('yarg')
+const ACTION_WAIT_OPTIONS_AUDIO = waitOptionsFor('audio')
+const ACTION_WAIT_OPTIONS_RB3 = waitOptionsFor('rb3')
 
 // RB3 cues are YARG-shaped, but the StageKit stream only yields lifecycle + LED/fog events, so rb3
 // gets a curated vocabulary rather than the full YARG set; only audio uses a different node shape.
@@ -144,7 +95,6 @@ export {
   ACTION_WAIT_OPTIONS_YARG,
   ACTION_WAIT_OPTIONS_RB3,
   AUDIO_EVENT_OPTIONS,
-  EASING_OPTIONS,
   YARG_EVENT_TYPES,
   YARG_EVENT_OPTIONS,
   YARG_EVENT_OPTIONS_CATEGORIZED,

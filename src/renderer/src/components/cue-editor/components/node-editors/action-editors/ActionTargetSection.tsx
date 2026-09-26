@@ -1,6 +1,5 @@
 import React from 'react'
 import type { ActionNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { LIGHT_TARGET_OPTIONS } from '../../../../../../../photonics-dmx/types'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import TargetGroupsMultiSelectEditor from '../../shared/TargetGroupsMultiSelectEditor'
 
@@ -37,7 +36,7 @@ const ActionTargetSection: React.FC<ActionTargetSectionProps> = ({
           })
         }
         expected="string"
-        validLiterals={LIGHT_TARGET_OPTIONS}
+        rule="filter"
         availableVariables={availableVariables}
       />
     </>

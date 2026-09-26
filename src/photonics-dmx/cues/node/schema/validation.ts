@@ -27,6 +27,7 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 import { getCueDomain } from '../../domains'
 import { checkContinuousCueCalledWaits } from './audioEventPolicyCheck'
+import { actionLiteralIssues } from '../cueValueRules'
 
 export type { StructuredValidationError } from './helpers'
 
@@ -88,6 +89,7 @@ export function __resetCueSemanticChecksForTests(): void {
   semanticChecks.length = 0
   registerCueSemanticCheck(checkEventVocabulary)
   registerCueSemanticCheck(checkContinuousCueCalledWaits)
+  registerCueSemanticCheck(checkActionLiteralWarnings)
 }
 
 /**
@@ -112,8 +114,30 @@ function checkEventVocabulary(file: NodeCueFile, _errors: string[], warnings: st
   }
 }
 
+/**
+ * Warn about action literals the cue value rules pass with a warning, such as a wait condition that
+ * never fires in the file's mode. A literal the rules refuse fails its cue at compile.
+ */
+function checkActionLiteralWarnings(
+  file: NodeCueFile,
+  _errors: string[],
+  warnings: string[],
+): void {
+  for (const cue of file.cues) {
+    for (const action of cue.nodes.actions ?? []) {
+      for (const { field, issue } of actionLiteralIssues(action, file.mode)) {
+        if (issue.severity !== 'warning') continue
+        warnings.push(
+          `cue '${cue.name}': action '${action.label ?? action.id}' ${field} ${issue.message}.`,
+        )
+      }
+    }
+  }
+}
+
 registerCueSemanticCheck(checkEventVocabulary)
 registerCueSemanticCheck(checkContinuousCueCalledWaits)
+registerCueSemanticCheck(checkActionLiteralWarnings)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,

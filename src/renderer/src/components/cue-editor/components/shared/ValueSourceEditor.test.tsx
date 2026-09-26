@@ -31,3 +31,51 @@ describe('ValueSourceEditor with a constrained literal', () => {
     expect(screen.queryByText(/is not a known value/)).toBeNull()
   })
 })
+
+describe('ValueSourceEditor with an optional field', () => {
+  it('shows an absent value as the default, unflagged', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="Blend Mode"
+        value={undefined}
+        onChange={jest.fn()}
+        expected="string"
+        rule="blend-mode"
+        optional
+        availableVariables={[]}
+      />,
+    )
+
+    const select = screen.getByRole('combobox', { name: 'Blend Mode' })
+    expect(select).toHaveDisplayValue('Default (replace)')
+    expect(select.getAttribute('aria-invalid')).toBeNull()
+  })
+})
+
+describe('ValueSourceEditor flags', () => {
+  it('names the select by its label and describes it by the flag', () => {
+    renderColour('bleu')
+
+    const select = screen.getByRole('combobox', { name: 'Colour' })
+    expect(select.getAttribute('aria-invalid')).toBe('true')
+    expect(select).toHaveAccessibleDescription("'bleu' is not a known value")
+  })
+
+  it('keeps a stored variable of another type selected and warns about it', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="lights (string)"
+        value={{ source: 'variable', name: 'allLights' }}
+        onChange={jest.fn()}
+        expected="string"
+        availableVariables={[{ name: 'allLights', type: 'light-array', scope: 'cue' }]}
+      />,
+    )
+
+    const select = screen.getByRole('combobox', { name: 'lights (string) variable' })
+    expect(select).toHaveDisplayValue('allLights (wrong type)')
+    expect(select).toHaveAccessibleDescription(
+      "'allLights' is a light-array variable, and this field takes string",
+    )
+  })
+})

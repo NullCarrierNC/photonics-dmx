@@ -1,10 +1,12 @@
-import React from 'react'
+import React, { useId } from 'react'
 import type {
   ActionNode,
   NodeCueMode,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { EASING_OPTIONS, getActionWaitOptions } from '../../../lib/options'
+import { literalIssue } from '../../../../../../../photonics-dmx/cues/node/cueValueRules'
+import { getActionWaitOptions } from '../../../lib/options'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
+import FieldIssue, { issueAttributes } from '../../shared/FieldIssue'
 
 /** The stored condition literal, or 'none' for a condition held in a variable. */
 function conditionFromValueSource(
@@ -16,29 +18,38 @@ function conditionFromValueSource(
 }
 
 type WaitConditionSelectProps = {
+  label: string
   value: string
   activeMode: NodeCueMode
   disabled?: boolean
   onChange: (value: string) => void
 }
 
-/** The mode's wait conditions, showing and flagging a stored one the mode does not offer. */
+/**
+ * The mode's wait conditions. A stored condition the mode does not offer stays selected, flagged as
+ * the cue value rules judge it.
+ */
 const WaitConditionSelect: React.FC<WaitConditionSelectProps> = ({
+  label,
   value,
   activeMode,
   disabled,
   onChange,
 }) => {
+  const issueId = useId()
   const options = getActionWaitOptions(activeMode)
-  const isUnknown = !options.some((option) => option.value === value)
+  const isOffered = options.some((option) => option.value === value)
+  const issue = literalIssue('wait-condition', value, activeMode)
   return (
     <>
       <select
+        aria-label={label}
         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}>
-        {isUnknown && (
+        disabled={disabled}
+        {...issueAttributes(issue, issueId)}>
+        {!isOffered && (
           <option value={value} disabled>
             {value}
           </option>
@@ -49,11 +60,7 @@ const WaitConditionSelect: React.FC<WaitConditionSelectProps> = ({
           </option>
         ))}
       </select>
-      {isUnknown && (
-        <span className="text-[10px] text-red-500">
-          &apos;{value}&apos; is not a known wait condition
-        </span>
-      )}
+      <FieldIssue issue={issue} id={issueId} />
     </>
   )
 }
@@ -80,6 +87,7 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
       <label className="flex flex-col font-medium">
         Wait For Condition
         <WaitConditionSelect
+          label="Wait For Condition"
           value={conditionFromValueSource(currentTiming.waitForCondition)}
           activeMode={activeMode}
           disabled={selectedActionHasEventParent}
@@ -124,6 +132,7 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
       <label className="flex flex-col font-medium">
         Wait Until Condition
         <WaitConditionSelect
+          label="Wait Until Condition"
           value={conditionFromValueSource(currentTiming.waitUntilCondition)}
           activeMode={activeMode}
           onChange={(value) =>
@@ -164,7 +173,8 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
       value={currentTiming.easing}
       onChange={(next) => updateTiming({ easing: next })}
       expected="string"
-      validLiterals={[...EASING_OPTIONS]}
+      rule="easing"
+      optional
       availableVariables={availableVariables}
     />
   </div>

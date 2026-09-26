@@ -187,3 +187,36 @@ describe('the built-in cue-called execution policy check', () => {
     expect(validateAudioNodeCueFile(cueCalledFile('beat', 'sometimes')).valid).toBe(false)
   })
 })
+
+describe('the built-in action literal check', () => {
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  /** Give the first action of a bundled library a wait-until condition. */
+  const withWaitUntil = (
+    mode: string,
+    file: string,
+    condition: string,
+  ): Record<string, unknown> => {
+    const parsed = JSON.parse(fs.readFileSync(path.join(CUE_ROOT, mode, file), 'utf8'))
+    const cue = (
+      parsed.cues as { nodes: { actions?: { timing: Record<string, unknown> }[] } }[]
+    ).find((c) => (c.nodes.actions ?? []).length > 0)
+    cue!.nodes.actions![0].timing.waitUntilCondition = { source: 'literal', value: condition }
+    return parsed
+  }
+
+  it('warns when an rb3 action waits until a YARG song event', () => {
+    const result = validateRb3NodeCueFile(withWaitUntil('rb3', 'rb3-stagekit.json', 'measure'))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "timing.waitUntilCondition 'measure' never fires in rb3 mode",
+    )
+  })
+
+  it('leaves a condition the mode raises alone', () => {
+    const result = validateYargNodeCueFile(withWaitUntil('yarg', 'yarg-alt1.json', 'measure'))
+
+    expect(result.valid && result.warnings).toEqual([])
+  })
+})
