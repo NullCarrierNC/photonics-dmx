@@ -13,8 +13,6 @@ const ForEachLightLogicEditor: React.FC<ForEachLightLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
-  const numberVars = availableVariables.filter((v) => v.type === 'number')
   const useGroupSize = node.groupSize != null
 
   return (
@@ -23,21 +21,24 @@ const ForEachLightLogicEditor: React.FC<ForEachLightLogicEditorProps> = ({
         label="Source Variable (light-array)"
         value={node.sourceVariable}
         onChange={(name) => updateNode({ sourceVariable: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
         placeholder="-- Select light-array --"
       />
       <VariableSelect
         label="Current Light Variable (light-array)"
         value={node.currentLightVariable}
         onChange={(name) => updateNode({ currentLightVariable: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
         hint="Holds current light(s) for this iteration (one element or a group if Group Size is set)."
       />
       <VariableSelect
         label="Current Index Variable (number)"
         value={node.currentIndexVariable}
         onChange={(name) => updateNode({ currentIndexVariable: name })}
-        variables={numberVars}
+        variables={availableVariables}
+        types={['number']}
       />
       <div className="space-y-1">
         <label className="flex items-center gap-2 cursor-pointer font-medium">

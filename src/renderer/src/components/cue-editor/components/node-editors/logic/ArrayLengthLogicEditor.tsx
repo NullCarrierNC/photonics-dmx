@@ -12,18 +12,14 @@ const ArrayLengthLogicEditor: React.FC<ArrayLengthLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const arrayVars = availableVariables.filter(
-    (v) => v.type === 'light-array' || v.type === 'color-array',
-  )
-  const numberVars = availableVariables.filter((v) => v.type === 'number')
-
   return (
     <div className="space-y-2 text-xs">
       <VariableSelect
         label="Source Variable (light-array or color-array)"
         value={node.sourceVariable}
         onChange={(name) => updateNode({ sourceVariable: name })}
-        variables={arrayVars}
+        variables={availableVariables}
+        types={['light-array', 'color-array']}
         placeholder="-- Select array --"
         showType
       />
@@ -32,7 +28,8 @@ const ArrayLengthLogicEditor: React.FC<ArrayLengthLogicEditorProps> = ({
         label="Assign To (number variable)"
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={numberVars}
+        variables={availableVariables}
+        types={['number']}
       />
 
       <p className="text-[10px] text-gray-500 italic">

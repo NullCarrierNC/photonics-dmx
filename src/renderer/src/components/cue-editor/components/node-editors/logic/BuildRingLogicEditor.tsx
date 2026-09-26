@@ -12,23 +12,22 @@ const BuildRingLogicEditor: React.FC<BuildRingLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
-  const numberVars = availableVariables.filter((v) => v.type === 'number')
-
   return (
     <div className="space-y-2 text-xs">
       <VariableSelect
         label="Ring (light-array variable)"
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
       />
 
       <VariableSelect
         label="Group Size (number variable)"
         value={node.assignGroupSize}
         onChange={(name) => updateNode({ assignGroupSize: name })}
-        variables={numberVars}
+        variables={availableVariables}
+        types={['number']}
       />
 
       <p className="text-[10px] text-gray-500 italic">

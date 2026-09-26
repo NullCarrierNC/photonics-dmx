@@ -13,8 +13,6 @@ const ColorFromIndexLogicEditor: React.FC<ColorFromIndexLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const colorVars = availableVariables.filter((v) => v.type === 'color' || v.type === 'string')
-
   return (
     <div className="space-y-2 text-xs">
       <ValueSourceEditor
@@ -38,7 +36,8 @@ const ColorFromIndexLogicEditor: React.FC<ColorFromIndexLogicEditorProps> = ({
         label="Assign To (colour variable)"
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={colorVars}
+        variables={availableVariables}
+        types={['color', 'string']}
         showType
       />
 
