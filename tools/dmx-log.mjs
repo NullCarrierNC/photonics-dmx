@@ -5,6 +5,7 @@
  *   npm run dmx:log -- --channels 1-12 --until-idle 2000 --out run.ndjson --table
  *   npm run dmx:log -- --protocol artnet --universe 1 --duration 5000 --table
  *   npm run dmx:log -- --replay run.ndjson --expect expect.json
+ *   npm run dmx:log -- --diff before.ndjson after.ndjson
  *
  * sACN: the app's multicast output is heard on the same machine, as sACN View hears it. When the
  * app sends on a chosen network interface, pass that interface's IPv4 address as `--iface`.
@@ -29,6 +30,7 @@
  *   --stats <file>        write each source's packet count and rate as JSON here. A rate runs
  *                         from the source's first lit packet
  *   --replay <file>       read rows from an earlier --out instead of listening
+ *   --diff <a> <b>        compare two earlier --out recordings and exit 1 when they differ
  *   --t0 first-change|first-packet   where 0 ms sits (default first-change)
  *   --table               print the rows as a markdown table
  *   --expect <file>       hold the rows to {universe?, states: [...]}, each state being
@@ -54,6 +56,7 @@ const {
   rebase,
   renderTable,
   checkExpectations,
+  diffRuns,
   countPacket,
   packetRates,
 } = require('./dmxLogCore.cjs')
@@ -63,6 +66,8 @@ function parseArgs(argv) {
   /** @type {Record<string, string>} */
   const flags = {}
   const bools = new Set()
+  /** @type {string[]} */
+  let diffFiles = []
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (!arg.startsWith('--')) {
@@ -70,14 +75,20 @@ function parseArgs(argv) {
     }
     const name = arg.slice(2)
     const next = argv[i + 1]
-    if (next === undefined || next.startsWith('--')) {
+    if (name === 'diff') {
+      diffFiles = argv.slice(i + 1, i + 3)
+      if (diffFiles.length < 2 || diffFiles.some((file) => file.startsWith('--'))) {
+        throw new Error('--diff needs two recordings')
+      }
+      i += 2
+    } else if (next === undefined || next.startsWith('--')) {
       bools.add(name)
     } else {
       flags[name] = next
       i++
     }
   }
-  return { flags, bools }
+  return { flags, bools, diffFiles }
 }
 
 /** @param {string | undefined} value @param {number | undefined} fallback */
@@ -247,8 +258,33 @@ function summarize(run, protocolName) {
   }
 }
 
+/** @param {string} file @returns {object[]} the rows of an earlier --out */
+function readRows(file) {
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line))
+}
+
+/** Prints where two recordings differ, universe by universe, and fails when they do. */
+function diff(fileA, fileB) {
+  const [a, b] = [readRows(fileA), readRows(fileB)]
+  const universes = [...new Set([...a, ...b].filter((row) => !row.end).map((row) => row.u))]
+  let same = true
+  for (const u of universes.sort((x, y) => x - y)) {
+    const { channels, differMs } = diffRuns(a, b, u)
+    const listed = Object.entries(channels)
+    if (listed.length === 0) continue
+    same = false
+    console.log(`Universe ${u} differs for ${differMs} ms`)
+    listed.forEach(([ch, ms]) => console.log(`  channel ${ch} from ${ms} ms`))
+  }
+  if (same) console.log('The recordings match')
+  process.exitCode = same ? 0 : 1
+}
+
 async function main() {
-  const { flags, bools } = parseArgs(process.argv.slice(2))
+  const { flags, bools, diffFiles } = parseArgs(process.argv.slice(2))
   const t0 = flags.t0 ?? 'first-change'
   if (t0 !== 'first-change' && t0 !== 'first-packet') {
     throw new Error(`--t0 must be first-change or first-packet, not '${t0}'`)
@@ -256,11 +292,12 @@ async function main() {
   const channels = flags.channels === undefined ? null : parseChannelSpec(flags.channels)
 
   let rows
+  if (diffFiles.length > 0) {
+    diff(diffFiles[0], diffFiles[1])
+    return
+  }
   if (flags.replay !== undefined) {
-    rows = readFileSync(flags.replay, 'utf8')
-      .split('\n')
-      .filter((line) => line.trim() !== '')
-      .map((line) => JSON.parse(line))
+    rows = readRows(flags.replay)
   } else {
     const protocol = flags.protocol ?? 'sacn'
     if (protocol !== 'sacn' && protocol !== 'artnet') {

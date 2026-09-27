@@ -10,6 +10,7 @@ const {
   statesOf,
   renderTable,
   checkExpectations,
+  diffRuns,
   countPacket,
   packetRates,
 } = require('../../../../tools/dmxLogCore.cjs')
@@ -217,6 +218,38 @@ describe('table', () => {
       '| 0 | 1 | 2 | 0 |',
       '| 0 | 2 | 1 | 0 |',
     ])
+  })
+})
+
+describe('recording diff', () => {
+  const before = (): Row[] => [
+    { ms: 0, u: 1, ch: { 1: 255 } },
+    { ms: 100, u: 1, ch: { 1: 0 } },
+    { ms: 200, end: true },
+  ]
+
+  it('finds nothing between matching recordings', () => {
+    expect(diffRuns(before(), before(), 1)).toEqual({ channels: {}, differMs: 0 })
+  })
+
+  it('gives each differing channel its first differing time, and how long any differs', () => {
+    const after: Row[] = [
+      { ms: 0, u: 1, ch: { 1: 255 } },
+      { ms: 50, u: 1, ch: { 1: 0, 2: 9 } },
+      { ms: 300, end: true },
+    ]
+    expect(diffRuns(before(), after, 1)).toEqual({ channels: { 1: 50, 2: 50 }, differMs: 150 })
+  })
+
+  it('compares only the time both recordings cover, on the universe asked for', () => {
+    const late: Row[] = [
+      { ms: 20, u: 1, ch: { 1: 255 } },
+      { ms: 20, u: 2, ch: { 1: 7 } },
+      { ms: 100, u: 1, ch: { 1: 0 } },
+      { ms: 150, end: true },
+    ]
+    expect(diffRuns(before(), late, 1)).toEqual({ channels: {}, differMs: 0 })
+    expect(diffRuns(before(), late, 2).channels).toEqual({ 1: 20 })
   })
 })
 

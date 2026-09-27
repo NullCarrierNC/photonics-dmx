@@ -335,6 +335,38 @@ function checkExpectations(rows, expect, options = {}) {
 }
 
 /**
+ * Where two recordings of one universe differ, reading each channel as holding its value between
+ * rows, from the later of their first rows to the earlier of their ends. Each differing channel
+ * maps to the first time it differs, and `differMs` is how long any channel differs.
+ * @param {Array<{ ms: number, u?: number, end?: boolean, ch?: Record<string, number> }>} a
+ * @param {Array<{ ms: number, u?: number, end?: boolean, ch?: Record<string, number> }>} b
+ * @param {number} universe
+ * @returns {{ channels: Record<string, number>, differMs: number }}
+ */
+function diffRuns(a, b, universe) {
+  const runs = [statesOf(a, universe), statesOf(b, universe)]
+  const lastMs = (run) => run.endMs ?? run.states.at(-1)?.ms ?? 0
+  const fromMs = Math.max(...runs.map((run) => run.states[0]?.ms ?? 0))
+  const toMs = Math.min(...runs.map(lastMs))
+  const times = [...new Set(runs.flatMap((run) => run.states.map((state) => state.ms)))]
+    .filter((ms) => ms >= fromMs && ms < toMs)
+    .sort((x, y) => x - y)
+  const valuesAt = (run, ms) => run.states.findLast((state) => state.ms <= ms)?.values ?? new Map()
+  /** @type {Record<string, number>} */
+  const channels = {}
+  let differMs = 0
+  times.forEach((ms, i) => {
+    const [left, right] = runs.map((run) => valuesAt(run, ms))
+    const differing = [...new Set([...left.keys(), ...right.keys()])].filter(
+      (ch) => (left.get(ch) ?? 0) !== (right.get(ch) ?? 0),
+    )
+    for (const ch of differing) channels[ch] ??= ms
+    if (differing.length > 0) differMs += (times[i + 1] ?? toMs) - ms
+  })
+  return { channels, differMs }
+}
+
+/**
  * @typedef {{ count: number, firstMs: number, lastMs: number, litMs: number | null,
  *   litCount: number }} PacketCount
  */
@@ -384,6 +416,7 @@ module.exports = {
   statesOf,
   renderTable,
   checkExpectations,
+  diffRuns,
   countPacket,
   packetRates,
 }
