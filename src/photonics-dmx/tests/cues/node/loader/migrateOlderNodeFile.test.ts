@@ -64,6 +64,38 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
+  it('renames a variable named like an expression built-in and leaves expression text as it is', () => {
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        {
+          id: 'c1',
+          name: 'One',
+          kind: 'lighting',
+          variables: ['min', 'pi', 'pi_2', 'a', 'b'].map((name) => variable(name)),
+          nodes: {
+            events: [],
+            actions: [{ id: 'a1', timing: { duration: read('pi') } }],
+            logic: [
+              { id: 'l1', logicType: 'expression', expression: 'min(a, b) + pi', assignTo: 'min' },
+            ],
+          },
+        },
+      ],
+    }
+
+    const changes = migrateOlderNodeFile(file)
+
+    expect(file.cues[0].variables.map((v) => v.name)).toEqual(['min_2', 'pi_3', 'pi_2', 'a', 'b'])
+    expect(file.cues[0].nodes.actions[0].timing.duration).toEqual(read('pi_3'))
+    expect(file.cues[0].nodes.logic).toEqual([
+      { id: 'l1', logicType: 'expression', expression: 'min(a, b) + pi', assignTo: 'min_2' },
+    ])
+    expect(changes.older).toEqual([
+      "Variable names cannot be built-in expression names: 'min' is now 'min_2', 'pi' is now 'pi_3'.",
+    ])
+  })
+
   it('renames an effect raiser parameter the effect file renames', () => {
     const file = {
       group: { id: 'g', name: 'G' },

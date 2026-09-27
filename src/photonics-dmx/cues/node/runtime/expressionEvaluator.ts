@@ -52,6 +52,12 @@ const FUNCTIONS: Record<string, { arity: number; fn: (a: number[]) => number }> 
   cos: { arity: 1, fn: ([a]) => Math.cos(a) },
 }
 
+/** The names an expression reads as its built-in functions and constants. */
+export const EXPRESSION_BUILTIN_NAMES: readonly string[] = [
+  ...Object.keys(FUNCTIONS),
+  ...Object.keys(CONSTANTS),
+]
+
 export class ExpressionParseError extends Error {
   constructor(message: string) {
     super(message)

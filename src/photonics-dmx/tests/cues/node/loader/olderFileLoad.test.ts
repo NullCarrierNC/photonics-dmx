@@ -8,6 +8,7 @@ import { CueRegistry } from '../../../../cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../../cues/registries/AudioCueRegistry'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { CueType } from '../../../../cues/types/cueTypes'
+import { compileExpression } from '../../../../cues/node/runtime/expressionEvaluator'
 
 const HISTORICAL = path.join(__dirname, '../../../historical')
 const BUNDLED_EFFECTS = path.resolve(
@@ -36,6 +37,7 @@ interface GraphJson {
       color: { name: ValueSourceJson; blendMode: ValueSourceJson }
       timing: { duration: ValueSourceJson; easing?: ValueSourceJson }
     }>
+    logic?: Array<{ expression: string }>
   }
   variables?: VariableJson[]
 }
@@ -311,6 +313,120 @@ describe('loading cue and effect files older builds wrote', () => {
         source: 'variable',
         name: 'fade_ms',
       })
+    })
+  })
+
+  describe('with variables named like expression built-ins', () => {
+    const numberVar = (name: string, isParameter = false) => ({
+      name,
+      type: 'number',
+      scope: 'cue',
+      initialValue: 3,
+      isParameter,
+    })
+    const expressionNode = (assignTo: string) => ({
+      id: 'x1',
+      type: 'logic',
+      logicType: 'expression',
+      expression: 'min(a, b) + pi',
+      assignTo,
+    })
+
+    /** An effect declaring `min` and `pi` beside a `min_2` of its own. */
+    const effectFile = {
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'fx', name: 'FX' },
+      effects: [
+        {
+          id: 'e1',
+          name: 'Spread',
+          mode: 'yarg',
+          nodes: { events: [], actions: [], logic: [expressionNode('pi')] },
+          connections: [],
+          variables: [
+            numberVar('min', true),
+            numberVar('min_2', true),
+            numberVar('pi'),
+            numberVar('a'),
+            numberVar('b'),
+          ],
+        },
+      ],
+    }
+
+    /** A cue declaring `min` and `pi` and passing its `min` to the effect's. */
+    const cueFile = {
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'raises-fx', name: 'Raises FX' },
+      cues: [
+        {
+          kind: 'lighting',
+          id: 'c1',
+          name: 'Raiser',
+          cueType: 'Default',
+          style: 'primary',
+          effects: [{ effectFileId: 'fx', effectId: 'e1', name: 'Spread' }],
+          variables: ['min', 'pi', 'a', 'b'].map((name) => numberVar(name)),
+          nodes: {
+            events: [{ id: 'ev', type: 'event', eventType: 'cue-called' }],
+            actions: [],
+            logic: [expressionNode('min')],
+            effectRaisers: [
+              {
+                id: 'r1',
+                type: 'effect-raiser',
+                effectId: 'e1',
+                parameterValues: { min: { source: 'variable', name: 'min' } },
+              },
+            ],
+          },
+          connections: [
+            { from: 'ev', to: 'x1' },
+            { from: 'x1', to: 'r1' },
+          ],
+        },
+      ],
+    }
+
+    const namesOf = (graph: { variables?: VariableJson[] }): string[] =>
+      (graph.variables ?? []).map((v) => v.name)
+
+    it('renames each with its uses, binds the raiser and keeps the built-ins in expressions', async () => {
+      writeJson(path.join(effectsDir, 'fx.json'), effectFile)
+      writeJson(path.join(cuesDir, 'raises-fx.json'), cueFile)
+
+      const effects = await effectLoader.loadAll()
+      const cues = await loader.loadAll()
+
+      expect(effects).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(cues).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(effects.migrations).toEqual([
+        "fx.json: Variable names cannot be built-in expression names: 'min' is now 'min_3', 'pi' is now 'pi_2'.",
+      ])
+      expect(cues.migrations).toEqual([
+        "raises-fx.json: Variable names cannot be built-in expression names: 'min' is now 'min_2', 'pi' is now 'pi_2', 'min' is now 'min_3'.",
+      ])
+      expect(yarg.getGroup('raises-fx')?.cues.has(CueType.Default)).toBe(true)
+      const [effect] = readJson(path.join(effectsDir, 'fx.json')).effects
+      const [cue] = readJson(path.join(cuesDir, 'raises-fx.json')).cues
+      expect(namesOf(effect)).toEqual(['min_3', 'min_2', 'pi_2', 'a', 'b'])
+      expect(namesOf(cue)).toEqual(['min_2', 'pi_2', 'a', 'b'])
+      expect(cue.nodes).toEqual(
+        expect.objectContaining({
+          logic: [expressionNode('min_2')],
+          effectRaisers: [
+            expect.objectContaining({
+              parameterValues: { min_3: { source: 'variable', name: 'min_2' } },
+            }),
+          ],
+        }),
+      )
+      expect(effect.nodes).toEqual(expect.objectContaining({ logic: [expressionNode('pi_2')] }))
+      const compiled = compileExpression(cue.nodes.logic?.[0].expression ?? '')
+      expect(compiled.variables).toEqual(['a', 'b'])
+      expect(compiled.evaluate((name) => (name === 'a' ? 4 : 9))).toBe(4 + Math.PI)
     })
   })
 })
