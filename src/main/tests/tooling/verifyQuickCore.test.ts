@@ -20,6 +20,7 @@ type Plan = {
   typecheckProjects: string[]
   testFiles: string[]
   dependencyChecks: boolean
+  cueSim: boolean
 }
 
 type Step = { name: string; command: string; args: string[]; note?: string }
@@ -90,6 +91,14 @@ describe('planChecks', () => {
   it('runs the dependency checks only when a package file changes', () => {
     expect(plan(modified('package-lock.json')).dependencyChecks).toBe(true)
     expect(plan(modified('src/main/menu.ts')).dependencyChecks).toBe(false)
+  })
+
+  it('runs the cue sim check for a bundled data or fingerprint change', () => {
+    expect(plan(modified('resources/defaults/node-data/cues/yarg/yarg-fade.json')).cueSim).toBe(
+      true,
+    )
+    expect(plan(modified('metrics/cue-sim-fingerprints.txt')).cueSim).toBe(true)
+    expect(plan(modified('src/main/menu.ts', 'metrics/size-budget.txt')).cueSim).toBe(false)
   })
 
   it('formats data and docs files but lints and tests only code', () => {
@@ -176,7 +185,7 @@ describe('pushGateSteps', () => {
       { name: 'npm run pushed:check', reason: 'it reads the refs of a push from stdin' },
     ])
     expect(gate.steps.find((step) => step.name === 'npm run coverage:check')?.note).toBe(
-      'held to HEAD and the branch base, without the refs of a push',
+      'run over the working tree, without the refs of a push',
     )
   })
 
@@ -190,6 +199,7 @@ describe('pushGateSteps', () => {
         'npm run format:check',
         'npx electron-vite build',
         'npm run knip:budget',
+        'npm run cue-sim:check',
         'npm run coverage:check',
         'npm run audit:check',
         'npm run test:coverage -- --randomize',

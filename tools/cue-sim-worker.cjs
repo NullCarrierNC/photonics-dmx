@@ -1,6 +1,6 @@
 /**
  * The cue-sim check's worker: runs the cues cueSimWatchdog.cjs sends it through the real
- * CueSimulator, each with Math.random seeded from its key, and sends back the sampled rows.
+ * CueSimulator, each with Math.random seeded from its key, and sends back the recorded rows.
  */
 /* eslint-disable @typescript-eslint/no-require-imports -- ts-node's hook loads the engine */
 const { join } = require('node:path')
@@ -10,22 +10,14 @@ require('ts-node').register({
   transpileOnly: true,
 })
 const { CueSimulator } = require('../src/photonics-dmx/sim/CueSimulator')
-const { SETTINGS, SCENARIOS, seededRandom } = require('./cueSimCore.cjs')
+const { SETTINGS, SIMULATOR_OPTIONS, SCENARIOS, seededRandom } = require('./cueSimCore.cjs')
 
 /** @param {{ key: string, domain: 'yarg' | 'rb3' | 'audio', library: string, cue: string }} cue */
 async function simulate({ key, domain, library, cue }) {
   const realRandom = Math.random
   Math.random = seededRandom(key)
   try {
-    const sim = await CueSimulator.create({
-      library,
-      domain,
-      frontCount: SETTINGS.frontCount,
-      backCount: SETTINGS.backCount,
-      strobeCount: SETTINGS.strobeCount,
-      bpm: SETTINGS.bpm,
-      level: SETTINGS.level,
-    })
+    const sim = await CueSimulator.create({ library, domain, ...SIMULATOR_OPTIONS })
     try {
       sim.setCue(cue)
       sim.loadScenario(SCENARIOS[domain])

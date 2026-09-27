@@ -1,8 +1,12 @@
 /**
- * A quick check of the staged changes for bulk commit runs, with the full set of typecheck, budgets
- * and every test for a change verifyQuickCore.cjs cannot judge. The full set lints and formats the
- * changed files only. `--full` runs the pre-push hook's own chain over the working tree instead,
- * less the check that reads the refs of a push, and is what to run at the end of a batch.
+ * A check of the staged changes for bulk commit runs. Every run formats and lints the changed
+ * files and runs the type-escape and size budgets, the referenced-paths check and the coverage
+ * guard. A change verifyQuickCore.cjs can judge adds a typecheck of the projects it touches and its
+ * related tests. Any other change takes the full set, which adds the whole typecheck, the any
+ * budget and every test. A package file change adds the lockfile and overrides checks, and a
+ * bundled data or fingerprint change the cue sim check. The knip budget, the bundle and the audit
+ * run only under `--full`, which runs the pre-push hook's own chain over the working tree, less
+ * the check that reads the refs of a push, and is what to run at the end of a batch.
  *
  * Usage: node tools/verify-quick.mjs [--full] [--range <from>..<to>]
  */
@@ -82,6 +86,7 @@ if (plan.dependencyChecks) {
   step('lockfile', npm, ['run', 'lockfile:check'])
   step('overrides', npm, ['run', 'overrides:check'])
 }
+if (plan.cueSim) step('cue sim', npm, ['run', 'cue-sim:check'])
 
 if (plan.mode === 'full') {
   step('jest', npx, ['jest', '--ci', '--randomize', `--maxWorkers=${workers}`])

@@ -1,7 +1,9 @@
 /**
  * Runs every bundled non-motion cue through the simulator and holds each timeline's fingerprint to
- * metrics/cue-sim-fingerprints.txt, and refuses a bundled cue or effect file changed since where
- * HEAD meets development without a higher cueVersion. `--write` rewrites the fingerprint list.
+ * metrics/cue-sim-fingerprints.txt, and refuses a bundled cue or effect file changed without a
+ * higher cueVersion. The bases it compares with are cueVersionBases' in cueSimCore.cjs: `--pushed`
+ * reads the refs of a push from stdin, and CI names its base in `CUE_VERSION_BASE_REF`. `--write`
+ * rewrites the fingerprint list.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -20,14 +22,16 @@ const {
   compareFingerprints,
   describeMove,
   cueVersionProblems,
+  cueVersionBases,
 } = require('./cueSimCore.cjs')
+const { parsePushedRefs } = require('./coverageThresholdCore.cjs')
 const { runCues } = require('./cueSimWatchdog.cjs')
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const LIST = 'metrics/cue-sim-fingerprints.txt'
 const NODE_DATA = 'resources/defaults/node-data'
 const WRITE = 'npm run cue-sim:check -- --write'
-/** Where a branch meets the mainline. */
+/** Where a branch with no upstream meets the mainline. */
 const MAINLINE = ['development', 'origin/development']
 /** A cue runs in well under a second, so one past this is stuck. */
 const CUE_TIMEOUT_MS = 30_000
@@ -48,23 +52,61 @@ function git(args) {
   }
 }
 
-/** @returns {string[]} problems with bundled files changed since the base without a cueVersion bump */
-function checkCueVersions() {
-  const base = MAINLINE.map((ref) => git(['merge-base', 'HEAD', ref])?.trim()).find(Boolean)
-  if (!base) {
-    console.log('cueVersion guard skipped: HEAD has no merge base with development')
-    return []
+/**
+ * @param {string} commit
+ * @param {string} ref the branch `commit` is pushed from, or HEAD
+ * @returns {string | null} where `commit` meets the ref's upstream or, failing that, development
+ */
+function branchBase(commit, ref) {
+  const upstream = git([
+    'rev-parse',
+    '--symbolic-full-name',
+    `${ref.replace(/^refs\/heads\//, '')}@{upstream}`,
+  ])?.trim()
+  for (const other of [...(upstream ? [upstream] : []), ...MAINLINE]) {
+    const base = git(['merge-base', commit, other])?.trim()
+    if (base) return base
   }
-  const changed = (git(['diff', '--name-only', base, '--', NODE_DATA]) ?? '')
-    .split('\n')
-    .filter((path) => path.endsWith('.json'))
-  return cueVersionProblems(
-    changed.map((path) => ({
-      path,
-      base: git(['show', `${base}:${path}`]),
-      current: existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : null,
-    })),
-  )
+  return null
+}
+
+/**
+ * @returns {{ baseProblems: string[], versionProblems: string[] }} bases the guard could not
+ *   compare with, and bundled files changed since a base without a cueVersion bump
+ */
+function checkCueVersions() {
+  const { bases, problems: baseProblems } = cueVersionBases({
+    pushed: process.argv.includes('--pushed') ? parsePushedRefs(readFileSync(0, 'utf8')) : null,
+    namedBase: process.env.CUE_VERSION_BASE_REF,
+    hasCommit: (sha) => git(['cat-file', '-e', `${sha}^{commit}`]) !== null,
+    branchBase,
+    mergeBase: (commit, other) => git(['merge-base', commit, other])?.trim() || null,
+  })
+  /** @type {string[]} */
+  const versionProblems = []
+  for (const { what, commit, base, against } of bases) {
+    const diff = git(['diff', '--name-only', base, ...(commit ? [commit] : []), '--', NODE_DATA])
+    if (diff === null) {
+      baseProblems.push(`${what}: git could not diff it against ${against} (${base.slice(0, 8)})`)
+      continue
+    }
+    const files = diff
+      .split('\n')
+      .filter((path) => path.endsWith('.json'))
+      .map((path) => ({
+        path,
+        base: git(['show', `${base}:${path}`]),
+        current: commit
+          ? git(['show', `${commit}:${path}`])
+          : existsSync(join(root, path))
+            ? readFileSync(join(root, path), 'utf8')
+            : null,
+      }))
+    for (const problem of cueVersionProblems(files)) {
+      versionProblems.push(`${what}: ${problem}, against ${against} (${base.slice(0, 8)})`)
+    }
+  }
+  return { baseProblems, versionProblems }
 }
 
 function bundledCues() {
@@ -79,12 +121,12 @@ function bundledCues() {
   })
 }
 
-const versionProblems = checkCueVersions()
+const { baseProblems, versionProblems } = checkCueVersions()
+for (const problem of [...baseProblems, ...versionProblems]) console.error(problem)
 if (versionProblems.length > 0) {
-  for (const problem of versionProblems) console.error(problem)
   console.error('Raise the top-level cueVersion of each file, or installs keep their old copy.')
-  process.exit(1)
 }
+if (baseProblems.length + versionProblems.length > 0) process.exit(1)
 
 const cues = bundledCues()
 const results = await runCues({
