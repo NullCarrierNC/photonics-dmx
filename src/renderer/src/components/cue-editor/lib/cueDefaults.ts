@@ -2,6 +2,8 @@ import {
   createDefaultActionTiming,
   type ActionNode,
   type AudioNodeCueDefinition,
+  type BaseEventNode,
+  type NetCueMode,
   type NodeCueFile,
   type NodeCueGroupMeta,
   type NodeCueKind,
@@ -15,9 +17,8 @@ import {
   type EffectGroupMeta,
   type YargEffectDefinition,
   type AudioEffectDefinition,
-  type YargEffectFile,
-  type AudioEffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { CueType } from '../../../../../photonics-dmx/cues/types/cueTypes'
 
 const createId = (): string => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -113,18 +114,10 @@ export const buildDefaultAudioTrigger = (id?: string): AudioTriggerNode => ({
   outputs: ['enter', 'during', 'exit'],
 })
 
-/**
- * A new cue: one event wired to one action. YARG and RB3 cues start on Cue Started, audio cues on
- * a beat, and a motion cue's action sets a position.
- */
-const createBlankCue = (
-  mode: NodeCueMode,
-  kind: NodeCueKind,
-): NetNodeCueDefinition | AudioNodeCueDefinition => {
-  // rb3 is YARG-shaped, so it uses the YARG cue-started event. Only audio uses the audio event.
-  const eventNode = mode === 'audio' ? buildDefaultAudioEvent() : buildDefaultYargCueStartedEvent()
+/** A new cue's graph: one event wired to one action, which sets a position for a motion cue. */
+const blankCueGraph = <E extends BaseEventNode>(eventNode: E, kind: NodeCueKind) => {
   const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
-  const base = {
+  return {
     id: `cue-${createId()}`,
     name: 'New Cue',
     description: '',
@@ -137,20 +130,32 @@ const createBlankCue = (
       nodePositions: {},
     },
   }
+}
 
-  // Motion cues are keyed by id on every platform, so they carry no cue type.
+/**
+ * A new YARG or RB3 cue, which starts on Cue Started. Motion cues are keyed by id, so they carry
+ * no cue type. RB3 lighting is the single fixed always-active gameplay cue, CueType.RB3.
+ */
+const createBlankNetCue = (mode: NetCueMode, kind: NodeCueKind): NetNodeCueDefinition => {
+  const base = blankCueGraph(buildDefaultYargCueStartedEvent(), kind)
   if (kind === 'motion') {
-    return { ...base, kind: 'motion' } as NetNodeCueDefinition | AudioNodeCueDefinition
+    return { ...base, kind: 'motion' }
   }
-  // rb3 lighting is the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped. Each
-  // new audio cue gets its own id, so two groups built in the editor never collide.
-  const cueType =
-    mode === 'audio'
-      ? { cueTypeId: `custom-audio-cue-${createId().slice(0, 8)}` }
-      : { cueType: mode === 'rb3' ? 'RB3' : 'Chorus' }
-  return { ...base, kind: 'lighting', style: 'primary', ...cueType } as
-    | NetNodeCueDefinition
-    | AudioNodeCueDefinition
+  const cueType = mode === 'rb3' ? CueType.RB3 : CueType.Chorus
+  return { ...base, kind: 'lighting', style: 'primary', cueType }
+}
+
+/**
+ * A new audio cue, which starts on a beat. Each new audio lighting cue gets its own id, so two
+ * groups built in the editor never collide.
+ */
+const createBlankAudioCue = (kind: NodeCueKind): AudioNodeCueDefinition => {
+  const base = blankCueGraph(buildDefaultAudioEvent(), kind)
+  if (kind === 'motion') {
+    return { ...base, kind: 'motion' }
+  }
+  const cueTypeId = `custom-audio-cue-${createId().slice(0, 8)}`
+  return { ...base, kind: 'lighting', style: 'primary', cueTypeId }
 }
 
 const NEW_GROUP_NAMES: Record<NodeCueMode, Record<NodeCueKind, string>> = {
@@ -160,42 +165,35 @@ const NEW_GROUP_NAMES: Record<NodeCueMode, Record<NodeCueKind, string>> = {
 }
 
 /** A new cue file holding one blank cue, in a group named for its platform and kind. */
-const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile =>
-  ({
-    version: 1,
-    mode,
-    group: {
-      id: `node-group-${Date.now()}`,
-      name: NEW_GROUP_NAMES[mode][kind],
-      description: '',
-    } satisfies NodeCueGroupMeta,
-    cues: [createBlankCue(mode, kind)],
-    bundled: false,
-  }) as NodeCueFile
-
-const createDefaultEffect = (mode: EffectMode): YargEffectDefinition | AudioEffectDefinition => {
-  const base = {
-    id: `effect-${createId()}`,
-    mode,
-    name: 'New Effect',
+const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile => {
+  const group: NodeCueGroupMeta = {
+    id: `node-group-${Date.now()}`,
+    name: NEW_GROUP_NAMES[mode][kind],
     description: '',
-    parameters: [],
-    nodes: {
-      events: [],
-      actions: [],
-    },
-    connections: [],
-    layout: {
-      nodePositions: {},
-    },
   }
-
-  if (mode === 'yarg') {
-    return base as YargEffectDefinition
+  if (mode === 'audio') {
+    return { version: 1, mode, group, cues: [createBlankAudioCue(kind)], bundled: false }
   }
-
-  return base as AudioEffectDefinition
+  return { version: 1, mode, group, cues: [createBlankNetCue(mode, kind)], bundled: false }
 }
+
+const blankEffect = () => ({
+  id: `effect-${createId()}`,
+  name: 'New Effect',
+  description: '',
+  nodes: {
+    events: [],
+    actions: [],
+  },
+  connections: [],
+  layout: {
+    nodePositions: {},
+  },
+})
+
+const createDefaultYargEffect = (): YargEffectDefinition => ({ ...blankEffect(), mode: 'yarg' })
+
+const createDefaultAudioEffect = (): AudioEffectDefinition => ({ ...blankEffect(), mode: 'audio' })
 
 const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
   const group: EffectGroupMeta = {
@@ -203,24 +201,10 @@ const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
     name: mode === 'yarg' ? 'New YARG Effects' : 'New Audio Effects',
     description: '',
   }
-
   if (mode === 'yarg') {
-    return {
-      version: 1,
-      mode,
-      group,
-      effects: [createDefaultEffect('yarg') as YargEffectDefinition],
-      bundled: false,
-    } as YargEffectFile
+    return { version: 1, mode, group, effects: [createDefaultYargEffect()], bundled: false }
   }
-
-  return {
-    version: 1,
-    mode,
-    group,
-    effects: [createDefaultEffect('audio') as AudioEffectDefinition],
-    bundled: false,
-  } as AudioEffectFile
+  return { version: 1, mode, group, effects: [createDefaultAudioEffect()], bundled: false }
 }
 
 export {
@@ -228,9 +212,11 @@ export {
   buildDefaultSetPositionAction,
   buildDefaultMotionPatternAction,
   buildDefaultAudioEvent,
-  createBlankCue,
+  createBlankAudioCue,
+  createBlankNetCue,
+  createDefaultAudioEffect,
   createDefaultFile,
-  createDefaultEffect,
   createDefaultEffectFile,
+  createDefaultYargEffect,
   createId,
 }

@@ -4,12 +4,10 @@ import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
-  NodeCueFile,
   NodeCueKind,
   NodeCueMode,
   NetNodeCueDefinition,
   YargEffectDefinition,
-  EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { fileBasename, firstByName } from '../lib/cueUtils'
@@ -136,8 +134,7 @@ export function useCueFileIO({
         setEditorDoc({ mode: 'cue', file, path: fileSummary.path })
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
-        const cueFile = file as NodeCueFile
-        const cues = cueFile.cues as (NetNodeCueDefinition | AudioNodeCueDefinition)[]
+        const cues: (NetNodeCueDefinition | AudioNodeCueDefinition)[] = file.cues
         // A caller mid-transition passes the kind it is switching to, since its state has not
         // committed yet. Everyone else gets the active kind.
         const targetKind = kindOverride ?? cueKind
@@ -190,8 +187,7 @@ export function useCueFileIO({
         setEditorDoc({ mode: 'effect', file, path: fileSummary.path })
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
-        const effectFile = file as EffectFile
-        const effects = effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[]
+        const effects: (YargEffectDefinition | AudioEffectDefinition)[] = file.effects
         const preferredEffect =
           preferredItemId != null ? effects.find((e) => e.id === preferredItemId) : null
         const effectToLoad = preferredEffect ?? firstByName(effects)
@@ -429,8 +425,7 @@ export function useCueFileIO({
           setEditorDoc({ mode: 'effect', file, path: currentPath })
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
-          const effectFile = file as EffectFile
-          const effects = effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[]
+          const effects: (YargEffectDefinition | AudioEffectDefinition)[] = file.effects
           const effectToLoad = effects.find((e) => e.id === selectedCueId) ?? firstByName(effects)
           setSelectedCueId(effectToLoad?.id ?? null)
           setIsDirty(false)
@@ -441,8 +436,7 @@ export function useCueFileIO({
           setEditorDoc({ mode: 'cue', file, path: currentPath })
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
-          const cueFile = file as NodeCueFile
-          const cues = cueFile.cues as (NetNodeCueDefinition | AudioNodeCueDefinition)[]
+          const cues: (NetNodeCueDefinition | AudioNodeCueDefinition)[] = file.cues
           const kept = cues.find((c) => c.id === selectedCueId)
           const cueToLoad =
             kept ?? firstByName(cues.filter((c) => c.kind === cueKind)) ?? firstByName(cues)
@@ -487,10 +481,7 @@ export function useCueFileIO({
         const file = await readEffectFile(currentPath)
         if (token !== selectRequestRef.current) return
         setEditorDoc({ mode: 'effect', file, path: currentPath })
-        const effects = (file as EffectFile).effects as (
-          | YargEffectDefinition
-          | AudioEffectDefinition
-        )[]
+        const effects: (YargEffectDefinition | AudioEffectDefinition)[] = file.effects
         const effectToLoad = effects.find((e) => e.id === selectedCueId) ?? firstByName(effects)
         setSelectedCueId(effectToLoad?.id ?? null)
         loadCueIntoFlow(effectToLoad ?? null)
@@ -498,7 +489,7 @@ export function useCueFileIO({
         const file = await readNodeCueFile(currentPath)
         if (token !== selectRequestRef.current) return
         setEditorDoc({ mode: 'cue', file, path: currentPath })
-        const cues = (file as NodeCueFile).cues as (NetNodeCueDefinition | AudioNodeCueDefinition)[]
+        const cues: (NetNodeCueDefinition | AudioNodeCueDefinition)[] = file.cues
         const kept = cues.find((c) => c.id === selectedCueId)
         const cueToLoad =
           kept ?? firstByName(cues.filter((c) => c.kind === cueKind)) ?? firstByName(cues)

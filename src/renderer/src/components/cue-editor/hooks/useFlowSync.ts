@@ -124,11 +124,9 @@ export function useFlowSync({
         | AudioEffectDefinition
         | null,
     ) => {
-      const isEffect = cue != null && 'mode' in cue && (cue.mode === 'yarg' || cue.mode === 'audio')
-
-      const { nodes: flowNodes, edges: flowEdges } = isEffect
-        ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-        : cueToFlow(cue as NetNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions)
+      // An effect definition carries its mode. A cue definition has none.
+      const { nodes: flowNodes, edges: flowEdges } =
+        cue && 'mode' in cue ? effectToFlow(cue) : cueToFlow(cue, effectDefinitions)
 
       setNodes(flowNodes)
       setEdges(flowEdges)

@@ -1,10 +1,9 @@
 import { describe, expect, it } from '@jest/globals'
-import { createBlankCue, createDefaultFile } from './cueDefaults'
-import type { NetNodeCueDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { createBlankAudioCue, createBlankNetCue, createDefaultFile } from './cueDefaults'
 
 describe('cueDefaults rb3 platform', () => {
   it('creates an rb3 motion cue with no cueType and a set-position action', () => {
-    const cue = createBlankCue('rb3', 'motion') as Extract<NetNodeCueDefinition, { kind: 'motion' }>
+    const cue = createBlankNetCue('rb3', 'motion')
     expect(cue.kind).toBe('motion')
     expect(cue).not.toHaveProperty('cueType')
     expect(cue.nodes.actions[0].effectType).toBe('set-position')
@@ -20,13 +19,8 @@ describe('cueDefaults rb3 platform', () => {
     expect(file.cues[0].kind).toBe('motion')
   })
   it('creates a YARG-shaped lighting cue fixed to CueType.RB3', () => {
-    const cue = createBlankCue('rb3', 'lighting') as Extract<
-      NetNodeCueDefinition,
-      { kind: 'lighting' }
-    >
-    expect(cue.kind).toBe('lighting')
-    expect(cue.cueType).toBe('RB3')
-    expect(cue.style).toBe('primary')
+    const cue = createBlankNetCue('rb3', 'lighting')
+    expect(cue).toMatchObject({ kind: 'lighting', cueType: 'RB3', style: 'primary' })
     // rb3 uses the YARG event vocabulary, never an audio event node.
     expect(cue.nodes.events[0].eventType).not.toMatch(/^audio/)
   })
@@ -36,18 +30,17 @@ describe('cueDefaults rb3 platform', () => {
     expect(file.mode).toBe('rb3')
     expect(file.group.name).toBe('New RB3 Group')
     expect(file.cues).toHaveLength(1)
-    const cue = file.cues[0] as Extract<NetNodeCueDefinition, { kind: 'lighting' }>
-    expect(cue.cueType).toBe('RB3')
-    expect(cue.style).toBe('primary')
+    expect(file.cues[0]).toMatchObject({ cueType: 'RB3', style: 'primary' })
   })
 })
 
 describe('cueDefaults audio platform', () => {
   it('gives each new audio lighting cue its own cue type id', () => {
-    const first = createBlankCue('audio', 'lighting') as { cueTypeId: string }
-    const second = createBlankCue('audio', 'lighting') as { cueTypeId: string }
+    const first = createBlankAudioCue('lighting')
+    const second = createBlankAudioCue('lighting')
 
-    expect(first.cueTypeId).toMatch(/^custom-audio-cue-/)
-    expect(second.cueTypeId).not.toBe(first.cueTypeId)
+    expect(first).toMatchObject({ cueTypeId: expect.stringMatching(/^custom-audio-cue-/) })
+    expect(second).toMatchObject({ cueTypeId: expect.stringMatching(/^custom-audio-cue-/) })
+    expect(second).not.toMatchObject({ cueTypeId: first.kind === 'lighting' && first.cueTypeId })
   })
 })

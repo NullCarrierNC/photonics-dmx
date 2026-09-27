@@ -3,7 +3,6 @@ import type { CueDocument, EditorDocument } from '../lib/types'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type {
   EffectDefinition,
-  EffectFile,
   NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { readEffectFile } from '../../../ipcApi'
@@ -91,7 +90,7 @@ export function useEffectDefinitions(
         try {
           const fileEntry = effectFileList.find((f) => f.groupId === effectRef.effectFileId)
           if (!fileEntry) return null
-          const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
+          const effectFileData = await readEffectFile(fileEntry.path)
           const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
           return effectDef ? ([effectRef.effectId, effectDef] as const) : null
         } catch (error) {

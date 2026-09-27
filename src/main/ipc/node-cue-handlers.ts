@@ -173,7 +173,14 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: validation.errors.join(', ') }
     }
 
-    // The file lands in its own mode's folder, except on the rb3 tab, which re-stamps it as rb3.
+    // The file lands in its own mode's folder, except on the rb3 tab, which re-stamps a
+    // YARG-shaped file as rb3. An audio file has no rb3 shape.
+    if (tab.value === 'rb3' && validation.data.mode === 'audio') {
+      return {
+        success: false,
+        error: 'Only a YARG or RB3 cue file can be imported on the RB3 tab.',
+      }
+    }
     const mode: NodeCueMode = tab.value === 'rb3' ? 'rb3' : validation.mode
     return {
       success: true,

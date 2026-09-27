@@ -4,24 +4,23 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
+  EffectFile,
+  NodeCueFile,
   NodeCueKind,
   NodeCueMode,
   NetNodeCueDefinition,
   YargEffectDefinition,
-  NetNodeCueFile,
-  AudioNodeCueFile,
-  YargEffectFile,
-  AudioEffectFile,
-  EffectMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument, EditorMode } from '../lib/types'
 import {
-  createBlankCue,
+  createBlankAudioCue,
+  createBlankNetCue,
+  createDefaultAudioEffect,
   createDefaultFile,
   createDefaultEffectFile,
-  createDefaultEffect,
+  createDefaultYargEffect,
 } from '../lib/cueDefaults'
-import { fileBasename, firstByName } from '../lib/cueUtils'
+import { effectModeFor, fileBasename, firstByName } from '../lib/cueUtils'
 import {
   modeKeyFor,
   setLastActiveMode,
@@ -31,6 +30,41 @@ import {
 import { validateNodeCue, validateEffect, saveNodeCueFile, saveEffectFile } from '../../../ipcApi'
 import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('useCueCrud')
+
+type AnyCue = NetNodeCueDefinition | AudioNodeCueDefinition
+type AnyEffect = YargEffectDefinition | AudioEffectDefinition
+
+/** The file with a blank cue of `kind` added, shaped for the file's own mode. */
+function withBlankCue(file: NodeCueFile, kind: NodeCueKind): { file: NodeCueFile; cue: AnyCue } {
+  if (file.mode === 'audio') {
+    const cue = createBlankAudioCue(kind)
+    return { file: { ...file, cues: [...file.cues, cue] }, cue }
+  }
+  const cue = createBlankNetCue(file.mode, kind)
+  return { file: { ...file, cues: [...file.cues, cue] }, cue }
+}
+
+/** The file with a blank effect added, shaped for the file's own mode. */
+function withBlankEffect(file: EffectFile): { file: EffectFile; effect: AnyEffect } {
+  if (file.mode === 'audio') {
+    const effect = createDefaultAudioEffect()
+    return { file: { ...file, effects: [...file.effects, effect] }, effect }
+  }
+  const effect = createDefaultYargEffect()
+  return { file: { ...file, effects: [...file.effects, effect] }, effect }
+}
+
+function withoutCue(file: NodeCueFile, cueId: string): NodeCueFile {
+  return file.mode === 'audio'
+    ? { ...file, cues: file.cues.filter((cue) => cue.id !== cueId) }
+    : { ...file, cues: file.cues.filter((cue) => cue.id !== cueId) }
+}
+
+function withoutEffect(file: EffectFile, effectId: string): EffectFile {
+  return file.mode === 'audio'
+    ? { ...file, effects: file.effects.filter((effect) => effect.id !== effectId) }
+    : { ...file, effects: file.effects.filter((effect) => effect.id !== effectId) }
+}
 
 export type UseCueCrudParams = {
   editorDoc: EditorDocument | null
@@ -48,14 +82,7 @@ export type UseCueCrudParams = {
   setValidationErrors: (errors: string[]) => void
   setIsDirty: (dirty: boolean) => void
   setCueKind: React.Dispatch<React.SetStateAction<NodeCueKind>>
-  loadCueIntoFlow: (
-    cue:
-      | NetNodeCueDefinition
-      | AudioNodeCueDefinition
-      | YargEffectDefinition
-      | AudioEffectDefinition
-      | null,
-  ) => void
+  loadCueIntoFlow: (cue: AnyCue | AnyEffect | null) => void
   rememberLastFilePath: (path: string | null) => void
   refreshFiles: () => Promise<void>
   refreshEffectFiles: () => Promise<void>
@@ -121,7 +148,7 @@ export function useCueCrud({
       }
 
       if (isInEffectMode) {
-        const file = createDefaultEffectFile(mode as EffectMode)
+        const file = createDefaultEffectFile(effectModeFor(mode))
         file.group.id = metadata.groupId
         file.group.name = metadata.groupName
         file.group.description = metadata.groupDescription
@@ -240,16 +267,11 @@ export function useCueCrud({
       return
     }
 
-    const newCue = createBlankCue(mode, cueKind)
-    const updatedCues = [...editorDoc.file.cues, newCue]
-    const updatedFile =
-      mode === 'yarg'
-        ? ({ ...editorDoc.file, cues: updatedCues as NetNodeCueDefinition[] } as NetNodeCueFile)
-        : ({ ...editorDoc.file, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
-    const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
-    setEditorDoc(updatedDoc)
-    setSelectedCueId(newCue.id)
-    loadCueIntoFlow(newCue as NetNodeCueDefinition | AudioNodeCueDefinition)
+    // The new cue joins the open file, so it takes that file's shape.
+    const added = withBlankCue(editorDoc.file, cueKind)
+    setEditorDoc({ ...editorDoc, file: added.file })
+    setSelectedCueId(added.cue.id)
+    loadCueIntoFlow(added.cue)
     setIsDirty(true)
   }, [
     editorDoc,
@@ -264,7 +286,7 @@ export function useCueCrud({
 
   const handleAddEffect = useCallback(() => {
     if (!editorDoc) {
-      const file = createDefaultEffectFile(mode as EffectMode)
+      const file = createDefaultEffectFile(effectModeFor(mode))
       const newEffect = file.effects[0]
       setFilename(`${file.group.id}.json`)
       setEditorDoc({ mode: 'effect', file, path: null })
@@ -279,22 +301,10 @@ export function useCueCrud({
       return
     }
 
-    const newEffect = createDefaultEffect(mode as EffectMode)
-    const updatedEffects = [...editorDoc.file.effects, newEffect]
-    const updatedFile =
-      mode === 'yarg'
-        ? ({
-            ...editorDoc.file,
-            effects: updatedEffects as YargEffectDefinition[],
-          } as YargEffectFile)
-        : ({
-            ...editorDoc.file,
-            effects: updatedEffects as AudioEffectDefinition[],
-          } as AudioEffectFile)
-    const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
-    setEditorDoc(updatedDoc)
-    setSelectedCueId(newEffect.id)
-    loadCueIntoFlow(newEffect as YargEffectDefinition | AudioEffectDefinition)
+    const added = withBlankEffect(editorDoc.file)
+    setEditorDoc({ ...editorDoc, file: added.file })
+    setSelectedCueId(added.effect.id)
+    loadCueIntoFlow(added.effect)
     setIsDirty(true)
   }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setFilename, setSelectedCueId, setIsDirty])
 
@@ -304,11 +314,8 @@ export function useCueCrud({
       const cueFile = editorDoc.file
       if (cueFile.cues.length <= 1) return
 
-      const updatedCues = cueFile.cues.filter((cue) => cue.id !== cueId)
-      const updatedFile =
-        cueFile.mode === 'yarg'
-          ? ({ ...cueFile, cues: updatedCues as NetNodeCueDefinition[] } as NetNodeCueFile)
-          : ({ ...cueFile, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
+      const updatedFile = withoutCue(cueFile, cueId)
+      const updatedCues: AnyCue[] = updatedFile.cues
       const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
 
       setEditorDoc(updatedDoc)
@@ -316,18 +323,15 @@ export function useCueCrud({
       // Only the removal of the open cue moves the selection. The flow holds unsaved canvas
       // edits, so any other deletion leaves it alone rather than reloading the persisted copy.
       if (cueId === selectedCueId) {
-        const sameKindCues = updatedCues.filter(
-          (cue): cue is NetNodeCueDefinition | AudioNodeCueDefinition =>
-            'kind' in cue && cue.kind === cueKind,
-        )
+        const sameKindCues = updatedCues.filter((cue) => cue.kind === cueKind)
         // The cross-kind fallback is unreachable from the sidebar, which disables delete at the
         // last cue of a kind, but it keeps the hook correct for any other caller.
         const nextCue = firstByName(sameKindCues) ?? firstByName(updatedCues)
-        if (nextCue?.kind === 'lighting' || nextCue?.kind === 'motion') {
+        if (nextCue) {
           setCueKind(nextCue.kind)
         }
         setSelectedCueId(nextCue?.id ?? null)
-        loadCueIntoFlow((nextCue as NetNodeCueDefinition | AudioNodeCueDefinition) ?? null)
+        loadCueIntoFlow(nextCue)
       }
 
       setIsDirty(true)
@@ -350,26 +354,16 @@ export function useCueCrud({
       const effectFile = editorDoc.file
       if (effectFile.effects.length <= 1) return
 
-      const updatedEffects = effectFile.effects.filter((effect) => effect.id !== effectId)
-      const updatedFile =
-        effectFile.mode === 'yarg'
-          ? ({
-              ...effectFile,
-              effects: updatedEffects as YargEffectDefinition[],
-            } as YargEffectFile)
-          : ({
-              ...effectFile,
-              effects: updatedEffects as AudioEffectDefinition[],
-            } as AudioEffectFile)
+      const updatedFile = withoutEffect(effectFile, effectId)
       const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
 
       setEditorDoc(updatedDoc)
 
       // As with removeCue, leave the canvas alone unless the open effect is the one going away.
       if (effectId === selectedCueId) {
-        const nextEffect = firstByName(updatedEffects)
+        const nextEffect = firstByName<AnyEffect>(updatedFile.effects)
         setSelectedCueId(nextEffect?.id ?? null)
-        loadCueIntoFlow((nextEffect as YargEffectDefinition | AudioEffectDefinition) ?? null)
+        loadCueIntoFlow(nextEffect)
       }
 
       setIsDirty(true)

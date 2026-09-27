@@ -46,8 +46,11 @@ import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
 import { useCueMetadata } from './useCueMetadata'
 import {
+  asImportedFile,
   basenamesLower,
+  effectModeFor,
   groupIdsLower,
+  importedCueFile,
   isCueTypeSelectable,
   suggestNonConflictingGroupId,
 } from '../lib/cueUtils'
@@ -228,8 +231,7 @@ const useCueFiles = ({
   const handleImport = useCallback(async () => {
     try {
       if (editorMode === 'effect') {
-        const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
-        const result = await pickEffectImportFile(effectMode)
+        const result = await pickEffectImportFile(effectModeFor(mode))
         if (!result.success) {
           if (!wasCancelled(result)) {
             onError?.(result.error)
@@ -285,17 +287,15 @@ const useCueFiles = ({
         return
       }
       try {
-        const raw = JSON.parse(JSON.stringify(pendingImport.content)) as NodeCueFile | EffectFile
-        delete raw.bundled
-        delete raw.cueVersion
-        raw.group = { ...raw.group, id: groupId.trim() }
-
         if (pendingImport.kind === 'cue') {
-          const cuePayload = raw as NodeCueFile
-          // Importing into the rb3 platform re-stamps the file mode so a YARG-shaped cue lands as
-          // an rb3 cue (rb3 reuses the YARG cue shape). yarg/audio imports keep the file's own mode.
-          if (pendingImport.saveMode === 'rb3') {
-            cuePayload.mode = 'rb3'
+          const cuePayload = importedCueFile(
+            pendingImport.content,
+            pendingImport.saveMode,
+            groupId.trim(),
+          )
+          if (!cuePayload) {
+            onError?.('Only a YARG or RB3 cue file can be imported on the RB3 tab.')
+            return
           }
           const validation = await validateNodeCue({ content: cuePayload })
           if (!validation.valid) {
@@ -321,7 +321,7 @@ const useCueFiles = ({
           }
           onSaveSuccess?.(`Cue imported: ${saveFilename}`)
         } else {
-          const effectPayload = raw as EffectFile
+          const effectPayload = asImportedFile(pendingImport.content, groupId.trim())
           const validation = await validateEffect({ content: effectPayload })
           if (!validation.valid) {
             onError?.(`Import validation failed: ${validation.errors.join(', ')}`)

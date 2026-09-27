@@ -330,4 +330,17 @@ describe('import pick validates the tab mode it is given', () => {
     expect(await m.invoke(channel, undefined)).toMatchObject({ success: true, mode: 'yarg' })
     expect(await m.invoke(channel, 'nonsense')).toMatchObject({ success: false })
   })
+
+  it('refuses an audio cue file picked on the RB3 tab', async () => {
+    const m = await bootMain()
+    const source = path.join(base, 'disco.json')
+    fs.writeFileSync(source, JSON.stringify(userCueFile('audio', 'disco', 'Disco')))
+    dialogPick.path = source
+
+    expect(await m.invoke(NODE_CUES.IMPORT_PICK, 'audio')).toMatchObject({ success: true })
+    expect(await m.invoke(NODE_CUES.IMPORT_PICK, 'rb3')).toEqual({
+      success: false,
+      error: 'Only a YARG or RB3 cue file can be imported on the RB3 tab.',
+    })
+  })
 })
