@@ -229,6 +229,24 @@ describe('EffectLoader compile errors surface on the summary', () => {
     expect(summary?.errors?.length).toBeGreaterThan(0)
     expect(summary?.errors?.join(' ')).toContain('Effect Listener')
   })
+
+  it('lists a colour this version does not know on the summary', async () => {
+    const file = minimalYargEffectFixture('grp-colours')
+    file.effects[0].variables = [
+      { name: 'tint', type: 'color', scope: 'cue', initialValue: 'mauve' },
+    ]
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await loader.saveFile('yarg', 'colours.json', file)
+    } finally {
+      warn.mockRestore()
+    }
+
+    const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('colours.json'))
+    expect(summary?.warnings).toEqual([
+      "effect 'Test Effect': variable 'tint' initial value 'mauve' is not a known Color and plays as blue.",
+    ])
+  })
 })
 
 class WatchedEffectLoader extends EffectLoader {

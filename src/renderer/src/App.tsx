@@ -56,6 +56,7 @@ import {
 } from './ipcApi'
 import { registerIpcListener } from './utils/ipcHelpers'
 import { configRecoveryMessages, type ConfigRecoveryFile } from './utils/configRecoveryMessages'
+import { cueFileLoadMessages } from './utils/cueFileLoadMessages'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('App')
@@ -136,22 +137,8 @@ export const App = (): JSX.Element => {
 
   const handleCueValidationErrors = useCallback(
     (reports: CueFileLoadReport[]): void => {
-      for (const { source, errors: messages, migrations } of reports) {
-        const label = source === 'node-cue' ? 'Cue file' : 'Effect file'
-        if (messages.length > 0) {
-          const message =
-            messages.length === 1
-              ? `${label} validation failed: ${messages[0]}`
-              : `${label} validation failed (${messages.length} files): ${messages.join('; ')}`
-          showToast(message, 'error', 7000)
-        }
-        if (migrations.length > 0) {
-          showToast(
-            `${label}s saved by an older version were updated to load in this one: ${migrations.join('; ')}`,
-            'warning',
-            10000,
-          )
-        }
+      for (const { text, level } of cueFileLoadMessages(reports)) {
+        showToast(text, level, level === 'error' ? 7000 : 10000)
       }
     },
     [showToast],

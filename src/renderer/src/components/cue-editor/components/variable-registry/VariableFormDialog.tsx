@@ -7,7 +7,9 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/types'
+import { COLOR_OPTIONS, isColor } from '../../../../../../photonics-dmx/types'
+import { initialValueIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import FieldIssue, { issueAttributes } from '../shared/FieldIssue'
 import ColorListEditor from '../shared/ColorListEditor'
 import { DraftNumberField } from '../../../controls/DraftField'
 import {
@@ -36,6 +38,7 @@ function getInitialValueInput(
   onChange: (val: VariableDefinition['initialValue']) => void,
   activeMode: NodeCueMode,
   cueKind: NodeCueKind,
+  issueProps: ReturnType<typeof issueAttributes>,
 ) {
   const defaultEventValue = getDefaultEventOption(activeMode, cueKind)?.value ?? ''
   // Categorized event set per mode (RB3 and YARG are both categorized; audio is a flat list).
@@ -74,7 +77,13 @@ function getInitialValueInput(
         <select
           className="rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={(value as string) ?? 'blue'}
-          onChange={(e) => onChange(e.target.value)}>
+          onChange={(e) => onChange(e.target.value)}
+          {...issueProps}>
+          {typeof value === 'string' && !isColor(value) && (
+            <option value={value} disabled>
+              {value}
+            </option>
+          )}
           {COLOR_OPTIONS.map((color) => (
             <option key={color} value={color}>
               {color}
@@ -146,7 +155,13 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   editingVar,
 }) => {
   const titleId = useId()
+  const issueId = useId()
   if (!isOpen) return null
+
+  const initialIssue =
+    formData.type && formData.initialValue !== undefined
+      ? initialValueIssue(formData.type, formData.initialValue)
+      : null
 
   const handleTypeChange = (newType: VariableType) => {
     let newValue: VariableDefinition['initialValue'] = 0
@@ -206,7 +221,9 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
             (val) => onFormDataChange({ ...formData, initialValue: val }),
             activeMode,
             cueKind,
+            issueAttributes(initialIssue, issueId),
           )}
+          <FieldIssue issue={initialIssue} id={issueId} />
         </label>
 
         <label className="flex flex-col font-medium text-sm">

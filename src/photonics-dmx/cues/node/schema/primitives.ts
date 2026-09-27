@@ -219,15 +219,12 @@ export const variableDefinitionSchema = {
     validValues: { type: 'array', items: { type: 'string' }, nullable: true },
   },
   // Each type starts as a value of that type, the same rule the editor applies before saving. An
-  // older file that breaks it is brought onto it as it loads.
+  // older file that breaks it is brought onto it as it loads. A colour name this build does not
+  // know passes here, and validation warns about it.
   allOf: [
     {
       if: { properties: { type: { const: 'color-array' } } },
-      then: {
-        properties: {
-          initialValue: { type: 'array', items: { type: 'string', enum: COLOR_OPTIONS } },
-        },
-      },
+      then: { properties: { initialValue: { type: 'array', items: { type: 'string' } } } },
     },
     {
       if: { properties: { type: { const: 'light-array' } } },
@@ -235,7 +232,7 @@ export const variableDefinitionSchema = {
     },
     {
       if: { properties: { type: { const: 'color' } } },
-      then: { properties: { initialValue: { type: 'string', enum: COLOR_OPTIONS } } },
+      then: { properties: { initialValue: { type: 'string' } } },
     },
     {
       if: { properties: { type: { const: 'number' } } },

@@ -1023,11 +1023,64 @@ describe('Node cue validation', () => {
     })
 
     it.each([
-      ['an unknown colour', ['red', 'bleu']],
       ['a number', ['red', 3]],
       ['a single colour', 'red'],
     ])('rejects a colour-array variable that starts as %s', (_label, initialValue) => {
       expect(validateNodeCueFile(withPalette(initialValue)).valid).toBe(false)
+    })
+
+    it.each([
+      ['color', 'mauve', "'mauve' is not a known Color and plays as blue"],
+      ['color', '', "'' is not a known Color and plays as blue"],
+      ['color-array', ['red', 'bleu'], "'bleu' is not a known Color and the list plays without it"],
+    ])(
+      'loads a %s variable that starts as %p and warns about it',
+      (type, initialValue, message) => {
+        const result = validateNodeCueFile(withVariable(type, initialValue))
+
+        expect(result.valid && result.warnings).toEqual([
+          `cue 'Test Cue': variable 'v' initial value ${message}.`,
+        ])
+      },
+    )
+
+    it('warns about a group variable that starts as a colour this version does not know', () => {
+      const file = validFile()
+      const result = validateNodeCueFile({
+        ...file,
+        group: {
+          ...file.group,
+          variables: [{ name: 'tint', type: 'color', scope: 'cue-group', initialValue: 'mauve' }],
+        },
+      })
+
+      expect(result.valid && result.warnings).toEqual([
+        "group 'Test Group': variable 'tint' initial value 'mauve' is not a known Color and plays as blue.",
+      ])
+    })
+
+    it('loads an action colour this version does not know and warns that it plays as blue', () => {
+      const action = setColorAction()
+      const result = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withNodes({
+            actions: [
+              {
+                ...action,
+                color: {
+                  name: { source: 'literal', value: 'mauve' },
+                  brightness: { source: 'literal', value: 'medium' },
+                },
+              },
+            ],
+          }),
+        ],
+      })
+
+      expect(result.valid && result.warnings).toEqual([
+        "cue 'Test Cue': action 'action-1' color.name 'mauve' is not a known Color and plays as blue.",
+      ])
     })
 
     it('accepts a light-array variable that starts empty', () => {
@@ -1044,7 +1097,6 @@ describe('Node cue validation', () => {
     })
 
     it.each([
-      ['color', 'mauve'],
       ['color', 5],
       ['boolean', 1],
       ['boolean', 'true'],
@@ -1553,7 +1605,8 @@ describe('Node cue validation', () => {
       expect(result.data?.effects).toHaveLength(1)
     })
 
-    it('rejects an effect whose colour-array variable starts with an unknown colour', () => {
+    it('loads an effect holding colours this version does not know and warns about each', () => {
+      const action = setColorAction()
       const result = validateYargEffectFile({
         version: 1,
         mode: 'yarg',
@@ -1563,15 +1616,32 @@ describe('Node cue validation', () => {
             id: 'eff-1',
             name: 'Test Effect',
             mode: 'yarg',
-            nodes: { events: [{ id: 'e1', type: 'event', eventType: 'beat' }], actions: [] },
-            connections: [],
+            nodes: {
+              events: [{ id: 'e1', type: 'event', eventType: 'beat' }],
+              actions: [
+                {
+                  ...action,
+                  color: { ...action.color, name: { source: 'literal', value: 'mauve' } },
+                },
+              ],
+            },
+            connections: [{ from: 'e1', to: 'action-1' }],
             variables: [
               { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['bleu'] },
             ],
           },
         ],
       })
-      expect(result.valid).toBe(false)
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          valid: true,
+          warnings: [
+            "effect 'Test Effect': variable 'palette' initial value 'bleu' is not a known Color and the list plays without it.",
+            "effect 'Test Effect': action 'action-1' color.name 'mauve' is not a known Color and plays as blue.",
+          ],
+        }),
+      )
     })
 
     it('rejects an effect whose light-array parameter starts with lights', () => {

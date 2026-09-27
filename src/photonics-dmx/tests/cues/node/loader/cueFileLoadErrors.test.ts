@@ -11,7 +11,7 @@ const ALT1 = path.join(__dirname, '../../../historical/v0.5.5-alpha.5/yarg-alt1.
 
 interface CueJson {
   cueType?: string
-  nodes: { actions: Array<{ color: { name: { source: string; value: unknown } } }> }
+  nodes: { actions: Array<{ color: { brightness: { source: string; value: unknown } } }> }
 }
 
 interface CueFileJson {
@@ -51,7 +51,7 @@ describe('reporting a cue file that does not load', () => {
     const file: CueFileJson = JSON.parse(fs.readFileSync(ALT1, 'utf-8'))
     const dischord = file.cues.find((cue) => cue.cueType === 'Dischord')
     if (!dischord) throw new Error('the library has no Dischord cue')
-    dischord.nodes.actions[0].color.name = { source: 'literal', value: 'ultraviolet' }
+    dischord.nodes.actions[0].color.brightness = { source: 'literal', value: 'blinding' }
     file.bundled = false
     file.group = { id: 'user-broken', name: 'User broken', isDefault: false }
     file.cues = [dischord]
@@ -64,7 +64,7 @@ describe('reporting a cue file that does not load', () => {
     expect(result.failed).toBe(1)
     expect(result.errors).toEqual([
       expect.stringMatching(
-        /^user-broken\.json: .*cue 'Dischord'.*'ultraviolet' is not a known Color/,
+        /^user-broken\.json: .*cue 'Dischord'.*'blinding' is not a known Brightness/,
       ),
     ])
   })

@@ -39,7 +39,7 @@ describe('migrateOlderNodeFile', () => {
       ],
     }
 
-    const notes = migrateOlderNodeFile(file)
+    const changes = migrateOlderNodeFile(file)
 
     expect(file.group.variables[0].name).toBe('my_var')
     expect(file.cues[0].variables.map((v) => v.name)).toEqual(['beat_count_2', 'beat_count', '_2x'])
@@ -58,7 +58,10 @@ describe('migrateOlderNodeFile', () => {
         { id: 'l5', logicType: 'debugger', variablesToLog: ['beat_count_2'] },
       ],
     })
-    expect(notes).toEqual([expect.stringContaining("'beat-count' is now 'beat_count_2'")])
+    expect(changes).toEqual({
+      older: [expect.stringContaining("'beat-count' is now 'beat_count_2'")],
+      unknown: [],
+    })
   })
 
   it('renames an effect raiser parameter the effect file renames', () => {
@@ -91,7 +94,7 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
-  it('stores an unknown easing as the default, in a value source or a bare string', () => {
+  it('reads an unknown easing as the default, in a value source or a bare string', () => {
     const file = {
       effects: [
         {
@@ -100,24 +103,93 @@ describe('migrateOlderNodeFile', () => {
           nodes: {
             actions: [
               { id: 'a1', timing: { easing: { source: 'literal', value: 'sin-out' } } },
-              { id: 'a2', timing: { easing: 'bounce' } },
-              { id: 'a3', timing: { easing: { source: 'literal', value: 'cubicIn' } } },
-              { id: 'a4', timing: { easing: { source: 'variable', name: 'curve' } } },
+              { id: 'a2', timing: { easing: 'sin-out' } },
+              { id: 'a3', timing: { easing: { source: 'literal', value: 'springOut' } } },
+              { id: 'a4', timing: { easing: 'bounce' } },
+              { id: 'a5', timing: { easing: { source: 'literal', value: 'cubicIn' } } },
+              { id: 'a6', timing: { easing: { source: 'variable', name: 'curve' } } },
             ],
           },
         },
       ],
     }
 
-    const notes = migrateOlderNodeFile(file)
+    const changes = migrateOlderNodeFile(file)
 
     expect(file.effects[0].nodes.actions.map((a) => a.timing.easing)).toEqual([
+      { source: 'literal', value: 'sinInOut' },
+      'sinInOut',
       { source: 'literal', value: 'sinInOut' },
       'sinInOut',
       { source: 'literal', value: 'cubicIn' },
       { source: 'variable', name: 'curve' },
     ])
-    expect(notes).toEqual(["Unknown easing 'sin-out', 'bounce' in 'Swell' now reads sinInOut."])
+    expect(changes).toEqual({
+      older: ["Unknown easing 'sin-out' in 'Swell' now reads sinInOut."],
+      unknown: [
+        "Easing 'springOut', 'bounce' in 'Swell' is not one this version knows and plays as sinInOut.",
+      ],
+    })
+  })
+
+  it('leaves colour initial values as they are and stores other values as they read', () => {
+    const file = {
+      group: {
+        id: 'g',
+        name: 'G',
+        variables: [
+          { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 'mauve' },
+          {
+            name: 'palette',
+            type: 'color-array',
+            scope: 'cue-group',
+            initialValue: ['red', 'Bleu'],
+          },
+          { name: 'steps', type: 'number', scope: 'cue-group', initialValue: '4' },
+        ],
+      },
+      cues: [],
+    }
+
+    const changes = migrateOlderNodeFile(file)
+
+    expect(file.group.variables.map((v) => v.initialValue)).toEqual(['mauve', ['red', 'Bleu'], 4])
+    expect(changes).toEqual({
+      older: [
+        "Initial values their type cannot hold now hold what the cue reads: 'steps' is now 4.",
+      ],
+      unknown: [],
+    })
+  })
+
+  it('leaves an action blend mode this version does not know as it is', () => {
+    const lit = (value: unknown) => ({ source: 'literal', value })
+    const file = {
+      cues: [
+        {
+          id: 'c1',
+          name: 'Glow',
+          kind: 'lighting',
+          nodes: {
+            actions: [
+              { id: 'a1', color: { name: lit('red'), blendMode: lit('screen') } },
+              { id: 'a2', color: { name: lit('red'), blendMode: lit('overlay') } },
+            ],
+          },
+        },
+      ],
+    }
+
+    const changes = migrateOlderNodeFile(file)
+
+    expect(file.cues[0].nodes.actions.map((a) => a.color)).toEqual([
+      { name: lit('red'), blendMode: lit('screen') },
+      { name: lit('red'), blendMode: lit('replace') },
+    ])
+    expect(changes).toEqual({
+      older: ["Retired blend mode multiply or overlay in 'Glow' now reads replace."],
+      unknown: ["Blend mode 'screen' in 'Glow' is not one this version knows."],
+    })
   })
 
   it('reads a cue stored with no kind as a lighting cue', () => {
@@ -130,10 +202,13 @@ describe('migrateOlderNodeFile', () => {
       ],
     }
 
-    const notes = migrateOlderNodeFile(file)
+    const changes = migrateOlderNodeFile(file)
 
     expect(file.cues.map((cue) => cue.kind)).toEqual(['lighting', 'motion', 'lighting'])
-    expect(notes).toEqual(['Cues stored with no kind now read as lighting cues.'])
+    expect(changes).toEqual({
+      older: ['Cues stored with no kind now read as lighting cues.'],
+      unknown: [],
+    })
   })
 
   it('drops a wait count below one from a wait with no condition', () => {
@@ -169,16 +244,17 @@ describe('migrateOlderNodeFile', () => {
       ],
     }
 
-    const notes = migrateOlderNodeFile(file)
+    const changes = migrateOlderNodeFile(file)
 
     expect(file.cues[0].nodes.actions.map((a) => a.timing)).toEqual([
       { waitForCondition: lit('none'), waitUntilCondition: lit('none') },
       { waitUntilCondition: lit('beat'), waitUntilConditionCount: lit(0) },
       { waitUntilCondition: lit('none'), waitUntilConditionCount: lit(2) },
     ])
-    expect(notes).toEqual([
-      "A wait count below one on a wait with no condition in 'Stomp' is dropped.",
-    ])
+    expect(changes).toEqual({
+      older: ["A wait count below one on a wait with no condition in 'Stomp' is dropped."],
+      unknown: [],
+    })
   })
 
   it('changes nothing in a file already on the current rules', () => {
@@ -197,7 +273,7 @@ describe('migrateOlderNodeFile', () => {
     }
     const before = structuredClone(file)
 
-    expect(migrateOlderNodeFile(file)).toEqual([])
+    expect(migrateOlderNodeFile(file)).toEqual({ older: [], unknown: [] })
     expect(file).toEqual(before)
   })
 })

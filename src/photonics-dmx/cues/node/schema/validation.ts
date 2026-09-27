@@ -27,7 +27,7 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 import { getCueDomain } from '../../domains'
 import { checkContinuousCueCalledWaits } from './audioEventPolicyCheck'
-import { actionLiteralIssues, compareOperandIssue } from '../cueValueRules'
+import { actionLiteralIssues, compareOperandIssue, initialValueIssue } from '../cueValueRules'
 
 export type { StructuredValidationError } from './helpers'
 
@@ -91,6 +91,7 @@ export function __resetCueSemanticChecksForTests(): void {
   registerCueSemanticCheck(checkContinuousCueCalledWaits)
   registerCueSemanticCheck(checkActionLiteralWarnings)
   registerCueSemanticCheck(checkArrayCompares)
+  registerCueSemanticCheck(checkInitialValues)
 }
 
 /**
@@ -150,10 +151,31 @@ function checkArrayCompares(file: NodeCueFile, _errors: string[], warnings: stri
   }
 }
 
+/**
+ * Warn about initial values the rules pass with a warning, such as a colour name this build does
+ * not know. `label` names the group, cue or effect declaring them.
+ */
+function initialValueWarnings(label: string, variables: readonly VariableDefinition[]): string[] {
+  return variables.flatMap(({ name, type, initialValue }) => {
+    const issue = initialValueIssue(type, initialValue)
+    return issue?.severity === 'warning'
+      ? [`${label}: variable '${name}' initial value ${issue.message}.`]
+      : []
+  })
+}
+
+function checkInitialValues(file: NodeCueFile, _errors: string[], warnings: string[]): void {
+  warnings.push(...initialValueWarnings(`group '${file.group.name}'`, file.group.variables ?? []))
+  for (const cue of file.cues) {
+    warnings.push(...initialValueWarnings(`cue '${cue.name}'`, cue.variables ?? []))
+  }
+}
+
 registerCueSemanticCheck(checkEventVocabulary)
 registerCueSemanticCheck(checkContinuousCueCalledWaits)
 registerCueSemanticCheck(checkActionLiteralWarnings)
 registerCueSemanticCheck(checkArrayCompares)
+registerCueSemanticCheck(checkInitialValues)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,
@@ -349,6 +371,8 @@ export interface EffectValidationResult<T = EffectFile> {
   valid: boolean
   data?: T
   errors: string[]
+  /** Non-fatal findings, as a cue file's validation reports them. */
+  warnings?: string[]
   mode?: EffectMode
 }
 
@@ -433,8 +457,28 @@ function validateEffectFileForMode<T extends EffectFile>(
     valid: true,
     data: file,
     errors: [],
+    warnings: file.effects.flatMap(effectWarnings),
     mode,
   }
+}
+
+/**
+ * The warnings for one effect: its initial values, and the action literals the rules pass with a
+ * warning in any mode, such as a colour name this build does not know.
+ */
+function effectWarnings(effect: EffectDefinition): string[] {
+  const label = `effect '${effect.name}'`
+  return [
+    ...initialValueWarnings(label, effect.variables ?? []),
+    ...(effect.nodes?.actions ?? []).flatMap((action) =>
+      actionLiteralIssues(action)
+        .filter(({ issue }) => issue.severity === 'warning')
+        .map(
+          ({ field, issue }) =>
+            `${label}: action '${action.label ?? action.id}' ${field} ${issue.message}.`,
+        ),
+    ),
+  ]
 }
 
 export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> =>

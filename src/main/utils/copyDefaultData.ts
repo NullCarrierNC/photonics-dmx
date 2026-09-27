@@ -3,6 +3,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { createLogger } from '../../shared/logger'
 import { isPlainObject } from '../ipc/validation/primitives'
+import { writeFileAtomic } from '../../photonics-dmx/helpers/atomicFileWrite'
 
 const log = createLogger('copyDefaultData')
 
@@ -33,19 +34,11 @@ export async function copyDefaultData(resourcesPath: string, appDataBase: string
 }
 
 /**
- * Writes JSON through a temp file and a rename, so a process killed mid-write leaves either the
- * previous file or the new one. A truncated file would parse-fail on the next launch and be
- * skipped by the guard below every time after that, leaving the cue permanently dead.
+ * Writes a seeded JSON file whole or not at all. A truncated file would parse-fail on the next
+ * launch and be skipped by the guard below every time after that, leaving the cue permanently dead.
  */
 async function writeJsonAtomic(destPath: string, data: Record<string, unknown>): Promise<void> {
-  const tempPath = `${destPath}.tmp.${process.pid}-${Date.now()}`
-  try {
-    await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8')
-    await fs.rename(tempPath, destPath)
-  } catch (error) {
-    await fs.rm(tempPath, { force: true }).catch(() => {})
-    throw error
-  }
+  await writeFileAtomic(destPath, JSON.stringify(data, null, 2))
 }
 
 /**

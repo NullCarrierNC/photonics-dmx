@@ -60,11 +60,13 @@ export class RegistryInitializer {
     log.info(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
     summary.errors.forEach((err) => log.error('[EffectLoader]', err))
     summary.migrations.forEach((note) => log.info('[EffectLoader]', note))
-    if (summary.errors.length > 0 || summary.migrations.length > 0) {
+    summary.unsaved.forEach((note) => log.warn('[EffectLoader]', note))
+    if (summary.errors.length > 0 || summary.migrations.length > 0 || summary.unsaved.length > 0) {
       this.ctx.pushValidationError({
         source: 'effect',
         errors: summary.errors,
         migrations: summary.migrations,
+        unsaved: summary.unsaved,
       })
     }
     await effectLoader.startWatching()
@@ -113,11 +115,13 @@ export class RegistryInitializer {
     log.info(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
     summary.errors.forEach((err) => log.error('[NodeCueLoader]', err))
     summary.migrations.forEach((note) => log.info('[NodeCueLoader]', note))
-    if (summary.errors.length > 0 || summary.migrations.length > 0) {
+    summary.unsaved.forEach((note) => log.warn('[NodeCueLoader]', note))
+    if (summary.errors.length > 0 || summary.migrations.length > 0 || summary.unsaved.length > 0) {
       this.ctx.pushValidationError({
         source: 'node-cue',
         errors: summary.errors,
         migrations: summary.migrations,
+        unsaved: summary.unsaved,
       })
     }
     await nodeCueLoader.startWatching()

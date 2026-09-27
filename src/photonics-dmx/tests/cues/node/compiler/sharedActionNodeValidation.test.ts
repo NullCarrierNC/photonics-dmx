@@ -149,14 +149,6 @@ const PARITY_CASES: ParityCase[] = [
     expectedMessageMatch: /target\.groups 'frnt' is not a known LocationGroup/,
   },
   {
-    description: 'rejects an unknown literal colour',
-    action: {
-      ...baseValidAction(),
-      color: baseColor({ name: { source: 'literal', value: 'bleu' } }),
-    },
-    expectedMessageMatch: /color\.name 'bleu' is not a known Color/,
-  },
-  {
     description: 'rejects an unknown literal brightness',
     action: {
       ...baseValidAction(),
@@ -283,6 +275,15 @@ describe('Cross-compiler action validation parity', () => {
       expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
     },
   )
+
+  it('compiles an action colour this version does not know in both compilers', () => {
+    const action: ActionNode = {
+      ...baseValidAction(),
+      color: baseColor({ name: { source: 'literal', value: 'bleu' } }),
+    }
+    expect(() => NodeCueCompiler.compileCue(buildCue(action), 'yarg')).not.toThrow()
+    expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
+  })
 
   for (const testCase of PARITY_CASES) {
     it(`${testCase.description} → both compilers reject with the same message`, () => {

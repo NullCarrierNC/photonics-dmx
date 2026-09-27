@@ -3,6 +3,8 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import { realPathOf } from '../../../helpers/realPath'
+import { writeFileAtomic } from '../../../helpers/atomicFileWrite'
+import type { NodeFileChanges } from './migrateOlderNodeFile'
 import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('BaseNodeFileLoader')
@@ -37,6 +39,8 @@ export interface BaseFileSummary<TMode extends string> {
   errors?: string[]
   /** What the load changed in a file an older build wrote, which it then saved. */
   migrations?: string[]
+  /** What the load read differently in a file it left as it is on disk, and why it left it. */
+  unsaved?: string[]
 }
 
 /** One summary bucket per mode, keyed by the mode discriminant. */
@@ -48,9 +52,37 @@ export interface BaseLoadResult {
   errors: string[]
   /** One line per change made to a file an older build wrote, led by the file's name. */
   migrations: string[]
+  /** One line per file the load read differently and left as it is on disk, led by its name. */
+  unsaved: string[]
 }
 
 export const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
+
+const errorCode = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+
+/** Write a new file, refusing a path that already holds one. */
+async function createFile(filePath: string, contents: string): Promise<void> {
+  try {
+    await fs.writeFile(filePath, contents, { encoding: 'utf-8', flag: 'wx' })
+  } catch (error) {
+    if (errorCode(error) === 'EEXIST') {
+      throw new Error(
+        `A file named '${path.basename(filePath)}' already exists. Choose a different name.`,
+      )
+    }
+    throw error
+  }
+}
+
+/** A rename replaces a read-only file, so a file's own write permission is checked first. */
+async function assertWritableIfPresent(filePath: string): Promise<void> {
+  try {
+    await fs.access(filePath, fs.constants.W_OK)
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT') throw error
+  }
+}
 
 export abstract class BaseNodeFileLoader<
   TMode extends string,
@@ -118,8 +150,9 @@ export abstract class BaseNodeFileLoader<
         failed: acc.failed + curr.failed,
         errors: acc.errors.concat(curr.errors),
         migrations: acc.migrations.concat(curr.migrations),
+        unsaved: acc.unsaved.concat(curr.unsaved),
       }),
-      { loaded: 0, failed: 0, errors: [], migrations: [] },
+      { loaded: 0, failed: 0, errors: [], migrations: [], unsaved: [] },
     )
 
     this.emit('changed', this.getSummary())
@@ -161,6 +194,7 @@ export abstract class BaseNodeFileLoader<
     let failed = 0
     const errors: string[] = []
     const migrations: string[] = []
+    const unsaved: string[] = []
     const summaries: TSummary[] = []
 
     for (const file of files) {
@@ -179,6 +213,7 @@ export abstract class BaseNodeFileLoader<
         if (summary) {
           summaries.push(summary)
           for (const note of summary.migrations ?? []) migrations.push(`${file}: ${note}`)
+          for (const note of summary.unsaved ?? []) unsaved.push(`${file}: ${note}`)
         }
         loaded++
       } catch (error) {
@@ -197,7 +232,7 @@ export abstract class BaseNodeFileLoader<
     }
 
     this.summaries[mode] = summaries
-    return { loaded, failed, errors, migrations }
+    return { loaded, failed, errors, migrations, unsaved }
   }
 
   // ---- watching -------------------------------------------------------------
@@ -258,7 +293,8 @@ export abstract class BaseNodeFileLoader<
 
   /**
    * Write a file a save produced, noting what was written for {@link isOwnSave}. A create-only
-   * write refuses a path that already holds a file.
+   * write refuses a path that already holds a file. Any other write replaces the file whole
+   * through a temp file, and refuses a file the user made read-only.
    */
   protected async writeSavedFile(
     filePath: string,
@@ -266,28 +302,48 @@ export abstract class BaseNodeFileLoader<
     createOnly: boolean,
   ): Promise<void> {
     await fs.mkdir(path.dirname(filePath), { recursive: true })
-    try {
-      await fs.writeFile(filePath, contents, { encoding: 'utf-8', flag: createOnly ? 'wx' : 'w' })
-    } catch (error) {
-      if (createOnly && error instanceof Error && 'code' in error && error.code === 'EEXIST') {
-        throw new Error(
-          `A file named '${path.basename(filePath)}' already exists. Choose a different name.`,
-        )
-      }
-      throw error
+    if (createOnly) {
+      await createFile(filePath, contents)
+    } else {
+      await assertWritableIfPresent(filePath)
+      await writeFileAtomic(filePath, contents)
     }
     this.savedContents.set(path.resolve(filePath), contents)
   }
 
   /**
-   * Write back a file a load brought forward from an older build, so the change is made and
-   * reported once. A failed write is logged, and the next load brings the file forward again.
+   * Write back a file a load brought forward from an older build, with the `changes` the load
+   * made. The changes are reported as saved once the write lands. A file holding values this build
+   * does not know is left as it is, and so is one whose write fails. Both are reported as unsaved,
+   * and the next load reads them the same way again.
    */
-  protected async writeMigratedFile(filePath: string, data: unknown): Promise<void> {
+  protected async writeMigratedFile(
+    filePath: string,
+    data: unknown,
+    changes: NodeFileChanges,
+  ): Promise<Pick<BaseFileSummary<TMode>, 'migrations' | 'unsaved'>> {
+    const notes = changes.older
+    if (changes.unknown.length > 0) {
+      return {
+        unsaved: [
+          `Holds values this version does not know and is left as it is on disk: ${[...changes.unknown, ...notes].join(' ')}`,
+        ],
+      }
+    }
+    if (notes.length === 0) return {}
     try {
       await this.writeSavedFile(filePath, JSON.stringify(data, null, 2), false)
+      return { migrations: [...notes] }
     } catch (error) {
       log.warn('Could not save the brought-forward file', filePath, error)
+      const code = errorCode(error)
+      const reason =
+        typeof code === 'string' ? code : error instanceof Error ? error.message : String(error)
+      return {
+        unsaved: [
+          `Could not save the update from an older version (${reason}), so each load updates it again: ${notes.join(' ')}`,
+        ],
+      }
     }
   }
 

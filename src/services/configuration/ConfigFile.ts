@@ -10,7 +10,11 @@ import {
   type ConfigRepairReport,
 } from './configCorruptTypes'
 import { migrateStepwise, readEnvelope, type ConfigWithVersion } from './configFileEnvelope'
-import { renameSyncWithRetry, renameWithRetry } from './configFileRename'
+import {
+  renameSyncWithRetry,
+  renameWithRetry,
+  writeFileAtomic,
+} from '../../photonics-dmx/helpers/atomicFileWrite'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
@@ -388,30 +392,22 @@ export class ConfigFile<T> {
       data: data,
     }
     const content = JSON.stringify(versionedData, null, 2)
-    const dir = path.dirname(this.filePath)
-    this.ensureConfigDirectory(dir)
-    const basename = path.basename(this.filePath)
-    const unique = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const tempPath = path.join(dir, `.${basename}.tmp.${unique}`)
+    this.ensureConfigDirectory(path.dirname(this.filePath))
     try {
       if (this.corruptFileInPlace) {
         try {
           await renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
-          log.info(`[Photonics Config] Moved the corrupt ${basename} aside before saving`)
+          log.info(
+            `[Photonics Config] Moved the corrupt ${path.basename(this.filePath)} aside before saving`,
+          )
         } catch (error) {
           // A file deleted or moved by hand since the load leaves nothing to preserve.
           if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error
         }
         this.corruptFileInPlace = false
       }
-      await fsPromises.writeFile(tempPath, content, 'utf-8')
-      await renameWithRetry(tempPath, this.filePath)
+      await writeFileAtomic(this.filePath, content)
     } catch (error) {
-      try {
-        await fsPromises.unlink(tempPath).catch(() => {})
-      } catch {
-        // ignore cleanup failure
-      }
       log.error(`Error saving configuration to ${this.filePath}:`, error)
       throw new Error(`Failed to save configuration: ${error}`)
     }

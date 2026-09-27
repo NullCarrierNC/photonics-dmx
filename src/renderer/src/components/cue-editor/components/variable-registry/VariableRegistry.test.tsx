@@ -134,12 +134,42 @@ describe('VariableRegistry', () => {
 
   it('refuses to save an initial value its type cannot hold', async () => {
     const { onVariablesChange } = renderRegistry([
-      { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 'mauve' },
+      { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 5 },
     ])
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByText(/'mauve' is not a known Color/)).toBeTruthy()
+    expect(await screen.findByText(/^Initial value: 5 is not a color value/)).toBeTruthy()
     expect(onVariablesChange).not.toHaveBeenCalled()
+  })
+
+  it('flags a colour this version does not know and saves the variable with it', () => {
+    const { onVariablesChange } = renderRegistry([
+      { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 'mauve' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByDisplayValue('mauve')).toBeTruthy()
+    expect(within(dialog).getByText("'mauve' is not a known Color and plays as blue")).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(onVariablesChange).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: 'accent', initialValue: 'mauve' })],
+      expect.anything(),
+    )
+  })
+
+  it('shows a listed colour this version does not know as stored and flags it', () => {
+    renderRegistry([
+      { name: 'palette', type: 'color-array', scope: 'cue-group', initialValue: ['red', 'Bleu'] },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByDisplayValue('Bleu')).toBeTruthy()
+    expect(
+      within(dialog).getByText("'Bleu' is not a known Color and the list plays without it"),
+    ).toBeTruthy()
   })
 })
