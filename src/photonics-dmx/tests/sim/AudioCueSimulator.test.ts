@@ -1,6 +1,10 @@
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
 import { describe, it, expect, jest } from '@jest/globals'
 import { CueSimulator } from '../../sim/CueSimulator'
 import type { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
+import { beatStartChase } from '../helpers/beatStartChase'
 
 // Loads a cue library and runs many virtual frames, over the 5s default on a slower CI runner.
 jest.setTimeout(30000)
@@ -60,31 +64,42 @@ describe('CueSimulator (audio)', () => {
     }
   })
 
-  it('opens the warm chase on its first step, held for the beat it starts on', async () => {
-    const sim = await CueSimulator.create({
-      library: LIBRARY,
-      domain: 'audio',
-      frontCount: 4,
-      backCount: 4,
-      bpm: 120,
-      level: 0.6,
-      sampleIntervalMs: 10,
-    })
+  it('starts a chase waiting for a beat on the beat frame it opens on', async () => {
+    const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audio-beat-chase-'))
     try {
-      sim.setCue('audio-sk-warm-auto')
-      const timeline = await sim.run(700)
-
-      const firstFront = timeline.lightOrder.front[0]
-      // The timeline keeps a row only when something changes, so the last row at or before a
-      // time is what the rig showed then.
-      const litAt = (timeMs: number): boolean => {
-        const shown = timeline.samples.filter((s) => s.timeMs <= timeMs).at(-1)
-        const light = shown?.lights[firstFront]
-        return light !== null && light !== undefined && light.intensity > 0
+      const cues = path.join(baseDir, 'node-data', 'cues', 'audio')
+      fs.mkdirSync(cues, { recursive: true })
+      const library = {
+        version: 1,
+        cueVersion: 1,
+        mode: 'audio',
+        group: { id: 'beat-chase', name: 'Beat chase', description: '' },
+        cues: [beatStartChase('beat-chase', 'primary')],
       }
-      expect([litAt(10), litAt(250), litAt(490), litAt(650)]).toEqual([true, true, true, false])
+      fs.writeFileSync(path.join(cues, 'beat-chase.json'), JSON.stringify(library))
+      const sim = await CueSimulator.create({
+        library: 'beat-chase',
+        domain: 'audio',
+        baseDir,
+        frontCount: 2,
+        backCount: 0,
+        bpm: 120,
+        sampleIntervalMs: 10,
+      })
+      try {
+        sim.setCue('beat-chase')
+        const timeline = await sim.run(20)
+
+        const [first, second] = timeline.lightOrder.front
+        // The timeline keeps a row only when something changes, so the last row at or before a
+        // time is what the rig showed then.
+        const shown = timeline.samples.filter((s) => s.timeMs <= 10).at(-1)
+        expect([shown?.lights[first]?.red ?? 0, shown?.lights[second]?.red ?? 0]).toEqual([255, 0])
+      } finally {
+        sim.dispose()
+      }
     } finally {
-      sim.dispose()
+      fs.rmSync(baseDir, { recursive: true, force: true })
     }
   })
 

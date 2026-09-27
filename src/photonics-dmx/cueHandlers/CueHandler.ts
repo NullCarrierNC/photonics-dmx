@@ -391,6 +391,7 @@ class CueHandler extends EventEmitter {
     // ships strobes, so a forced group missing the cueType falls through to normal selection.
     const cue = forcedCue ?? this.registry.getCueImplementation(cueType, trackMode)
 
+    const runs: Promise<void>[] = []
     if (cue) {
       const incomingIsSecondary = cue.style === CueStyle.Secondary
       // End a running fade before this cue executes (see the field comment). Beyond the chart's
@@ -431,11 +432,7 @@ class CueHandler extends EventEmitter {
         this.currentPrimaryCue = cue
       }
 
-      try {
-        await cue.execute(historicCueData, this._sequencer, this._lightManager)
-      } catch (error) {
-        log.error(`Cue ${cueType} execution failed:`, error)
-      }
+      runs.push(this.runCue(cue, cueType, historicCueData))
     }
     // No `else` log here: the registry already logs (and dedups) a missing cue implementation.
 
@@ -450,11 +447,22 @@ class CueHandler extends EventEmitter {
         this.applyMotionCue(null)
       } else {
         this.motionCoordinator.select(dispatchToken, { cueKey: cueType })
-        await this.runMotionCue(this.motionCoordinator.getCurrent(), historicCueData)
+        runs.push(this.runMotionCue(this.motionCoordinator.getCurrent(), historicCueData))
       }
     }
 
+    // The lighting and motion cues both run up to their first await before this yields, so a beat
+    // raised once the frame is dispatched reaches whatever either submitted to wait for it.
+    await Promise.all(runs)
     this.emit('cueHandled', historicCueData)
+  }
+
+  private async runCue(cue: INetCue, cueType: CueType, data: CueData): Promise<void> {
+    try {
+      await cue.execute(data, this._sequencer, this._lightManager)
+    } catch (error) {
+      log.error(`Cue ${cueType} execution failed:`, error)
+    }
   }
 
   /** Point this chain at the coordinator's motion cue and run it against this chain's sequencer. */

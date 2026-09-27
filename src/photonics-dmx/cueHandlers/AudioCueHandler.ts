@@ -126,16 +126,23 @@ export class AudioCueHandler extends EventEmitter {
       executionCount: this.executionCount,
     }
 
-    const ran = new Set<IAudioCue>()
-    const run = async (cue: IAudioCue | null): Promise<void> => {
-      if (!cue || ran.has(cue)) return
-      ran.add(cue)
-      await cue.execute(cueData, this.sequencer, this.lightManager)
+    // Every slot's cue runs up to its first await before this yields, so a beat raised once the
+    // frame is dispatched reaches whatever each cue submitted to wait for it.
+    const cues = new Set<IAudioCue>()
+    for (const cue of [
+      this.currentPrimaryCue,
+      this.currentSecondaryCue,
+      this.currentStrobeCue,
+      this.appliedMotionCue,
+    ]) {
+      if (cue) cues.add(cue)
     }
-    await run(this.currentPrimaryCue)
-    await run(this.currentSecondaryCue)
-    await run(this.currentStrobeCue)
-    await run(this.appliedMotionCue)
+    const runs = [...cues].map(async (cue) =>
+      cue.execute(cueData, this.sequencer, this.lightManager),
+    )
+    for (const run of await Promise.allSettled(runs)) {
+      if (run.status === 'rejected') throw run.reason
+    }
   }
 
   /** The motion cue the audio input runs, as the renderer should show it. */
