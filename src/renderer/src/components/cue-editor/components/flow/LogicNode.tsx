@@ -7,13 +7,14 @@ import type {
   LogicNode,
   LogicNodeMeta,
   ValueSource,
+  ColorListValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { LOGIC_NODE_META } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type LogicType = LogicNode['logicType']
 type LogicOf<T extends LogicType> = Extract<LogicNode, { logicType: T }>
 
-const formatValueSource = (value?: ValueSource): string => {
+const formatValueSource = (value?: ValueSource | ColorListValueSource): string => {
   if (!value) return ''
   if (value.source === 'literal') {
     return `${value.value}`

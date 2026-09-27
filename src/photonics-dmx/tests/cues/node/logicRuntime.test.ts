@@ -453,7 +453,6 @@ describe('Node cue logic runtime', () => {
         mode: 'init',
         varName: 'arr',
         valueType: 'light-array',
-        value: { source: 'literal', value: [] },
       }
       const shuffleNode: LogicNode = {
         id: 'shuffle1',

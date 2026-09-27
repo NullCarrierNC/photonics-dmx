@@ -22,6 +22,7 @@ import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
 import { MAX_NODE_LAYER } from '../../constants/nodeConstants'
 import type {
+  ColorListValueSource,
   ActionNode,
   LogicNode,
   NodeCueMode,
@@ -265,7 +266,7 @@ export function colorListIssue(value: unknown): ValueIssue | null {
 /** A field of a logic node that holds a colour or, for a palette, a colour list. */
 interface LogicColorField {
   field: string
-  source: ValueSource | undefined
+  source: ValueSource | ColorListValueSource | undefined
   list?: boolean
 }
 
