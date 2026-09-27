@@ -10,6 +10,7 @@ import {
   BaseListSummary,
   BaseLoadResult,
   isJsonFile,
+  type GroupIdClaim,
 } from './BaseNodeFileLoader'
 const log = createLogger('EffectLoader')
 
@@ -42,11 +43,11 @@ interface EffectLoaderOptions {
 }
 
 export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSummary> {
-  /** The group id each loaded effect file holds, by path. A file refused at load holds none. */
-  private readonly groupHolders = new Map<string, { mode: EffectMode; groupId: string }>()
+  /** The group id each loaded effect file holds, by path. A file that fails its load holds none. */
+  private readonly groupHolders = new Map<string, GroupIdClaim<EffectMode>>()
 
   constructor(options: EffectLoaderOptions) {
-    super(options.baseDir, 'effects', ['yarg', 'audio'])
+    super(options.baseDir, 'effects', ['yarg', 'audio'], 'effect')
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
@@ -108,7 +109,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     )
     await this.loadFile(mode, filePath)
 
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
     return { success: true, path: filePath }
   }
 
@@ -116,7 +117,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     const { filePath: resolvedPath } = this.resolveExistingEffectFilePath(filePath)
     await fs.rm(resolvedPath, { force: true })
     this.forgetFile(resolvedPath)
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
     return { success: true }
   }
 
@@ -152,7 +153,15 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   }
 
   protected async readAndRegister(mode: EffectMode, filePath: string): Promise<EffectFileSummary> {
-    this.groupHolders.delete(path.resolve(filePath))
+    try {
+      return await this.readAndHold(mode, filePath)
+    } catch (error) {
+      this.removeRegistration(filePath)
+      throw error
+    }
+  }
+
+  private async readAndHold(mode: EffectMode, filePath: string): Promise<EffectFileSummary> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
     const changes = migrateOlderNodeFile(parsed)
@@ -165,6 +174,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     const file = validation.data
 
     if (!file) {
+      this.removeRegistration(filePath)
       return {
         path: filePath,
         errors: ['Validation returned no data'],
@@ -173,14 +183,12 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       } as EffectFileSummary
     }
 
-    // The file already holding the group id keeps it. A full load goes in name order.
-    this.assertGroupIdFree(
-      filePath,
-      mode,
-      file.group.id,
-      'Import this file to give it a group ID of its own.',
-    )
-    this.groupHolders.set(path.resolve(filePath), { mode, groupId: file.group.id })
+    const displaced = this.claimGroupId(filePath, mode, file.group.id)
+    if (displaced !== undefined) {
+      this.groupHolders.delete(displaced)
+      this.refuseGroupId(displaced, mode, file.group.id, filePath)
+    }
+    this.holdGroupId(filePath, { mode, groupId: file.group.id })
 
     // Compile each effect at load (and so at save, which calls loadFile) so invalid action
     // payloads surface on the file summary for the editor rather than only at runtime when a
@@ -219,42 +227,21 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return summary
   }
 
-  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
-  private assertGroupIdFree(
-    filePath: string,
-    mode: EffectMode,
-    groupId: string,
-    advice: string,
-  ): void {
-    const holder = this.groupIdHolder(filePath, mode, groupId)
-    if (holder) {
-      throw new Error(
-        `The ${mode} effect file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
-      )
-    }
+  private holdGroupId(filePath: string, claim: GroupIdClaim<EffectMode>): void {
+    const held = this.groupHolders.get(filePath)
+    if (held && held.groupId !== claim.groupId) this.releaseGroupId(held.mode, held.groupId)
+    this.groupHolders.set(filePath, claim)
   }
 
-  /** The path of another loaded file in the mode that holds this group id, if one does. */
-  private groupIdHolder(targetPath: string, mode: EffectMode, groupId: string): string | undefined {
-    const normalizedTarget = path.resolve(targetPath)
-    const key = groupId.trim().toLowerCase()
-    if (!key) {
-      return undefined
-    }
-    for (const [holderPath, holder] of this.groupHolders) {
-      if (
-        holder.mode === mode &&
-        holderPath !== normalizedTarget &&
-        holder.groupId.trim().toLowerCase() === key
-      ) {
-        return holderPath
-      }
-    }
-    return undefined
+  protected heldGroupIds(): Iterable<[string, GroupIdClaim<EffectMode>]> {
+    return this.groupHolders
   }
 
   protected removeRegistration(filePath: string): void {
-    this.groupHolders.delete(path.resolve(filePath))
+    const held = this.groupHolders.get(filePath)
+    if (!held) return
+    this.groupHolders.delete(filePath)
+    this.releaseGroupId(held.mode, held.groupId)
   }
 
   protected makeErrorSummary(

@@ -43,6 +43,8 @@ export interface BaseFileSummary<TMode extends string> {
   unsaved?: string[]
 }
 
+const GROUP_ID_REFUSED_ADVICE = 'Import this file to give it a group ID of its own.'
+
 /** One summary bucket per mode, keyed by the mode discriminant. */
 export type BaseListSummary<TMode extends string, TSummary> = Record<TMode, TSummary[]>
 
@@ -57,6 +59,17 @@ export interface BaseLoadResult {
 }
 
 export const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
+
+/** The group id a file holds, or was refused, in its mode. */
+export interface GroupIdClaim<TMode extends string> {
+  mode: TMode
+  groupId: string
+}
+
+const sameGroupId = <TMode extends string>(
+  a: GroupIdClaim<TMode>,
+  b: GroupIdClaim<TMode>,
+): boolean => a.mode === b.mode && a.groupId.trim().toLowerCase() === b.groupId.trim().toLowerCase()
 
 const errorCode = (error: unknown): unknown =>
   typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
@@ -100,6 +113,12 @@ export abstract class BaseNodeFileLoader<
    */
   private readonly savedContents = new Map<string, string>()
 
+  /** Files a load refused a group id another file holds, by path. */
+  private readonly refusedGroupIds = new Map<string, GroupIdClaim<TMode>>()
+
+  /** Group ids a file let go of since the last change was reported. */
+  private releasedGroupIds: GroupIdClaim<TMode>[] = []
+
   /**
    * @param baseDir application base directory
    * @param subDir  segment under `node-data` that scopes this loader's roots,
@@ -107,8 +126,14 @@ export abstract class BaseNodeFileLoader<
    * @param modes   the mode discriminants this loader handles; each maps to a
    *                directory `<baseDir>/node-data/<subDir>/<mode>` and a summary
    *                bucket.
+   * @param fileKind what messages call one of this loader's files, e.g. `'cue'`.
    */
-  constructor(baseDir: string, subDir: string, modes: readonly TMode[]) {
+  constructor(
+    baseDir: string,
+    subDir: string,
+    modes: readonly TMode[],
+    private readonly fileKind: string,
+  ) {
     super()
     this.baseDir = baseDir
     this.modes = modes
@@ -130,8 +155,11 @@ export abstract class BaseNodeFileLoader<
   /** Parse, validate and register a single file; returns its summary. */
   protected abstract readAndRegister(mode: TMode, filePath: string): Promise<TSummary>
 
-  /** Remove the registration a file holds. */
+  /** Remove the registration a file holds, letting go of its group id. */
   protected abstract removeRegistration(filePath: string): void
+
+  /** The group id each file holding one holds, by path. */
+  protected abstract heldGroupIds(): Iterable<[string, GroupIdClaim<TMode>]>
 
   /** Build a placeholder summary describing a file that failed to load. */
   protected abstract makeErrorSummary(mode: TMode, filePath: string, message: string): TSummary
@@ -155,7 +183,7 @@ export abstract class BaseNodeFileLoader<
       { loaded: 0, failed: 0, errors: [], migrations: [], unsaved: [] },
     )
 
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
     return summary
   }
 
@@ -182,13 +210,14 @@ export abstract class BaseNodeFileLoader<
     const dir = this.dirs[mode]
     // Sorted, so files load and groups register in the same order on every platform. readdir hands
     // them back in whatever order the filesystem keeps.
-    const files = (await fs.readdir(dir).catch(() => [] as string[])).sort()
+    const files = (await fs.readdir(dir).catch(() => [] as string[])).sort().filter(isJsonFile)
 
-    // Paths this mode registered on its previous load, so a file that has since vanished from disk
-    // (e.g. a manual reload() with no chokidar unlink event) is unregistered rather than left stale
-    // in the registry.
-    const previousPaths = new Set(this.summaries[mode].map((s) => s.path))
-    const currentPaths = new Set<string>()
+    // A file loaded before and gone from disk since (e.g. a manual reload() with no chokidar unlink
+    // event) is dropped before any file loads, so a group id it held is free for the files that do.
+    const currentPaths = new Set(files.map((file) => path.join(dir, file)))
+    for (const { path: stalePath } of this.summaries[mode]) {
+      if (!currentPaths.has(stalePath)) this.forgetFile(stalePath)
+    }
 
     let loaded = 0
     let failed = 0
@@ -198,12 +227,7 @@ export abstract class BaseNodeFileLoader<
     const summaries: TSummary[] = []
 
     for (const file of files) {
-      if (!isJsonFile(file)) {
-        continue
-      }
-
       const filePath = path.join(dir, file)
-      currentPaths.add(filePath)
       try {
         const summary = await this.loadFile(mode, filePath)
         if (!summary) continue
@@ -216,13 +240,6 @@ export abstract class BaseNodeFileLoader<
         const message = error instanceof Error ? error.message : String(error)
         summaries.push(this.makeErrorSummary(mode, filePath, message))
         errors.push(`${path.basename(file)}: ${message}`)
-      }
-    }
-
-    // Unregister files present last time but gone now.
-    for (const stalePath of previousPaths) {
-      if (!currentPaths.has(stalePath)) {
-        this.forgetFile(stalePath)
       }
     }
 
@@ -249,7 +266,7 @@ export abstract class BaseNodeFileLoader<
 
     this.watcher.on('add', (file) => void this.handleFileChange(file))
     this.watcher.on('change', (file) => void this.handleFileChange(file))
-    this.watcher.on('unlink', (file) => this.handleFileRemoved(file))
+    this.watcher.on('unlink', (file) => void this.handleFileRemoved(file))
   }
 
   public async dispose(): Promise<void> {
@@ -269,7 +286,7 @@ export abstract class BaseNodeFileLoader<
     }
 
     await this.loadFileRecordingErrors(mode, filePath)
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
   }
 
   /**
@@ -277,6 +294,7 @@ export abstract class BaseNodeFileLoader<
    * whatever it registered before is dropped, so it reads as no file at all. Returns null for it.
    */
   protected async loadFile(mode: TMode, filePath: string): Promise<TSummary | null> {
+    this.refusedGroupIds.delete(filePath)
     if (!this.isPathWithinDir(filePath, this.dirs[mode])) {
       log.warn(`Skipping ${filePath}: it links outside ${this.dirs[mode]}.`)
       this.forgetFile(filePath)
@@ -367,15 +385,92 @@ export abstract class BaseNodeFileLoader<
     return onDisk === saved
   }
 
-  protected handleFileRemoved(filePath: string): void {
+  protected async handleFileRemoved(filePath: string): Promise<void> {
     this.forgetFile(filePath)
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
   }
 
   /** Drop a file's registration and its summary. */
   protected forgetFile(filePath: string): void {
+    this.refusedGroupIds.delete(filePath)
     this.removeRegistration(filePath)
     this.removeSummary(filePath)
+  }
+
+  /**
+   * Load again, in name order, each file refused a group id a file has since let go of, so the
+   * first of them takes it. Then report the summary.
+   */
+  protected async publishChanges(): Promise<void> {
+    while (this.releasedGroupIds.length > 0) {
+      const released = this.releasedGroupIds
+      this.releasedGroupIds = []
+      const waiting = [...this.refusedGroupIds]
+        .filter(([, refused]) => released.some((claim) => sameGroupId(claim, refused)))
+        .sort(([a], [b]) => (path.basename(a) < path.basename(b) ? -1 : 1))
+      for (const [filePath, { mode }] of waiting) {
+        await this.loadFileRecordingErrors(mode, filePath)
+      }
+    }
+    this.emit('changed', this.getSummary())
+  }
+
+  // ---- group ids ------------------------------------------------------------
+
+  /** Note that a file has let go of a group id, so a file refused it can take it. */
+  protected releaseGroupId(mode: TMode, groupId: string): void {
+    this.releasedGroupIds.push({ mode, groupId })
+  }
+
+  /** The path of another file in the mode that holds this group id, if one does. */
+  protected groupIdHolder(filePath: string, mode: TMode, groupId: string): string | undefined {
+    const target = path.resolve(filePath)
+    for (const [heldPath, held] of this.heldGroupIds()) {
+      if (sameGroupId(held, { mode, groupId }) && path.resolve(heldPath) !== target) {
+        return heldPath
+      }
+    }
+    return undefined
+  }
+
+  private groupIdTaken(holder: string, mode: TMode, groupId: string, advice: string): Error {
+    return new Error(
+      `The ${mode} ${this.fileKind} file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
+    )
+  }
+
+  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
+  protected assertGroupIdFree(
+    filePath: string,
+    mode: TMode,
+    groupId: string,
+    advice: string,
+  ): void {
+    const holder = this.groupIdHolder(filePath, mode, groupId)
+    if (holder) throw this.groupIdTaken(holder, mode, groupId, advice)
+  }
+
+  /**
+   * Settle the group id a load claims. The first file in name order holds it, so a load is refused
+   * an id an earlier-named file holds, and takes one a later-named file holds. Returns the file it
+   * takes the id from, which it hands to {@link refuseGroupId} once it holds the id.
+   */
+  protected claimGroupId(filePath: string, mode: TMode, groupId: string): string | undefined {
+    const holder = this.groupIdHolder(filePath, mode, groupId)
+    if (holder === undefined) return undefined
+    if (path.basename(holder) < path.basename(filePath)) {
+      this.removeRegistration(filePath)
+      this.refusedGroupIds.set(filePath, { mode, groupId })
+      throw this.groupIdTaken(holder, mode, groupId, GROUP_ID_REFUSED_ADVICE)
+    }
+    return holder
+  }
+
+  /** Record a file as refused the group id `holder` has taken from it. */
+  protected refuseGroupId(filePath: string, mode: TMode, groupId: string, holder: string): void {
+    this.refusedGroupIds.set(filePath, { mode, groupId })
+    const { message } = this.groupIdTaken(holder, mode, groupId, GROUP_ID_REFUSED_ADVICE)
+    this.updateSummary(this.makeErrorSummary(mode, filePath, message))
   }
 
   /** Subclass hook to log a failed watch-triggered reload. */

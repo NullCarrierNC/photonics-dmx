@@ -207,6 +207,11 @@ class WatchedNodeCueLoader extends NodeCueLoader {
   public reportChange(filePath: string): Promise<void> {
     return this.handleFileChange(filePath)
   }
+
+  /** Reports a file removal the way the directory watcher does. */
+  public reportRemoval(filePath: string): Promise<void> {
+    return this.handleFileRemoved(filePath)
+  }
 }
 
 describe('NodeCueLoader', () => {
@@ -686,15 +691,84 @@ describe('NodeCueLoader', () => {
       expect([...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]).toEqual(['from-a'])
     })
 
-    it('leaves the id with the file holding it when an earlier-named file arrives', async () => {
+    const served = (): string[] => [...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]
+    const errorsOf = (name: string): string[] | undefined =>
+      loader.getSummary().yarg.find((s) => path.basename(s.path) === name)?.errors
+
+    it('gives the id to an earlier-named file that arrives on reload', async () => {
       writeMotionFile('b.json', 'from-b')
       await loader.loadAll()
 
       writeMotionFile('a.json', 'from-a')
       const result = await loader.reload()
 
-      expect(result.errors).toEqual([refusal('a.json', 'b.json')])
-      expect([...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]).toEqual(['from-b'])
+      expect(result.errors).toEqual([refusal('b.json', 'a.json')])
+      expect(served()).toEqual(['from-a'])
+    })
+
+    it('gives the id to an earlier-named file the watcher reports', async () => {
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      await loader.reportChange(writeMotionFile('a.json', 'from-a'))
+
+      expect(served()).toEqual(['from-a'])
+      expect(errorsOf('a.json')).toBeUndefined()
+      expect(errorsOf('b.json')).toEqual([refusal('b.json', 'a.json').slice('b.json: '.length)])
+    })
+
+    it('hands the group to the refused file when the file holding it is deleted', async () => {
+      const holder = writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      await loader.deleteFile(holder)
+
+      expect(served()).toEqual(['from-b'])
+      expect(errorsOf('b.json')).toBeUndefined()
+    })
+
+    it('hands the group to the refused file when the watcher reports the holder removed', async () => {
+      const holder = writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      fs.rmSync(holder)
+      await loader.reportRemoval(holder)
+
+      expect(served()).toEqual(['from-b'])
+      expect(loader.getSummary().yarg.map((s) => path.basename(s.path))).toEqual(['b.json'])
+    })
+
+    it('hands the group to the refused file when the holder is saved under a new id', async () => {
+      writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      const renamed = yargMotionOnlyFile()
+      renamed.group = { ...renamed.group, id: 'renamed' }
+      await loader.saveFile('yarg', 'a.json', renamed)
+
+      expect(served()).toEqual(['from-b'])
+      expect(errorsOf('b.json')).toBeUndefined()
+    })
+
+    it('keeps an audio group turned off when an earlier-named file takes its id', async () => {
+      const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+      fs.mkdirSync(audioDir, { recursive: true })
+      const write = (name: string, cueTypeId: string): string => {
+        const filePath = path.join(audioDir, name)
+        fs.writeFileSync(filePath, JSON.stringify(audioLightingFile('audio-shared', cueTypeId)))
+        return filePath
+      }
+      write('b.json', 'from-b')
+      await loader.loadAll()
+      audioRegistry.disableGroup('audio-shared')
+
+      await loader.reportChange(write('a.json', 'from-a'))
+
+      expect([...(audioRegistry.getGroup('audio-shared')?.cues.keys() ?? [])]).toEqual(['from-a'])
+      expect(audioRegistry.getEnabledGroups()).not.toContain('audio-shared')
     })
   })
 

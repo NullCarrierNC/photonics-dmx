@@ -334,12 +334,12 @@ describe('EffectLoader watcher reports', () => {
 
 describe('EffectLoader with a group id two files on disk share', () => {
   let tmpDir: string
-  let loader: EffectLoader
+  let loader: WatchedEffectLoader
   let yargDir: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-shared-'))
-    loader = new EffectLoader({ baseDir: tmpDir })
+    loader = new WatchedEffectLoader({ baseDir: tmpDir })
     yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
     fs.mkdirSync(yargDir, { recursive: true })
   })
@@ -349,11 +349,18 @@ describe('EffectLoader with a group id two files on disk share', () => {
   })
 
   /** An effect file in the shared group whose one effect has the given name. */
-  function writeEffectFile(name: string, effectName: string): void {
+  function writeEffectFile(name: string, effectName: string): string {
     const file = minimalYargEffectFixture('shared-effects')
     file.effects = file.effects.map((effect) => ({ ...effect, name: effectName }))
-    fs.writeFileSync(path.join(yargDir, name), JSON.stringify(file), 'utf-8')
+    const filePath = path.join(yargDir, name)
+    fs.writeFileSync(filePath, JSON.stringify(file), 'utf-8')
+    return filePath
   }
+
+  const servedName = async (): Promise<string | undefined> =>
+    (await loader.readEffectFilesByGroupId('yarg')).get('shared-effects')?.effects[0].name
+  const errorsOf = (name: string): string[] | undefined =>
+    loader.getSummary().yarg.find((s) => path.basename(s.path) === name)?.errors
 
   it('loads the first in name order and refuses the other, naming the file that holds it', async () => {
     writeEffectFile('a.json', 'From a')
@@ -368,7 +375,7 @@ describe('EffectLoader with a group id two files on disk share', () => {
     expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From a')
   })
 
-  it('hands cue builds the file holding the id when an earlier-named file arrives', async () => {
+  it('gives the id to an earlier-named file that arrives on reload', async () => {
     writeEffectFile('b.json', 'From b')
     await loader.loadAll()
 
@@ -376,9 +383,42 @@ describe('EffectLoader with a group id two files on disk share', () => {
     const result = await loader.reload()
 
     expect(result.errors).toEqual([
-      "a.json: The yarg effect file b.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+      "b.json: The yarg effect file a.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
     ])
-    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
-    expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From b')
+    expect(await servedName()).toBe('From a')
+  })
+
+  it('gives the id to an earlier-named file the watcher reports', async () => {
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    await loader.reportChange(writeEffectFile('a.json', 'From a'))
+
+    expect(await servedName()).toBe('From a')
+    expect(errorsOf('b.json')).toEqual([
+      "The yarg effect file a.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+    ])
+  })
+
+  it('hands the id to the refused file when the file holding it is deleted', async () => {
+    const holder = writeEffectFile('a.json', 'From a')
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    await loader.deleteFile(holder)
+
+    expect(await servedName()).toBe('From b')
+    expect(errorsOf('b.json')).not.toContainEqual(expect.stringContaining('already uses'))
+  })
+
+  it('hands the id to the refused file when the holder is saved under a new id', async () => {
+    writeEffectFile('a.json', 'From a')
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    await loader.saveFile('yarg', 'a.json', minimalYargEffectFixture('renamed'))
+
+    expect(await servedName()).toBe('From b')
+    expect(errorsOf('b.json')).not.toContainEqual(expect.stringContaining('already uses'))
   })
 })

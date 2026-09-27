@@ -20,7 +20,12 @@ import type { EffectReference } from '../../types/nodeCueTypes'
 import { buildEffectRegistry, type EffectFilesByMode } from './effectRegistryBuilder'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
-import { BaseNodeFileLoader, BaseListSummary, BaseLoadResult } from './BaseNodeFileLoader'
+import {
+  BaseNodeFileLoader,
+  BaseListSummary,
+  BaseLoadResult,
+  type GroupIdClaim,
+} from './BaseNodeFileLoader'
 const log = createLogger('NodeCueLoader')
 
 export interface NodeCueFileSummary {
@@ -135,7 +140,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   private effectFilesPass: EffectFilesByMode | null = null
 
   constructor(private readonly options: NodeCueLoaderOptions) {
-    super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'])
+    super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'], 'cue')
   }
 
   protected override onBeforeLoadAll(): void {
@@ -162,7 +167,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
         await this.loadFileRecordingErrors(registration.mode, filePath)
       }
     })
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
   }
 
   /** Run a load pass that reads each effect file once, however many cue files reference it. */
@@ -234,15 +239,15 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     )
     await this.loadFile(mode, filePath)
 
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
     return { success: true, path: filePath }
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
     const { filePath: resolvedPath } = this.resolveExistingCueFilePath(filePath)
     await fs.rm(resolvedPath, { force: true })
-    this.unregisterFile(resolvedPath)
-    this.emit('changed', this.getSummary())
+    this.forgetFile(resolvedPath)
+    await this.publishChanges()
     return { success: true }
   }
 
@@ -280,17 +285,11 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     const file = validation.data
-    // The file already holding the group id keeps it. A full load goes in name order.
-    this.assertGroupIdFree(
-      filePath,
-      mode,
-      file.group.id,
-      'Import this file to give it a group ID of its own.',
-    )
+    const displaced = this.claimGroupId(filePath, mode, file.group.id)
     // Per-cue compile failures go on the file's summary, where the cue editor lists them.
     const compileErrors: string[] = []
     const compileWarnings: string[] = []
-    await this.registerFile(filePath, mode, file, compileErrors, compileWarnings)
+    await this.registerFile(filePath, mode, file, { compileErrors, compileWarnings, displaced })
     const saved = await this.writeMigratedFile(filePath, parsed, changes)
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
@@ -327,17 +326,24 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     return summary
   }
 
+  /**
+   * Build and register a file's group. `displaced` is the later-named file the group id is taken
+   * from, whose group this one replaces.
+   */
   private async registerFile(
     filePath: string,
     mode: NodeCueMode,
     file: NodeCueFile,
-    compileErrors: string[],
-    compileWarnings: string[],
+    build: { compileErrors: string[]; compileWarnings: string[]; displaced?: string },
   ): Promise<void> {
+    const { compileErrors, compileWarnings, displaced } = build
     const effectFileIds = effectFileIdsOf(file)
     const strategy = strategyForFile(file)
     if (strategy) {
       this.unregisterFile(filePath)
+      if (displaced !== undefined) {
+        this.takeGroupFrom(displaced, filePath, { mode, groupId: file.group.id, builtIn: false })
+      }
       await strategy.registerFile(file, mode, compileErrors)
       this.fileRegistrations.set(filePath, {
         mode,
@@ -361,6 +367,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       const group = await this.buildOrUnregister(filePath, () =>
         buildAudioGroup(audioFile, compileErrors, context, compileWarnings),
       )
+      if (displaced !== undefined) {
+        this.takeGroupFrom(displaced, filePath, { mode, groupId: group.id, builtIn: true })
+      }
       this.registerAudioGroup(filePath, audioFile, group)
     } else {
       // Both net modes compile through the same path and differ only in which registry instance
@@ -368,6 +377,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       const group = await this.buildOrUnregister(filePath, () =>
         buildNetGroup(file as NetNodeCueFile, compileErrors, context, compileWarnings),
       )
+      if (displaced !== undefined) {
+        this.takeGroupFrom(displaced, filePath, { mode, groupId: group.id, builtIn: true })
+      }
       const registry = this.options.registries[mode]
       if (this.holdsGroup(filePath, mode, group.id)) {
         registry.replaceGroup(group)
@@ -389,6 +401,29 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       this.unregisterFile(filePath)
       throw error
     }
+  }
+
+  /**
+   * Hand a file the group id of the later-named file it takes it from. When both groups are built
+   * in, the registration moves to the file, so the file's rebuilt group swaps in where that one
+   * served.
+   */
+  private takeGroupFrom(
+    displaced: string,
+    filePath: string,
+    claim: { mode: NodeCueMode; groupId: string; builtIn: boolean },
+  ): void {
+    const { mode, groupId } = claim
+    const registration = this.fileRegistrations.get(displaced)
+    if (!registration) return
+    if (claim.builtIn && this.holdsGroup(displaced, mode, groupId)) {
+      this.unregisterFile(filePath)
+      this.fileRegistrations.delete(displaced)
+      this.fileRegistrations.set(filePath, registration)
+    } else {
+      this.unregisterFile(displaced)
+    }
+    this.refuseGroupId(displaced, mode, groupId, filePath)
   }
 
   /** Whether the file's current registration is a built-in group with this id and mode. */
@@ -463,47 +498,12 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     )
 
     this.fileRegistrations.delete(filePath)
+    this.releaseGroupId(registration.mode, registration.groupId)
   }
 
-  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
-  private assertGroupIdFree(
-    filePath: string,
-    mode: NodeCueMode,
-    groupId: string,
-    advice: string,
-  ): void {
-    const holder = this.groupIdHolder(filePath, mode, groupId)
-    if (holder) {
-      throw new Error(
-        `The ${mode} cue file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
-      )
-    }
-  }
-
-  /**
-   * The path of another registered file in the mode that holds this group id, if one does. Two
-   * files sharing one would overwrite each other in the registry (see registerFile).
-   */
-  private groupIdHolder(
-    targetPath: string,
-    mode: NodeCueMode,
-    groupId: string,
-  ): string | undefined {
-    const normalizedTarget = path.resolve(targetPath)
-    const key = groupId.trim().toLowerCase()
-    if (!key) {
-      return undefined
-    }
-    for (const [registeredPath, reg] of this.fileRegistrations) {
-      if (
-        reg.mode === mode &&
-        path.resolve(registeredPath) !== normalizedTarget &&
-        reg.groupId.trim().toLowerCase() === key
-      ) {
-        return registeredPath
-      }
-    }
-    return undefined
+  /** Two files sharing a group id would overwrite each other in the registry (see registerFile). */
+  protected heldGroupIds(): Iterable<[string, GroupIdClaim<NodeCueMode>]> {
+    return this.fileRegistrations
   }
 
   protected removeRegistration(filePath: string): void {
