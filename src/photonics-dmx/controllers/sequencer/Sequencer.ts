@@ -142,6 +142,27 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Resubmit an effect that may still be running, carrying each light's running effect of this
+   * name over to it where it can. See {@link EffectManager.updateEffect}.
+   */
+  public updateEffect(name: string, effect: Effect): void {
+    this.effectManager.updateEffect(name, effect)
+  }
+
+  /**
+   * {@link updateEffect} with a completion callback, refused while a blackout runs. The waiter held
+   * for `name` is fired with `cancelled = true` before `onComplete` takes its place.
+   * @returns True when the effect was applied, false when a gate refused it
+   */
+  public updateEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+  ): boolean {
+    return this.effectManager.updateEffectWithCallback(name, effect, onComplete)
+  }
+
+  /**
    * Remove a completion callback for an effect.
    *
    * @param name The name of the effect

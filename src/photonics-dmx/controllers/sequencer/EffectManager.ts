@@ -15,11 +15,14 @@ import {
   REPLACE_EFFECT,
   SET_EFFECT,
   SET_EFFECT_UNBLOCKED_NAME,
+  UPDATE_EFFECT,
+  UPDATE_EFFECT_WAITING,
   type SubmissionOutcome,
   type SubmissionPolicy,
 } from './effectSubmission'
 import { PersistentRunRegistry } from './PersistentRunRegistry'
 import { EffectScheduler } from './EffectScheduler'
+import { carryOverRunning } from './effectCarryOver'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('EffectManager')
 
@@ -35,7 +38,7 @@ const log = createLogger('EffectManager')
  * - Coordinates with SystemEffects for blackout handling
  * - Tracks layer-specific effect history
  *
- * Provides five key methods for effects:
+ * Provides six key methods for effects:
  * - addEffect: Adds an effect, replacing existing ones (if on same layer) or queueing
  * - setEffect: Like addEffect but clears all effects on all layers first
  * - replaceEffect: Per-(layer, light) replace; cancels active/queued for the same
@@ -43,6 +46,8 @@ const log = createLogger('EffectManager')
  *   Use for state-target effects like non-blocking set-position where the latest
  *   submission must win. replaceEffectWithCallback is the variant for a caller
  *   that parks on completion.
+ * - updateEffect: Carries a running effect of the same name over to the new submission where
+ *   it can, and replaces it elsewhere, for a caller resubmitting the same effect every frame
  * - addEffectUnblockedName: Discards if effect with same name exists anywhere
  * - setEffectUnblockedName: Like addEffectUnblockedName but cancels existing effects
  */
@@ -240,6 +245,34 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
+   * Resubmits an effect that may still be running. A light running this name carries on where it
+   * can: with unchanged steps it runs on as it is, and partway through a first fade of the same
+   * length and easing it heads for the new colour on its own clock. Every other light is replaced
+   * as {@link replaceEffect} does, easing from its current state.
+   */
+  public updateEffect(name: string, effect: Effect): void {
+    this.submitEffect(name, effect, false, UPDATE_EFFECT)
+  }
+
+  /**
+   * {@link updateEffect} for a caller that parks on completion, refused while a blackout runs. The
+   * waiter held for `name` hears `cancelled = true` before `onComplete` takes its place.
+   * @returns True when the effect was applied
+   */
+  public updateEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+  ): boolean {
+    const applied = this.submitEffect(name, effect, false, UPDATE_EFFECT_WAITING) === 'applied'
+    if (applied) {
+      this.effectCallbacks.fire(name, true)
+      this.effectCallbacks.add(name, onComplete)
+    }
+    return applied
+  }
+
+  /**
    * Adds a new effect and clears all other effects that were running.
    * Used for significant changes in scenes. E.g., from Menu to in-game.
    *
@@ -300,7 +333,15 @@ export class EffectManager implements IEffectManager {
       isPersistent,
     )
 
-    if (policy.mode === 'replace') {
+    if (policy.mode === 'update') {
+      carryOverRunning(name, effect, transitionsByLayerAndLight, {
+        layerManager: this.layerManager,
+        effectTransformer: this.effectTransformer,
+        lightTransitionController: this.lightTransitionController,
+      })
+    }
+
+    if (policy.mode === 'replace' || policy.mode === 'update') {
       this.scheduler.replaceEffectTransitions(
         name,
         effect,

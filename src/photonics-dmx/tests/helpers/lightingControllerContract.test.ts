@@ -96,6 +96,31 @@ describe.each([
     })
   })
 
+  it('hands a running effect over to the waiter of an update of the same name', () => {
+    withSubject((s) => {
+      const first = jest.fn()
+      const second = jest.fn()
+      s.controller.addEffectUnblockedNameWithCallback('held', s.effect(), first)
+      s.frame()
+
+      expect(s.controller.updateEffectWithCallback('held', s.effect(), second)).toBe(true)
+      s.frame()
+
+      expect(first).toHaveBeenCalledWith(true)
+      expect(second).not.toHaveBeenCalled()
+    })
+  })
+
+  it('refuses an update with a waiter while a blackout fades', () => {
+    withSubject((s) => {
+      const late = jest.fn()
+      void s.controller.blackout(500)
+      s.frame()
+
+      expect(s.controller.updateEffectWithCallback('late', s.effect(), late)).toBe(false)
+    })
+  })
+
   it('refuses an unblocked-name submission while a blackout fades', () => {
     withSubject((s) => {
       const late = jest.fn()

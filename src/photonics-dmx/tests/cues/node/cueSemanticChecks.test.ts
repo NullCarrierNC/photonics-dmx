@@ -167,9 +167,9 @@ describe('the built-in cue-called execution policy check', () => {
     const result = validateAudioNodeCueFile(cueCalledFile('beat'))
 
     expect(result.valid).toBe(true)
-    expect(result.valid && result.warnings.join('\n')).toContain(
-      "the cue-called event starts a run on every audio frame and 'paint' waits",
-    )
+    expect(result.valid && result.warnings).toEqual([
+      "cue 'Called': the cue-called event starts a run on every audio frame and 'paint' waits, so runs pile up. Use the Ignore while running or Latest pending policy.",
+    ])
   })
 
   it('stays quiet once the event has another policy, or nothing waits', () => {

@@ -47,7 +47,7 @@ export function checkContinuousCueCalledWaits(
       }
       if (waiting) {
         warnings.push(
-          `cue '${cue.name}': the cue-called event starts a run on every audio frame and '${waiting}' waits, so runs pile up behind it. Give the event an execution policy other than continuous.`,
+          `cue '${cue.name}': the cue-called event starts a run on every audio frame and '${waiting}' waits, so runs pile up. Use the Ignore while running or Latest pending policy.`,
         )
       }
     }

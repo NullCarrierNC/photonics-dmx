@@ -7,9 +7,10 @@ export interface SubmissionPolicy {
   /**
    * How existing effects are handled: 'add' runs beside other layers (queueing behind the same
    * name), 'set' clears everything first, 'replace' cancels the targeted (layer, light) slots and
-   * starts immediately.
+   * starts immediately, and 'update' carries a running effect of the same name over to the
+   * submission where it can and replaces the rest.
    */
-  mode: 'add' | 'set' | 'replace'
+  mode: 'add' | 'set' | 'replace' | 'update'
   /** Refuse the submission when an effect with the same name is already running anywhere. */
   blockDuplicateName: boolean
   /** What an active blackout does to the submission. */
@@ -24,7 +25,10 @@ export interface SubmissionPolicy {
    */
   layer0RepeatQueues: boolean
   /** Verb pair for the blackout and duplicate-name log lines. */
-  verb: { imperative: 'add' | 'set' | 'replace'; progressive: 'adding' | 'setting' | 'replacing' }
+  verb: {
+    imperative: 'add' | 'set' | 'replace' | 'update'
+    progressive: 'adding' | 'setting' | 'replacing' | 'updating'
+  }
   /** Log line used when this variant cancels an active blackout. */
   blackoutCancelLog: string
 }
@@ -49,6 +53,23 @@ export const REPLACE_EFFECT: SubmissionPolicy = {
   layer0RepeatQueues: false,
   verb: { imperative: 'replace', progressive: 'replacing' },
   blackoutCancelLog: 'Replace cancelling blackout',
+}
+
+export const UPDATE_EFFECT: SubmissionPolicy = {
+  mode: 'update',
+  blockDuplicateName: false,
+  blackout: 'cancel',
+  blackoutBaseLayerOnly: true,
+  blackoutFirst: false,
+  layer0RepeatQueues: false,
+  verb: { imperative: 'update', progressive: 'updating' },
+  blackoutCancelLog: 'Update cancelling blackout',
+}
+
+/** {@link UPDATE_EFFECT} for a waiter, which a blackout refuses as it does the unblocked adds. */
+export const UPDATE_EFFECT_WAITING: SubmissionPolicy = {
+  ...UPDATE_EFFECT,
+  blackout: 'refuse',
 }
 
 export const SET_EFFECT: SubmissionPolicy = {
