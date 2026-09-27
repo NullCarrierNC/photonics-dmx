@@ -99,14 +99,20 @@ export function resolveActionColor(
   }
 }
 
-/** The action's layer, kept on the layers that exist whatever a variable holds. */
+/**
+ * The action's layer, kept on the layers a cue draws on whatever a variable holds. A layer outside
+ * them warns, and draws on the nearest one.
+ */
 export function resolveActionLayer(
   layer: ValueSource | undefined,
   context: ExecutionContext,
 ): number {
   if (!layer) return 0
   const n = resolveNumber(layer, context)
-  return Number.isFinite(n) ? Math.min(MAX_NODE_LAYER, Math.max(0, n)) : 0
+  if (!Number.isFinite(n)) return 0
+  const kept = Math.min(MAX_NODE_LAYER, Math.max(0, n))
+  if (kept !== n) context.unknownValues.report('layer', n, `drawing on layer ${kept}`)
+  return kept
 }
 
 function resolveBearingValue(source: ValueSource, context: ExecutionContext): number {

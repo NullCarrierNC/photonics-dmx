@@ -2,6 +2,7 @@ import { jest } from '@jest/globals'
 import type { ILightingController } from '../../controllers/sequencer/interfaces'
 import type { Effect } from '../../types'
 import { CLOCK_RATE_MS_DEFAULT } from '../../../shared/clockRate'
+import { drawsOnBlackoutLayer } from '../../controllers/sequencer/effectSubmission'
 
 type Member = keyof ILightingController
 
@@ -172,24 +173,28 @@ export function completingLightingController(
     settleBlackouts()
     wipe()
   }
-  const belowSystemLayer = (effect: Effect): boolean => effect.transitions[0].layer < 255
-  /** An add or replace below the system layer cancels a fading blackout. */
-  const cancelFadeBelowSystemLayer = (effect: Effect): void => {
-    if (belowSystemLayer(effect)) settleBlackouts()
-  }
+  /** An effect with nothing to draw, or one drawing on the blackout's layer, is refused. */
+  const refused = (effect: Effect): boolean =>
+    effect.transitions.length === 0 || drawsOnBlackoutLayer(effect)
   /** Whether an unblocked-name submission is refused before the duplicate-name check. */
-  const refusedUnblocked = (effect: Effect): boolean =>
-    effect.transitions.length === 0 || (blackoutPending() && belowSystemLayer(effect))
-  const add = (name: string, effect: Effect): void => {
-    if (effect.transitions.length === 0) return
-    cancelFadeBelowSystemLayer(effect)
+  const refusedUnblocked = (effect: Effect): boolean => refused(effect) || blackoutPending()
+  /** An add or replace cancels a fading blackout. */
+  const add = (name: string, effect: Effect): boolean => {
+    if (refused(effect)) return false
+    settleBlackouts()
     place(name, effect)
+    return true
   }
 
   const fake = fakeLightingController({
-    addEffect: add,
-    replaceEffect: add,
+    addEffect: (name, effect) => {
+      add(name, effect)
+    },
+    replaceEffect: (name, effect) => {
+      add(name, effect)
+    },
     setEffect: (name, effect) => {
+      if (drawsOnBlackoutLayer(effect)) return
       settleBlackouts()
       if (effect.transitions.length === 0) return
       const onLayer0 = effect.transitions.some((transition) => transition.layer === 0)
@@ -201,14 +206,13 @@ export function completingLightingController(
       place(name, effect)
     },
     replaceEffectWithCallback: (name, effect, onComplete) => {
-      if (effect.transitions.length === 0) return false
-      add(name, effect)
+      if (!add(name, effect)) return false
       fire(name, true)
       hold(name, onComplete)
       return true
     },
     updateEffectWithCallback: (name, effect, onComplete) => {
-      if (blackoutPending() || effect.transitions.length === 0) return false
+      if (blackoutPending() || refused(effect)) return false
       place(name, effect)
       fire(name, true)
       hold(name, onComplete)

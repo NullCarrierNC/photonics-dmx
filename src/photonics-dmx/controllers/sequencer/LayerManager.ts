@@ -1,6 +1,7 @@
 import { ILayerManager, QueuedEffect, LightEffectState } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
 import { RGBIO, TrackedLight } from '../../types'
+import { BLACKOUT_LAYER } from '../../constants/nodeConstants'
 
 /**
  * @class LayerManager
@@ -19,8 +20,8 @@ import { RGBIO, TrackedLight } from '../../types'
  * - Layers 1-99: Standard effect layers
  * - Layers 100+: High priority "flash" layers
  * - Layer 200: Strobe effects
- * - Layers 201-254: Reserved for future use
- * - Layer 255: Blackout layer
+ * - Layer 254: the top layer a cue draws on, where the bundled strobe cues flash
+ * - Layer 255: Blackout layer, which the sequencer refuses any submission on
  *
  */
 export class LayerManager implements ILayerManager {
@@ -29,7 +30,7 @@ export class LayerManager implements ILayerManager {
   // Per-light queue tracking: Map<layer, Map<lightId, QueuedEffect>>
   private _effectQueue: Map<number, Map<string, QueuedEffect>> = new Map()
   private _layerLastUsed: Map<number, number> = new Map()
-  private _blackoutLayersUnder: number = 255
+  private _blackoutLayersUnder: number = BLACKOUT_LAYER
   private _lightTransitionController: LightTransitionController
 
   /**

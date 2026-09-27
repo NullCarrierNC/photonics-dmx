@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 4,
+  "cueVersion": 5,
   "mode": "yarg",
   "group": {
     "id": "yarg-alt1",
@@ -5488,7 +5488,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -5714,7 +5714,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -5940,7 +5940,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -6166,7 +6166,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",

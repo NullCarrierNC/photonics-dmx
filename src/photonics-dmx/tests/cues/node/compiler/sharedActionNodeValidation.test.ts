@@ -84,14 +84,14 @@ interface ParityCase {
 
 const PARITY_CASES: ParityCase[] = [
   {
-    description: 'rejects a literal layer above the top layer',
-    action: { ...baseValidAction(), layer: { source: 'literal', value: 300 } },
-    expectedMessageMatch: /layer must be a number from 0 to 255/,
+    description: 'rejects a literal layer on the blackout layer',
+    action: { ...baseValidAction(), layer: { source: 'literal', value: 255 } },
+    expectedMessageMatch: /layer must be a number from 0 to 254/,
   },
   {
     description: 'rejects a negative literal layer',
     action: { ...baseValidAction(), layer: { source: 'literal', value: -1 } },
-    expectedMessageMatch: /layer must be a number from 0 to 255/,
+    expectedMessageMatch: /layer must be a number from 0 to 254/,
   },
   {
     description: 'rejects missing target.groups',

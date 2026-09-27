@@ -201,5 +201,8 @@ export const AUDIO_CUE_DATA_PROPERTIES = [
 // Layers
 // ============================================================================
 
-/** The highest layer an action may draw on. The blackout draws on it too. */
-export const MAX_NODE_LAYER = 255
+/** The blackout's own layer, above everything else. The sequencer refuses any submission on it. */
+export const BLACKOUT_LAYER = 255
+
+/** The highest layer an action may draw on, the one under the blackout. */
+export const MAX_NODE_LAYER = BLACKOUT_LAYER - 1

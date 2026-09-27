@@ -170,6 +170,7 @@ describe('loading cue and effect files older builds wrote', () => {
         expect.stringMatching(/^user-legacy-one\.json: .*Dischord.*replace/),
         expect.stringMatching(/^user-legacy\.json: .*Dischord.*replace/),
         expect.stringMatching(/^user-legacy\.json: .*'sin-out'.*Harmony/),
+        expect.stringMatching(/^user-legacy\.json: Layer 255 in .*'Strobe Fast'.* now reads 254/),
       ])
 
       expect((await effectLoader.loadAll()).migrations).toEqual([])
