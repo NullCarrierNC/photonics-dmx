@@ -421,16 +421,16 @@ function variableRules(actions: readonly ActionNode[]): Map<string, ValueRule[]>
 }
 
 /** Effect parameters named for the field they conventionally carry, whatever they feed. */
-const PARAMETER_NAME_RULES: Readonly<Record<string, LiteralRule>> = {
-  waitUntilCondition: 'wait-condition',
-  waitForCondition: 'wait-condition',
-  brightness: 'brightness',
-  colorBrightness: 'brightness',
-  lowBrightness: 'brightness',
-  startBrightness: 'brightness',
-  endBrightness: 'brightness',
-  blendMode: 'blend-mode',
-}
+const PARAMETER_NAME_RULES: ReadonlyMap<string, LiteralRule> = new Map([
+  ['waitUntilCondition', 'wait-condition'],
+  ['waitForCondition', 'wait-condition'],
+  ['brightness', 'brightness'],
+  ['colorBrightness', 'brightness'],
+  ['lowBrightness', 'brightness'],
+  ['startBrightness', 'brightness'],
+  ['endBrightness', 'brightness'],
+  ['blendMode', 'blend-mode'],
+])
 
 /** What an effect declares about one of its parameters. */
 export interface EffectParameter {
@@ -448,7 +448,7 @@ export function parameterRules(
   effectActions: readonly ActionNode[],
 ): ValueRule[] {
   const rules = [...(variableRules(effectActions).get(parameter.name) ?? [])]
-  const named = PARAMETER_NAME_RULES[parameter.name]
+  const named = PARAMETER_NAME_RULES.get(parameter.name)
   if (named && !rules.includes(named)) rules.push(named)
   return rules
 }

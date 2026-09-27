@@ -2,6 +2,7 @@ import {
   compileExpression,
   expressionVariables,
   ExpressionParseError,
+  renameExpressionVariables,
 } from '../../../../cues/node/runtime/expressionEvaluator'
 
 const ev = (src: string, vars: Record<string, number> = {}) =>
@@ -61,6 +62,20 @@ describe('expressionEvaluator', () => {
     expect(expressionVariables('a + (b - a) * t').sort()).toEqual(['a', 'b', 't'])
     expect(expressionVariables('clamp(x, 0, pi)').sort()).toEqual(['x'])
     expect(expressionVariables('min(x, y) * 2')).toEqual(expect.arrayContaining(['x', 'y']))
+  })
+
+  it('reads a name every object inherits, such as toString, as a variable', () => {
+    const vars = new Map([['toString', 4]])
+
+    expect(compileExpression('toString + 1').evaluate((name) => vars.get(name) ?? 0)).toBe(5)
+    expect(expressionVariables('toString + constructor')).toEqual(['toString', 'constructor'])
+    expect(renameExpressionVariables('toString + 1', new Map([['toString', 'to_string']]))).toBe(
+      'to_string + 1',
+    )
+  })
+
+  it('refuses a call to a name every object inherits as an unknown function', () => {
+    expect(() => compileExpression('toString(1)')).toThrow("unknown function 'toString'")
   })
 
   it('throws a parse error on malformed input and an unknown function', () => {
