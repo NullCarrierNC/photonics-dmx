@@ -28,6 +28,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import { NODE_DRAG_MIME, parseNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
+import { isDialogOpen, subscribeToPage } from '../../../utils/openDialogs'
 
 type Props = {
   nodes: EditorNode[]
@@ -107,6 +108,10 @@ const CueFlowCanvas: React.FC<Props> = ({
 
   const menuRef = React.useRef<HTMLDivElement>(null)
   const reactFlowInstanceRef = React.useRef<ReactFlowInstance | null>(null)
+
+  // An open dialog owns the keyboard wherever focus sits, so Backspace leaves the graph behind it
+  // alone. The Cue Editor has no undo for a deleted node.
+  const dialogOpen = React.useSyncExternalStore(subscribeToPage, isDialogOpen)
 
   const handleInit = React.useCallback(
     (instance: ReactFlowInstance) => {
@@ -245,6 +250,7 @@ const CueFlowCanvas: React.FC<Props> = ({
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
+        deleteKeyCode={dialogOpen ? null : 'Backspace'}
         fitView
         className="rounded-b-lg"
         proOptions={{ hideAttribution: true }}>

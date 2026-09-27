@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import * as React from 'react'
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { useToast } from '../hooks/useToast'
 import ToastContainer, { ToastStack } from './Toast'
@@ -91,6 +91,29 @@ describe('ToastStack', () => {
 
     await waitFor(() => expect(screen.getByText('Could not delete')).toBeInTheDocument())
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('leaves focus in the dialog when its Dismiss button is used', async () => {
+    renderWithProviders(
+      <>
+        <Modal onClose={jest.fn()} labelledBy="t" panelClassName="">
+          <h2 id="t">Delete rig</h2>
+        </Modal>
+        <Toaster message="Could not delete" duration={0} />
+        <ToastStack />
+      </>,
+    )
+    const dialog = screen.getByRole('dialog', { name: 'Delete rig' })
+    const dismiss = await waitFor(() => within(dialog).getByRole('button', { name: 'Dismiss' }))
+
+    dismiss.focus()
+    fireEvent.click(dismiss)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('Could not delete')).toBeNull()
+    expect(dialog).toHaveFocus()
   })
 
   it('keeps the newest few toasts when a burst arrives', () => {

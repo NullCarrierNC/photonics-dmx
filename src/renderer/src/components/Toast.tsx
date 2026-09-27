@@ -2,6 +2,7 @@ import React, { useEffect, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { useAtomValue } from 'jotai'
 import { toastsAtom, useToast, type Toast } from '../hooks/useToast'
+import { innermostOpenDialog, subscribeToPage } from '../utils/openDialogs'
 
 interface ToastContainerProps {
   toasts: Toast[]
@@ -53,22 +54,6 @@ const ToastExpiry: React.FC<{ toast: Toast; onExpire: (id: string) => void }> = 
   return null
 }
 
-/** Calls `onChange` whenever elements are added to or removed from the page. */
-function subscribeToPage(onChange: () => void): () => void {
-  const observer = new MutationObserver(onChange)
-  observer.observe(document.body, { childList: true, subtree: true })
-  return () => observer.disconnect()
-}
-
-/**
- * The innermost open dialog, if any. An `aria-modal` dialog hides everything outside it from
- * assistive technology.
- */
-function openDialog(): HTMLElement | null {
-  const open = document.querySelectorAll<HTMLElement>('[aria-modal="true"]')
-  return open.length > 0 ? open[open.length - 1] : null
-}
-
 /**
  * The one toast stack a window shows, fed by every useToast in that window. Rendered once, by
  * WindowShell, so toasts from two places stack in one live region. While a dialog is open the
@@ -77,7 +62,7 @@ function openDialog(): HTMLElement | null {
 export const ToastStack: React.FC = () => {
   const toasts = useAtomValue(toastsAtom)
   const { hideToast } = useToast()
-  const dialog = useSyncExternalStore(subscribeToPage, openDialog)
+  const dialog = useSyncExternalStore(subscribeToPage, innermostOpenDialog)
   const container = <ToastContainer toasts={toasts} onDismiss={hideToast} />
   return (
     <>
