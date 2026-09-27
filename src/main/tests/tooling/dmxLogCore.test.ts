@@ -10,6 +10,7 @@ const {
   statesOf,
   renderTable,
   checkExpectations,
+  countPacket,
   packetRates,
 } = require('../../../../tools/dmxLogCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -220,14 +221,23 @@ describe('table', () => {
 })
 
 describe('packet rates', () => {
-  it('counts each source from its first packet to its last', () => {
+  it('counts packets from the first lit one', () => {
+    let seen = countPacket(undefined, 0, frame())
+    seen = countPacket(seen, 1000, frame({ 3: 9 }))
+    seen = countPacket(seen, 1023, frame())
+    expect(seen).toEqual({ count: 3, firstMs: 0, lastMs: 1023, litMs: 1000, litCount: 2 })
+  })
+
+  it('rates each source from its first lit packet, or its first packet when none lit', () => {
     const counts = new Map([
-      ['a', { count: 45, firstMs: 100, lastMs: 1100 }],
-      ['b', { count: 1, firstMs: 50, lastMs: 50 }],
+      ['a', { count: 46, firstMs: 0, lastMs: 1100, litMs: 100, litCount: 45 }],
+      ['b', { count: 3, firstMs: 0, lastMs: 100, litMs: null, litCount: 0 }],
+      ['c', { count: 1, firstMs: 50, lastMs: 50, litMs: 50, litCount: 1 }],
     ])
     expect(packetRates(counts)).toEqual([
-      { source: 'a', count: 45, spanMs: 1000, perSecond: 44 },
-      { source: 'b', count: 1, spanMs: 0, perSecond: 0 },
+      { source: 'a', count: 46, spanMs: 1000, perSecond: 44 },
+      { source: 'b', count: 3, spanMs: 100, perSecond: 20 },
+      { source: 'c', count: 1, spanMs: 0, perSecond: 0 },
     ])
   })
 })

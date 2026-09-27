@@ -335,14 +335,42 @@ function checkExpectations(rows, expect, options = {}) {
 }
 
 /**
- * Each source's packet count and rate, from its first packet to its last.
- * @param {Map<string, { count: number, firstMs: number, lastMs: number }>} packetCounts
+ * @typedef {{ count: number, firstMs: number, lastMs: number, litMs: number | null,
+ *   litCount: number }} PacketCount
+ */
+
+/**
+ * A source's packet count with one more packet, heard at `ms`. `litMs` and `litCount` start at the
+ * first packet that lights a channel.
+ * @param {PacketCount | undefined} seen
+ * @param {number} ms
+ * @param {ArrayLike<number>} dmx
+ * @returns {PacketCount}
+ */
+function countPacket(seen, ms, dmx) {
+  const count = seen ?? { count: 0, firstMs: ms, lastMs: ms, litMs: null, litCount: 0 }
+  const litMs = count.litMs ?? (Array.prototype.some.call(dmx, (value) => value > 0) ? ms : null)
+  return {
+    ...count,
+    count: count.count + 1,
+    lastMs: ms,
+    litMs,
+    litCount: count.litCount + (litMs === null ? 0 : 1),
+  }
+}
+
+/**
+ * Each source's packet count, and its rate from its first lit packet to its last (from its first
+ * packet when none lit), so a sender's start-up frame ahead of the look does not dilute the rate.
+ * @param {Map<string, PacketCount>} packetCounts
  * @returns {Array<{ source: string, count: number, spanMs: number, perSecond: number }>}
  */
 function packetRates(packetCounts) {
-  return [...packetCounts].map(([source, { count, firstMs, lastMs }]) => {
-    const spanMs = lastMs - firstMs
-    return { source, count, spanMs, perSecond: spanMs > 0 ? ((count - 1) * 1000) / spanMs : 0 }
+  return [...packetCounts].map(([source, { count, firstMs, lastMs, litMs, litCount }]) => {
+    const fromMs = litMs ?? firstMs
+    const counted = litMs === null ? count : litCount
+    const spanMs = lastMs - fromMs
+    return { source, count, spanMs, perSecond: spanMs > 0 ? ((counted - 1) * 1000) / spanMs : 0 }
   })
 }
 
@@ -356,5 +384,6 @@ module.exports = {
   statesOf,
   renderTable,
   checkExpectations,
+  countPacket,
   packetRates,
 }

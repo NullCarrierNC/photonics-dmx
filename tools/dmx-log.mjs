@@ -26,7 +26,8 @@
  *   --duration <ms>       stop after this long
  *   --until-idle <ms>     stop once nothing has changed for this long after the first lit frame
  *   --out <file>          write the rows as NDJSON here
- *   --stats <file>        write each source's packet count and rate as JSON here
+ *   --stats <file>        write each source's packet count and rate as JSON here. A rate runs
+ *                         from the source's first lit packet
  *   --replay <file>       read rows from an earlier --out instead of listening
  *   --t0 first-change|first-packet   where 0 ms sits (default first-change)
  *   --table               print the rows as a markdown table
@@ -53,6 +54,7 @@ const {
   rebase,
   renderTable,
   checkExpectations,
+  countPacket,
   packetRates,
 } = require('./dmxLogCore.cjs')
 
@@ -162,7 +164,7 @@ function listen({ open, channels, durationMs, idleMs }) {
   return new Promise((resolve, reject) => {
     const recorder = createRecorder(channels)
     const rows = []
-    /** @type {Map<string, { count: number, firstMs: number, lastMs: number }>} */
+    /** @type {Map<string, import('./dmxLogCore.cjs').PacketCount>} */
     const packetCounts = new Map()
     let outOfOrder = 0
     let corrupt = 0
@@ -195,8 +197,7 @@ function listen({ open, channels, durationMs, idleMs }) {
     const source = open({
       packet: ({ u, src, key, dmx }) => {
         const ms = now()
-        const seen = packetCounts.get(key) ?? { count: 0, firstMs: ms, lastMs: ms }
-        packetCounts.set(key, { ...seen, count: seen.count + 1, lastMs: ms })
+        packetCounts.set(key, countPacket(packetCounts.get(key), ms, dmx))
         const row = recorder.push({ ms, u, src, dmx })
         if (row !== null) {
           rows.push(row)
@@ -227,7 +228,7 @@ function listen({ open, channels, durationMs, idleMs }) {
   })
 }
 
-/** @param {{ packetCounts: Map<string, { count: number, firstMs: number, lastMs: number }>, outOfOrder: number, corrupt: number, elapsedMs: number, rows: unknown[] }} run */
+/** @param {{ packetCounts: Map<string, import('./dmxLogCore.cjs').PacketCount>, outOfOrder: number, corrupt: number, elapsedMs: number, rows: unknown[] }} run */
 function summarize(run, protocolName) {
   console.error(`Listened ${run.elapsedMs} ms, ${run.rows.length - 1} change rows`)
   if (run.packetCounts.size === 0) {
