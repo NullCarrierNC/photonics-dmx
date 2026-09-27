@@ -1089,6 +1089,18 @@ describe('Node cue validation', () => {
       ])
     })
 
+    it.each([
+      ['RB3', 'yarg', validateRb3NodeCueFile],
+      ['YARG', 'rb3', validateYargNodeCueFile],
+    ] as const)('%s validation refuses a file of the other net mode', (_, mode, validate) => {
+      const other = mode === 'yarg' ? 'rb3' : 'yarg'
+      const result = validate({ ...validFile(), mode })
+
+      expect(result).toEqual(
+        expect.objectContaining({ valid: false, errors: [`/mode: must be '${other}'`] }),
+      )
+    })
+
     it('loads an action colour this version does not know and warns that it plays as blue', () => {
       const action = setColorAction()
       const result = validateNodeCueFile({
