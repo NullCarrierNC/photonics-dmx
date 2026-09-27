@@ -30,6 +30,45 @@ const twoPars: WireScenario['rig'] = {
   ],
 }
 
+/** A primary audio cue that sets the front row red when its one event fires. */
+const redOn = (event: Record<string, unknown>) => ({
+  kind: 'lighting',
+  id: 'red',
+  cueTypeId: 'red',
+  name: 'red',
+  description: '',
+  style: 'primary',
+  nodes: {
+    events: [{ id: 'ev', type: 'event', ...event }],
+    actions: [
+      {
+        id: 'set',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'max' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+        layer: { source: 'literal', value: 1 },
+      },
+    ],
+    logic: [],
+  },
+  connections: [{ from: 'ev', to: 'set' }],
+  layout: { nodePositions: {} },
+})
+
 describe('runWireScenario', () => {
   beforeEach(() => {
     mockAppData = fs.mkdtempSync(path.join(os.tmpdir(), 'wire-scenario-'))
@@ -137,44 +176,10 @@ describe('runWireScenario', () => {
     expect(recording.rigStarts[1].lights[1].channels).toMatchObject({ masterDimmer: 5, red: 7 })
   })
 
-  it('plays a scenario-only audio cue laid over the bundled libraries', async () => {
-    const setRed = {
-      kind: 'lighting',
-      id: 'red',
-      cueTypeId: 'red',
-      name: 'red',
-      description: '',
-      style: 'primary',
-      nodes: {
-        events: [{ id: 'ev', type: 'event', eventType: 'cue-called', triggerMode: 'edge' }],
-        actions: [
-          {
-            id: 'set',
-            type: 'action',
-            effectType: 'set-color',
-            target: {
-              groups: { source: 'literal', value: 'front' },
-              filter: { source: 'literal', value: 'all' },
-            },
-            color: {
-              name: { source: 'literal', value: 'red' },
-              brightness: { source: 'literal', value: 'max' },
-            },
-            timing: {
-              waitForCondition: { source: 'literal', value: 'none' },
-              waitForTime: { source: 'literal', value: 0 },
-              duration: { source: 'literal', value: 0 },
-              waitUntilCondition: { source: 'literal', value: 'none' },
-              waitUntilTime: { source: 'literal', value: 0 },
-            },
-            layer: { source: 'literal', value: 1 },
-          },
-        ],
-        logic: [],
-      },
-      connections: [{ from: 'ev', to: 'set' }],
-      layout: { nodePositions: {} },
-    }
+  it.each([
+    ['on every frame', { eventType: 'cue-called', triggerMode: 'edge' }],
+    ['on a beat, past its cooldown', { eventType: 'beat', triggerMode: 'edge', cooldownMs: 100 }],
+  ])('plays a scenario-only audio cue firing %s from the first frame', async (_label, event) => {
     const scenario: WireScenario = {
       name: 'audio',
       rig: twoPars,
@@ -184,12 +189,13 @@ describe('runWireScenario', () => {
           version: 1,
           mode: 'audio',
           group: { id: 'wire-test', name: 'Wire test', description: '' },
-          cues: [setRed],
+          cues: [{ ...redOn(event), id: 'red', cueTypeId: 'red' }],
         },
       },
-      steps: [{ type: 'audio', cue: 'red', level: 0.5, durationMs: 300 }],
+      steps: [{ type: 'audio', cue: 'red', level: 0.5, bpm: 120, durationMs: 300, mark: 'start' }],
       channels: '1-8',
-      expect: { states: [{ ch: { '1': 255, '2': 255, '3': 0, '5': 255, '6': 255 } }] },
+      t0: 'mark:start',
+      expect: { states: [{ ch: { '1': 255, '2': 255, '3': 0, '5': 255, '6': 255 }, atMs: 10 }] },
     }
     const { check } = evaluate(scenario, await runWireScenario(scenario, mockAppData))
     expect(check.lines).toEqual([expect.stringMatching(/^PASS/)])

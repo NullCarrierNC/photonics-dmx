@@ -20,6 +20,12 @@ import { rigFiles, scenarioProblems, type WireScenario } from './wireScenario'
 
 const BUNDLED = path.resolve(__dirname, '../../../resources/defaults')
 
+/**
+ * How far the virtual clock runs before a scenario starts. The app's monotonic clock is never near
+ * 0 while a song plays, and cooldowns measured from a last trigger of 0 would hold back the first.
+ */
+const VIRTUAL_START_MS = 10_000
+
 /** What a scenario sent to the wire, on the virtual clock from 0 ms. */
 interface WireRecording {
   name: string
@@ -105,8 +111,14 @@ export async function runWireScenario(
     clock = virtualTime
   }
   try {
+    if (clock instanceof VirtualTime) {
+      await clock.advance(VIRTUAL_START_MS)
+    }
     await loadCueLibraries(baseDir)
     const config = new ConfigurationManager()
+    // Recorded times count from the scenario's start.
+    const origin = clock.getCurrentTimeMs()
+    const now = (): number => clock.getCurrentTimeMs() - origin
     const recording: WireRecording = {
       name: scenario.name,
       universe: scenario.universe ?? 1,
@@ -123,7 +135,7 @@ export async function runWireScenario(
         throw new Error(`Scenario '${scenario.name}' has no active rig`)
       }
       recording.rigStarts.push({
-        atMs: clock.getCurrentTimeMs(),
+        atMs: now(),
         lights: [...rig.config.frontLights, ...rig.config.backLights].map(({ id, channels }) => ({
           id,
           channels,
@@ -133,7 +145,7 @@ export async function runWireScenario(
         rig,
         clock,
         onSend: (send) => {
-          if (recordingSends) recording.sends.push(send)
+          if (recordingSends) recording.sends.push({ ...send, ms: send.ms - origin })
         },
         forward: (buffer) =>
           recordingSends && mode.forward ? mode.forward(buffer) : Promise.resolve(true),
@@ -150,7 +162,7 @@ export async function runWireScenario(
     try {
       for (const step of scenario.steps) {
         if (step.mark !== undefined) {
-          recording.marks[step.mark] = clock.getCurrentTimeMs()
+          recording.marks[step.mark] = now()
         }
         if (step.type !== 'saveTemplates') {
           await playStep(run, clock, step)
@@ -166,7 +178,7 @@ export async function runWireScenario(
         await config.saveUserLights(templates.value)
         run = startRig()
       }
-      recording.endMs = clock.getCurrentTimeMs()
+      recording.endMs = now()
     } finally {
       recordingSends = false
       run?.dispose()
