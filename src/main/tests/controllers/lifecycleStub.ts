@@ -110,7 +110,7 @@ export function senderLifecycleStub() {
   }
 }
 
-/** The console surface a restart reads and hands back to. */
+/** The console surface a graph build reads and hands back to. */
 export function consoleModeStub() {
   return {
     getConsoleRestore: jest.fn().mockReturnValue(null),

@@ -20,7 +20,12 @@ import { TestEffectRunner } from './TestEffectRunner'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import { SenderLifecycleController } from './SenderLifecycleController'
-import { ConsoleModeController, enterConsoleMode, leaveConsoleMode } from './ConsoleModeController'
+import {
+  ConsoleModeController,
+  enterConsoleMode,
+  leaveConsoleMode,
+  settleGraphUp,
+} from './ConsoleModeController'
 import { cycleRb3OntoSavedMode } from './ListenerCoordinator'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
@@ -49,7 +54,8 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
  *
  * Transitions (call graph):
  * - [construction] → `initializing` (until first successful `init()`)
- * - `init()` (cold): `initializing` → `running` when complete. Idempotent when already `running` + initialized.
+ * - `init()` (cold): `initializing` or `failed` → `running`, or `consoleMode` while a console page
+ *   holds the console, when complete. Idempotent when already initialized.
  * - `restartControllers()`: `running`, `consoleMode`, or `failed` → `restarting` for teardown/reinit, then
  *   `running` or `consoleMode` (restored) when complete. Overlapping calls share one in-flight restart.
  *   If `shutdown()` starts mid-restart, reinit is skipped and the failure is rethrown.
@@ -258,7 +264,8 @@ export class ControllerManager {
     }
 
     this.isInitialized = true
-    this.lifecycle.settlePhase('running', faultMark)
+    // Every path that brings the graph up ends here: cold start, restart reinit and Retry.
+    settleGraphUp(this.lifecycle, this.consoleMode, faultMark)
   }
 
   /**
@@ -493,7 +500,6 @@ export class ControllerManager {
       graph: this.graph,
       listenerLifecycle: this.listenerLifecycle,
       senderLifecycle: this.senderLifecycle,
-      consoleMode: this.consoleMode,
       motionCueSimulator: this.motionCueSimulator,
       init: () => this.init(),
       isInitialized: () => this.isInitialized,

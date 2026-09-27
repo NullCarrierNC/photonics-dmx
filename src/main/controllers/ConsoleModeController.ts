@@ -64,6 +64,23 @@ export function enterConsoleMode(
   })
 }
 
+/**
+ * Settle the phase for a graph that has come up. An open console page still holds the wire, so
+ * the phase is `consoleMode` and the new publisher takes a blank manual buffer.
+ */
+export function settleGraphUp(
+  lifecycle: Pick<ControllerLifecycle, 'settlePhase'>,
+  consoleMode: Pick<
+    ConsoleModeController,
+    'getConsoleRestore' | 'onControllersReinitializedWhileConsoleOpen'
+  >,
+  faultMark: number,
+): void {
+  const consoleOpen = consoleMode.getConsoleRestore() !== null
+  lifecycle.settlePhase(consoleOpen ? 'consoleMode' : 'running', faultMark)
+  consoleMode.onControllersReinitializedWhileConsoleOpen()
+}
+
 /** Leave console mode, returning the phase to `running` when the console held it. */
 export async function leaveConsoleMode(
   lifecycle: ConsolePhaseLifecycle,
