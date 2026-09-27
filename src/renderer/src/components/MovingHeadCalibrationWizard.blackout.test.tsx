@@ -83,4 +83,28 @@ describe('MovingHeadCalibrationWizard with Escape bound to blackout', () => {
     expect(ipcApi.disableConsole).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('blacks out on Escape in a range box and keeps the typed range', async () => {
+    const { store } = renderWithProviders(
+      <>
+        <BlackoutShortcut />
+        <MovingHeadCalibrationWizard
+          light={light}
+          rigId="rig-1"
+          lightingConfig={createMockLightingConfig({ frontLights: [] })}
+          onClose={() => {}}
+          onComplete={() => {}}
+        />
+      </>,
+    )
+    const pan = (await screen.findByLabelText('Pan range (deg)')) as HTMLInputElement
+    pan.focus()
+    fireEvent.change(pan, { target: { value: '36' } })
+
+    fireEvent.keyDown(pan, { key: 'Escape', code: 'Escape' })
+
+    await waitFor(() => expect(store.get(masterOutputAtom).blackout).toBe(true))
+    expect(pan.value).toBe('36')
+    expect(ipcApi.disableConsole).not.toHaveBeenCalled()
+  })
 })

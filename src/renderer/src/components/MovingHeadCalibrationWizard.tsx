@@ -3,6 +3,7 @@ import Modal from './Modal'
 import {
   DmxLight,
   FixtureConfig,
+  fixtureConfigFieldBounds,
   LightingConfiguration,
   normalizeFixtureConfig,
   RgbMovingHeadLight,
@@ -14,6 +15,7 @@ import {
 } from '../../../photonics-dmx/helpers/movingHeadCalibration'
 import { buildInitialConsoleBuffer } from './movingHeadCalibrationBuffer'
 import { DmxSlider } from './MovingHeadCalibrationWizard/DmxSlider'
+import { DraftNumberField } from './controls/DraftField'
 import {
   STAGE_LABELS_READY_STEP,
   WizardBeamPreview,
@@ -45,6 +47,9 @@ const STEP_TITLES = [
 ] as const
 
 const REVIEW_STEP = STEP_TITLES.length - 1
+
+const RANGE_INPUT_CLASS =
+  'p-2 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white'
 
 /** Steps where the user must press a capture button before Next is enabled. */
 const STEPS_REQUIRING_SET_CAPTURE = new Set([4, 5, 6])
@@ -261,21 +266,11 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
             </p>
             <label className="flex flex-col gap-1 text-sm">
               <span>Pan range (deg)</span>
-              <input
-                type="number"
-                min={1}
-                max={720}
+              <DraftNumberField
+                {...fixtureConfigFieldBounds('panRangeDeg', config)}
                 value={config.panRangeDeg}
-                onChange={(e) =>
-                  setConfig((c) => ({
-                    ...c,
-                    panRangeDeg: Math.max(
-                      1,
-                      Math.min(720, Math.round(Number(e.target.value) || 1)),
-                    ),
-                  }))
-                }
-                className="p-2 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                onCommit={(panRangeDeg) => setConfig((c) => ({ ...c, panRangeDeg }))}
+                className={RANGE_INPUT_CLASS}
               />
             </label>
           </div>
@@ -289,21 +284,11 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
             </p>
             <label className="flex flex-col gap-1 text-sm">
               <span>Tilt range (deg)</span>
-              <input
-                type="number"
-                min={1}
-                max={360}
+              <DraftNumberField
+                {...fixtureConfigFieldBounds('tiltRangeDeg', config)}
                 value={config.tiltRangeDeg}
-                onChange={(e) =>
-                  setConfig((c) => ({
-                    ...c,
-                    tiltRangeDeg: Math.max(
-                      1,
-                      Math.min(360, Math.round(Number(e.target.value) || 1)),
-                    ),
-                  }))
-                }
-                className="p-2 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+                onCommit={(tiltRangeDeg) => setConfig((c) => ({ ...c, tiltRangeDeg }))}
+                className={RANGE_INPUT_CLASS}
               />
             </label>
           </div>
