@@ -92,8 +92,8 @@ export function applyWaitUntil(
 
 /**
  * Counts one occurrence of the event a held transition waits until. A positive count ends the hold
- * on the occurrence that brings it to exactly zero. An uncounted, zero or negative one ends on the
- * first.
+ * on the occurrence that brings it to zero or below, so 2.5 waits three. An uncounted, zero or
+ * negative one ends on the first.
  *
  * A beat or measure counts only once a frame has published since the hold began, so a step started
  * or submitted in the frame of a beat shows until the next one. A transition waiting to start
@@ -114,7 +114,7 @@ export function countHoldEvent(
   const count = transition.waitUntilConditionCount
   if (count !== undefined && count > 0) {
     transition.waitUntilConditionCount = count - 1
-    if (count - 1 !== 0) return false
+    if (count - 1 > 0) return false
   }
   advancePastTransition(effect, currentTime, prepare)
   return true

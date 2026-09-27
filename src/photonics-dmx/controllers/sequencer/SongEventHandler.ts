@@ -226,12 +226,12 @@ export class SongEventHandler implements ISongEventHandler {
           activeEffect.state === 'waitingFor' &&
           currentTransition.waitForCondition === eventType
         ) {
-          // A positive count starts the transition on the occurrence that brings it to exactly
-          // zero. An uncounted, zero or negative one starts on the first.
+          // A positive count starts the transition on the occurrence that brings it to zero or
+          // below, so 2.5 waits three. An uncounted, zero or negative one starts on the first.
           const count = currentTransition.waitForConditionCount
           if (count !== undefined && count > 0) {
             currentTransition.waitForConditionCount = count - 1
-            if (count - 1 !== 0) return
+            if (count - 1 > 0) return
           }
           this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
           released = true
