@@ -24,6 +24,7 @@ import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { buildDomainChainHandlers, readMotionPrefs } from './cueRuntimeDomains'
 import { createLogger } from '../../shared/logger'
+import { TeardownSteps } from '../../photonics-dmx/helpers/teardownSteps'
 import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 
 const log = createLogger('ControllerGraph')
@@ -375,19 +376,12 @@ export class ControllerGraph {
    * first failure so the restart can refuse to rebuild on top of a partially torn-down graph.
    */
   public disposeChainsForRestart(): void {
-    const failures: unknown[] = []
+    const steps = new TeardownSteps(log)
     for (const chain of this.rigChains) {
-      try {
-        chain.dispose()
-      } catch (err) {
-        log.error(`Error disposing rig chain ${chain.rigId} for a restart:`, err)
-        failures.push(err)
-      }
+      steps.run(`disposing rig chain ${chain.rigId} for a restart`, () => chain.dispose())
     }
     this.rigChains = []
-    if (failures.length > 0) {
-      throw failures[0]
-    }
+    steps.rethrowFirst()
   }
 
   /** Shut down the publisher, tolerating failure. Used by the shutdown path. */
