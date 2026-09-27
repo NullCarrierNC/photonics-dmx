@@ -8,9 +8,7 @@ import type {
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateSharedActionNodePayload } from '../../../../../../../photonics-dmx/cues/node/compiler/sharedActionNodeValidation'
-import ActionTargetSection from './ActionTargetSection'
-import ActionColorFields from './ActionColorFields'
-import ActionTimingSection from './ActionTimingSection'
+import ActionNodeEditor from '../ActionNodeEditor'
 
 type Field =
   | 'Target Groups'
@@ -21,9 +19,25 @@ type Field =
   | 'Easing'
   | 'Wait For Condition'
   | 'Wait Until Condition'
+  | 'Wait For Time (ms)'
+  | 'Wait For Count'
+  | 'Duration (ms)'
+  | 'Wait Until Time (ms)'
+  | 'Wait Until Count'
+  | 'Layer'
 
-function actionWith(field: Field, value: string | undefined): ActionNode {
+const NUMBER_FIELDS: readonly Field[] = [
+  'Wait For Time (ms)',
+  'Wait For Count',
+  'Duration (ms)',
+  'Wait Until Time (ms)',
+  'Wait Until Count',
+  'Layer',
+]
+
+function actionWith(field: Field, value: string | number | undefined): ActionNode {
   const literal = { source: 'literal' as const, value: value ?? '' }
+  const optional = value === undefined ? undefined : literal
   const action: ActionNode = {
     id: 'a1',
     type: 'action',
@@ -67,6 +81,18 @@ function actionWith(field: Field, value: string | undefined): ActionNode {
       return { ...action, timing: { ...action.timing, waitForCondition: literal } }
     case 'Wait Until Condition':
       return { ...action, timing: { ...action.timing, waitUntilCondition: literal } }
+    case 'Wait For Time (ms)':
+      return { ...action, timing: { ...action.timing, waitForTime: literal } }
+    case 'Wait For Count':
+      return { ...action, timing: { ...action.timing, waitForConditionCount: optional } }
+    case 'Duration (ms)':
+      return { ...action, timing: { ...action.timing, duration: literal } }
+    case 'Wait Until Time (ms)':
+      return { ...action, timing: { ...action.timing, waitUntilTime: literal } }
+    case 'Wait Until Count':
+      return { ...action, timing: { ...action.timing, waitUntilConditionCount: optional } }
+    case 'Layer':
+      return { ...action, layer: optional }
   }
 }
 
@@ -81,27 +107,26 @@ function compilerRejects(action: ActionNode): boolean {
 
 function editorFlags(action: ActionNode, field: Field, mode: NodeCueMode): boolean {
   renderWithProviders(
-    <>
-      <ActionTargetSection node={action} availableVariables={[]} updateNode={jest.fn()} />
-      <ActionColorFields node={action} availableVariables={[]} updateNode={jest.fn()} />
-      <ActionTimingSection
-        node={action}
-        currentTiming={action.timing}
-        updateTiming={jest.fn()}
-        activeMode={mode}
-        selectedActionHasEventParent={false}
-        availableVariables={[]}
-      />
-    </>,
+    <ActionNodeEditor
+      node={action}
+      activeMode={mode}
+      cueKind="lighting"
+      editorMode="cue"
+      selectedActionHasEventParent={false}
+      availableVariables={[]}
+      updateNode={jest.fn()}
+    />,
   )
   const control =
     field === 'Target Groups'
       ? screen.getByRole('group', { name: field })
-      : screen.getByRole('combobox', { name: field })
+      : NUMBER_FIELDS.includes(field)
+        ? screen.getByRole('spinbutton', { name: field })
+        : screen.getByRole('combobox', { name: field })
   return control.getAttribute('aria-invalid') === 'true'
 }
 
-const CASES: Array<[Field, string | undefined, NodeCueMode]> = [
+const CASES: Array<[Field, string | number | undefined, NodeCueMode]> = [
   ['Target Groups', 'front', 'yarg'],
   ['Target Groups', 'front,back,', 'yarg'],
   ['Target Groups', 'front,,back', 'yarg'],
@@ -125,6 +150,24 @@ const CASES: Array<[Field, string | undefined, NodeCueMode]> = [
   ['Wait Until Condition', 'beat', 'rb3'],
   ['Wait Until Condition', 'led-3', 'yarg'],
   ['Wait Until Condition', 'measure', 'audio'],
+  ['Wait For Time (ms)', 0, 'yarg'],
+  ['Wait For Time (ms)', -1, 'yarg'],
+  ['Wait For Count', 1, 'yarg'],
+  ['Wait For Count', 0, 'yarg'],
+  ['Wait For Count', undefined, 'yarg'],
+  ['Duration (ms)', 200, 'yarg'],
+  ['Duration (ms)', -5, 'yarg'],
+  ['Wait Until Time (ms)', 10, 'rb3'],
+  ['Wait Until Time (ms)', -1, 'rb3'],
+  ['Wait Until Count', 2, 'yarg'],
+  ['Wait Until Count', 0, 'yarg'],
+  ['Wait Until Count', -1, 'audio'],
+  ['Wait Until Count', undefined, 'yarg'],
+  ['Layer', 0, 'yarg'],
+  ['Layer', 255, 'yarg'],
+  ['Layer', 256, 'yarg'],
+  ['Layer', -1, 'yarg'],
+  ['Layer', undefined, 'yarg'],
 ]
 
 describe('action fields and the compiler', () => {

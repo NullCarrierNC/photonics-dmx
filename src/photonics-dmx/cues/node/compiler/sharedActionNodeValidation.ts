@@ -1,5 +1,4 @@
 import type { ActionNode, ValueSource } from '../../types/nodeCueTypes'
-import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
 import { actionLiteralIssues } from '../cueValueRules'
 
 /**
@@ -37,22 +36,6 @@ export function validateSharedActionNodePayload(
   const refused = actionLiteralIssues(action).find(({ issue }) => issue.severity === 'error')
   if (refused) {
     throw createError(`Action '${label}' ${refused.field} ${refused.issue.message}.`)
-  }
-
-  validateLayer(action, label, createError)
-}
-
-function validateLayer(
-  action: ActionNode,
-  label: string,
-  createError: (message: string) => Error,
-): void {
-  if (action.layer?.source !== 'literal') return
-  const n = Number(action.layer.value)
-  if (!Number.isFinite(n) || n < 0 || n > MAX_NODE_LAYER) {
-    throw createError(
-      `Action '${label}' layer literal must be a number from 0 to ${MAX_NODE_LAYER}.`,
-    )
   }
 }
 
@@ -122,38 +105,13 @@ function validateTiming(
   )
   validateRequiredTimingValueSource(timing.waitUntilTime, label, 'waitUntilTime', createError)
 
-  validateNonNegativeNumberLiteral(timing.waitForTime, label, 'waitForTime', createError)
-  validateNonNegativeNumberLiteral(timing.waitUntilTime, label, 'waitUntilTime', createError)
-  validateNonNegativeNumberLiteral(timing.duration, label, 'duration', createError)
-
-  validateOptionalPositiveNumberLiteral(
-    timing.waitForConditionCount,
-    label,
-    'waitForConditionCount',
-    createError,
-  )
-  validateOptionalPositiveNumberLiteral(
-    timing.waitUntilConditionCount,
-    label,
-    'waitUntilConditionCount',
-    createError,
-  )
-
-  if (timing.level !== undefined) {
-    validateOptionalValueSource(timing.level, label, 'level', createError)
-    if (timing.level.source === 'literal') {
-      const v = Number(timing.level.value)
-      if (!Number.isFinite(v) || v < 0 || v > 1) {
-        throw createError(
-          `Action '${label}' timing.level literal must be a number between 0 and 1.`,
-        )
-      }
-    }
+  // A count left null reads as no count.
+  for (const field of ['waitForConditionCount', 'waitUntilConditionCount'] as const) {
+    const count = timing[field]
+    if (count !== null) validateOptionalValueSource(count, label, field, createError)
   }
-
-  if (timing.easing !== undefined) {
-    validateOptionalValueSource(timing.easing, label, 'easing', createError)
-  }
+  validateOptionalValueSource(timing.level, label, 'level', createError)
+  validateOptionalValueSource(timing.easing, label, 'easing', createError)
 }
 
 function isValueSource(value: unknown): value is ValueSource {
@@ -183,44 +141,13 @@ function validateRequiredTimingValueSource(
 }
 
 function validateOptionalValueSource(
-  value: ValueSource,
-  label: string,
-  field: string,
-  createError: (message: string) => Error,
-): void {
-  if (!isValueSource(value)) {
-    throw createError(`Action '${label}' timing.${field} must be a ValueSource.`)
-  }
-}
-
-function validateNonNegativeNumberLiteral(
-  value: ValueSource,
-  label: string,
-  field: string,
-  createError: (message: string) => Error,
-): void {
-  if (value.source !== 'literal') return
-  const n = Number(value.value)
-  if (!Number.isFinite(n) || n < 0) {
-    throw createError(
-      `Action '${label}' timing.${field} literal must be a non-negative finite number.`,
-    )
-  }
-}
-
-function validateOptionalPositiveNumberLiteral(
   value: ValueSource | undefined,
   label: string,
   field: string,
   createError: (message: string) => Error,
 ): void {
-  if (value === undefined || value === null) return
+  if (value === undefined) return
   if (!isValueSource(value)) {
     throw createError(`Action '${label}' timing.${field} must be a ValueSource.`)
-  }
-  if (value.source !== 'literal') return
-  const n = Number(value.value)
-  if (!Number.isFinite(n) || n <= 0) {
-    throw createError(`Action '${label}' timing.${field} literal must be a positive finite number.`)
   }
 }

@@ -20,6 +20,7 @@ import {
 import type { WaitCondition } from '../../types'
 import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
+import { MAX_NODE_LAYER } from '../../constants/nodeConstants'
 import type {
   ActionNode,
   LogicNode,
@@ -37,7 +38,7 @@ export interface ValueIssue {
 const error = (message: string): ValueIssue => ({ severity: 'error', message })
 const warning = (message: string): ValueIssue => ({ severity: 'warning', message })
 
-/** The kinds of literal a rule here knows how to check. */
+/** The kinds of text literal a rule here knows how to check. */
 export type LiteralRule =
   | 'groups'
   | 'filter'
@@ -47,19 +48,32 @@ export type LiteralRule =
   | 'easing'
   | 'wait-condition'
 
+/**
+ * The kinds of number literal a rule here knows how to check: a time in ms, a wait count, a level
+ * from 0 to 1 and a layer.
+ */
+export type NumberRule = 'time' | 'count' | 'level' | 'layer'
+
+/** Any kind of literal a rule here knows how to check. */
+export type ValueRule = LiteralRule | NumberRule
+
+export function isNumberRule(rule: ValueRule): rule is NumberRule {
+  return rule === 'time' || rule === 'count' || rule === 'level' || rule === 'layer'
+}
+
 /** Every easing an action may name. */
 const EASING_OPTIONS: readonly EasingType[] = Object.values(EasingType)
 
 /** The easing an action plays with when it names none. */
 export const DEFAULT_EASING = EasingType.SIN_IN_OUT
 
-const LITERAL_DEFAULTS: Partial<Record<LiteralRule, string>> = {
+const LITERAL_DEFAULTS: Partial<Record<ValueRule, string>> = {
   'easing': DEFAULT_EASING,
   'blend-mode': 'replace',
 }
 
 /** What the runtime uses for a literal of this kind left out of the file, when it may be. */
-export function literalDefault(rule: LiteralRule): string | undefined {
+export function literalDefault(rule: ValueRule): string | undefined {
   return LITERAL_DEFAULTS[rule]
 }
 
@@ -120,15 +134,34 @@ function waitConditionIssue(value: unknown, mode: NodeCueMode | undefined): Valu
   return null
 }
 
+/** Whether a number literal of this kind is one the file may hold, as the compilers read it. */
+function numberIssue(rule: NumberRule, value: unknown): ValueIssue | null {
+  const n = Number(value)
+  const finite = Number.isFinite(n)
+  switch (rule) {
+    case 'time':
+      return finite && n >= 0 ? null : error('must be a non-negative finite number')
+    case 'count':
+      return finite && n > 0 ? null : error('must be a positive finite number')
+    case 'level':
+      return finite && n >= 0 && n <= 1 ? null : error('must be a number between 0 and 1')
+    case 'layer':
+      return finite && n >= 0 && n <= MAX_NODE_LAYER
+        ? null
+        : error(`must be a number from 0 to ${MAX_NODE_LAYER}`)
+  }
+}
+
 /**
  * Whether a literal of this kind is one the file may hold. `mode` narrows the wait conditions to
  * those that fire in it, and a condition from another mode is a warning.
  */
 export function literalIssue(
-  rule: LiteralRule,
+  rule: ValueRule,
   value: unknown,
   mode?: NodeCueMode,
 ): ValueIssue | null {
+  if (isNumberRule(rule)) return numberIssue(rule, value)
   switch (rule) {
     case 'groups':
       return groupsIssue(value)
@@ -153,14 +186,14 @@ export function literalIssue(
 
 /** A field of an action whose literal a rule here judges, named by its path in the action. */
 interface ActionLiteralField {
-  rule: LiteralRule
+  rule: ValueRule
   field: string
   source: ValueSource | undefined
 }
 
 /** The fields of an action that hold a ruled literal, in the order the compilers check them. */
 function actionLiteralFields(action: ActionNode): ActionLiteralField[] {
-  const { target, color, timing } = action
+  const { target, color, timing, layer } = action
   return [
     { rule: 'groups', field: 'target.groups', source: target?.groups },
     { rule: 'filter', field: 'target.filter', source: target?.filter },
@@ -168,12 +201,23 @@ function actionLiteralFields(action: ActionNode): ActionLiteralField[] {
     { rule: 'brightness', field: 'color.brightness', source: color?.brightness },
     { rule: 'blend-mode', field: 'color.blendMode', source: color?.blendMode },
     { rule: 'wait-condition', field: 'timing.waitForCondition', source: timing?.waitForCondition },
+    { rule: 'time', field: 'timing.waitForTime', source: timing?.waitForTime },
+    { rule: 'count', field: 'timing.waitForConditionCount', source: timing?.waitForConditionCount },
+    { rule: 'time', field: 'timing.duration', source: timing?.duration },
     {
       rule: 'wait-condition',
       field: 'timing.waitUntilCondition',
       source: timing?.waitUntilCondition,
     },
+    { rule: 'time', field: 'timing.waitUntilTime', source: timing?.waitUntilTime },
+    {
+      rule: 'count',
+      field: 'timing.waitUntilConditionCount',
+      source: timing?.waitUntilConditionCount,
+    },
     { rule: 'easing', field: 'timing.easing', source: timing?.easing },
+    { rule: 'level', field: 'timing.level', source: timing?.level },
+    { rule: 'layer', field: 'layer', source: layer },
   ]
 }
 
@@ -267,6 +311,17 @@ export function logicLiteralIssues(
   })
 }
 
+/**
+ * Whether a variable or event name fits {@link VARIABLE_NAME_PATTERN}, as the schema requires of
+ * both. A variable name must also meet {@link variableNameIssue}.
+ */
+export function nameIssue(kind: 'variable' | 'event', name: string): ValueIssue | null {
+  if (VARIABLE_NAME_PATTERN.test(name)) return null
+  return error(
+    `"${name}" is not a valid ${kind} name. Use letters, digits and underscores, starting with a letter or underscore`,
+  )
+}
+
 /** Whether a literal is one of a field's own choices, for a field no rule here covers. */
 export function choiceIssue(value: unknown, choices: readonly string[]): ValueIssue | null {
   const text = String(value ?? '')
@@ -313,8 +368,8 @@ export function variableIssue(
 }
 
 /** The ruled action fields each variable of a graph feeds directly, by variable name. */
-function variableRules(actions: readonly ActionNode[]): Map<string, LiteralRule[]> {
-  const rules = new Map<string, LiteralRule[]>()
+function variableRules(actions: readonly ActionNode[]): Map<string, ValueRule[]> {
+  const rules = new Map<string, ValueRule[]>()
   for (const action of actions) {
     for (const { rule, source } of actionLiteralFields(action)) {
       if (source?.source !== 'variable') continue
@@ -352,7 +407,7 @@ export interface EffectParameter {
 export function parameterRules(
   parameter: EffectParameter,
   effectActions: readonly ActionNode[],
-): LiteralRule[] {
+): ValueRule[] {
   const rules = [...(variableRules(effectActions).get(parameter.name) ?? [])]
   const named = PARAMETER_NAME_RULES[parameter.name]
   if (named && !rules.includes(named)) rules.push(named)
@@ -447,15 +502,12 @@ function unknownColorIssue(type: VariableType, value: unknown): ValueIssue | nul
 }
 
 /**
- * Whether a variable may take `name`: expressions read variables by name, so it fits
- * {@link VARIABLE_NAME_PATTERN} and is none of the names an expression reads as its own.
+ * Whether a variable may take `name`: expressions read variables by name, so it meets
+ * {@link nameIssue} and is none of the names an expression reads as its own.
  */
 export function variableNameIssue(name: string): ValueIssue | null {
-  if (!VARIABLE_NAME_PATTERN.test(name)) {
-    return error(
-      `"${name}" is not a valid variable name. Use letters, digits and underscores, starting with a letter or underscore`,
-    )
-  }
+  const patternIssue = nameIssue('variable', name)
+  if (patternIssue) return patternIssue
   if (RESERVED_VARIABLE_NAMES.includes(name))
     return error(`'${name}' is a built-in expression name`)
   return null
@@ -497,6 +549,15 @@ export function compareOperandIssue(
  */
 export function unlistedIssue(value: string, choices: readonly string[]): ValueIssue | null {
   return choices.includes(value) ? null : warning(`'${value}' is not one of this field's choices`)
+}
+
+/**
+ * Whether a raiser names one of the effects in `effectIds`. The schema refuses a raiser that names
+ * none, and one naming an effect the cue does not hold still loads.
+ */
+export function effectIdIssue(effectId: string, effectIds: readonly string[]): ValueIssue | null {
+  if (effectId === '') return error('Select an effect')
+  return unlistedIssue(effectId, effectIds)
 }
 
 /** Whether a bearing literal names a stage direction or a number of degrees. */

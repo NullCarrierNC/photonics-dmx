@@ -1,6 +1,8 @@
 import React, { useId, useState } from 'react'
 import Modal from '../../Modal'
 import type { EventDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { nameIssue } from '../../../../../photonics-dmx/cues/node/cueValueRules'
+import FieldIssue, { issueAttributes } from './shared/FieldIssue'
 import type { EditorDocument } from '../lib/types'
 import { useConfirm } from '../../../hooks/useConfirm'
 import { useToast } from '../../../hooks/useToast'
@@ -27,6 +29,8 @@ const EventRegistry: React.FC<Props> = ({
     description: '',
   })
   const dialogTitleId = useId()
+  const nameIssueId = useId()
+  const typedNameIssue = formData.name ? nameIssue('event', formData.name) : null
 
   const currentCue =
     editorDoc?.mode === 'cue' ? editorDoc.file.cues.find((c) => c.id === selectedCueId) : null
@@ -58,6 +62,10 @@ const EventRegistry: React.FC<Props> = ({
   const handleSave = () => {
     if (!formData.name) {
       showToast('Please enter an event name', 'error')
+      return
+    }
+    if (typedNameIssue) {
+      showToast(`${typedNameIssue.message}.`, 'error')
       return
     }
 
@@ -178,9 +186,10 @@ const EventRegistry: React.FC<Props> = ({
                 value={formData.name ?? ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="eventName"
-                pattern="[a-zA-Z_][a-zA-Z0-9_]*"
                 disabled={!!editingEvent}
+                {...issueAttributes(typedNameIssue, nameIssueId)}
               />
+              <FieldIssue issue={typedNameIssue} id={nameIssueId} />
               <span className="text-[10px] text-gray-500 mt-1">
                 Must start with letter or underscore
               </span>

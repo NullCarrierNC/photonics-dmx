@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest } from '@jest/globals'
 import { screen } from '@testing-library/react'
+import Ajv from 'ajv'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import type {
   EffectDefinition,
@@ -9,6 +10,7 @@ import type {
   ValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { effectRaiserNodeSchema } from '../../../../../../photonics-dmx/cues/node/schema/nodes'
 import EffectRaiserEditor from './EffectRaiserEditor'
 
 const variable = (name: string): ValueSource => ({ source: 'variable', name })
@@ -29,7 +31,11 @@ const effect: EffectDefinition = {
           name: { source: 'literal', value: 'red' },
           brightness: { source: 'literal', value: 'high' },
         },
-        timing: { ...createDefaultActionTiming(), waitUntilCondition: variable('holdUntil') },
+        timing: {
+          ...createDefaultActionTiming(),
+          duration: variable('fadeMs'),
+          waitUntilCondition: variable('holdUntil'),
+        },
       },
     ],
     effectListeners: [{ id: 'l1', type: 'effect-listener' }],
@@ -38,16 +44,21 @@ const effect: EffectDefinition = {
   variables: [
     { name: 'sweepGroups', type: 'string', scope: 'cue', initialValue: 'front', isParameter: true },
     { name: 'holdUntil', type: 'string', scope: 'cue', initialValue: 'none', isParameter: true },
+    { name: 'fadeMs', type: 'number', scope: 'cue', initialValue: 200, isParameter: true },
   ],
 } as EffectDefinition
 
-function renderRaiser(parameterValues: Record<string, ValueSource>, mode: NodeCueMode) {
-  const node: EffectRaiserNode = {
-    id: 'r1',
-    type: 'effect-raiser',
-    effectId: 'fx',
-    parameterValues,
-  }
+function raiser(effectId: string, parameterValues: Record<string, ValueSource> = {}) {
+  const node: EffectRaiserNode = { id: 'r1', type: 'effect-raiser', effectId, parameterValues }
+  return node
+}
+
+function renderRaiser(
+  parameterValues: Record<string, ValueSource>,
+  mode: NodeCueMode,
+  effectId = 'fx',
+) {
+  const node = raiser(effectId, parameterValues)
   renderWithProviders(
     <EffectRaiserEditor
       node={node}
@@ -58,6 +69,19 @@ function renderRaiser(parameterValues: Record<string, ValueSource>, mode: NodeCu
     />,
   )
 }
+
+describe('EffectRaiserEditor effect', () => {
+  it.each(['', 'fx', 'retired-fx'])(
+    'flags the effect %p exactly when the schema refuses it',
+    (effectId) => {
+      const schemaAccepts = new Ajv().compile(effectRaiserNodeSchema)
+      renderRaiser({}, 'yarg', effectId)
+
+      const select = screen.getByRole('combobox', { name: 'Select Effect' })
+      expect(select.getAttribute('aria-invalid') === 'true').toBe(!schemaAccepts(raiser(effectId)))
+    },
+  )
+})
 
 describe('EffectRaiserEditor parameters', () => {
   it('warns about a group literal the effect feeds into its target groups', () => {
@@ -84,5 +108,21 @@ describe('EffectRaiserEditor parameters', () => {
     expect(
       screen.getByRole('combobox', { name: 'holdUntil (string)' }),
     ).toHaveAccessibleDescription("'beat' never fires in rb3 mode, so this wait does not end on it")
+  })
+
+  it('warns about a number the effect feeds into a field that refuses it', () => {
+    renderRaiser({ fadeMs: { source: 'literal', value: -5 } }, 'yarg')
+
+    expect(screen.getByRole('spinbutton', { name: 'fadeMs (number)' })).toHaveAccessibleDescription(
+      'must be a non-negative finite number',
+    )
+  })
+
+  it('accepts a number the effect field takes', () => {
+    renderRaiser({ fadeMs: { source: 'literal', value: 250 } }, 'yarg')
+
+    expect(
+      screen.getByRole('spinbutton', { name: 'fadeMs (number)' }),
+    ).not.toHaveAccessibleDescription()
   })
 })

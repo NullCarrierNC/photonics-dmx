@@ -99,9 +99,9 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
       showToast('Please fill in all required fields', 'error')
       return
     }
-    const nameIssue = variableNameIssue(formData.name)
-    if (nameIssue) {
-      showToast(`${nameIssue.message}.`, 'error')
+    const invalidName = variableNameIssue(formData.name)
+    if (invalidName) {
+      showToast(`${invalidName.message}.`, 'error')
       return
     }
     const initialIssue = initialValueIssue(formData.type, formData.initialValue)

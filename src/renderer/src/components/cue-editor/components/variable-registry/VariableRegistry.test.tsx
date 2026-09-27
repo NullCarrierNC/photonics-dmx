@@ -1,11 +1,13 @@
 /** @jest-environment jsdom */
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import Ajv from 'ajv'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import type { EditorDocument } from '../../lib/types'
 import type { VariableDefinition } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ConfirmModalHost from '../../../ConfirmModalHost'
 import { ToastStack } from '../../../Toast'
+import { variableDefinitionSchema } from '../../../../../../photonics-dmx/cues/node/schema/primitives'
 import VariableRegistry from './VariableRegistry'
 
 afterEach(() => cleanup())
@@ -102,9 +104,7 @@ describe('VariableRegistry', () => {
       addGroupVariable(name)
 
       expect(
-        await screen.findByText(
-          `"${name}" is not a valid variable name. Use letters, digits and underscores, starting with a letter or underscore.`,
-        ),
+        await screen.findByText(new RegExp(`^"${name}" is not a valid variable name.*\\.$`)),
       ).toBeTruthy()
       expect(screen.getByRole('dialog')).toBeInTheDocument()
       expect(onVariablesChange).not.toHaveBeenCalled()
@@ -131,6 +131,21 @@ describe('VariableRegistry', () => {
     expect(within(dialog).getByText("'max' is a built-in expression name")).toBeTruthy()
     expect(name).toHaveAttribute('aria-invalid', 'true')
   })
+
+  it.each(['speed', '_step', 'Hold2', 'beat-count', 'my var', '2x', 'tëst', 'max', 'pi'])(
+    'flags the name %s exactly when the schema refuses it',
+    (name) => {
+      const schemaAccepts = new Ajv().compile(variableDefinitionSchema)
+      renderRegistry()
+      fireEvent.click(screen.getAllByRole('button', { name: '+ Add' })[0])
+      const input = screen.getByPlaceholderText('variableName')
+      fireEvent.change(input, { target: { value: name } })
+
+      expect(input.getAttribute('aria-invalid') === 'true').toBe(
+        !schemaAccepts({ name, type: 'number', scope: 'cue', initialValue: 0 }),
+      )
+    },
+  )
 
   it('adds a variable with a free name', () => {
     const { onVariablesChange } = renderRegistry()

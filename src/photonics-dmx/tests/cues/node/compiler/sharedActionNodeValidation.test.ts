@@ -86,12 +86,12 @@ const PARITY_CASES: ParityCase[] = [
   {
     description: 'rejects a literal layer above the top layer',
     action: { ...baseValidAction(), layer: { source: 'literal', value: 300 } },
-    expectedMessageMatch: /layer literal must be a number from 0 to 255/,
+    expectedMessageMatch: /layer must be a number from 0 to 255/,
   },
   {
     description: 'rejects a negative literal layer',
     action: { ...baseValidAction(), layer: { source: 'literal', value: -1 } },
-    expectedMessageMatch: /layer literal must be a number from 0 to 255/,
+    expectedMessageMatch: /layer must be a number from 0 to 255/,
   },
   {
     description: 'rejects missing target.groups',
@@ -210,7 +210,7 @@ const PARITY_CASES: ParityCase[] = [
         waitForTime: { source: 'literal', value: -1 },
       },
     },
-    expectedMessageMatch: /waitForTime literal must be a non-negative finite number/,
+    expectedMessageMatch: /waitForTime must be a non-negative finite number/,
   },
   {
     description: 'rejects a non-finite literal duration',
@@ -221,7 +221,7 @@ const PARITY_CASES: ParityCase[] = [
         duration: { source: 'literal', value: Number.POSITIVE_INFINITY as unknown as number },
       },
     },
-    expectedMessageMatch: /duration literal must be a non-negative finite number/,
+    expectedMessageMatch: /duration must be a non-negative finite number/,
   },
   {
     description: 'rejects an out-of-range literal level (must be 0..1)',
@@ -232,7 +232,7 @@ const PARITY_CASES: ParityCase[] = [
         level: { source: 'literal', value: 5 },
       },
     },
-    expectedMessageMatch: /timing\.level literal must be a number between 0 and 1/,
+    expectedMessageMatch: /timing\.level must be a number between 0 and 1/,
   },
   {
     description: 'rejects a non-positive optional waitForConditionCount literal',
@@ -243,7 +243,7 @@ const PARITY_CASES: ParityCase[] = [
         waitForConditionCount: { source: 'literal', value: 0 },
       },
     },
-    expectedMessageMatch: /waitForConditionCount literal must be a positive finite number/,
+    expectedMessageMatch: /waitForConditionCount must be a positive finite number/,
   },
   {
     description: 'rejects an unknown easing literal',

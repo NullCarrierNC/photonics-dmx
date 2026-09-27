@@ -5,10 +5,13 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
+  effectIdIssue,
+  isNumberRule,
   literalChoices,
   parameterRules,
   raiserParameterIssue,
 } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import type { LiteralRule } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
 import KnownValueSelect from '../shared/KnownValueSelect'
 
@@ -31,15 +34,21 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
   const selectedEffect = availableEffects.find((e) => e.id === node.effectId)
   const parameterVars = selectedEffect?.definition?.variables?.filter((v) => v.isParameter) ?? []
   const effectActions = selectedEffect?.definition?.nodes?.actions ?? []
+  const effectOptions = availableEffects.map((effect) => ({ value: effect.id, label: effect.name }))
+  const effectId = node.effectId || ''
 
   return (
     <div className="space-y-2 text-xs">
       <KnownValueSelect
         label="Select Effect"
-        value={node.effectId || ''}
-        options={availableEffects.map((effect) => ({ value: effect.id, label: effect.name }))}
-        onChange={(effectId) => updateNode({ effectId })}
+        value={effectId}
+        options={effectOptions}
+        onChange={(next) => updateNode({ effectId: next })}
         placeholder="-- Choose an effect --"
+        issue={effectIdIssue(
+          effectId,
+          effectOptions.map((option) => option.value),
+        )}
       />
       {availableEffects.length === 0 && (
         <p className="text-[10px] text-amber-600 dark:text-amber-400">
@@ -76,7 +85,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
             const integerOnly = param.type === 'number' && param.name === 'paramLayer'
             // The choices of the first rule the parameter meets that has a list of its own.
             const listedRule = parameterRules(param, effectActions).find(
-              (rule) => rule !== 'groups',
+              (rule): rule is LiteralRule => !isNumberRule(rule) && rule !== 'groups',
             )
             const validLiterals =
               param.validValues ?? (listedRule ? literalChoices(listedRule, activeMode) : undefined)

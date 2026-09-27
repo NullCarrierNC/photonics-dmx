@@ -12,8 +12,8 @@ import {
   initialValueIssue,
   variableNameIssue,
 } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
-import FieldIssue, { issueAttributes } from '../shared/FieldIssue'
 import ColorListEditor from '../shared/ColorListEditor'
+import FieldIssue, { issueAttributes } from '../shared/FieldIssue'
 import { DraftNumberField } from '../../../controls/DraftField'
 import {
   AUDIO_EVENT_OPTIONS,
@@ -162,7 +162,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   const nameIssueId = useId()
   if (!isOpen) return null
 
-  const nameIssue = formData.name ? variableNameIssue(formData.name) : null
+  const typedNameIssue = formData.name ? variableNameIssue(formData.name) : null
 
   const initialIssue =
     formData.type && formData.initialValue !== undefined
@@ -197,14 +197,13 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
             value={formData.name ?? ''}
             onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
             placeholder="variableName"
-            pattern="[a-zA-Z_][a-zA-Z0-9_]*"
             disabled={!!editingVar}
-            {...issueAttributes(nameIssue, nameIssueId)}
+            {...issueAttributes(typedNameIssue, nameIssueId)}
           />
+          <FieldIssue issue={typedNameIssue} id={nameIssueId} />
           <span className="text-[10px] text-gray-500 mt-1">
             Must start with letter or underscore
           </span>
-          <FieldIssue issue={nameIssue} id={nameIssueId} />
         </label>
 
         <label className="flex flex-col font-medium text-sm">
