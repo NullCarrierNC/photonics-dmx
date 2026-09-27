@@ -158,7 +158,7 @@ export interface LightsFromIndexLogicNode extends BaseLogicNode {
 
 export interface ColorFromIndexLogicNode extends BaseLogicNode {
   logicType: 'color-from-index'
-  colors: ValueSource // Palette: inline literal Color[] (enum-validated) or a color-array variable
+  colors: ValueSource // Palette: an inline list of colour names or a color-array variable
   index: ValueSource // Index into the palette (with wraparound modulo palette length)
   assignTo: string // Variable written with type 'color'
 }

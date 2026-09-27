@@ -20,7 +20,13 @@ import {
 import type { WaitCondition } from '../../types'
 import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
-import type { ActionNode, NodeCueMode, ValueSource, VariableType } from '../types/nodeCueTypes'
+import type {
+  ActionNode,
+  LogicNode,
+  NodeCueMode,
+  ValueSource,
+  VariableType,
+} from '../types/nodeCueTypes'
 import { RESERVED_VARIABLE_NAMES, VARIABLE_NAME_PATTERN } from '../types/nodeCueTypes'
 
 export interface ValueIssue {
@@ -179,6 +185,84 @@ export function actionLiteralIssues(
   return actionLiteralFields(action).flatMap(({ rule, field, source }) => {
     if (source?.source !== 'literal') return []
     const issue = literalIssue(rule, source.value, mode)
+    return issue ? [{ field, issue }] : []
+  })
+}
+
+/**
+ * Whether a colour list may hold `value`. The list plays without a name this build does not know,
+ * so one is a warning.
+ */
+export function colorListIssue(value: unknown): ValueIssue | null {
+  if (!Array.isArray(value)) return null
+  const unknown = value.find((entry) => !isColor(entry))
+  return unknown === undefined
+    ? null
+    : warning(`'${String(unknown)}' is not a known Color and the list plays without it`)
+}
+
+/** A field of a logic node that holds a colour or, for a palette, a colour list. */
+interface LogicColorField {
+  field: string
+  source: ValueSource | undefined
+  list?: boolean
+}
+
+/** The variables a logic node's fields may read, as a file declares them. */
+type DeclaredVariables = ReadonlyArray<{ name: string; type: string; validValues?: string[] }>
+
+/**
+ * The fields of a logic node that hold a colour. A conditional operand holds one when the other
+ * side reads a declared colour variable, which compares it as a colour, unless that variable lists
+ * the values it may hold.
+ */
+function logicColorFields(node: LogicNode, variables: DeclaredVariables): LogicColorField[] {
+  switch (node.logicType) {
+    case 'color-from-index':
+      return [{ field: 'colors', source: node.colors, list: true }]
+    case 'variable': {
+      if (node.mode === 'get') return []
+      const assignments = node.assignments ?? []
+      if (assignments.length === 0) {
+        return node.valueType === 'color' ? [{ field: 'value', source: node.value }] : []
+      }
+      return assignments.flatMap((assignment, index) =>
+        assignment.valueType === 'color'
+          ? [{ field: `assignments[${index}].value`, source: assignment.value }]
+          : [],
+      )
+    }
+    case 'indexed-variable':
+      return node.mode === 'set' && node.valueType === 'color'
+        ? [{ field: 'value', source: node.value }]
+        : []
+    case 'conditional': {
+      const readsColor = (source: ValueSource | undefined): boolean => {
+        if (source?.source !== 'variable') return false
+        const variable = variables.find((v) => v.name === source.name)
+        return variable?.type === 'color' && !variable.validValues?.length
+      }
+      return [
+        ...(readsColor(node.right) ? [{ field: 'left', source: node.left }] : []),
+        ...(readsColor(node.left) ? [{ field: 'right', source: node.right }] : []),
+      ]
+    }
+    default:
+      return []
+  }
+}
+
+/**
+ * Each issue the rules find in a logic node's literals, named by the field holding it. `variables`
+ * are those the node's graph declares.
+ */
+export function logicLiteralIssues(
+  node: LogicNode,
+  variables: DeclaredVariables,
+): { field: string; issue: ValueIssue }[] {
+  return logicColorFields(node, variables).flatMap(({ field, source, list }) => {
+    if (source?.source !== 'literal') return []
+    const issue = list ? colorListIssue(source.value) : literalIssue('color', source.value)
     return issue ? [{ field, issue }] : []
   })
 }
@@ -358,11 +442,8 @@ function unknownColorIssue(type: VariableType, value: unknown): ValueIssue | nul
     return warning(`'${value}' is not a known Color and plays as blue`)
   }
   if (type !== 'color-array' || !Array.isArray(value)) return null
-  if (!value.every((entry): entry is string => typeof entry === 'string')) return null
-  const unknown = value.find((entry) => !isColor(entry))
-  return unknown === undefined
-    ? null
-    : warning(`'${unknown}' is not a known Color and the list plays without it`)
+  if (!value.every((entry) => typeof entry === 'string')) return null
+  return colorListIssue(value)
 }
 
 /**

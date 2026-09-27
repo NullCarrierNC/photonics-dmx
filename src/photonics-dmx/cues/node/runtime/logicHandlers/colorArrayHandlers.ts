@@ -11,8 +11,8 @@ import { log, warnOncePerNode, type LogicHandler } from './handlerContext'
 export const colorFromIndexHandler: LogicHandler<'color-from-index'> = (logicNode, ctx) => {
   const { nodeId, context, variableDefinitions, getVarStore, degenerateKey, rigSuffix } = ctx
   // Pick a colour from a palette by index, with wraparound. The colour analogue of
-  // lights-from-index. The palette is a ValueSource resolving to a color-array: an inline
-  // literal Color[] (enum-validated at load) or a color-array variable.
+  // lights-from-index. The palette is a ValueSource resolving to a color-array: an inline list
+  // of colour names, played without any this build does not know, or a color-array variable.
   const colors = resolveColorArray(logicNode.colors, context, variableDefinitions)
   if (!colors || colors.length === 0) {
     warnOncePerNode(

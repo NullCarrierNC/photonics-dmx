@@ -1,7 +1,6 @@
 /**
  * Variable and event declarations a cue graph carries.
  */
-import type { Color } from '../../../types'
 import { EXPRESSION_BUILTIN_NAMES } from '../../node/runtime/expressionEvaluator'
 
 /** Every variable/value type, the single source both the schema enums and the editor dropdowns derive
@@ -36,8 +35,9 @@ export function isVariableName(name: string): boolean {
   return VARIABLE_NAME_PATTERN.test(name) && !RESERVED_VARIABLE_NAMES.includes(name)
 }
 
+/** A literal list is a palette's colour names, which may hold a name this build does not know. */
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean | string | Color[] }
+  | { source: 'literal'; value: number | boolean | string | string[] }
   | { source: 'variable'; name: string }
 
 export interface VariableDefinition {

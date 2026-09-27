@@ -1113,6 +1113,94 @@ describe('Node cue validation', () => {
       ])
     })
 
+    it('loads a palette colour this version does not know and warns that it is left out', () => {
+      const result = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withLogic({
+            id: 'logic-1',
+            type: 'logic',
+            logicType: 'color-from-index',
+            colors: { source: 'literal', value: ['red', 'mauve'] },
+            index: { source: 'literal', value: 0 },
+            assignTo: 'tint',
+          }),
+        ],
+      })
+
+      expect(result.valid && result.warnings).toEqual([
+        "cue 'Test Cue': color-from-index 'logic-1' colors 'mauve' is not a known Color and the list plays without it.",
+      ])
+    })
+
+    it.each([
+      [
+        'a variable node sets',
+        {
+          logicType: 'variable',
+          mode: 'set',
+          varName: 'tint',
+          valueType: 'color',
+          value: { source: 'literal', value: 'mauve' },
+        },
+        "variable 'logic-1' value",
+      ],
+      [
+        'a multi-set variable node sets',
+        {
+          logicType: 'variable',
+          mode: 'init',
+          varName: 'tint',
+          valueType: 'color',
+          assignments: [
+            { varName: 'steps', valueType: 'number', value: { source: 'literal', value: 2 } },
+            { varName: 'tint', valueType: 'color', value: { source: 'literal', value: 'mauve' } },
+          ],
+        },
+        "variable 'logic-1' assignments[1].value",
+      ],
+      [
+        'an indexed variable node sets',
+        {
+          logicType: 'indexed-variable',
+          mode: 'set',
+          varName: 'cell',
+          index: { source: 'literal', value: 0 },
+          valueType: 'color',
+          value: { source: 'literal', value: 'mauve' },
+        },
+        "indexed-variable 'logic-1' value",
+      ],
+      [
+        'a conditional compares a colour variable with',
+        {
+          logicType: 'conditional',
+          comparator: '==',
+          left: { source: 'variable', name: 'accent' },
+          right: { source: 'literal', value: 'mauve' },
+        },
+        "conditional 'logic-1' right",
+      ],
+    ])(
+      'loads a file where %s a colour this version does not know, and warns',
+      (_l, logic, field) => {
+        const cue = withLogic({ id: 'logic-1', type: 'logic', ...logic })
+        const result = validateNodeCueFile({
+          ...validFile(),
+          cues: [
+            {
+              ...cue,
+              variables: [{ name: 'accent', type: 'color', scope: 'cue', initialValue: 'red' }],
+            },
+          ],
+        })
+
+        expect(result.valid && result.warnings).toEqual([
+          `cue 'Test Cue': ${field} 'mauve' is not a known Color and plays as blue.`,
+        ])
+      },
+    )
+
     it('accepts a light-array variable that starts empty', () => {
       expect(validateNodeCueFile(withVariable('light-array', [])).valid).toBe(true)
     })
@@ -1693,6 +1781,45 @@ describe('Node cue validation', () => {
         ],
       })
       expect(result.valid).toBe(false)
+    })
+
+    it('loads an effect whose palette holds a colour this version does not know, and warns', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'effect-group', name: 'Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: {
+              events: [{ id: 'e1', type: 'event', eventType: 'beat' }],
+              actions: [],
+              logic: [
+                {
+                  id: 'pick',
+                  type: 'logic',
+                  logicType: 'color-from-index',
+                  colors: { source: 'literal', value: ['Red', 'blue'] },
+                  index: { source: 'literal', value: 0 },
+                  assignTo: 'tint',
+                },
+              ],
+            },
+            connections: [{ from: 'e1', to: 'pick' }],
+          },
+        ],
+      })
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          valid: true,
+          warnings: [
+            "effect 'Test Effect': color-from-index 'pick' colors 'Red' is not a known Color and the list plays without it.",
+          ],
+        }),
+      )
     })
 
     it('rejects an effect whose light-array parameter starts with lights', () => {

@@ -4,13 +4,13 @@ import { screen } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import ValueSourceEditor from './ValueSourceEditor'
 
-function renderColour(value: string) {
+function renderCueType(value: string) {
   renderWithProviders(
     <ValueSourceEditor
-      label="Colour"
+      label="Cue type"
       value={{ source: 'literal', value }}
       onChange={jest.fn()}
-      expected="color"
+      expected="cue-type"
       availableVariables={[]}
     />,
   )
@@ -18,16 +18,16 @@ function renderColour(value: string) {
 
 describe('ValueSourceEditor with a constrained literal', () => {
   it('shows and flags a stored value outside its choices', () => {
-    renderColour('bleu')
+    renderCueType('Chorsu')
 
-    expect(screen.getByRole('combobox')).toHaveProperty('value', 'bleu')
-    expect(screen.getByText("'bleu' is not a known value")).toBeTruthy()
+    expect(screen.getByRole('combobox')).toHaveProperty('value', 'Chorsu')
+    expect(screen.getByText("'Chorsu' is not a known value")).toBeTruthy()
   })
 
   it('does not flag a value from its choices', () => {
-    renderColour('blue')
+    renderCueType('Chorus')
 
-    expect(screen.getByRole('combobox')).toHaveProperty('value', 'blue')
+    expect(screen.getByRole('combobox')).toHaveProperty('value', 'Chorus')
     expect(screen.queryByText(/is not a known value/)).toBeNull()
   })
 })
@@ -46,6 +46,23 @@ describe('ValueSourceEditor with the colour rule', () => {
     )
 
     const select = screen.getByRole('combobox', { name: 'Colour' })
+    expect(select).toHaveDisplayValue('bleu')
+    expect(select.getAttribute('aria-invalid')).toBeNull()
+    expect(select).toHaveAccessibleDescription("'bleu' is not a known Color and plays as blue")
+  })
+
+  it('warns the same way for a colour field that names no rule', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="Value"
+        value={{ source: 'literal', value: 'bleu' }}
+        onChange={jest.fn()}
+        expected="color"
+        availableVariables={[]}
+      />,
+    )
+
+    const select = screen.getByRole('combobox', { name: 'Value' })
     expect(select).toHaveDisplayValue('bleu')
     expect(select.getAttribute('aria-invalid')).toBeNull()
     expect(select).toHaveAccessibleDescription("'bleu' is not a known Color and plays as blue")
@@ -74,11 +91,11 @@ describe('ValueSourceEditor with an optional field', () => {
 
 describe('ValueSourceEditor flags', () => {
   it('names the select by its label and describes it by the flag', () => {
-    renderColour('bleu')
+    renderCueType('Chorsu')
 
-    const select = screen.getByRole('combobox', { name: 'Colour' })
+    const select = screen.getByRole('combobox', { name: 'Cue type' })
     expect(select.getAttribute('aria-invalid')).toBe('true')
-    expect(select).toHaveAccessibleDescription("'bleu' is not a known value")
+    expect(select).toHaveAccessibleDescription("'Chorsu' is not a known value")
   })
 
   it('keeps a stored variable of another type selected and warns about it', () => {
@@ -124,5 +141,23 @@ describe('ValueSourceEditor for a colour-array value', () => {
     renderPalette(true)
 
     expect(screen.getByRole('checkbox')).toBeTruthy()
+  })
+
+  it('shows a listed colour this version does not know and warns that it is left out', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="palette (color-array)"
+        value={{ source: 'literal', value: ['red', 'mauve'] }}
+        onChange={jest.fn()}
+        expected="color-array"
+        listLiteral
+        availableVariables={[]}
+      />,
+    )
+
+    expect(screen.getByDisplayValue('mauve')).toBeTruthy()
+    expect(
+      screen.getByText("'mauve' is not a known Color and the list plays without it"),
+    ).toBeTruthy()
   })
 })

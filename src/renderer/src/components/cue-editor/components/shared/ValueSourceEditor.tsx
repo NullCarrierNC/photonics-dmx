@@ -5,6 +5,7 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   choiceIssue,
+  colorListIssue,
   literalChoices,
   literalDefault,
   literalIssue,
@@ -18,7 +19,6 @@ import type {
 import { isVariableSource } from './nodeEditorUtils'
 import ColorListEditor from './ColorListEditor'
 import FieldIssue, { issueAttributes } from './FieldIssue'
-import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/types'
 import { AUDIO_EVENT_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
 import { YARG_EVENT_TYPES, RB3_EVENT_OPTIONS } from '../../lib/options'
@@ -42,7 +42,10 @@ interface ValueSourceEditorProps {
     | 'color-array'
     | 'event'
     | 'either'
-  /** The cue value rule a literal here must meet, which also supplies the choices. */
+  /**
+   * The cue value rule a literal here must meet, which also supplies the choices. A colour field
+   * meets the colour rule unless it names another.
+   */
   rule?: LiteralRule
   /** The field may be left out of the file, and the runtime then uses the rule's default. */
   optional?: boolean
@@ -74,7 +77,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   value,
   onChange,
   expected = 'either',
-  rule,
+  rule: namedRule,
   optional = false,
   issue: callerIssue,
   listLiteral = false,
@@ -85,12 +88,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   activeMode,
 }) => {
   const issueId = useId()
+  const rule = namedRule ?? (expected === 'color' ? 'color' : undefined)
   const isLightArray = expected === 'light-array'
   const isColorArray = expected === 'color-array'
   const effectiveValidLiterals = (() => {
     if (validLiterals) return validLiterals
     if (rule) return literalChoices(rule, activeMode)
-    if (expected === 'color') return COLOR_OPTIONS
     if (expected === 'cue-type') return CUE_TYPE_VALUES
     if (expected === 'event' && activeMode) {
       if (activeMode === 'audio') return [...AUDIO_EVENT_OPTIONS]
@@ -133,6 +136,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     constrainedLiteralChoices?.some((opt) => opt.value === literalText) ?? false
   const literalProblem = ((): ValueIssue | null => {
     if (!isLiteral || isDefaulted) return null
+    if (isColorArray) return colorListIssue(source.value)
     if (rule && !validLiterals && !validLiteralOptions) {
       return literalIssue(rule, source.value, activeMode)
     }

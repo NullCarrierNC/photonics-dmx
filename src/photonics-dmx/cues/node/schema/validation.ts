@@ -29,7 +29,12 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 import { getCueDomain } from '../../domains'
 import { checkContinuousCueCalledWaits } from './audioEventPolicyCheck'
-import { actionLiteralIssues, compareOperandIssue, initialValueIssue } from '../cueValueRules'
+import {
+  actionLiteralIssues,
+  compareOperandIssue,
+  initialValueIssue,
+  logicLiteralIssues,
+} from '../cueValueRules'
 
 export type { StructuredValidationError } from './helpers'
 
@@ -94,6 +99,7 @@ export function __resetCueSemanticChecksForTests(): void {
   registerCueSemanticCheck(checkActionLiteralWarnings)
   registerCueSemanticCheck(checkArrayCompares)
   registerCueSemanticCheck(checkInitialValues)
+  registerCueSemanticCheck(checkLogicLiteralWarnings)
 }
 
 /**
@@ -195,11 +201,29 @@ function checkInitialValues(file: NodeCueFile, _errors: string[], warnings: stri
   }
 }
 
+/**
+ * Warn about logic node literals the rules pass with a warning, such as a colour this build does
+ * not know. The graph's declared variables tell which operands are colours.
+ */
+function logicLiteralWarnings(graph: WarnedGraph, warnings: string[]): void {
+  for (const node of graph.logic) {
+    for (const { field, issue } of logicLiteralIssues(node, graph.variables)) {
+      if (issue.severity !== 'warning') continue
+      warnings.push(`${graph.label}: ${node.logicType} '${node.id}' ${field} ${issue.message}.`)
+    }
+  }
+}
+
+function checkLogicLiteralWarnings(file: NodeCueFile, _errors: string[], warnings: string[]): void {
+  for (const graph of cueGraphs(file)) logicLiteralWarnings(graph, warnings)
+}
+
 registerCueSemanticCheck(checkEventVocabulary)
 registerCueSemanticCheck(checkContinuousCueCalledWaits)
 registerCueSemanticCheck(checkActionLiteralWarnings)
 registerCueSemanticCheck(checkArrayCompares)
 registerCueSemanticCheck(checkInitialValues)
+registerCueSemanticCheck(checkLogicLiteralWarnings)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,
@@ -488,6 +512,7 @@ function validateEffectFileForMode<T extends EffectFile>(
     initialValueWarnings(`effect '${effect.name}'`, effect.variables ?? []),
   )
   for (const graph of graphs) actionLiteralWarnings(graph, warnings)
+  for (const graph of graphs) logicLiteralWarnings(graph, warnings)
   for (const graph of graphs) arrayCompareWarnings(graph, warnings)
 
   return {
