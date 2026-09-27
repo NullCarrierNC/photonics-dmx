@@ -17,6 +17,7 @@ import {
   previewRigIdAtom,
 } from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
+import ConsoleChannelRow from '../components/ConsoleChannelRow'
 import StrobeChannelPreviewNotice from '../components/StrobeChannelPreviewNotice'
 import { DmxRigSelectField } from '../components/DmxRigSelectField'
 import SacnToggle from '../components/SacnToggle'
@@ -336,21 +337,20 @@ const DmxConsole: React.FC = () => {
               isPanTiltChannelName(channelName) &&
               (prevName == null || !isPanTiltChannelName(prevName))
             return (
-              <li
+              <ConsoleChannelRow
                 key={channelName}
-                className={`flex flex-col gap-0.5${showMhColourPanSeparator ? ' pt-3 mt-1 border-t border-gray-200 dark:border-gray-600' : ''}`}>
-                <div className="flex justify-between items-center gap-2">
+                className={
+                  showMhColourPanSeparator
+                    ? 'pt-3 mt-1 border-t border-gray-200 dark:border-gray-600'
+                    : undefined
+                }
+                label={
                   <span className="capitalize text-gray-700 dark:text-gray-300 text-sm">
                     {channelLabel(channelName)}
                   </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    Value: {dmxValues[channelNumber] ?? 0}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400 shrink-0">
-                    DMX ch
-                  </label>
+                }
+                channel={channelNumber}
+                channelBox={
                   <DraftNumberField
                     value={channelNumber}
                     min={1}
@@ -365,70 +365,41 @@ const DmxConsole: React.FC = () => {
                         : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
                     }`}
                   />
-                  <input
-                    type="range"
-                    min={0}
-                    max={255}
-                    value={
-                      consoleEnabled
-                        ? consoleBuffer[channelNumber] ?? 0
-                        : dmxValues[channelNumber] ?? 0
-                    }
-                    disabled={!consoleEnabled}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10)
-                      handleChannelValueChange(channelNumber, v)
-                    }}
-                    className="flex-1 min-w-[120px] slider"
-                  />
-                </div>
-              </li>
+                }
+                consoleEnabled={consoleEnabled}
+                consoleBuffer={consoleBuffer}
+                dmxValues={dmxValues}
+                onValueChange={(v) => handleChannelValueChange(channelNumber, v)}
+              />
             )
           })}
           {/* Added channels — template-owned, so the DMX number is read-only here; the value slider
               still drives the channel so users can test it. Duplicate types collide by name, hence
               index keys and no remap input. */}
-          {alignedExtras.map((extra, i) => {
-            const label = extraChannelDisplayLabel(extraLabelFixture, i)
-            return (
-              <li key={`extra-${i}`} className="flex flex-col gap-0.5">
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-gray-700 dark:text-gray-300 text-sm">{label}</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    Value: {dmxValues[extra.channel] ?? 0}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400 shrink-0">
-                    DMX ch
-                  </label>
-                  <input
-                    type="number"
-                    value={extra.channel}
-                    disabled
-                    readOnly
-                    className="w-20 p-1 border rounded text-sm border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                  />
-                  <input
-                    type="range"
-                    min={0}
-                    max={255}
-                    value={
-                      consoleEnabled
-                        ? consoleBuffer[extra.channel] ?? 0
-                        : dmxValues[extra.channel] ?? 0
-                    }
-                    disabled={!consoleEnabled || extra.channel < 1}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10)
-                      handleChannelValueChange(extra.channel, v)
-                    }}
-                    className="flex-1 min-w-[120px] slider"
-                  />
-                </div>
-              </li>
-            )
-          })}
+          {alignedExtras.map((extra, i) => (
+            <ConsoleChannelRow
+              key={`extra-${i}`}
+              label={
+                <span className="text-gray-700 dark:text-gray-300 text-sm">
+                  {extraChannelDisplayLabel(extraLabelFixture, i)}
+                </span>
+              }
+              channel={extra.channel}
+              channelBox={
+                <input
+                  type="number"
+                  value={extra.channel}
+                  disabled
+                  readOnly
+                  className="w-20 p-1 border rounded text-sm border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                />
+              }
+              consoleEnabled={consoleEnabled}
+              consoleBuffer={consoleBuffer}
+              dmxValues={dmxValues}
+              onValueChange={(v) => handleChannelValueChange(extra.channel, v)}
+            />
+          ))}
         </ul>
       </div>
     )

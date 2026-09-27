@@ -4,17 +4,20 @@
  * has to hand it back, including when the page leaves before main has answered.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
-import { lightingPrefsAtom, previewRigIdAtom } from '../atoms'
+import { lightingPrefsAtom, myDmxLightsAtom, previewRigIdAtom } from '../atoms'
 import DmxConsole from './DmxConsole'
 import {
   ConfigStrobeType,
+  FixtureTypes,
+  type DmxFixture,
   type DmxLight,
   type DmxRig,
   type RgbDmxChannels,
+  type RgbLight,
 } from '../../../photonics-dmx/types'
 import { rgbLight } from '../../../photonics-dmx/tests/helpers/testFixtures'
 
@@ -342,5 +345,98 @@ describe('DmxConsole channel remap', () => {
     moveChannel(boxesOn(1)[0], 10)
 
     await waitFor(() => expect(lastBuffer()).toEqual({ 1: 200, 10: 200 }))
+  })
+})
+
+describe('DmxConsole unassigned channels', () => {
+  const light = (overrides: Partial<RgbLight>): RgbLight =>
+    rgbLight({
+      id: 'light-u',
+      name: 'Unset PAR',
+      label: 'Unset PAR',
+      position: 1,
+      fixtureId: 'no-such-template',
+      universe: 1,
+      channels: { masterDimmer: 30, red: 31, green: 32, blue: 33 },
+      ...overrides,
+    })
+
+  const masterlessTemplate: DmxFixture = {
+    id: 'masterless',
+    fixture: FixtureTypes.RGB,
+    name: 'Masterless',
+    label: 'Masterless',
+    position: 0,
+    isStrobeEnabled: false,
+    channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 },
+  }
+
+  async function openConsoleWith(lights: DmxLight[], templates: DmxFixture[] = []) {
+    const withLights: DmxRig = {
+      ...rig,
+      config: { ...rig.config, numLights: lights.length, frontLights: lights },
+    }
+    jest.mocked(ipcApi.getDmxRigs).mockResolvedValue([withLights])
+    jest.mocked(ipcApi.getDmxRig).mockResolvedValue(withLights)
+    renderWithProviders(<DmxConsole />, {
+      seed: (set) => {
+        set(previewRigIdAtom, rig.id)
+        set(myDmxLightsAtom, templates)
+      },
+    })
+    const toggle = await screen.findByRole('button', { name: 'Enable console' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    fireEvent.click(toggle)
+    await screen.findByRole('button', { name: 'Disable console' })
+  }
+
+  /** The channel rows of the card for the light named `name`. */
+  const rowsOf = (name: string): HTMLElement[] =>
+    within(screen.getByText(new RegExp(`^${name} \\(#`)).closest('div')!).getAllByRole('listitem')
+
+  const rowNamed = (name: string, channel: RegExp): HTMLElement =>
+    rowsOf(name).find((row) => channel.test(row.textContent ?? ''))!
+
+  function expectNotSet(row: HTMLElement): void {
+    expect(row.querySelector('input[type="range"]')).toBeNull()
+    const box = within(row).getByRole('spinbutton')
+    expect(box).toBeDisabled()
+    expect(box).toHaveValue(null)
+    expect(row.textContent).not.toMatch(/Value:/)
+  }
+
+  beforeEach(() => {
+    resetIpcApiMock()
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('shows an unassigned channel as not set, with no slider', async () => {
+    await openConsoleWith([light({ channels: { masterDimmer: 30, red: 0, green: 0, blue: 33 } })])
+
+    expectNotSet(rowNamed('Unset PAR', /^red/))
+    expectNotSet(rowNamed('Unset PAR', /^green/))
+    const blue = rowNamed('Unset PAR', /^blue/)
+    expect(blue.querySelector('input[type="range"]')).not.toBeNull()
+    expect(within(blue).getByRole('spinbutton')).toHaveValue(33)
+  })
+
+  it('shows an added channel with no DMX number as not set', async () => {
+    await openConsoleWith([light({ extraChannels: [{ type: 'white', channel: 0 }] })])
+
+    expectNotSet(rowNamed('Unset PAR', /^white/i))
+  })
+
+  it.each([
+    ['its template has no master', light({ fixtureId: 'masterless', unplaced: true })],
+    ['its template is gone', light({ unplaced: true })],
+  ])('shows every channel of an unplaced light as not set when %s', async (_, unplaced) => {
+    await openConsoleWith([unplaced], [masterlessTemplate])
+
+    const rows = rowsOf('Unset PAR')
+    expect(rows).toHaveLength(4)
+    rows.forEach(expectNotSet)
   })
 })

@@ -19,6 +19,7 @@ import {
   type LightingConfiguration,
   type RgbFixture,
   type RgbLight,
+  type RgbMovingHeadLight,
   type SavedFixture,
 } from '../../../photonics-dmx/types'
 import {
@@ -77,7 +78,7 @@ const lightingConfig: LightingConfiguration = {
 
 type OnLightChange = (updatedLight: DmxLight) => void
 
-function renderCard(opts: { light?: DmxLight; templates?: SavedFixture[] } = {}) {
+function renderCard(opts: { light?: DmxLight; templates?: SavedFixture[]; rigId?: string } = {}) {
   const onChange = jest.fn<OnLightChange>()
   const view = render(
     <LightChannelsConfig
@@ -86,6 +87,7 @@ function renderCard(opts: { light?: DmxLight; templates?: SavedFixture[] } = {})
       onClick={() => {}}
       isHighlighted={false}
       myLights={opts.templates ?? [template()]}
+      rigId={opts.rigId}
       lightingConfig={lightingConfig}
     />,
   )
@@ -320,5 +322,36 @@ describe('LightChannelsConfig fixture config fields', () => {
     fireEvent.blur(field)
 
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('LightChannelsConfig calibration', () => {
+  const templates = (): SavedFixture[] => [{ ...rgbMovingHeadFixture(), id: 'test-fixture-1' }]
+  const calibrate = (): HTMLElement => screen.getByRole('button', { name: 'Calibrate (live DMX)' })
+
+  it('offers calibration for a moving head with pan and tilt channels', () => {
+    renderCard({ light: rgbMovingHeadLight(), templates: templates(), rigId: 'rig-1' })
+
+    expect(calibrate()).toBeEnabled()
+  })
+
+  const head = rgbMovingHeadLight()
+  const unsetting = (unset: Partial<RgbMovingHeadLight['channels']>): RgbMovingHeadLight => ({
+    ...head,
+    channels: { ...head.channels, ...unset },
+  })
+
+  it.each<[string, DmxLight]>([
+    ['whose pan has no DMX channel', unsetting({ pan: 0 })],
+    ['whose tilt has no DMX channel', unsetting({ tilt: 0 })],
+    [
+      'that is unplaced',
+      { ...unsetting({ red: 0, green: 0, blue: 0, pan: 0, tilt: 0 }), unplaced: true },
+    ],
+  ])('holds calibration for a moving head %s', (_, movingHead) => {
+    renderCard({ light: movingHead, templates: templates(), rigId: 'rig-1' })
+
+    expect(calibrate()).toBeDisabled()
+    expect(screen.getByText('Calibration needs a DMX channel for Pan and Tilt.')).toBeTruthy()
   })
 })
