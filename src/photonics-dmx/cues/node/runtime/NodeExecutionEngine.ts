@@ -39,6 +39,7 @@ import {
 } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
+import { releaseHeldBy, type RaisedEffect } from './raisedEffects'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { ContextLifecycleEvent } from './executionStateMachineLifecycle'
@@ -49,12 +50,6 @@ import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('NodeExecutionEngine')
-
-/** A running effect engine, with the release for whatever hold its raising context took. */
-interface RaisedEffect {
-  engine: EffectExecutionEngine
-  releaseWaiter: () => void
-}
 
 /** Optional collaborators for a {@link NodeExecutionEngine}; omitted fields fall back to defaults. */
 export interface NodeExecutionEngineOptions {
@@ -575,7 +570,11 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       if (holdsContext) {
         context.registerActiveAction(raiserNode.id, raiserNode)
       }
-      this.activeEffectEngines.set(engineKey, { engine: effectEngine, releaseWaiter: release })
+      this.activeEffectEngines.set(engineKey, {
+        engine: effectEngine,
+        releaseWaiter: release,
+        heldBy: holdsContext ? context.id : undefined,
+      })
 
       effectEngine.triggerEffect(context.cueData)
       releaseInterrupted?.()
@@ -678,6 +677,10 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
   protected override onContextCancelled(contextId: string): void {
     this.onContextLifecycle?.(contextId, 'cancelled')
+  }
+
+  protected override releaseRaisedEffects(contextIds: ReadonlySet<string>): Map<string, number> {
+    return releaseHeldBy(this.activeEffectEngines, contextIds)
   }
 
   /** Cancel nested effect engines spawned by effect-raiser nodes. */

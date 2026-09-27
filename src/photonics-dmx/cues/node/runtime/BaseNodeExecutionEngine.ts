@@ -108,7 +108,9 @@ export abstract class BaseNodeExecutionEngine {
   protected variableDefinitions: VariableDefinition[]
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   protected submittedEffects: Map<string, number> = new Map()
-  private readonly awaitedEffects = new AwaitedEffects()
+  private readonly awaitedEffects = new AwaitedEffects((name, layer) =>
+    this.sequencer.removeEffect(name, layer),
+  )
   /** motion-pattern effect names for cancelAll → removeMotionPattern. */
   protected submittedMotionPatterns: Set<string> = new Set()
   /** Last submitted set-position payload per effect name (idempotency after transition ends). */
@@ -692,7 +694,7 @@ export abstract class BaseNodeExecutionEngine {
       }
     }
     this.submittedEffects.clear()
-    this.awaitedEffects.clear()
+    this.awaitedEffects.clear(!skipEffectRemoval)
 
     for (const name of this.submittedMotionPatterns) {
       if (!skipEffectRemoval) {
@@ -706,21 +708,24 @@ export abstract class BaseNodeExecutionEngine {
   }
 
   /**
-   * Cancel the runs started from these events and call `startAgain`. A new run that submits an
-   * effect the old ones waited on takes it over through the sequencer's update, going on from the
-   * look it shows. The waited-on effects no new run submitted are then removed, releasing their
-   * waiters with `cancelled = true`. Effects the runs submitted without waiting stay up.
+   * Cancel the runs started from these events, with the raised effects they are held on, and call
+   * `startAgain`, which starts the replacing run and calls `ended` once it has ended. The waited-on
+   * effects and the looks the raised effects left stay up until then. The replacing run takes over
+   * one it submits again through the sequencer's update, going on from the look it shows, and the
+   * rest are removed when it ends, releasing waiters with `cancelled = true`. Effects the runs
+   * submitted without waiting stay up.
    */
-  public restartEventRuns(eventNodeIds: string[], startAgain: () => void): void {
-    const runs = [...this.activeContexts.values()].filter((c) =>
-      eventNodeIds.includes(c.eventNode.id),
+  public restartEventRuns(eventNodeIds: string[], startAgain: (ended: () => void) => void): void {
+    const runs = new Set(
+      [...this.activeContexts.values()]
+        .filter((c) => eventNodeIds.includes(c.eventNode.id))
+        .map((c) => c.id),
     )
-    this.awaitedEffects.handOver(runs.map((c) => c.id))
-    for (const eventNodeId of eventNodeIds) this.cancelContexts(eventNodeId)
-    startAgain()
-    for (const [name, layer] of this.awaitedEffects.takeUnclaimed()) {
-      this.sequencer.removeEffect(name, layer)
+    const cancel = (): Map<string, number> => {
+      for (const eventNodeId of eventNodeIds) this.cancelContexts(eventNodeId)
+      return this.releaseRaisedEffects(runs)
     }
+    this.awaitedEffects.restart(runs, eventNodeIds, cancel, startAgain)
   }
 
   /**
@@ -734,6 +739,11 @@ export abstract class BaseNodeExecutionEngine {
       context.dispose()
       this.activeContexts.delete(contextId)
     }
+  }
+
+  /** Cancel the raised effects holding these contexts open, returning what they leave showing. */
+  protected releaseRaisedEffects(_contextIds: ReadonlySet<string>): Map<string, number> {
+    return new Map()
   }
 
   /** Cancellation pre-step (cue flushes pending node activations). */
@@ -899,8 +909,11 @@ export abstract class BaseNodeExecutionEngine {
           )
         } else {
           this.submittedEffects.set(effectName, resolvedLayer)
+          const takingOver = this.awaitedEffects.claim(effectName)
           if (useSetEffect) {
             this.sequencer.setEffectUnblockedName(effectName, effect)
+          } else if (takingOver) {
+            this.sequencer.updateEffect(effectName, effect)
           } else {
             this.sequencer.addEffect(effectName, effect)
           }
@@ -986,8 +999,11 @@ export abstract class BaseNodeExecutionEngine {
         )
       } else {
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
+        const takingOver = this.awaitedEffects.claim(chainEffectName)
         if (useSetEffectChain) {
           this.sequencer.setEffectUnblockedName(chainEffectName, composedEffect)
+        } else if (takingOver) {
+          this.sequencer.updateEffect(chainEffectName, composedEffect)
         } else {
           this.sequencer.addEffectUnblockedName(chainEffectName, composedEffect)
         }
@@ -1083,6 +1099,8 @@ export abstract class BaseNodeExecutionEngine {
 
     const shouldBlock = this.isBlockingTiming(resolvedTiming)
     const useSetEffect = this.getAndConsumeInitialClearPolicy()
+    // Each move below replaces a running move of this name, taking over one a restarted run left.
+    this.awaitedEffects.claim(effectName)
 
     if (shouldBlock) {
       const settle = (cancelled: boolean): void => {
@@ -1157,10 +1175,11 @@ export abstract class BaseNodeExecutionEngine {
       this.awaitedEffects.settle(context.id, name)
       settle(cancelled)
     }
+    const takingOver = this.awaitedEffects.claim(name)
     let accepted: boolean
     if (useSetEffect) {
       accepted = this.sequencer.setEffectUnblockedNameWithCallback(name, effect, onComplete)
-    } else if (this.awaitedEffects.claim(name)) {
+    } else if (takingOver) {
       accepted = this.sequencer.updateEffectWithCallback(name, effect, onComplete)
     } else {
       accepted = this.sequencer.addEffectUnblockedNameWithCallback(name, effect, onComplete)
