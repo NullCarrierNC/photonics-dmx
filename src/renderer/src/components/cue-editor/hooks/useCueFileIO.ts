@@ -12,7 +12,7 @@ import type {
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
-import { fileBasename, firstByName, savedAsUserFile } from '../lib/cueUtils'
+import { fileBasename, firstByName } from '../lib/cueUtils'
 import {
   clearLastFilePathForMode,
   modeKeyFor,
@@ -232,7 +232,7 @@ export function useCueFileIO({
       const open = openDocRef.current
       if (!open || open.mode !== saved.mode || open.path !== saved.path) return
       const current = getUpdatedDocument() ?? open
-      setEditorDoc(savedAsUserFile(current, path))
+      setEditorDoc({ ...current, path })
       setFilename(fileBasename(path))
       rememberLastFilePath(path)
       setValidationErrors([])
@@ -264,9 +264,8 @@ export function useCueFileIO({
     const createOnly = editorDoc.path === null
     const saveFilename = createOnly ? `${snapshot.file.group.id}.json` : filename
 
-    // A saved file is the user's, so a newer shipped version never replaces it.
     if (snapshot.mode === 'effect') {
-      const effectContent = { ...snapshot.file, bundled: false }
+      const effectContent = snapshot.file
       try {
         const validation = await validateEffect({ content: effectContent })
         if (!validation.valid) {
@@ -293,7 +292,7 @@ export function useCueFileIO({
         return false
       }
     } else {
-      const cueContent = { ...snapshot.file, bundled: false }
+      const cueContent = snapshot.file
       try {
         const validation = await validateNodeCue({ content: cueContent })
         if (!validation.valid) {
