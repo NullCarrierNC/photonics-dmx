@@ -1018,6 +1018,27 @@ describe('Node cue validation', () => {
     })
     const withPalette = (initialValue: unknown) => withVariable('color-array', initialValue)
 
+    it.each(['min', 'pi'])('rejects a variable named %s, a built-in expression name', (name) => {
+      const file = withVariable('number', 0)
+      file.cues[0].variables[0].name = name
+
+      expect(validateNodeCueFile(file)).toEqual(
+        expect.objectContaining({
+          valid: false,
+          errors: expect.arrayContaining([
+            expect.stringMatching(/^\/cues\/0\/variables\/0\/name:/),
+          ]),
+        }),
+      )
+    })
+
+    it('accepts an event named like a built-in expression name', () => {
+      const file = validFile()
+      const events = [{ name: 'min' }]
+
+      expect(validateNodeCueFile({ ...file, cues: [{ ...validCue(), events }] }).valid).toBe(true)
+    })
+
     it('accepts a colour-array variable that starts as known colours', () => {
       expect(validateNodeCueFile(withPalette(['red', 'amber'])).valid).toBe(true)
     })
@@ -1043,6 +1064,15 @@ describe('Node cue validation', () => {
         ])
       },
     )
+
+    it('rejects a group variable named like a built-in expression name', () => {
+      const file = validFile()
+      const variables = [{ name: 'sqrt', type: 'number', scope: 'cue-group', initialValue: 0 }]
+
+      expect(validateNodeCueFile({ ...file, group: { ...file.group, variables } }).valid).toBe(
+        false,
+      )
+    })
 
     it('warns about a group variable that starts as a colour this version does not know', () => {
       const file = validFile()
@@ -1642,6 +1672,27 @@ describe('Node cue validation', () => {
           ],
         }),
       )
+    })
+
+    it('rejects an effect parameter named like a built-in expression name', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'effect-group', name: 'Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: { events: [{ id: 'e1', type: 'event', eventType: 'beat' }], actions: [] },
+            connections: [],
+            variables: [
+              { name: 'max', type: 'number', scope: 'cue', isParameter: true, initialValue: 1 },
+            ],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
     })
 
     it('rejects an effect whose light-array parameter starts with lights', () => {

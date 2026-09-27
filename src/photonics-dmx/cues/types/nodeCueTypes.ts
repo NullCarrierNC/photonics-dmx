@@ -130,7 +130,12 @@ export type {
   VariableLogicNode,
 } from './node/logicNodes'
 
-export { VARIABLE_NAME_PATTERN, VARIABLE_TYPES, isVariableName } from './node/variables'
+export {
+  RESERVED_VARIABLE_NAMES,
+  VARIABLE_NAME_PATTERN,
+  VARIABLE_TYPES,
+  isVariableName,
+} from './node/variables'
 export type {
   EventDefinition,
   ValueSource,

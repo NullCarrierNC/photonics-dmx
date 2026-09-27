@@ -29,7 +29,7 @@ export const VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/
  * Names no variable may take, since an expression reads them as its built-in functions and
  * constants. Event names are never read in an expression and may take them.
  */
-const RESERVED_VARIABLE_NAMES: readonly string[] = EXPRESSION_BUILTIN_NAMES
+export const RESERVED_VARIABLE_NAMES: readonly string[] = EXPRESSION_BUILTIN_NAMES
 
 /** A name that fits {@link VARIABLE_NAME_PATTERN} and is not a built-in expression name. */
 export function isVariableName(name: string): boolean {
