@@ -4,6 +4,7 @@ import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import { realPathOf } from '../../../helpers/realPath'
 import { writeFileAtomic } from '../../../helpers/atomicFileWrite'
+import type { NodeFileChanges } from './migrateOlderNodeFile'
 import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('BaseNodeFileLoader')
@@ -311,15 +312,24 @@ export abstract class BaseNodeFileLoader<
   }
 
   /**
-   * Write back a file a load brought forward from an older build, described by `notes`. The notes
-   * are reported as saved once the write lands. A failed write is reported as unsaved, and the
-   * next load brings the file forward again.
+   * Write back a file a load brought forward from an older build, with the `changes` the load
+   * made. The changes are reported as saved once the write lands. A file holding values this build
+   * does not know is left as it is, and so is one whose write fails. Both are reported as unsaved,
+   * and the next load reads them the same way again.
    */
   protected async writeMigratedFile(
     filePath: string,
     data: unknown,
-    notes: readonly string[],
+    changes: NodeFileChanges,
   ): Promise<Pick<BaseFileSummary<TMode>, 'migrations' | 'unsaved'>> {
+    const notes = changes.older
+    if (changes.unknown.length > 0) {
+      return {
+        unsaved: [
+          `Holds values this version does not know and is left as it is on disk: ${[...changes.unknown, ...notes].join(' ')}`,
+        ],
+      }
+    }
     if (notes.length === 0) return {}
     try {
       await this.writeSavedFile(filePath, JSON.stringify(data, null, 2), false)

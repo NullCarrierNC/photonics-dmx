@@ -28,13 +28,39 @@ function fillDiskPartway(): void {
   })
 }
 
+interface GraphJson {
+  name: string
+  cueType?: string
+  nodes: { actions: Array<{ timing: { easing?: { source: string; value: unknown } } }> }
+  variables?: Array<Record<string, unknown>>
+}
+
+interface LibraryJson {
+  bundled?: boolean
+  version: number
+  group: Record<string, unknown>
+  cues: GraphJson[]
+  effects: GraphJson[]
+}
+
 /** The v0.5.5-alpha.5 alt1 library as a user's copy of it, which a load brings forward. */
-function olderCueFileText(groupId: string): string {
-  const file = JSON.parse(
+function olderCueFile(groupId: string): LibraryJson {
+  const file: LibraryJson = JSON.parse(
     fs.readFileSync(path.join(HISTORICAL, 'v0.5.5-alpha.5', 'yarg-alt1.json'), 'utf-8'),
   )
   file.bundled = false
   file.group = { ...file.group, id: groupId, name: groupId, isDefault: false }
+  return file
+}
+
+const olderCueFileText = (groupId: string): string => JSON.stringify(olderCueFile(groupId), null, 2)
+
+/** The alt1 copy with an easing this build does not know, as a newer build would write it. */
+function newerCueFileText(groupId: string): string {
+  const file = olderCueFile(groupId)
+  const harmony = file.cues.find((cue) => cue.cueType === 'Harmony')
+  if (!harmony) throw new Error('the library has no Harmony cue')
+  harmony.nodes.actions[0].timing.easing = { source: 'literal', value: 'springOut' }
   return JSON.stringify(file, null, 2)
 }
 
@@ -165,6 +191,98 @@ describe('writing back cue and effect files a load brings forward', () => {
       expect(summary).toEqual(
         expect.objectContaining({ migrations: undefined, unsaved: [expect.any(String)] }),
       )
+    })
+  })
+
+  describe('a file holding values this version does not know', () => {
+    it('leaves a cue file as it is on disk and loads it as this version reads it', async () => {
+      const filePath = path.join(cuesDir, 'newer.json')
+      const original = newerCueFileText('newer')
+      fs.writeFileSync(filePath, original)
+
+      const result = await loader.loadAll()
+
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
+      expect(result).toEqual(
+        expect.objectContaining({
+          loaded: 1,
+          failed: 0,
+          migrations: [],
+          unsaved: [
+            "newer.json: Holds values this version does not know and is left as it is on disk: Easing 'springOut' in 'Harmony' is not one this version knows and plays as sinInOut. Unknown easing 'sin-out' in 'Harmony' now reads sinInOut.",
+          ],
+        }),
+      )
+      expect(yarg.getGroup('newer')?.cues.size).toBe(24)
+    })
+
+    it('leaves an effect file as it is on disk and loads it', async () => {
+      const filePath = path.join(effectsDir, 'my-effects.json')
+      const file: LibraryJson = JSON.parse(
+        fs.readFileSync(path.join(HISTORICAL, 'f3f851db', 'my-effects.json'), 'utf-8'),
+      )
+      file.effects[0].nodes.actions[0].timing.easing = { source: 'literal', value: 'springOut' }
+      const original = JSON.stringify(file, null, 2)
+      fs.writeFileSync(filePath, original)
+
+      const result = await effectLoader.loadAll()
+
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
+      expect(result).toEqual(
+        expect.objectContaining({
+          loaded: 1,
+          migrations: [],
+          unsaved: [
+            expect.stringMatching(
+              /^my-effects\.json: Holds values this version does not know .*'springOut' in 'Flash Colour'.*'beat-count'/,
+            ),
+          ],
+        }),
+      )
+      expect((await effectLoader.readEffectFilesByGroupId('yarg')).has('my-effects')).toBe(true)
+    })
+
+    it('leaves a file with a blend mode this version does not know as it is and flags the cue', async () => {
+      const filePath = path.join(cuesDir, 'newer.json')
+      const file = olderCueFile('newer')
+      const harmony = file.cues.find((cue) => cue.cueType === 'Harmony')
+      Object.assign(harmony?.nodes.actions[0] ?? {}, {
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'max' },
+          blendMode: { source: 'literal', value: 'screen' },
+        },
+      })
+      const original = JSON.stringify(file, null, 2)
+      fs.writeFileSync(filePath, original)
+
+      const result = await loader.loadAll()
+
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
+      expect(result).toEqual(
+        expect.objectContaining({
+          loaded: 1,
+          migrations: [],
+          unsaved: [
+            expect.stringMatching(
+              /^newer\.json: Holds values .* Blend mode 'screen' in 'Harmony' is not one this version knows\./,
+            ),
+          ],
+        }),
+      )
+      const [summary] = loader.getSummary().yarg
+      expect(summary.errors).toEqual([expect.stringContaining('screen')])
+    })
+
+    it('refuses a file of a newer file version and leaves it as it is', async () => {
+      const filePath = path.join(cuesDir, 'newer.json')
+      const original = JSON.stringify({ ...olderCueFile('newer'), version: 2 }, null, 2)
+      fs.writeFileSync(filePath, original)
+
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 0, failed: 1, migrations: [] }))
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
     })
   })
 

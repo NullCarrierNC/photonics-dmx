@@ -2,7 +2,8 @@
  * Brings a parsed cue or effect file an older build wrote onto what this build accepts, before
  * validation: a cue with no kind reads as lighting, a retired blend mode as replace, an unknown
  * easing as the default, an unused wait count is dropped, a variable name the editor once accepted
- * is renamed with every use of it, and an initial value takes its type.
+ * is renamed with every use of it, and an initial value takes its type. Values this build does not
+ * know are noted apart from what an older build wrote.
  */
 import { VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { VariableType } from '../../types/nodeCueTypes'
@@ -20,6 +21,20 @@ const isObject = (value: unknown): value is JsonObject =>
 
 /** Blend modes the editor offered up to v0.5.5. Both blend as replace. */
 const RETIRED_BLEND_MODES: ReadonlySet<unknown> = new Set(['multiply', 'overlay'])
+
+/** Easing names outside every build's easing set that libraries older builds shipped stored. */
+const OLDER_EASINGS: ReadonlySet<unknown> = new Set(['sin-out'])
+
+/** What a load changed in a parsed file, one note per kind of change. */
+export interface NodeFileChanges {
+  /** Changes to what an older build wrote. */
+  older: string[]
+  /**
+   * Values this build does not know, each read as what it plays as here or left for the compiler
+   * to report. A newer build may have written them, so the file is left as it is on disk.
+   */
+  unknown: string[]
+}
 
 /** Logic node fields that hold one variable name. */
 const NAME_FIELDS = [
@@ -93,22 +108,29 @@ function retireBlendModes(graphs: readonly JsonObject[]): string | null {
 }
 
 /**
- * An easing literal the runtime does not know plays as the default easing, so it is stored as that.
- * The oldest files hold the easing as a bare string, which validation later wraps.
+ * An easing literal the runtime does not know plays as the default easing, so it reads as that.
+ * Those `fromOlderBuild` picks out are the names older builds shipped, and the rest are names this
+ * build does not know. The oldest files hold the easing as a bare string, which validation later
+ * wraps.
  */
-function replaceUnknownEasings(graphs: readonly JsonObject[]): string | null {
+function replaceUnknownEasings(
+  graphs: readonly JsonObject[],
+  fromOlderBuild: boolean,
+): string | null {
   const values = new Set<string>()
   const changed = new Set<string>()
+  const replaces = (value: unknown): boolean =>
+    literalIssue('easing', value) !== null && OLDER_EASINGS.has(value) === fromOlderBuild
   for (const { action, graph } of actionsOf(graphs)) {
     const timing = isObject(action.timing) ? action.timing : null
     if (!timing) continue
     const easing = timing.easing
     if (isObject(easing) && easing.source === 'literal') {
-      if (literalIssue('easing', easing.value) === null) continue
+      if (!replaces(easing.value)) continue
       values.add(`'${String(easing.value)}'`)
       easing.value = DEFAULT_EASING
     } else if (typeof easing === 'string') {
-      if (literalIssue('easing', easing) === null) continue
+      if (!replaces(easing)) continue
       values.add(`'${easing}'`)
       timing.easing = DEFAULT_EASING
     } else {
@@ -116,8 +138,31 @@ function replaceUnknownEasings(graphs: readonly JsonObject[]): string | null {
     }
     changed.add(graph)
   }
-  return changed.size > 0
-    ? `Unknown easing ${[...values].join(', ')} in ${[...changed].join(', ')} now reads ${DEFAULT_EASING}.`
+  if (changed.size === 0) return null
+  const where = `${[...values].join(', ')} in ${[...changed].join(', ')}`
+  return fromOlderBuild
+    ? `Unknown easing ${where} now reads ${DEFAULT_EASING}.`
+    : `Easing ${where} is not one this version knows and plays as ${DEFAULT_EASING}.`
+}
+
+/**
+ * An action blend mode named in a literal this build does not know stays as it is, and the
+ * compiler reports the action. The retired blend modes are older and read as replace.
+ */
+function findUnknownBlendModes(graphs: readonly JsonObject[]): string | null {
+  const values = new Set<string>()
+  const found = new Set<string>()
+  for (const { action, graph } of actionsOf(graphs)) {
+    const source = isObject(action.color) ? action.color.blendMode : null
+    if (!isObject(source) || source.source !== 'literal') continue
+    const { value } = source
+    if (typeof value !== 'string' || value === '' || RETIRED_BLEND_MODES.has(value)) continue
+    if (literalIssue('blend-mode', value) === null) continue
+    values.add(`'${value}'`)
+    found.add(graph)
+  }
+  return found.size > 0
+    ? `Blend mode ${[...values].join(', ')} in ${[...found].join(', ')} is not one this version knows.`
     : null
 }
 
@@ -267,19 +312,25 @@ function renameVariables(file: JsonObject, graphs: readonly JsonObject[]): strin
   return `Variable names must use letters, digits and underscores: ${pairs.join(', ')}.`
 }
 
+const notesOf = (notes: ReadonlyArray<string | null>): string[] =>
+  notes.filter((note): note is string => note !== null)
+
 /**
- * Rewrites what an older build wrote in a parsed cue or effect file, in place. Returns one note per
- * kind of change, and none for a file already on the current rules.
+ * Rewrites a parsed cue or effect file in place onto what this build reads: what an older build
+ * wrote, and values this build does not know. Returns the notes for each, and none for a file
+ * already on the current rules.
  */
-export function migrateOlderNodeFile(file: unknown): string[] {
-  if (!isObject(file)) return []
+export function migrateOlderNodeFile(file: unknown): NodeFileChanges {
+  if (!isObject(file)) return { older: [], unknown: [] }
   const graphs = graphsOf(file)
-  return [
+  const unknown = notesOf([replaceUnknownEasings(graphs, false), findUnknownBlendModes(graphs)])
+  const older = notesOf([
     defaultCueKinds(file),
     retireBlendModes(graphs),
-    replaceUnknownEasings(graphs),
+    replaceUnknownEasings(graphs, true),
     dropUncountedWaitCounts(graphs),
     renameVariables(file, graphs),
     conformInitialValues(declarationsOf(file, graphs)),
-  ].filter((note): note is string => note !== null)
+  ])
+  return { older, unknown }
 }

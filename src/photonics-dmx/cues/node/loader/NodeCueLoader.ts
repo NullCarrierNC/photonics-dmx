@@ -281,7 +281,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   ): Promise<NodeCueFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
-    const migrations = migrateOlderNodeFile(parsed)
+    const changes = migrateOlderNodeFile(parsed)
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -301,7 +301,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const compileErrors: string[] = []
     const compileWarnings: string[] = []
     await this.registerFile(filePath, mode, file, compileErrors, compileWarnings)
-    const saved = await this.writeMigratedFile(filePath, parsed, migrations)
+    const saved = await this.writeMigratedFile(filePath, parsed, changes)
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
     const motionCueCount = file.cues.filter((c) => c.kind === 'motion').length

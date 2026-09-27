@@ -160,7 +160,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     this.groupHolders.delete(path.resolve(filePath))
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
-    const migrations = migrateOlderNodeFile(parsed)
+    const changes = migrateOlderNodeFile(parsed)
     const validation = validateEffectFileInFolder(mode, parsed)
 
     if (!validation.valid) {
@@ -200,7 +200,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       }
     }
 
-    const saved = await this.writeMigratedFile(filePath, parsed, migrations)
+    const saved = await this.writeMigratedFile(filePath, parsed, changes)
 
     const summary: EffectFileSummary = {
       path: filePath,
