@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 2,
+  "cueVersion": 3,
   "mode": "yarg",
   "group": {
     "id": "yarg-motion-default",
@@ -2280,7 +2280,7 @@
           {
             "id": "cbh-event-beat",
             "type": "event",
-            "eventType": "cue-called"
+            "eventType": "beat"
           }
         ],
         "actions": [
@@ -2415,66 +2415,6 @@
         ],
         "logic": [
           {
-            "id": "cbh-init-tick",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhTick",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cbh-init-mod",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhMod",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cbh-init-flip",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhFlip",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cbh-init-even-bearing",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhEvenBearing",
-            "valueType": "string",
-            "value": {
-              "source": "literal",
-              "value": "stage-right"
-            }
-          },
-          {
-            "id": "cbh-init-odd-bearing",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhOddBearing",
-            "valueType": "string",
-            "value": {
-              "source": "literal",
-              "value": "stage-left"
-            }
-          },
-          {
             "id": "cbh-init-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
@@ -2537,7 +2477,7 @@
             },
             "right": {
               "source": "literal",
-              "value": 0
+              "value": 1
             }
           },
           {
@@ -2648,26 +2588,6 @@
       "connections": [
         {
           "from": "cbh-event-start",
-          "to": "cbh-init-tick"
-        },
-        {
-          "from": "cbh-init-tick",
-          "to": "cbh-init-mod"
-        },
-        {
-          "from": "cbh-init-mod",
-          "to": "cbh-init-flip"
-        },
-        {
-          "from": "cbh-init-flip",
-          "to": "cbh-init-even-bearing"
-        },
-        {
-          "from": "cbh-init-even-bearing",
-          "to": "cbh-init-odd-bearing"
-        },
-        {
-          "from": "cbh-init-odd-bearing",
           "to": "cbh-init-beat-ms"
         },
         {
@@ -2751,26 +2671,6 @@
           "cbh-action-odd": {
             "x": 90,
             "y": 820
-          },
-          "cbh-init-tick": {
-            "x": -386.0237964832457,
-            "y": 27.614523878249543
-          },
-          "cbh-init-mod": {
-            "x": -383.0692370520922,
-            "y": 89.77371961190124
-          },
-          "cbh-init-flip": {
-            "x": -387.50107619882243,
-            "y": 159.31931392343654
-          },
-          "cbh-init-even-bearing": {
-            "x": -412.6148313636275,
-            "y": 230.3421879505487
-          },
-          "cbh-init-odd-bearing": {
-            "x": -405.2284327857437,
-            "y": 302.8423416932375
           },
           "cbh-init-beat-ms": {
             "x": -384.54651676766895,
