@@ -108,7 +108,7 @@ export abstract class BaseNodeExecutionEngine {
   protected variableDefinitions: VariableDefinition[]
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   protected submittedEffects: Map<string, number> = new Map()
-  private readonly awaitedEffects = new AwaitedEffects((name, layer) =>
+  protected readonly awaitedEffects = new AwaitedEffects((name, layer) =>
     this.sequencer.removeEffect(name, layer),
   )
   /** motion-pattern effect names for cancelAll → removeMotionPattern. */
