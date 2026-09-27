@@ -10,6 +10,7 @@ import { TrackedLight } from '../../../types'
 import { NodeCueMode } from '../../types/nodeCueTypes'
 import { parsePatternPropertyId, configLightGroupToLocationGroups } from '../utils/patternUtils'
 import { getCueDomain } from '../../domains'
+import { CONFIG_LIGHT_ARRAY_GROUPS } from '../../../constants/nodeConstants'
 
 /**
  * Resolve a cue-data property against the family the running cue belongs to.
@@ -23,7 +24,7 @@ export function extractCueDataValue(
   cueData: CueData | AudioCueData,
   cueId: string,
   mode: NodeCueMode,
-): number | string | boolean {
+): number | string | boolean | undefined {
   return getCueDomain(mode).extractCueData(property, cueData, cueId)
 }
 
@@ -44,14 +45,11 @@ export function extractConfigDataValue(
       return lightManager.getLightsInGroup('front').length
     case 'back-lights-count':
       return lightManager.getLightsInGroup('back').length
-    case 'all-lights-array':
-      return lightManager.getLightsInGroup(['front', 'back'])
-    case 'front-lights-array':
-      return lightManager.getLightsInGroup('front')
-    case 'back-lights-array':
-      return lightManager.getLightsInGroup('back')
-    case 'strobe-lights-array':
-      return lightManager.getLightsInGroup('strobe')
+  }
+
+  const wholeGroups = CONFIG_LIGHT_ARRAY_GROUPS.get(property)
+  if (wholeGroups) {
+    return lightManager.getLightsInGroup([...wholeGroups])
   }
 
   // Try to parse as a pattern filter property (DRY approach)

@@ -14,10 +14,19 @@ import { AudioCueRegistry, type AudioCueGroup } from '../../registries/AudioCueR
 import { AudioCueType } from '../../types/audioCueTypes'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
-import { migrateOlderNodeFile, type EffectFileRenames } from './migrateOlderNodeFile'
+import {
+  migrateOlderNodeFile,
+  type EffectFileRenames,
+  type EffectLookup,
+  type NodeFileChanges,
+} from './migrateOlderNodeFile'
 import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
 import type { EffectReference } from '../../types/nodeCueTypes'
-import { buildEffectRegistry, type EffectFilesByMode } from './effectRegistryBuilder'
+import {
+  buildEffectRegistry,
+  readEffectFiles,
+  type EffectFilesByMode,
+} from './effectRegistryBuilder'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import {
@@ -187,7 +196,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const { filePath: resolvedPath, mode } = this.resolveExistingCueFilePath(filePath)
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed: unknown = JSON.parse(data)
-    migrateOlderNodeFile(parsed, this.effectFileRenames(mode))
+    await this.migrateOlderFile(parsed, mode)
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -196,6 +205,26 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     return validation.data
+  }
+
+  /**
+   * Rewrite a parsed cue file in place onto what this build reads, renaming its raisers' parameters
+   * as the effect files they raise from were renamed and checking its raisers against those effects.
+   * The mode is the file's own when the caller gives none. Returns the notes of what changed.
+   */
+  public async migrateOlderFile(
+    parsed: unknown,
+    mode?: NodeCueMode,
+    effectFiles: EffectFilesByMode = this.effectFilesPass ?? new Map(),
+  ): Promise<NodeFileChanges> {
+    const { effectLoader } = this.options
+    const declared = typeof parsed === 'object' && parsed !== null && 'mode' in parsed
+    const fileMode = mode ?? this.getModes().find((m) => declared && parsed.mode === m)
+    if (!effectLoader || !fileMode) return migrateOlderNodeFile(parsed)
+    const files = await readEffectFiles(effectLoader, fileMode, effectFiles)
+    const effects: EffectLookup = (effectFileId, effectId) =>
+      files.get(effectFileId)?.effects.find((effect) => effect.id === effectId)
+    return migrateOlderNodeFile(parsed, this.effectFileRenames(fileMode), effects)
   }
 
   /**
@@ -276,7 +305,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   ): Promise<NodeCueFileSummary> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
-    const changes = migrateOlderNodeFile(parsed, this.effectFileRenames(mode))
+    const effectFiles = this.effectFilesPass ?? new Map()
+    const changes = await this.migrateOlderFile(parsed, mode, effectFiles)
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -289,7 +319,12 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     // Per-cue compile failures go on the file's summary, where the cue editor lists them.
     const compileErrors: string[] = []
     const compileWarnings: string[] = []
-    await this.registerFile(filePath, mode, file, { compileErrors, compileWarnings, displaced })
+    await this.registerFile(filePath, mode, file, {
+      compileErrors,
+      compileWarnings,
+      displaced,
+      effectFiles,
+    })
     const saved = await this.writeMigratedFile(filePath, parsed, changes)
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
@@ -334,9 +369,14 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     filePath: string,
     mode: NodeCueMode,
     file: NodeCueFile,
-    build: { compileErrors: string[]; compileWarnings: string[]; displaced?: string },
+    build: {
+      compileErrors: string[]
+      compileWarnings: string[]
+      displaced?: string
+      effectFiles: EffectFilesByMode
+    },
   ): Promise<void> {
-    const { compileErrors, compileWarnings, displaced } = build
+    const { compileErrors, compileWarnings, displaced, effectFiles } = build
     const effectFileIds = effectFileIdsOf(file)
     const strategy = strategyForFile(file)
     if (strategy) {
@@ -354,7 +394,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       return
     }
 
-    const context = this.buildContext(this.effectFilesPass ?? new Map())
+    const context = this.buildContext(effectFiles)
 
     // The group is built while the previous one keeps serving, and swapped in without an await
     // between taking the old group out and putting the new one in, so no cue resolves against a

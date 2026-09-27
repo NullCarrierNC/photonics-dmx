@@ -221,6 +221,23 @@ function actionLiteralFields(action: ActionNode): ActionLiteralField[] {
   ]
 }
 
+/**
+ * Each ruled field of an action that reads a light-array variable as text, which it reads as none.
+ * A light array in the groups field targets its own lights.
+ */
+export function actionLightArrayReads(
+  action: ActionNode,
+  variables: ReadonlyArray<{ name: string; type: string }>,
+): { field: string; issue: ValueIssue }[] {
+  return actionLiteralFields(action).flatMap(({ rule, field, source }) => {
+    if (rule === 'groups' || source?.source !== 'variable') return []
+    const variable = variables.find((v) => v.name === source.name)
+    const issue =
+      variable?.type === 'light-array' ? variableIssue(source.name, 'string', variables) : null
+    return issue ? [{ field, issue }] : []
+  })
+}
+
 /** Each issue the rules find in an action's literals, for a cue of `mode` when it is known. */
 export function actionLiteralIssues(
   action: ActionNode,
@@ -464,7 +481,8 @@ function parameterTypeIssue(type: VariableType, value: unknown): ValueIssue | nu
 
 /**
  * Whether a raiser passes `parameter` a value the effect can use. The effect falls back to a default
- * for one it cannot, so every finding is a warning and an older file keeps loading.
+ * for most it cannot, which is a warning, and an older file keeps loading. A light array passed as
+ * group names names no group, so the effect lights nothing, and that is an error.
  */
 export function raiserParameterIssue(
   parameter: EffectParameter,
@@ -477,6 +495,16 @@ export function raiserParameterIssue(
 ): ValueIssue | null {
   if (!source) return null
   if (source.source === 'variable') {
+    const variable = context.variables.find((v) => v.name === source.name)
+    if (
+      variable?.type === 'light-array' &&
+      parameter.type !== 'light-array' &&
+      parameterRules(parameter, context.effectActions).includes('groups')
+    ) {
+      return error(
+        `'${source.name}' is a light-array variable, and this parameter takes group names, so it lights nothing`,
+      )
+    }
     return asWarning(variableIssue(source.name, parameter.type, context.variables))
   }
   const typeIssue = parameterTypeIssue(parameter.type, source.value)

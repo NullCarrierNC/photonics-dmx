@@ -88,7 +88,7 @@ export function resolveBoolean(
   return value === true || value === 'true'
 }
 
-/** A string, cue-type, colour or event value as text. */
+/** A string, cue-type, colour or event value as text. A light array has no text, and warns. */
 export function resolveString(
   source: ValueSource | undefined,
   context: ExecutionContext,
@@ -96,7 +96,10 @@ export function resolveString(
 ): string {
   if (!source) return ''
   if (source.source === 'literal') return String(source.value)
-  return String(lookupVariable(source.name, context, variableDefinitions).value)
+  const held = lookupVariable(source.name, context, variableDefinitions)
+  return held.type === 'light-array'
+    ? context.unknownValues.lightArrayAsText(source.name)
+    : String(held.value)
 }
 
 function resolveLightArray(
@@ -162,6 +165,13 @@ export class UnknownValueWarnings {
 
   constructor(private readonly cueId: string) {}
 
+  /** Warns `message` the first time `key` is reported. */
+  private reportOnce(key: string, message: string): void {
+    if (this.reported.has(key)) return
+    this.reported.add(key)
+    log.warn(message)
+  }
+
   /**
    * Warns that `value` is not a known `kind`. An undefined value is a source with nothing to read,
    * such as a variable the caller could not look up, and takes its fallback quietly.
@@ -169,10 +179,16 @@ export class UnknownValueWarnings {
   report(kind: string, value: unknown, outcome: string): void {
     if (value === undefined) return
     const text = String(value)
-    const key = `${kind}:${text}`
-    if (this.reported.has(key)) return
-    this.reported.add(key)
-    log.warn(`Unknown ${kind} "${text}" in cue ${this.cueId}, ${outcome}`)
+    this.reportOnce(`${kind}:${text}`, `Unknown ${kind} "${text}" in cue ${this.cueId}, ${outcome}`)
+  }
+
+  /** The text a light-array variable read as text gives, which is none. Warns once per variable. */
+  lightArrayAsText(name: string): string {
+    this.reportOnce(
+      `light-array text:${name}`,
+      `Light-array variable '${name}' read as text in cue ${this.cueId}, which reads as no text`,
+    )
+    return ''
   }
 }
 

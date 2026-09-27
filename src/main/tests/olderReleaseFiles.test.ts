@@ -64,6 +64,9 @@ const noKind = (file: string): string =>
 
 const harmonyEasing = "yarg-alt1.json: Unknown easing 'sin-out' in 'Harmony' now reads sinInOut."
 
+const dischordGroups =
+  "yarg-alt1.json: A light array passed where an effect takes group names now passes the names of its groups: 'Dischord' raiser 'y1-dischord-blue' lights is now 'front,back'."
+
 /** A dedicated strobe row the layout editor gave the channels of an RGB template. */
 const strobeRowRepairs = (at: string, withoutStrobeChannel: boolean): string[] => [
   ...(withoutStrobeChannel ? [`repaired: ${at}.channels.strobeChannel is missing`] : []),
@@ -101,7 +104,7 @@ const EXPECTED: Record<string, Expected> = {
     retired: ['audio-motion-fast.json', 'yarg-motion-fast.json'],
   },
   'v0.6.1-alpha.6': {
-    cues: [harmonyEasing],
+    cues: [harmonyEasing, dischordGroups],
     // Seeded by these builds and shipped by none since, so startup retires it. Its action waits on
     // 'audio-trigger', which this build does not read as a wait condition.
     refused: [
@@ -115,9 +118,9 @@ const EXPECTED: Record<string, Expected> = {
       ...inLayout(strobeRowRepairs('strobeLights[0]', false)),
       ...inRigs(strobeRowRepairs('rigs[0].config.strobeLights[0]', false)),
     ],
-    cues: [harmonyEasing],
+    cues: [harmonyEasing, dischordGroups],
   },
-  'v0.7.0-alpha.7': { cues: [harmonyEasing] },
+  'v0.7.0-alpha.7': { cues: [harmonyEasing, dischordGroups] },
   'f3f851db': {
     effects: [
       "my-effects.json: Variable names must use letters, digits and underscores: 'beat-count' is now 'beat_count'.",

@@ -41,12 +41,15 @@ export interface CueDomainDescriptor extends CueVocabulary {
    * `extraTypes` carries the types a registry has learnt at runtime, which only audio uses.
    */
   cueTypesFor(kind: NodeCueKind, ctx: { extraTypes: readonly string[] }): readonly string[]
-  /** Resolve one cue-data property against this family's frame shape. */
+  /**
+   * Resolve one cue-data property against this family's frame shape, or undefined for a frame field
+   * the frame does not carry.
+   */
   extractCueData(
     property: string,
     cueData: CueData | AudioCueData,
     cueId: string,
-  ): number | string | boolean
+  ): number | string | boolean | undefined
 }
 
 /**
@@ -58,7 +61,7 @@ const netRuntime = {
   family: 'net' as const,
   isEventTriggered: isNetEventTriggered,
   extractCueData: (property: string, cueData: CueData | AudioCueData, cueId: string) =>
-    extractNetCueDataValue(property as NetCueDataProperty, cueData as CueData, cueId),
+    extractNetCueDataValue(property as NetCueDataProperty, cueData, cueId),
 }
 
 export const CUE_DOMAIN_DESCRIPTORS: Record<NodeCueMode, CueDomainDescriptor> = {

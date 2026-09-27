@@ -2,17 +2,21 @@
  * Brings a parsed cue or effect file an older build wrote onto what this build accepts, before
  * validation: a cue with no kind reads as lighting, a retired blend mode as replace, an unknown
  * easing as the default, an unused wait count is dropped, a variable name the editor once accepted
- * is renamed with every use of it, and an initial value other than a colour takes its type. Values
- * this build does not know are noted apart from what an older build wrote.
+ * is renamed with every use of it, an initial value other than a colour takes its type, and a light
+ * array passed to an effect's group names passes the names of its groups. Values this build does
+ * not know are noted apart from what an older build wrote.
  */
 import { VARIABLE_NAME_PATTERN, VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
-import type { VariableType } from '../../types/nodeCueTypes'
+import type { EffectDefinition, VariableType } from '../../types/nodeCueTypes'
+import { LOCATION_OPTIONS } from '../../../types'
+import { CONFIG_LIGHT_ARRAY_GROUPS } from '../../../constants/nodeConstants'
 import { renameExpressionVariables } from '../runtime/expressionEvaluator'
 import {
   DEFAULT_EASING,
   initialValueAsRead,
   initialValueIssue,
   literalIssue,
+  parameterRules,
 } from '../cueValueRules'
 
 type JsonObject = Record<string, unknown>
@@ -391,6 +395,100 @@ function renameVariables(
   ]
 }
 
+/** The effect a cue's reference names, by effect file group id and effect id. */
+export type EffectLookup = (effectFileId: string, effectId: string) => EffectDefinition | undefined
+
+/** Logic node fields that read a variable without writing it. */
+const READ_ONLY_NAME_FIELDS: ReadonlySet<string> = new Set(['sourceVariable'])
+
+/** Whether a logic node can write variable `name`. */
+function writesVariable(node: JsonObject, name: string): boolean {
+  const named = NAME_FIELDS.some(
+    (field) => !READ_ONLY_NAME_FIELDS.has(field) && node[field] === name,
+  )
+  const assigned =
+    Array.isArray(node.assignments) &&
+    node.assignments.some((assignment) => isObject(assignment) && assignment.varName === name)
+  return named || assigned
+}
+
+/**
+ * The groups every light of light-array variable `name` comes from, when each node in `graphs` that
+ * writes it reads a whole-group array of the rig configuration. Null when any other node writes it,
+ * or none does.
+ */
+function heldGroups(name: string, graphs: readonly JsonObject[]): string[] | null {
+  const groups = new Set<string>()
+  let written = false
+  for (const graph of graphs) {
+    const logic = isObject(graph.nodes) ? graph.nodes.logic : undefined
+    for (const node of Array.isArray(logic) ? logic.filter(isObject) : []) {
+      if (!writesVariable(node, name)) continue
+      const held =
+        node.logicType === 'config-data' && typeof node.dataProperty === 'string'
+          ? CONFIG_LIGHT_ARRAY_GROUPS.get(node.dataProperty)
+          : undefined
+      if (!held) return null
+      held.forEach((group) => groups.add(group))
+      written = true
+    }
+  }
+  return written ? LOCATION_OPTIONS.filter((group) => groups.has(group)) : null
+}
+
+/** The declared variables a cue reads, its own before the group's it shadows. */
+function variablesOf(file: JsonObject, cue: JsonObject): JsonObject[] {
+  const own = Array.isArray(cue.variables) ? cue.variables.filter(isObject) : []
+  const group = isObject(file.group) ? file.group.variables : undefined
+  return [...own, ...(Array.isArray(group) ? group.filter(isObject) : [])]
+}
+
+/**
+ * Builds up to v0.7.0 shipped raisers passing a light-array variable to an effect parameter that
+ * names the groups its actions target, which reads the lights as text naming no group. The raiser
+ * passes the names of the groups the variable's lights come from, where every write of it says.
+ */
+function nameRaisedLightArrayGroups(file: JsonObject, effects: EffectLookup): string | null {
+  const cues = Array.isArray(file.cues) ? file.cues.filter(isObject) : []
+  const changed: string[] = []
+  for (const cue of cues) {
+    const raisers = isObject(cue.nodes) ? cue.nodes.effectRaisers : undefined
+    const references = Array.isArray(cue.effects) ? cue.effects.filter(isObject) : []
+    const variables = variablesOf(file, cue)
+    for (const raiser of Array.isArray(raisers) ? raisers.filter(isObject) : []) {
+      const reference = references.find((ref) => ref.effectId === raiser.effectId)
+      const effect =
+        reference &&
+        typeof reference.effectFileId === 'string' &&
+        typeof raiser.effectId === 'string'
+          ? effects(reference.effectFileId, raiser.effectId)
+          : undefined
+      if (!effect || !isObject(raiser.parameterValues)) continue
+      const effectActions = effect.nodes?.actions ?? []
+      for (const [key, source] of Object.entries(raiser.parameterValues)) {
+        if (!isObject(source) || source.source !== 'variable') continue
+        const variable = variables.find((v) => v.name === source.name)
+        const parameter = effect.variables?.find((v) => v.isParameter && v.name === key)
+        if (variable?.type !== 'light-array' || !parameter || parameter.type === 'light-array') {
+          continue
+        }
+        if (!parameterRules(parameter, effectActions).includes('groups')) continue
+        // A group variable is shared by every cue in the file, so any of them may write it.
+        const writers = variable.scope === 'cue' ? [cue] : cues
+        const groups = heldGroups(String(source.name), writers)
+        if (!groups) continue
+        raiser.parameterValues[key] = { source: 'literal', value: groups.join(',') }
+        changed.push(
+          `${labelOf(cue)} raiser '${String(raiser.id)}' ${key} is now '${groups.join(',')}'`,
+        )
+      }
+    }
+  }
+  return changed.length > 0
+    ? `A light array passed where an effect takes group names now passes the names of its groups: ${changed.join(', ')}.`
+    : null
+}
+
 /**
  * A note naming each rename once. A raiser key follows the effect it raises, so it can take
  * another name than a variable of the same name.
@@ -410,12 +508,13 @@ const notesOf = (notes: ReadonlyArray<string | null>): string[] =>
 /**
  * Rewrites a parsed cue or effect file in place onto what this build reads: what an older build
  * wrote, and values this build does not know. `effectFileRenames` gives the renames of the effect
- * files a cue raises from. Returns the notes for each, and none for a file already on the current
- * rules.
+ * files a cue raises from, and with `effects` a cue file's raisers are also checked against the
+ * effects they raise. Returns the notes for each, and none for a file already on the current rules.
  */
 export function migrateOlderNodeFile(
   file: unknown,
   effectFileRenames?: EffectFileRenames,
+  effects?: EffectLookup,
 ): NodeFileChanges {
   if (!isObject(file)) return { older: [], unknown: [] }
   const graphs = graphsOf(file)
@@ -427,6 +526,7 @@ export function migrateOlderNodeFile(
     dropUncountedWaitCounts(graphs),
     ...renameVariables(file, graphs, effectFileRenames),
     conformInitialValues(declarationsOf(file, graphs)),
+    effects ? nameRaisedLightArrayGroups(file, effects) : null,
   ])
   return { older, unknown }
 }

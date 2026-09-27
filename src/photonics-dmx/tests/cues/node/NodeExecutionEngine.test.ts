@@ -1228,11 +1228,13 @@ describe('NodeExecutionEngine', () => {
         { id: 'back1', position: 0, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
       ]
 
-      mockLightManager.getLightsInGroup = jest.fn((groups: string | string[]) => {
-        if (groups === 'front') return mockFrontLights
-        if (groups === 'back') return mockBackLights
-        return []
-      })
+      mockLightManager.getLightsInGroup = jest.fn((groups: string | string[]) =>
+        [groups].flat().flatMap((group) => {
+          if (group === 'front') return mockFrontLights
+          if (group === 'back') return mockBackLights
+          return []
+        }),
+      )
 
       const config1: LogicNode = {
         id: 'config1',

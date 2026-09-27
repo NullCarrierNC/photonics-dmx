@@ -85,8 +85,9 @@ export class ActionEffectFactory {
 
   /**
    * The lights an action targets. A light-array variable in the groups slot names its own lights
-   * and skips the filter. Groups and a filter held in any other variable read its value, and text
-   * naming neither warns under the cue's own warnings.
+   * and skips the filter. Groups and a filter held in any other variable read its value, a light
+   * array in the filter slot reads as no text, and text naming neither warns under the cue's own
+   * warnings.
    */
   public static resolveLights(
     lightManager: DmxLightManager,
@@ -94,8 +95,13 @@ export class ActionEffectFactory {
     unknownValues: UnknownValueWarnings,
     variableResolver?: (name: string) => VariableValue | undefined,
   ): TrackedLight[] {
-    const read = (source: ValueSource): unknown =>
-      source.source === 'variable' ? variableResolver?.(source.name)?.value : source.value
+    const read = (source: ValueSource): unknown => {
+      if (source.source === 'literal') return source.value
+      const held = variableResolver?.(source.name)
+      return held?.type === 'light-array'
+        ? unknownValues.lightArrayAsText(source.name)
+        : held?.value
+    }
 
     if (target.groups.source === 'variable') {
       const held = variableResolver?.(target.groups.name)
