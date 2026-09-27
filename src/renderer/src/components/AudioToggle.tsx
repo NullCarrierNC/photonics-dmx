@@ -29,7 +29,8 @@ const AudioToggle = ({ notReady = false, disabled = false, className }: AudioTog
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
   const [gameModeSaving, setGameModeSaving] = useState(false)
   const labelId = useId()
-  const held = isRunSwitchHeld(isAudioEnabled, notReady, isYargEnabled || isRb3Enabled || disabled)
+  // Only one listener runs at a time, so a game listener holds audio off.
+  const held = isRunSwitchHeld(isAudioEnabled, notReady || isYargEnabled || isRb3Enabled, disabled)
 
   const refreshGameMode = useCallback(async () => {
     try {

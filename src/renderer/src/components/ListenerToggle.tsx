@@ -39,15 +39,15 @@ interface ListenerToggleProps {
 }
 
 /**
- * The switch for one game listener. Only one listener runs at a time, so the switch is held while
- * the other game listener or audio runs.
+ * The switch for one game listener. Only one listener runs at a time, so a stopped switch is held
+ * while the other game listener or audio runs.
  */
 const ListenerToggle = ({ listener, notReady = false, disabled = false }: ListenerToggleProps) => {
   const { name, enabledAtom, otherAtom, enable, disable } = LISTENERS[listener]
   const [isEnabled, setIsEnabled] = useAtom(enabledAtom)
   const isOtherEnabled = useAtomValue(otherAtom)
   const isAudioEnabled = useAtomValue(audioListenerEnabledAtom)
-  const held = isRunSwitchHeld(isEnabled, notReady, isOtherEnabled || isAudioEnabled || disabled)
+  const held = isRunSwitchHeld(isEnabled, notReady || isOtherEnabled || isAudioEnabled, disabled)
 
   const handleToggle = () => {
     const newState = !isEnabled
