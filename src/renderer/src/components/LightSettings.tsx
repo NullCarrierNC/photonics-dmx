@@ -15,20 +15,13 @@ import {
   normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
 import { isStorableBrightnessScale } from '../../../photonics-dmx/helpers/brightnessScaling'
-import { extraChannelDisplayLabel } from './lightChannelDisplay'
+import { STROBE_VALUE_FIELDS, extraChannelDisplayLabel } from './lightChannelDisplay'
 import { withChannelNumber, withFixtureType, withStrobeChannelOption } from './fixtureTemplateEdits'
 import { DraftNumberField } from './controls/DraftField'
 
 function isFixtureConfigKey(name: string): name is keyof FixtureConfig {
   return name in DEFAULT_MOVING_HEAD_FIXTURE_CONFIG
 }
-
-const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> = [
-  { key: 'slow', label: 'Strobe Slow' },
-  { key: 'medium', label: 'Strobe Medium' },
-  { key: 'fast', label: 'Strobe Fast' },
-  { key: 'fastest', label: 'Strobe Fastest' },
-]
 
 const BRIGHTNESS_SCALING_FIELDS: ReadonlyArray<{ key: keyof BrightnessScaling; label: string }> = [
   { key: 'red', label: 'Red' },

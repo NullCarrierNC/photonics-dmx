@@ -24,7 +24,11 @@ import {
   deriveExtraChannelsForMaster,
   maxMasterDimmerForTemplate,
 } from '../../../photonics-dmx/helpers/rigTemplateSync'
-import { extraChannelDisplayLabel, sortBaseChannelEntries } from './lightChannelDisplay'
+import {
+  STROBE_VALUE_FIELDS,
+  extraChannelDisplayLabel,
+  sortBaseChannelEntries,
+} from './lightChannelDisplay'
 import { resolveMasterDimmer } from './lightChannelMaster'
 import { BsArrowsMove, BsLightningFill } from 'react-icons/bs'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
@@ -49,13 +53,6 @@ interface LightChannelsConfigProps {
     listeners?: DraggableSyntheticListeners | undefined
   }
 }
-
-const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> = [
-  { key: 'slow', label: 'Strobe Slow' },
-  { key: 'medium', label: 'Strobe Medium' },
-  { key: 'fast', label: 'Strobe Fast' },
-  { key: 'fastest', label: 'Strobe Fastest' },
-]
 
 const getDisplayName = (channelName: string) => {
   if (channelName === 'masterDimmer') return 'Master Dimmer'
