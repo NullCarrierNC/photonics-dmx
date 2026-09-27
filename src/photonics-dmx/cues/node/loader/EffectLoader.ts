@@ -2,7 +2,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { validateEffectFile, validateEffectFileInFolder } from '../schema/validation'
 import { EffectCompiler } from '../compiler/EffectCompiler'
-import { migrateOlderNodeFile } from './migrateOlderNodeFile'
+import { migrateOlderNodeFile, variableRenamesOf } from './migrateOlderNodeFile'
 import { EffectFile, EffectMode } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import {
@@ -45,6 +45,9 @@ interface EffectLoaderOptions {
 export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSummary> {
   /** The group id each loaded effect file holds, by path. A file that fails its load holds none. */
   private readonly groupHolders = new Map<string, GroupIdClaim<EffectMode>>()
+
+  /** The renames a load gave each loaded file's variable names, by path. */
+  private readonly variableRenames = new Map<string, ReadonlyMap<string, string>>()
 
   constructor(options: EffectLoaderOptions) {
     super(options.baseDir, 'effects', ['yarg', 'audio'], 'effect')
@@ -164,6 +167,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   private async readAndHold(mode: EffectMode, filePath: string): Promise<EffectFileSummary> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
+    const renames = variableRenamesOf(parsed)
     const changes = migrateOlderNodeFile(parsed)
     const validation = validateEffectFileInFolder(mode, parsed)
 
@@ -189,6 +193,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       this.refuseGroupId(displaced, mode, file.group.id, filePath)
     }
     this.holdGroupId(filePath, { mode, groupId: file.group.id })
+    if (renames.size > 0) this.variableRenames.set(filePath, renames)
 
     // Compile each effect at load (and so at save, which calls loadFile) so invalid action
     // payloads surface on the file summary for the editor rather than only at runtime when a
@@ -227,6 +232,20 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return summary
   }
 
+  /**
+   * The renames a load gave the variable names of the effect file holding a group id. A cue file an
+   * older build wrote still passes that effect's parameters by their old names.
+   */
+  public variableRenamesFor(
+    mode: EffectMode,
+    groupId: string,
+  ): ReadonlyMap<string, string> | undefined {
+    for (const [filePath, held] of this.groupHolders) {
+      if (held.mode === mode && held.groupId === groupId) return this.variableRenames.get(filePath)
+    }
+    return undefined
+  }
+
   private holdGroupId(filePath: string, claim: GroupIdClaim<EffectMode>): void {
     const held = this.groupHolders.get(filePath)
     if (held && held.groupId !== claim.groupId) this.releaseGroupId(held.mode, held.groupId)
@@ -238,6 +257,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   }
 
   protected removeRegistration(filePath: string): void {
+    this.variableRenames.delete(filePath)
     const held = this.groupHolders.get(filePath)
     if (!held) return
     this.groupHolders.delete(filePath)

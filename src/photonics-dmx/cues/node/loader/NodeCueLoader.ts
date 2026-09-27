@@ -14,7 +14,7 @@ import { AudioCueRegistry, type AudioCueGroup } from '../../registries/AudioCueR
 import { AudioCueType } from '../../types/audioCueTypes'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
-import { migrateOlderNodeFile } from './migrateOlderNodeFile'
+import { migrateOlderNodeFile, type EffectFileRenames } from './migrateOlderNodeFile'
 import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
 import type { EffectReference } from '../../types/nodeCueTypes'
 import { buildEffectRegistry, type EffectFilesByMode } from './effectRegistryBuilder'
@@ -187,7 +187,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const { filePath: resolvedPath, mode } = this.resolveExistingCueFilePath(filePath)
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed: unknown = JSON.parse(data)
-    migrateOlderNodeFile(parsed)
+    migrateOlderNodeFile(parsed, this.effectFileRenames(mode))
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -276,7 +276,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   ): Promise<NodeCueFileSummary> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
-    const changes = migrateOlderNodeFile(parsed)
+    const changes = migrateOlderNodeFile(parsed, this.effectFileRenames(mode))
     migrateLegacyBearings(parsed)
     const validation = validateCueFileForMode(mode, parsed)
 
@@ -547,6 +547,12 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
 
   public isDebugEnabled(): boolean {
     return this.nodeCueDebug.enabled
+  }
+
+  /** The renames a load gave the variable names of the effect files a cue of this mode raises. */
+  private effectFileRenames(mode: NodeCueMode): EffectFileRenames {
+    const effectMode = getCueDomain(mode).effectMode
+    return (effectFileId) => this.options.effectLoader?.variableRenamesFor(effectMode, effectFileId)
   }
 
   /** What the group builders need from this loader, reading effect files through `effectFiles`. */
