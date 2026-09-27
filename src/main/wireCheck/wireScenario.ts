@@ -52,6 +52,9 @@ export interface WireScenario {
   yargLibrary?: string
   audioLibrary?: string
   rb3Library?: string
+  /** RB3 cue mode (the default) or direct mode, which maps StageKit LEDs with no cues. */
+  rb3Mode?: 'cue' | 'direct'
+  /** A manual motion cue from the motion library of the input the steps drive. */
   motion?: { groupId: string; cueId: string }
   /** Cue library files laid over a copy of the bundled node data, by path under `node-data`. */
   cueFiles?: Record<string, unknown>
