@@ -17,7 +17,7 @@ jest.mock(
 )
 
 import { useUnloadGuard } from '../../hooks/useUnloadGuard'
-import { DraftNumberField, DraftTextField } from './DraftField'
+import { DraftNumberField, DraftOptionalNumberField, DraftTextField } from './DraftField'
 
 function field(): HTMLInputElement {
   return screen.getByRole('spinbutton') as HTMLInputElement
@@ -403,6 +403,37 @@ describe('a draft field on a page that guards unsaved changes', () => {
     )
 
     fireEvent.change(field(), { target: { value: '05' } })
+
+    expect(unloadIsRefused()).toBe(false)
+    view.unmount()
+  })
+
+  it('counts an emptied optional number as unsaved until it is committed as off', () => {
+    const onCommit = jest.fn<(value: number | undefined) => void>()
+    const view = renderWithProviders(
+      <GuardedPage>
+        <DraftOptionalNumberField value={50} onCommit={onCommit} />
+      </GuardedPage>,
+    )
+
+    fireEvent.change(field(), { target: { value: '' } })
+    expect(unloadIsRefused()).toBe(true)
+
+    fireEvent.blur(field())
+    expect(onCommit).toHaveBeenCalledWith(undefined)
+    expect(unloadIsRefused()).toBe(false)
+    view.unmount()
+  })
+
+  it('does not count emptying an optional number that is already off', () => {
+    const view = renderWithProviders(
+      <GuardedPage>
+        <DraftOptionalNumberField value={undefined} onCommit={() => {}} />
+      </GuardedPage>,
+    )
+
+    fireEvent.change(field(), { target: { value: '7' } })
+    fireEvent.change(field(), { target: { value: '' } })
 
     expect(unloadIsRefused()).toBe(false)
     view.unmount()

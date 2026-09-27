@@ -21,6 +21,9 @@ import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 
+// The cases boot a release's files, some with the whole bundled library, from disk.
+jest.setTimeout(20_000)
+
 const HISTORICAL = path.join(__dirname, '../../photonics-dmx/tests/historical')
 
 interface CorpusFile {
