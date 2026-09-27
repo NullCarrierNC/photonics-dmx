@@ -13,6 +13,7 @@ import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRe
 import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
+import { TeardownSteps } from '../../photonics-dmx/helpers/teardownSteps'
 import { validateAudioLightingData } from '../ipc/audioLightingValidation'
 import type { RigChain } from './RigChain'
 import { clearAndBlackOutChains } from './chainBlackout'
@@ -175,12 +176,13 @@ export class AudioController {
       ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.audioDataHandler = null
     }
-    if (this.audioProcessor) {
-      this.audioProcessor.setOnStrobeStateChange(null)
-      this.audioProcessor.setOnGameModeCueChange(null)
-      this.audioProcessor.setOnGameModeScheduleChange(null)
-      this.audioProcessor.shutdown()
-      this.audioProcessor = null
+    const processor = this.audioProcessor
+    this.audioProcessor = null
+    if (processor) {
+      processor.setOnStrobeStateChange(null)
+      processor.setOnGameModeCueChange(null)
+      processor.setOnGameModeScheduleChange(null)
+      processor.shutdown()
     }
   }
 
@@ -190,13 +192,16 @@ export class AudioController {
     }
     log.info('Disabling audio...')
     // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
-    // blackout is the last word on the lights.
-    this.releaseProcessor()
+    // blackout is the last word on the lights. A cue that fails to stop still leaves the rig dark
+    // and audio off, and its failure is thrown once the rest has run.
+    const steps = new TeardownSteps(log)
+    steps.run('shutting down the audio processor', () => this.releaseProcessor())
     await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling Audio')
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
     log.info('Sent audio:disable to renderer')
     this.isAudioEnabled = false
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled: false })
+    steps.rethrowFirst()
     log.info('Audio disabled successfully')
   }
 

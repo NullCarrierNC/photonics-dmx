@@ -6,6 +6,7 @@ import type { ListenerLifecycleController } from './ListenerLifecycleController'
 import type { SenderLifecycleController } from './SenderLifecycleController'
 import type { MotionCueSimulator } from './MotionCueSimulator'
 import { createLogger } from '../../shared/logger'
+import { TeardownSteps } from '../../photonics-dmx/helpers/teardownSteps'
 
 const log = createLogger('ControllerManager')
 
@@ -110,6 +111,12 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
     log.info('Controllers shutdown completed, reinitializing')
   } catch (error) {
     log.error('Error shutting down controllers:', error)
+    // The graph is not rebuilt over a failed teardown, so nothing it left running may keep driving
+    // the rig: the strobe slot clears, the publisher sends its final blackout and the clock stops.
+    const safety = new TeardownSteps(log)
+    safety.run('clearing the strobe slot', () => ctx.graph.resetStrobeState())
+    safety.run('stopping the DMX publisher', () => ctx.graph.shutdownPublisherSafe())
+    safety.run('stopping the clock', () => ctx.graph.destroyClock())
   }
 
   abortIfShuttingDown(ctx.lifecycle, 'during teardown')

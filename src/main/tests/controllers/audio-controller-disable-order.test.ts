@@ -26,16 +26,19 @@ import type { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLigh
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import type { AudioCueProcessor } from '../../../photonics-dmx/processors/AudioCueProcessor'
 
-function makeChain(rigId: string): RigChain {
-  return {
+/** A rig chain on a fake sequencer, with that sequencer. */
+function makeChain(rigId: string): { chain: RigChain; sequencer: FakeLightingController } {
+  const sequencer = fakeLightingController()
+  const chain = {
     rigId,
     isPrimary: rigId === 'primary',
     dmxLightManager: {} as DmxLightManager,
-    sequencer: fakeLightingController(),
+    sequencer,
     cueHandlers: { yarg: null, rb3: null },
     audioCueHandler: null,
     rb3MenuCueHandler: null,
   } as unknown as RigChain
+  return { chain, sequencer }
 }
 
 function makeDeps(chains: RigChain[]): AudioControllerDeps {
@@ -52,12 +55,35 @@ function makeDeps(chains: RigChain[]): AudioControllerDeps {
   } as unknown as AudioControllerDeps
 }
 
+interface AudioInternals {
+  isAudioEnabled: boolean
+  audioDataHandler: (() => void) | null
+  audioProcessor: AudioCueProcessor | null
+}
+
+/** A controller over `chains` with audio running on a processor whose shutdown is `shutdown`. */
+function enabledAudio(
+  chains: RigChain[],
+  shutdown: () => void,
+): { controller: AudioController; internals: AudioInternals } {
+  const controller = new AudioController(makeDeps(chains))
+  const internals = controller as unknown as AudioInternals
+  internals.isAudioEnabled = true
+  internals.audioDataHandler = () => {}
+  internals.audioProcessor = {
+    setOnStrobeStateChange: jest.fn(),
+    setOnGameModeCueChange: jest.fn(),
+    setOnGameModeScheduleChange: jest.fn(),
+    shutdown,
+  } as unknown as AudioCueProcessor
+  return { controller, internals }
+}
+
 describe('AudioController disableAudio ordering', () => {
   it('removes the frame listener and shuts the processor down before clearing every rig', async () => {
     const order: string[] = []
-    const chains = [makeChain('primary'), makeChain('second')]
-    for (const chain of chains) {
-      const sequencer = chain.sequencer as unknown as FakeLightingController
+    const rigs = [makeChain('primary'), makeChain('second')]
+    for (const { chain, sequencer } of rigs) {
       sequencer.removeAllEffects.mockImplementation(() => {
         order.push(`removeAllEffects:${chain.rigId}`)
       })
@@ -70,21 +96,10 @@ describe('AudioController disableAudio ordering', () => {
       order.push('removeFrameListener')
     })
 
-    const deps = makeDeps(chains)
-    const controller = new AudioController(deps)
-    const internals = controller as unknown as {
-      isAudioEnabled: boolean
-      audioDataHandler: (() => void) | null
-      audioProcessor: AudioCueProcessor | null
-    }
-    internals.isAudioEnabled = true
-    internals.audioDataHandler = () => {}
-    internals.audioProcessor = {
-      setOnStrobeStateChange: jest.fn(),
-      setOnGameModeCueChange: jest.fn(),
-      setOnGameModeScheduleChange: jest.fn(),
-      shutdown: () => order.push('processorShutdown'),
-    } as unknown as AudioCueProcessor
+    const { controller, internals } = enabledAudio(
+      rigs.map((rig) => rig.chain),
+      () => order.push('processorShutdown'),
+    )
 
     await controller.disableAudio()
 
@@ -98,6 +113,23 @@ describe('AudioController disableAudio ordering', () => {
     ])
     expect(internals.audioProcessor).toBeNull()
     expect(internals.audioDataHandler).toBeNull()
+    expect(internals.isAudioEnabled).toBe(false)
+  })
+
+  it('clears every rig and turns audio off when the processor fails to stop, then throws', async () => {
+    const rigs = [makeChain('primary'), makeChain('second')]
+    const failure = new Error('cue failed to stop')
+    const { controller, internals } = enabledAudio(
+      rigs.map((rig) => rig.chain),
+      () => {
+        throw failure
+      },
+    )
+
+    await expect(controller.disableAudio()).rejects.toThrow(failure)
+
+    for (const { sequencer } of rigs) expect(sequencer.blackout).toHaveBeenCalledWith(0)
+    expect(internals.audioProcessor).toBeNull()
     expect(internals.isAudioEnabled).toBe(false)
   })
 })

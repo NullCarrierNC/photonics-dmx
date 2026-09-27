@@ -14,6 +14,7 @@ import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorMan
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { Rb3RunningMode } from '../../shared/ipc/listenerTypes'
 import { createLogger } from '../../shared/logger'
+import { TeardownSteps } from '../../photonics-dmx/helpers/teardownSteps'
 import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { buildDomainChainHandlers } from './cueRuntimeDomains'
 import type { RigChain } from './RigChain'
@@ -196,16 +197,20 @@ export class ListenerCoordinator {
     // Input, then cues, then output: every cue engine is stopped before the rig is cleared, so the
     // blackout is the last word on the lights. The socket closes synchronously, so no frame lands
     // past this line, and awaiting it last keeps the blackout in the toggle's own tick.
+    // A cue that fails to stop still leaves the rig dark and YARG off, and its failure is thrown
+    // once the rest has run.
+    const steps = new TeardownSteps(log)
     const listenerClosing = this.yargListener?.shutdown()
     this.deps.setVenuePostProcessing('Default')
-    this.notifyRuntimeDisabled('yarg')
-    this.clearChainHandlers('yarg')
+    steps.run('ending the YARG runtime', () => this.notifyRuntimeDisabled('yarg'))
+    this.clearChainHandlers('yarg', steps)
     await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling YARG')
     if (listenerClosing) {
       await listenerClosing
       this.yargListener = null
     }
     this.setListenerEnabled('yarg', false)
+    steps.rethrowFirst()
   }
 
   /** Apply the optional runtime decorator for a domain, or pass the base runtime through. */
@@ -257,13 +262,17 @@ export class ListenerCoordinator {
   /**
    * Shutdown every chain's handler for a domain and drop the shared reference. Each handler's
    * shutdown ends any open song, so the registry's once-per-song and motion locks don't survive the
-   * session. Safe to call when no handlers exist.
+   * session. Safe to call when no handlers exist. Every handler is shut down and dropped whatever
+   * one throws, and the first failure goes to `steps`, or is thrown at the end without them.
    */
-  private clearChainHandlers(domain: NetCueMode): void {
+  private clearChainHandlers(domain: NetCueMode, steps?: TeardownSteps): void {
+    const run = steps ?? new TeardownSteps(log)
     for (const chain of this.deps.getRigChains()) {
       const handler = chain.cueHandlers[domain]
       if (handler) {
-        handler.shutdown()
+        run.run(`shutting down the ${domain} cue handler for rig ${chain.rigId}`, () =>
+          handler.shutdown(),
+        )
         chain.cueHandlers[domain] = null
       }
     }
@@ -274,6 +283,7 @@ export class ListenerCoordinator {
       this.rb3CueHandler = null
       this.deps.setRb3CueHandlerRef(null)
     }
+    if (!steps) run.rethrowFirst()
   }
 
   public async enableRb3(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
@@ -417,16 +427,23 @@ export class ListenerCoordinator {
     // destroying the processors stops the keepalive and the menu pump generating frames of their
     // own, so the blackout below is the last word on the lights rather than something a late
     // packet or a local tick can undo.
+    // A processor or cue that fails to stop still leaves the rig dark, and its failure is thrown
+    // once the rest has run.
+    const steps = new TeardownSteps(log)
     const listenerClosing = this.rb3eListener?.shutdown()
-    if (this.processorManager) {
-      this.processorManager.destroy()
-      this.processorManager = null
+    const processorManager = this.processorManager
+    this.processorManager = null
+    if (processorManager) {
+      steps.run('destroying the RB3 processors', () => processorManager.destroy())
     }
-    this.notifyRuntimeDisabled('rb3')
-    this.clearChainHandlers('rb3')
+    steps.run('ending the RB3 runtime', () => this.notifyRuntimeDisabled('rb3'))
+    this.clearChainHandlers('rb3', steps)
     for (const chain of this.deps.getRigChains()) {
-      if (chain.rb3MenuCueHandler) {
-        chain.rb3MenuCueHandler.shutdown()
+      const menuHandler = chain.rb3MenuCueHandler
+      if (menuHandler) {
+        steps.run(`shutting down the RB3 menu cue handler for rig ${chain.rigId}`, () =>
+          menuHandler.shutdown(),
+        )
         chain.rb3MenuCueHandler = null
       }
     }
@@ -438,6 +455,7 @@ export class ListenerCoordinator {
       await listenerClosing
       this.rb3eListener = null
     }
+    steps.rethrowFirst()
   }
 
   public async disableRb3(): Promise<void> {
