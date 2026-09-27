@@ -240,12 +240,18 @@ export function actionLightArrayReads(
   })
 }
 
-/** Each issue the rules find in an action's literals, for a cue of `mode` when it is known. */
+/**
+ * Each issue the rules find in an action's literals, for a cue of `mode` when it is known, and each
+ * field reading a variable with no name, which never runs: the file loads with a warning for it.
+ */
 export function actionLiteralIssues(
   action: ActionNode,
   mode?: NodeCueMode,
 ): { field: string; issue: ValueIssue }[] {
   return actionLiteralFields(action).flatMap(({ rule, field, source }) => {
+    if (source?.source === 'variable' && source.name === '') {
+      return [{ field, issue: warning('names no variable') }]
+    }
     if (source?.source !== 'literal') return []
     const issue = literalIssue(rule, source.value, mode)
     return issue ? [{ field, issue }] : []

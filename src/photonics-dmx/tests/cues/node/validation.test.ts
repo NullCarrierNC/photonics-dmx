@@ -1138,6 +1138,27 @@ describe('Node cue validation', () => {
       ])
     })
 
+    it('loads an action field reading a variable with no name and warns about it', () => {
+      const action = setColorAction()
+      const result = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withNodes({
+            actions: [
+              {
+                ...action,
+                timing: { ...action.timing, duration: { source: 'variable', name: '' } },
+              },
+            ],
+          }),
+        ],
+      })
+
+      expect(result.valid && result.warnings).toEqual([
+        "cue 'Test Cue': action 'action-1' timing.duration names no variable.",
+      ])
+    })
+
     it('loads a palette colour this version does not know and warns that it is left out', () => {
       const result = validateNodeCueFile({
         ...validFile(),
