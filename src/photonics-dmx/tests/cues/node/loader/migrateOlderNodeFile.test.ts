@@ -64,6 +64,75 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
+  it('renames a variable named like an expression built-in and leaves expression text as it is', () => {
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        {
+          id: 'c1',
+          name: 'One',
+          kind: 'lighting',
+          variables: ['min', 'pi', 'pi_2', 'a', 'b'].map((name) => variable(name)),
+          nodes: {
+            events: [],
+            actions: [{ id: 'a1', timing: { duration: read('pi') } }],
+            logic: [
+              { id: 'l1', logicType: 'expression', expression: 'min(a, b) + pi', assignTo: 'min' },
+            ],
+          },
+        },
+      ],
+    }
+
+    const changes = migrateOlderNodeFile(file)
+
+    expect(file.cues[0].variables.map((v) => v.name)).toEqual(['min_2', 'pi_3', 'pi_2', 'a', 'b'])
+    expect(file.cues[0].nodes.actions[0].timing.duration).toEqual(read('pi_3'))
+    expect(file.cues[0].nodes.logic).toEqual([
+      { id: 'l1', logicType: 'expression', expression: 'min(a, b) + pi', assignTo: 'min_2' },
+    ])
+    expect(changes.older).toEqual([
+      "Variable names cannot be built-in expression names: 'min' is now 'min_2', 'pi' is now 'pi_3'.",
+    ])
+  })
+
+  it('renames a bare use of a variable named like a built-in function in expression text', () => {
+    const expression = (id: string, text: string) => ({
+      id,
+      logicType: 'expression',
+      expression: text,
+      assignTo: 'a',
+    })
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        {
+          id: 'c1',
+          name: 'One',
+          kind: 'lighting',
+          variables: ['min', 'pi', 'a', 'b'].map((name) => variable(name)),
+          nodes: {
+            events: [],
+            actions: [],
+            logic: [
+              expression('l1', 'min(a,b)*2.50+  min /pi'),
+              expression('l2', 'max(min, 1)'),
+              expression('l3', 'min (a) + pi'),
+            ],
+          },
+        },
+      ],
+    }
+
+    migrateOlderNodeFile(file)
+
+    expect(file.cues[0].nodes.logic.map((node) => node.expression)).toEqual([
+      'min(a,b)*2.50+  min_2 /pi',
+      'max(min_2, 1)',
+      'min (a) + pi',
+    ])
+  })
+
   it('renames an effect raiser parameter the effect file renames', () => {
     const file = {
       group: { id: 'g', name: 'G' },
@@ -92,6 +161,42 @@ describe('migrateOlderNodeFile', () => {
     expect(file.cues[0].nodes.effectRaisers[0].parameterValues).toEqual({
       beat_count: { source: 'literal', value: 4 },
     })
+  })
+
+  it('reports a raiser key and a variable of one name that take different names', () => {
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        {
+          id: 'c1',
+          name: 'One',
+          kind: 'lighting',
+          variables: [variable('beat-count')],
+          effects: [{ effectFileId: 'fx', effectId: 'counter', name: 'Counter' }],
+          nodes: {
+            events: [],
+            actions: [],
+            effectRaisers: [
+              {
+                id: 'r1',
+                type: 'effect-raiser',
+                effectId: 'counter',
+                parameterValues: { 'beat-count': read('beat-count') },
+              },
+            ],
+          },
+        },
+      ],
+    }
+
+    const changes = migrateOlderNodeFile(file, () => new Map([['beat-count', 'beat_count_2']]))
+
+    expect(file.cues[0].nodes.effectRaisers[0].parameterValues).toEqual({
+      beat_count_2: read('beat_count'),
+    })
+    expect(changes.older).toEqual([
+      "Variable names must use letters, digits and underscores: 'beat-count' is now 'beat_count', 'beat-count' is now 'beat_count_2'.",
+    ])
   })
 
   it('renames a raiser key as its own file renames the effect it raises', () => {

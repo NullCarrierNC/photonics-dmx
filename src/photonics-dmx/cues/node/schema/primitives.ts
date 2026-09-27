@@ -6,6 +6,7 @@ import {
   NodeActionConfig,
   NodeMotionPatternSetting,
   NodePositionSetting,
+  RESERVED_VARIABLE_NAMES,
   VARIABLE_NAME_PATTERN,
   ValueSource,
   VariableDefinition,
@@ -198,7 +199,12 @@ export const variableDefinitionSchema = {
   required: ['name', 'type', 'scope', 'initialValue'],
   additionalProperties: false,
   properties: {
-    name: { type: 'string', minLength: 1, pattern: VARIABLE_NAME_PATTERN.source },
+    name: {
+      type: 'string',
+      minLength: 1,
+      pattern: VARIABLE_NAME_PATTERN.source,
+      not: { enum: [...RESERVED_VARIABLE_NAMES] },
+    },
     type: {
       type: 'string',
       enum: [

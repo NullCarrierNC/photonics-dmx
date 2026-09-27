@@ -7,8 +7,10 @@ import type {
   NodeCueKind,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { isVariableName } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { initialValueIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import {
+  initialValueIssue,
+  variableNameIssue,
+} from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import type { EditorDocument } from '../../lib/types'
 import VariableList from './VariableList'
 import VariableFormDialog from './VariableFormDialog'
@@ -97,11 +99,9 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
       showToast('Please fill in all required fields', 'error')
       return
     }
-    if (!isVariableName(formData.name)) {
-      showToast(
-        `"${formData.name}" is not a valid variable name. Use letters, digits and underscores, starting with a letter or underscore.`,
-        'error',
-      )
+    const nameIssue = variableNameIssue(formData.name)
+    if (nameIssue) {
+      showToast(`${nameIssue.message}.`, 'error')
       return
     }
     const initialIssue = initialValueIssue(formData.type, formData.initialValue)

@@ -102,12 +102,35 @@ describe('VariableRegistry', () => {
       addGroupVariable(name)
 
       expect(
-        await screen.findByText(new RegExp(`"${name}" is not a valid variable name`)),
+        await screen.findByText(
+          `"${name}" is not a valid variable name. Use letters, digits and underscores, starting with a letter or underscore.`,
+        ),
       ).toBeTruthy()
       expect(screen.getByRole('dialog')).toBeInTheDocument()
       expect(onVariablesChange).not.toHaveBeenCalled()
     },
   )
+
+  it.each(['min', 'pi'])('refuses the built-in expression name %s', async (name) => {
+    const { onVariablesChange } = renderRegistry()
+    addGroupVariable(name)
+
+    expect(await screen.findByText(`'${name}' is a built-in expression name.`)).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(onVariablesChange).not.toHaveBeenCalled()
+  })
+
+  it('names a built-in expression name under the field as it is typed', () => {
+    renderRegistry()
+    fireEvent.click(screen.getAllByRole('button', { name: '+ Add' })[0])
+    const name = screen.getByPlaceholderText('variableName')
+
+    fireEvent.change(name, { target: { value: 'max' } })
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText("'max' is a built-in expression name")).toBeTruthy()
+    expect(name).toHaveAttribute('aria-invalid', 'true')
+  })
 
   it('adds a variable with a free name', () => {
     const { onVariablesChange } = renderRegistry()

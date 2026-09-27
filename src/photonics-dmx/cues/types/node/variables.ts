@@ -2,6 +2,7 @@
  * Variable and event declarations a cue graph carries.
  */
 import type { Color } from '../../../types'
+import { EXPRESSION_BUILTIN_NAMES } from '../../node/runtime/expressionEvaluator'
 
 /** Every variable/value type, the single source both the schema enums and the editor dropdowns derive
  *  from so they cannot drift from the VariableType union. */
@@ -24,8 +25,15 @@ export type VariableType = (typeof VARIABLE_TYPES)[number]
  */
 export const VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/
 
+/**
+ * Names no variable may take, since an expression reads them as its built-in functions and
+ * constants. Event names are never read in an expression and may take them.
+ */
+export const RESERVED_VARIABLE_NAMES: readonly string[] = EXPRESSION_BUILTIN_NAMES
+
+/** A name that fits {@link VARIABLE_NAME_PATTERN} and is not a built-in expression name. */
 export function isVariableName(name: string): boolean {
-  return VARIABLE_NAME_PATTERN.test(name)
+  return VARIABLE_NAME_PATTERN.test(name) && !RESERVED_VARIABLE_NAMES.includes(name)
 }
 
 export type ValueSource =

@@ -5,8 +5,9 @@
  * is renamed with every use of it, and an initial value other than a colour takes its type. Values
  * this build does not know are noted apart from what an older build wrote.
  */
-import { VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
+import { VARIABLE_NAME_PATTERN, VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { VariableType } from '../../types/nodeCueTypes'
+import { renameExpressionVariables } from '../runtime/expressionEvaluator'
 import {
   DEFAULT_EASING,
   initialValueAsRead,
@@ -199,13 +200,16 @@ function dropUncountedWaitCounts(graphs: readonly JsonObject[]): string | null {
 
 /**
  * A name that passes {@link isVariableName}: each other character becomes an underscore, a leading
- * digit gets an underscore before it, and a numbered suffix keeps it clear of names in `taken`.
+ * digit gets an underscore before it, and a numbered suffix keeps it clear of names in `taken` and
+ * of the built-in expression names.
  */
 function conformingVariableName(name: string, taken: ReadonlySet<string>): string {
   const cleaned = name.replace(/[^a-zA-Z0-9_]/g, '_')
   const base = /^[a-zA-Z_]/.test(cleaned) ? cleaned : `_${cleaned}`
   let candidate = base
-  for (let n = 2; taken.has(candidate); n++) candidate = `${base}_${n}`
+  for (let n = 2; taken.has(candidate) || !isVariableName(candidate); n++) {
+    candidate = `${base}_${n}`
+  }
   return candidate
 }
 
@@ -243,7 +247,10 @@ function conformInitialValues(declarations: readonly JsonObject[]): string | nul
     : null
 }
 
-/** Renames every variable use under `node`: variable value sources and logic node name fields. */
+/**
+ * Renames every variable use under `node`: variable value sources, logic node name fields and the
+ * identifiers an expression reads as variables.
+ */
 function renameUses(node: unknown, renames: ReadonlyMap<string, string>): void {
   if (Array.isArray(node)) {
     for (const item of node) renameUses(item, renames)
@@ -252,6 +259,9 @@ function renameUses(node: unknown, renames: ReadonlyMap<string, string>): void {
   if (!isObject(node)) return
   if (node.source === 'variable' && typeof node.name === 'string') {
     node.name = renames.get(node.name) ?? node.name
+  }
+  if (node.logicType === 'expression' && typeof node.expression === 'string') {
+    node.expression = renameExpressionVariables(node.expression, renames)
   }
   for (const field of NAME_FIELDS) {
     const value = node[field]
@@ -297,7 +307,7 @@ function referencedRenames(
 function renameRaiserParameters(
   graph: JsonObject,
   renamesFor: (raiser: JsonObject) => ReadonlyMap<string, string> | undefined,
-  renamed: Map<string, string>,
+  renamed: Array<readonly [string, string]>,
 ): void {
   const raisers = isObject(graph.nodes) ? graph.nodes.effectRaisers : undefined
   if (!Array.isArray(raisers)) return
@@ -313,7 +323,7 @@ function renameRaiserParameters(
         ? key
         : effectRenames?.get(key) ?? conformingVariableName(key, taken)
       taken.add(name)
-      if (name !== key) renamed.set(key, name)
+      if (name !== key) renamed.push([key, name])
       next[name] = value
     }
     raiser.parameterValues = next
@@ -343,7 +353,7 @@ function renameVariables(
   file: JsonObject,
   graphs: readonly JsonObject[],
   effectFileRenames: EffectFileRenames | undefined,
-): string | null {
+): Array<string | null> {
   const declarations = declarationsOf(file, graphs)
   const renames = declaredRenames(declarations)
 
@@ -358,7 +368,7 @@ function renameVariables(
 
   // A raiser in an effect file that raises one of the file's own effects takes the file's renames.
   const ownEffectIds = new Set(Array.isArray(file.effects) ? graphs.map((effect) => effect.id) : [])
-  const renamed = new Map(renames)
+  const renamed: Array<readonly [string, string]> = [...renames]
   for (const graph of graphs) {
     renameRaiserParameters(
       graph,
@@ -369,9 +379,29 @@ function renameVariables(
       renamed,
     )
   }
-  if (renamed.size === 0) return null
-  const pairs = [...renamed].map(([from, to]) => `'${from}' is now '${to}'`)
-  return `Variable names must use letters, digits and underscores: ${pairs.join(', ')}.`
+  return [
+    renameNote(
+      'Variable names must use letters, digits and underscores',
+      renamed.filter(([from]) => !VARIABLE_NAME_PATTERN.test(from)),
+    ),
+    renameNote(
+      'Variable names cannot be built-in expression names',
+      renamed.filter(([from]) => VARIABLE_NAME_PATTERN.test(from)),
+    ),
+  ]
+}
+
+/**
+ * A note naming each rename once. A raiser key follows the effect it raises, so it can take
+ * another name than a variable of the same name.
+ */
+function renameNote(
+  rule: string,
+  renamed: ReadonlyArray<readonly [string, string]>,
+): string | null {
+  if (renamed.length === 0) return null
+  const pairs = new Set(renamed.map(([from, to]) => `'${from}' is now '${to}'`))
+  return `${rule}: ${[...pairs].join(', ')}.`
 }
 
 const notesOf = (notes: ReadonlyArray<string | null>): string[] =>
@@ -395,7 +425,7 @@ export function migrateOlderNodeFile(
     retireBlendModes(graphs),
     replaceUnknownEasings(graphs, true),
     dropUncountedWaitCounts(graphs),
-    renameVariables(file, graphs, effectFileRenames),
+    ...renameVariables(file, graphs, effectFileRenames),
     conformInitialValues(declarationsOf(file, graphs)),
   ])
   return { older, unknown }
