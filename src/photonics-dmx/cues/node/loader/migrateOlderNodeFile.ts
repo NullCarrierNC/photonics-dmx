@@ -297,7 +297,7 @@ function referencedRenames(
 function renameRaiserParameters(
   graph: JsonObject,
   renamesFor: (raiser: JsonObject) => ReadonlyMap<string, string> | undefined,
-  renamed: Map<string, string>,
+  renamed: Array<readonly [string, string]>,
 ): void {
   const raisers = isObject(graph.nodes) ? graph.nodes.effectRaisers : undefined
   if (!Array.isArray(raisers)) return
@@ -313,7 +313,7 @@ function renameRaiserParameters(
         ? key
         : effectRenames?.get(key) ?? conformingVariableName(key, taken)
       taken.add(name)
-      if (name !== key) renamed.set(key, name)
+      if (name !== key) renamed.push([key, name])
       next[name] = value
     }
     raiser.parameterValues = next
@@ -358,7 +358,7 @@ function renameVariables(
 
   // A raiser in an effect file that raises one of the file's own effects takes the file's renames.
   const ownEffectIds = new Set(Array.isArray(file.effects) ? graphs.map((effect) => effect.id) : [])
-  const renamed = new Map(renames)
+  const renamed: Array<readonly [string, string]> = [...renames]
   for (const graph of graphs) {
     renameRaiserParameters(
       graph,
@@ -369,9 +369,11 @@ function renameVariables(
       renamed,
     )
   }
-  if (renamed.size === 0) return null
-  const pairs = [...renamed].map(([from, to]) => `'${from}' is now '${to}'`)
-  return `Variable names must use letters, digits and underscores: ${pairs.join(', ')}.`
+  if (renamed.length === 0) return null
+  // A raiser key follows the effect it raises, so it can take another name than a variable of the
+  // same name, and the note names each rename once.
+  const pairs = new Set(renamed.map(([from, to]) => `'${from}' is now '${to}'`))
+  return `Variable names must use letters, digits and underscores: ${[...pairs].join(', ')}.`
 }
 
 const notesOf = (notes: ReadonlyArray<string | null>): string[] =>

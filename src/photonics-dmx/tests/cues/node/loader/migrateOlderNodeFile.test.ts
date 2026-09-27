@@ -94,6 +94,42 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
+  it('reports a raiser key and a variable of one name that take different names', () => {
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        {
+          id: 'c1',
+          name: 'One',
+          kind: 'lighting',
+          variables: [variable('beat-count')],
+          effects: [{ effectFileId: 'fx', effectId: 'counter', name: 'Counter' }],
+          nodes: {
+            events: [],
+            actions: [],
+            effectRaisers: [
+              {
+                id: 'r1',
+                type: 'effect-raiser',
+                effectId: 'counter',
+                parameterValues: { 'beat-count': read('beat-count') },
+              },
+            ],
+          },
+        },
+      ],
+    }
+
+    const changes = migrateOlderNodeFile(file, () => new Map([['beat-count', 'beat_count_2']]))
+
+    expect(file.cues[0].nodes.effectRaisers[0].parameterValues).toEqual({
+      beat_count_2: read('beat_count'),
+    })
+    expect(changes.older).toEqual([
+      "Variable names must use letters, digits and underscores: 'beat-count' is now 'beat_count', 'beat-count' is now 'beat_count_2'.",
+    ])
+  })
+
   it('renames a raiser key as its own file renames the effect it raises', () => {
     const file = {
       group: { id: 'fx', name: 'FX' },
