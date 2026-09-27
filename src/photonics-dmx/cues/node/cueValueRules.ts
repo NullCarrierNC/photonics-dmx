@@ -176,7 +176,9 @@ export function literalIssue(
     case 'brightness':
       return isBrightness(value) ? null : error(`'${String(value)}' is not a known Brightness`)
     case 'blend-mode':
-      return isBlendMode(value) ? null : error(`'${String(value)}' is not a known BlendMode`)
+      return isBlendMode(value)
+        ? null
+        : warning(`'${String(value)}' is not a known BlendMode and plays as replace`)
     case 'easing':
       return isEasingType(value) ? null : error(`'${String(value)}' is not a known easing`)
     case 'wait-condition':

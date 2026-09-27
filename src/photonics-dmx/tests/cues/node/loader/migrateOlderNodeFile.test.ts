@@ -337,7 +337,7 @@ describe('migrateOlderNodeFile', () => {
     ])
     expect(changes).toEqual({
       older: ["Retired blend mode multiply or overlay in 'Glow' now reads replace."],
-      unknown: ["Blend mode 'screen' in 'Glow' is not one this version knows."],
+      unknown: [],
     })
   })
 

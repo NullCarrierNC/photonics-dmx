@@ -242,7 +242,7 @@ describe('writing back cue and effect files a load brings forward', () => {
       expect((await effectLoader.readEffectFilesByGroupId('yarg')).has('my-effects')).toBe(true)
     })
 
-    it('leaves a file with a blend mode this version does not know as it is and flags the cue', async () => {
+    it('writes back what an older build wrote, keeps a blend mode this version does not know and warns', async () => {
       const filePath = path.join(cuesDir, 'newer.json')
       const file = olderCueFile('newer')
       const harmony = file.cues.find((cue) => cue.cueType === 'Harmony')
@@ -258,20 +258,20 @@ describe('writing back cue and effect files a load brings forward', () => {
 
       const result = await loader.loadAll()
 
-      expect(fs.readFileSync(filePath, 'utf-8')).toBe(original)
-      expect(result).toEqual(
-        expect.objectContaining({
-          loaded: 1,
-          migrations: [],
-          unsaved: [
-            expect.stringMatching(
-              /^newer\.json: Holds values .* Blend mode 'screen' in 'Harmony' is not one this version knows\./,
-            ),
-          ],
-        }),
+      const written = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+      const writtenHarmony = written.cues.find(
+        (cue: { cueType: string }) => cue.cueType === 'Harmony',
       )
+      expect(writtenHarmony.nodes.actions[0].color.blendMode).toEqual({
+        source: 'literal',
+        value: 'screen',
+      })
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, unsaved: [] }))
       const [summary] = loader.getSummary().yarg
-      expect(summary.errors).toEqual([expect.stringContaining('screen')])
+      expect(summary.errors).toBeUndefined()
+      expect(summary.warnings).toEqual(
+        expect.arrayContaining([expect.stringContaining("'screen' is not a known BlendMode")]),
+      )
     })
 
     it('refuses a file of a newer file version and leaves it as it is', async () => {

@@ -151,27 +151,6 @@ function replaceUnknownEasings(
     : `Easing ${where} is not one this version knows and plays as ${DEFAULT_EASING}.`
 }
 
-/**
- * An action blend mode named in a literal this build does not know stays as it is, and the
- * compiler reports the action. The retired blend modes are older and read as replace.
- */
-function findUnknownBlendModes(graphs: readonly JsonObject[]): string | null {
-  const values = new Set<string>()
-  const found = new Set<string>()
-  for (const { action, graph } of actionsOf(graphs)) {
-    const source = isObject(action.color) ? action.color.blendMode : null
-    if (!isObject(source) || source.source !== 'literal') continue
-    const { value } = source
-    if (typeof value !== 'string' || value === '' || RETIRED_BLEND_MODES.has(value)) continue
-    if (literalIssue('blend-mode', value) === null) continue
-    values.add(`'${value}'`)
-    found.add(graph)
-  }
-  return found.size > 0
-    ? `Blend mode ${[...values].join(', ')} in ${[...found].join(', ')} is not one this version knows.`
-    : null
-}
-
 /** Each wait condition field, with the field that counts how many times it must fire. */
 const COUNTED_WAITS = [
   ['waitForCondition', 'waitForConditionCount'],
@@ -570,7 +549,7 @@ export function migrateOlderNodeFile(
 ): NodeFileChanges {
   if (!isObject(file)) return { older: [], unknown: [] }
   const graphs = graphsOf(file)
-  const unknown = notesOf([replaceUnknownEasings(graphs, false), findUnknownBlendModes(graphs)])
+  const unknown = notesOf([replaceUnknownEasings(graphs, false)])
   const older = notesOf([
     defaultCueKinds(file),
     retireBlendModes(graphs),

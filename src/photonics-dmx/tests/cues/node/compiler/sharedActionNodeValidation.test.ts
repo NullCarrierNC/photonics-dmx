@@ -157,14 +157,6 @@ const PARITY_CASES: ParityCase[] = [
     expectedMessageMatch: /color\.brightness 'bright' is not a known Brightness/,
   },
   {
-    description: 'rejects an unknown literal blend mode',
-    action: {
-      ...baseValidAction(),
-      color: baseColor({ blendMode: { source: 'literal', value: 'multiply' } }),
-    },
-    expectedMessageMatch: /color\.blendMode 'multiply' is not a known BlendMode/,
-  },
-  {
     description: 'rejects set-color without color',
     action: { ...baseValidAction(), effectType: 'set-color', color: undefined },
     expectedMessageMatch: /set-color.*must include color/,
@@ -275,6 +267,15 @@ describe('Cross-compiler action validation parity', () => {
       expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
     },
   )
+
+  it('compiles an action blend mode this version does not know in both compilers', () => {
+    const action: ActionNode = {
+      ...baseValidAction(),
+      color: baseColor({ blendMode: { source: 'literal', value: 'glow' } }),
+    }
+    expect(() => NodeCueCompiler.compileCue(buildCue(action), 'yarg')).not.toThrow()
+    expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
+  })
 
   it('compiles an action colour this version does not know in both compilers', () => {
     const action: ActionNode = {
