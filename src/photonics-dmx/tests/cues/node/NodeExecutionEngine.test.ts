@@ -28,6 +28,7 @@ import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../..
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { noopRuntimeBroadcaster, type RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { fakeLightingController } from '../../helpers/fakeLightingController'
+import { UnknownValueWarnings } from '../../../cues/node/runtime/valueResolver'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
@@ -365,7 +366,13 @@ describe('NodeExecutionEngine', () => {
 
   describe('Execution Context', () => {
     const createContext = (): ExecutionContext =>
-      new ExecutionContext(beatEvent, createCueData('Strong'), cueLevelVarStore, groupLevelVarStore)
+      new ExecutionContext(
+        beatEvent,
+        createCueData('Strong'),
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new UnknownValueWarnings('test'),
+      )
 
     it('should prevent cycles with visited tracking', () => {
       const context = createContext()

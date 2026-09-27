@@ -132,8 +132,9 @@ export const LIGHT_TARGET_OPTIONS = [
  *        last in Half-1 AND first in Half-2
  * Half-1: The first half of the lights in each group
  * Half-2: The second half of the lights in each group
- * Third-*: Divides the lights into thirds.
- *        If the number of lights are even, will use half or quarter depending on count
+ * Third-*: Splits the lights of each group, in order, into three runs that hold every light
+ *        once. A spare light joins the middle third and a second spare joins the first, so
+ *        one light is the middle third and two lights are the first and middle thirds.
  * Linear: Sequentially applies the effect to the first, then second, then third, etc., lights
  * Inverse-Linear: The reverse of linear, starting at the last to first.
  */

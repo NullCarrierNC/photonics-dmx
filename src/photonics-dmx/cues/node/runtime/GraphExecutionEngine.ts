@@ -18,6 +18,7 @@ import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { ExecutionParameters } from './GraphExecutionPolicy'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { monotonicNowMs } from '../../../../shared/time'
+import type { UnknownValueWarnings } from './valueResolver'
 
 /**
  * How long a cue-started or cue-called run may hold the lifecycle slot while frames wait behind it.
@@ -61,6 +62,7 @@ export class GraphExecutionEngine {
   private effectRegistry?: EffectRegistry
   private compiledCue?: CompiledNetCue
   private debug?: NodeCueDebugSwitch
+  private unknownValues?: UnknownValueWarnings
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
   /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
@@ -88,7 +90,8 @@ export class GraphExecutionEngine {
 
   /**
    * Create engine for a cue graph (YARG or motion node cues).
-   * Effect registry required for effect-raiser nodes.
+   * Effect registry required for effect-raiser nodes. A loaded cue passes its unknown-value
+   * warnings, so each of its activations reports under the one cue.
    */
   static forCue(
     compiledCue: CompiledNetCue,
@@ -102,6 +105,7 @@ export class GraphExecutionEngine {
     variableDefinitions: VariableDefinition[],
     callbacks?: NodeRuntimeCallbacks,
     debug?: NodeCueDebugSwitch,
+    unknownValues?: UnknownValueWarnings,
   ): GraphExecutionEngine {
     const engine = new GraphExecutionEngine(
       policy,
@@ -116,6 +120,7 @@ export class GraphExecutionEngine {
     engine.compiledCue = compiledCue
     engine.effectRegistry = effectRegistry
     engine.debug = debug
+    engine.unknownValues = unknownValues
     return engine
   }
 
@@ -160,6 +165,7 @@ export class GraphExecutionEngine {
         onContextLifecycle: this.esmLifecycle.onContextLifecycle,
         revisitPolicy: this.policy.revisitPolicy,
         debug: this.debug,
+        unknownValues: this.unknownValues,
       },
     )
     return this.nodeEngine

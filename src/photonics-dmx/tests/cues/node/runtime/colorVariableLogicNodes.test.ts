@@ -13,6 +13,7 @@ import type {
   ValueSource,
   VariableDefinition,
 } from '../../../../cues/types/nodeCueTypes'
+import { UnknownValueWarnings } from '../../../../cues/node/runtime/valueResolver'
 
 function harness() {
   const cueStore = new Map<string, VariableValue>()
@@ -22,7 +23,13 @@ function harness() {
     { name: 's', type: 'string', scope: 'cue', initialValue: '' },
   ]
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'beat' }
-  const context = new ExecutionContext(ev, {} as CueData, cueStore, groupStore)
+  const context = new ExecutionContext(
+    ev,
+    {} as CueData,
+    cueStore,
+    groupStore,
+    new UnknownValueWarnings('test'),
+  )
   const evalCtx: LogicNodeEvaluatorContext = {
     cueId: 'g:c',
     mode: 'yarg',

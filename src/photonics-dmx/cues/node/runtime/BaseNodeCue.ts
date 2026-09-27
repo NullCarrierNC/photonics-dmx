@@ -11,6 +11,7 @@ import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { NetNodeCueDefinition } from '../../types/nodeCueTypes'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { UnknownValueWarnings } from './valueResolver'
 
 /** Per-sequencer runtime state for one cue. */
 interface NodeCueRunState {
@@ -36,6 +37,7 @@ export abstract class BaseNodeCue implements INetCue {
   private readonly runtimeBroadcaster: RuntimeBroadcaster
   private readonly debug?: NodeCueDebugSwitch
   private readonly states = new Map<ILightingController, NodeCueRunState>()
+  private readonly unknownValues: UnknownValueWarnings
 
   constructor(
     groupId: string,
@@ -51,6 +53,7 @@ export abstract class BaseNodeCue implements INetCue {
     this.runtimeCallbacks = runtimeCallbacks
     this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
     this.debug = debug
+    this.unknownValues = new UnknownValueWarnings(this.id)
   }
 
   // --- hooks for the genuine differences --------------------------------------
@@ -119,6 +122,7 @@ export abstract class BaseNodeCue implements INetCue {
         this.definition.variables ?? [],
         this.runtimeCallbacks,
         this.debug,
+        this.unknownValues,
       )
     }
     return state

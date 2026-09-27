@@ -20,6 +20,7 @@ import type { FixtureConfig, TrackedLight } from '../../types'
 import type { CueData } from '../../cues/types/cueTypes'
 import type { NodeMotionPatternSetting, NetEventNode } from '../../cues/types/nodeCueTypes'
 import { panTiltDmxToSphericalXY } from '../../../renderer/src/components/lightsDmxPreviewMath'
+import { UnknownValueWarnings } from '../../cues/node/runtime/valueResolver'
 
 const TWO_PI = Math.PI * 2
 const DEG_TO_RAD = Math.PI / 180
@@ -28,7 +29,13 @@ const NEAR_POLE_EPS_DEG = 1e-9
 
 function makeExecutionContext(): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
-  return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
+  return new ExecutionContext(
+    ev,
+    {} as CueData,
+    new Map(),
+    new Map(),
+    new UnknownValueWarnings('test'),
+  )
 }
 
 function resolveNodPattern(): ResolvedMotionPatternSetting {

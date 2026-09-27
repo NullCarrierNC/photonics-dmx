@@ -6,6 +6,7 @@ import type { ILightingController } from '../../../../controllers/sequencer/inte
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
+import { UnknownValueWarnings } from '../../../../cues/node/runtime/valueResolver'
 
 /** The idle callback is queued as a microtask, so let it run before asserting on it. */
 const flushIdle = (): Promise<void> => Promise.resolve()
@@ -142,7 +143,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -207,7 +208,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       // Should not throw
@@ -326,7 +327,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -425,7 +426,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -551,7 +552,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -720,7 +721,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -837,7 +838,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -935,7 +936,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -1034,7 +1035,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())
@@ -1107,7 +1108,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       const startTime = Date.now()
@@ -1181,7 +1182,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
       const cueData = createCueData()
       const onIdle = jest.fn(() => {
@@ -1203,7 +1204,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1305,7 +1306,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         { lights: { type: 'light-array', value: lights } },
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1342,7 +1343,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         { lights: { type: 'light-array', value: lights } },
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1385,7 +1386,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         { lights: { type: 'light-array', value: lights } },
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       engine.triggerEffect(createCueData())
@@ -1469,7 +1470,7 @@ describe('EffectExecutionEngine', () => {
         broadcaster,
         {},
         createCueData(),
-        { callerMode: 'yarg' },
+        { callerMode: 'yarg', unknownValues: new UnknownValueWarnings('test') },
       )
 
       await engine.triggerEffect(createCueData())

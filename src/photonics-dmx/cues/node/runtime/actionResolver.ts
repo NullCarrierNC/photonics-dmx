@@ -50,7 +50,10 @@ export function resolveActionTiming(
   timing: ActionTimingConfig,
   context: ExecutionContext,
 ): ResolvedActionTiming {
-  let waitUntilCondition = parseWaitCondition(resolveString(timing.waitUntilCondition, context))
+  let waitUntilCondition = parseWaitCondition(
+    resolveString(timing.waitUntilCondition, context),
+    context.unknownValues,
+  )
   let waitUntilTime = resolveNumber(timing.waitUntilTime, context)
 
   // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait so the effect
@@ -65,7 +68,10 @@ export function resolveActionTiming(
 
   return {
     ...timing,
-    waitForCondition: parseWaitCondition(resolveString(timing.waitForCondition, context)),
+    waitForCondition: parseWaitCondition(
+      resolveString(timing.waitForCondition, context),
+      context.unknownValues,
+    ),
     waitUntilCondition,
     waitForTime: resolveNumber(timing.waitForTime, context),
     waitForConditionCount: timing.waitForConditionCount

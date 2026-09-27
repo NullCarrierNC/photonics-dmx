@@ -9,10 +9,17 @@ import {
   setMinLogLevel,
   type LogEntry,
 } from '../../../../shared/logger'
+import { UnknownValueWarnings } from '../../../cues/node/runtime/valueResolver'
 
 function makeContext(): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
-  return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
+  return new ExecutionContext(
+    ev,
+    {} as CueData,
+    new Map(),
+    new Map(),
+    new UnknownValueWarnings('test'),
+  )
 }
 
 /** A fresh setting per call, the way each compiled cue node holds its own. */

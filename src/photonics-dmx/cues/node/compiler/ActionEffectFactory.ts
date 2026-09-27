@@ -1,4 +1,11 @@
-import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO } from '../../../types'
+import {
+  WaitCondition,
+  TrackedLight,
+  Effect,
+  EffectTransition,
+  RGBIO,
+  isWaitCondition,
+} from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { VariableValue } from '../runtime/executionTypes'
 import {
@@ -7,7 +14,7 @@ import {
   parseColor,
   parseLightTarget,
   parseLocationGroups,
-  parseWaitCondition,
+  type UnknownValueWarnings,
 } from '../runtime/valueResolver'
 import type {
   ActionTimingConfig,
@@ -38,6 +45,12 @@ import {
 const literalValue = (source: ValueSource | undefined) =>
   source?.source === 'literal' ? source.value : undefined
 
+/** A literal wait condition. A cue or effect whose literal names no condition does not compile. */
+const literalWaitCondition = (source: ValueSource | undefined): WaitCondition => {
+  const value = literalValue(source)
+  return isWaitCondition(value) ? value : 'none'
+}
+
 export class ActionEffectFactory {
   private static resolveColorSetting(color: NodeColorSetting): ResolvedColorSetting {
     const opacity = color.opacity?.source === 'literal' ? Number(color.opacity.value) : undefined
@@ -58,11 +71,11 @@ export class ActionEffectFactory {
     }
     const easing = literalValue(timing.easing)
     return {
-      waitForCondition: parseWaitCondition(literalValue(timing.waitForCondition)),
+      waitForCondition: literalWaitCondition(timing.waitForCondition),
       waitForTime: finiteOr(literalValue(timing.waitForTime), 0),
       waitForConditionCount: count(timing.waitForConditionCount),
       duration: finiteOr(literalValue(timing.duration), 200),
-      waitUntilCondition: parseWaitCondition(literalValue(timing.waitUntilCondition)),
+      waitUntilCondition: literalWaitCondition(timing.waitUntilCondition),
       waitUntilTime: finiteOr(literalValue(timing.waitUntilTime), 0),
       waitUntilConditionCount: count(timing.waitUntilConditionCount),
       easing: easing === undefined ? undefined : String(easing),
@@ -72,11 +85,13 @@ export class ActionEffectFactory {
 
   /**
    * The lights an action targets. A light-array variable in the groups slot names its own lights
-   * and skips the filter. Groups and a filter held in any other variable read its value.
+   * and skips the filter. Groups and a filter held in any other variable read its value, and text
+   * naming neither warns under the cue's own warnings.
    */
   public static resolveLights(
     lightManager: DmxLightManager,
     target: NodeActionTarget,
+    unknownValues: UnknownValueWarnings,
     variableResolver?: (name: string) => VariableValue | undefined,
   ): TrackedLight[] {
     const read = (source: ValueSource): unknown =>
@@ -87,9 +102,9 @@ export class ActionEffectFactory {
       if (held?.type === 'light-array') return held.value
     }
 
-    const groups = parseLocationGroups(read(target.groups))
+    const groups = parseLocationGroups(read(target.groups), unknownValues)
     if (groups.length === 0) return []
-    return lightManager.getLights(groups, parseLightTarget(read(target.filter)))
+    return lightManager.getLights(groups, parseLightTarget(read(target.filter), unknownValues))
   }
 
   public static buildEffect(params: BuildEffectParams): Effect | null {

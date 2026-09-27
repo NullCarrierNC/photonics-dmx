@@ -313,54 +313,19 @@ export class DmxLightManager {
   }
 
   /**
-   * Divides the lights array into three parts and returns the specified third.
-   * - If `thirdNumber = 2` and the number of lights is odd, returns the exact middle light.
-   * - Remainder 1 goes to third-2 (middle), remainder 2 goes to third-1 and third-2.
-   *
-   * @param lights - Array of TrackedLight objects.
-   * @param thirdNumber - The third to retrieve (1, 2, or 3).
-   * @returns An array of TrackedLight objects corresponding to the specified third.
+   * Splits the lights, in order, into three runs that hold every light once. Each third takes
+   * a third of the count rounded down. One spare light joins the middle third and a second spare
+   * joins the first, so a single light is the middle third and two lights are first and middle.
    */
-  private getThird(lights: TrackedLight[], thirdNumber: number): TrackedLight[] {
-    const len = lights.length
+  private getThird(lights: TrackedLight[], thirdNumber: 1 | 2 | 3): TrackedLight[] {
+    const base = Math.floor(lights.length / 3)
+    const remainder = lights.length % 3
+    const middleStart = base + (remainder === 2 ? 1 : 0)
+    const lastStart = middleStart + base + (remainder > 0 ? 1 : 0)
 
-    if (thirdNumber < 1 || thirdNumber > 3) {
-      throw new Error('thirdNumber must be 1, 2, or 3.')
-    }
-
-    if (len === 0) return []
-
-    if (len < 3) {
-      // Handle cases with fewer than 3 lights
-      if (thirdNumber === 1) return lights.slice(0, 1)
-      if (thirdNumber === 2) return lights.slice(1, 2)
-      if (thirdNumber === 3) return lights.slice(2, 3)
-      return []
-    }
-
-    // Special handling for thirdNumber = 2 with odd number of lights
-    if (thirdNumber === 2 && len % 2 === 1) {
-      const midIndex = Math.floor(len / 2)
-      return lights.slice(midIndex, midIndex + 1)
-    }
-
-    const base = Math.floor(len / 3)
-    const remainder = len % 3
-    let start = 0
-    let end = 0
-
-    // Distribute remainders: remainder 1 goes to third-2 (middle), remainder 2 goes to third-1 and third-2
-    if (thirdNumber === 1) {
-      end = base + (remainder >= 2 ? 1 : 0)
-    } else if (thirdNumber === 2) {
-      start = base + (remainder >= 2 ? 1 : 0)
-      end = start + base + (remainder >= 1 ? 1 : 0)
-    } else if (thirdNumber === 3) {
-      start = 2 * base + (remainder >= 1 ? 1 : 0) + (remainder >= 2 ? 1 : 0)
-      end = len
-    }
-
-    return lights.slice(start, end)
+    if (thirdNumber === 1) return lights.slice(0, middleStart)
+    if (thirdNumber === 2) return lights.slice(middleStart, lastStart)
+    return lights.slice(lastStart)
   }
 
   /**

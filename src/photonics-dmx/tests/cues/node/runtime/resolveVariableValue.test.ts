@@ -3,6 +3,7 @@ import { ExecutionContext } from '../../../../cues/node/runtime/ExecutionContext
 import {
   resolveVariableValue,
   UninitializedVariableError,
+  UnknownValueWarnings,
 } from '../../../../cues/node/runtime/valueResolver'
 import type { VariableValue } from '../../../../cues/node/runtime/executionTypes'
 import type { CueData } from '../../../../cues/types/cueTypes'
@@ -11,7 +12,13 @@ import { createMockTrackedLight } from '../../../helpers/testFixtures'
 
 function contextWith(variables: Record<string, VariableValue> = {}): ExecutionContext {
   const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
-  return new ExecutionContext(ev, {} as CueData, new Map(Object.entries(variables)), new Map())
+  return new ExecutionContext(
+    ev,
+    {} as CueData,
+    new Map(Object.entries(variables)),
+    new Map(),
+    new UnknownValueWarnings('test'),
+  )
 }
 
 const literal = (value: number | boolean | string): ValueSource => ({ source: 'literal', value })
