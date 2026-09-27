@@ -1,4 +1,6 @@
 import {
+  DRUM_NOTE_MAP,
+  INSTRUMENT_NOTE_MAP,
   defaultCueData,
   getCueTypeFromId,
   type CueData,
@@ -15,14 +17,24 @@ import type { WireRun } from './WireRun'
 export type AudioLevel = number | number[] | { every: number; high: number; low: number }
 
 /**
+ * A YARG frame event, named as the cue simulator names them: `keyframe-first|next|previous`,
+ * `drum-<pad>`, `guitar-|bass-|keys-<fret>`, and `vocal-note` / `vocal-note-off`, which start and
+ * end a sounding vocal.
+ */
+interface FrameEvent {
+  atMs: number
+  event: string
+}
+
+/**
  * YARG frames at `frameMs` carrying `cue`, with beats from `bpm` (every 4th a Measure) and each
- * keyframe on the first frame at or after its time into the step.
+ * event on the first frame at or after its time into the step.
  */
 interface GameStep {
   type: 'yarg'
   cue: string
   strobe?: StrobeState
-  keyframes?: Array<{ atMs: number; keyframe: 'First' | 'Next' | 'Previous' }>
+  events?: FrameEvent[]
   bpm?: number
   venue?: VenueSize
   frameMs?: number
@@ -115,11 +127,50 @@ function cueTypeOf(cue: string): CueType {
   return cueType
 }
 
+const KEYFRAMES: Record<string, CueData['keyframe']> = {
+  'keyframe-first': 'First',
+  'keyframe-next': 'Next',
+  'keyframe-previous': 'Previous',
+}
+
+const NOTE_FIELDS = {
+  drum: 'drumNotes',
+  guitar: 'guitarNotes',
+  bass: 'bassNotes',
+  keys: 'keysNotes',
+} as const
+
+/** The frame fields one event sets, with the vocal state it leaves, or an error for an unknown one. */
+export function applyFrameEvent(event: string, frame: Partial<CueData>, vocal: boolean): boolean {
+  const keyframe = KEYFRAMES[event]
+  if (keyframe) {
+    frame.keyframe = keyframe
+    return vocal
+  }
+  if (event === 'vocal-note' || event === 'vocal-note-off') {
+    return event === 'vocal-note'
+  }
+  const dash = event.indexOf('-')
+  const kind = event.slice(0, dash)
+  const name = event.slice(dash + 1)
+  if (kind === 'drum' && DRUM_NOTE_MAP[name]) {
+    frame.drumNotes = [...(frame.drumNotes ?? []), DRUM_NOTE_MAP[name]]
+    return vocal
+  }
+  if ((kind === 'guitar' || kind === 'bass' || kind === 'keys') && INSTRUMENT_NOTE_MAP[name]) {
+    const field = NOTE_FIELDS[kind]
+    frame[field] = [...(frame[field] ?? []), INSTRUMENT_NOTE_MAP[name]]
+    return vocal
+  }
+  throw new Error(`Unknown YARG event '${event}'`)
+}
+
 function yargFrame(
   step: GameStep,
   cue: CueType,
   beat: CueData['beat'],
-  keyframe: CueData['keyframe'],
+  events: Partial<CueData>,
+  vocal: boolean,
 ): CueData {
   return {
     ...defaultCueData,
@@ -133,8 +184,10 @@ function yargFrame(
     lightingCue: cue,
     strobeState: step.strobe ?? 'Strobe_Off',
     beat,
-    keyframe,
+    keyframe: 'Off',
+    vocalNote: vocal ? 1 : 0,
     trackMode: 'tracked',
+    ...events,
   }
 }
 
@@ -167,8 +220,9 @@ export async function playStep(run: WireRun, clock: WireClock, step: PlayStep): 
   const beatMs = bpm > 0 ? 60000 / bpm : Infinity
   const listener = step.type === 'yarg' ? run.yarg() : null
   const cue = step.type === 'yarg' ? cueTypeOf(step.cue) : null
-  const keyframes =
-    step.type === 'yarg' ? [...(step.keyframes ?? [])].sort((a, b) => a.atMs - b.atMs) : []
+  const events =
+    step.type === 'yarg' ? [...(step.events ?? [])].sort((a, b) => a.atMs - b.atMs) : []
+  let vocal = false
   let frameIndex = 0
   let beatIndex = 0
   let level = 0
@@ -193,11 +247,14 @@ export async function playStep(run: WireRun, clock: WireClock, step: PlayStep): 
         beatIndex++
       }
       if (listener && cue && step.type === 'yarg') {
-        const keyframe =
-          keyframes.length > 0 && keyframes[0].atMs <= elapsed() + EPSILON
-            ? keyframes.shift()?.keyframe ?? 'Off'
-            : 'Off'
-        listener.processCueData(yargFrame(step, cue, beat, keyframe))
+        // A frame carries one keyframe, so a second one due waits for the next frame.
+        const fields: Partial<CueData> = {}
+        while (events.length > 0 && events[0].atMs <= elapsed() + EPSILON) {
+          if (fields.keyframe && KEYFRAMES[events[0].event]) break
+          const next = events.shift()
+          if (next) vocal = applyFrameEvent(next.event, fields, vocal)
+        }
+        listener.processCueData(yargFrame(step, cue, beat, fields, vocal))
       } else if (audio && step.type === 'audio') {
         level = levelAt(step.level, frameIndex)
         void audio.dispatch(beatThisFrame ? { beat: 'Strong' } : {})

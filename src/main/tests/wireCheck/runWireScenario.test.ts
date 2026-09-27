@@ -218,15 +218,15 @@ describe('runWireScenario', () => {
   })
 
   it('raises a keyframe on the first frame at or after its time', async () => {
-    const stomp = (keyframes: Array<{ atMs: number; keyframe: 'Next' }>): WireScenario => ({
+    const stomp = (events: Array<{ atMs: number; event: string }>): WireScenario => ({
       name: 'stomp',
       rig: twoPars,
       yargLibrary: 'yarg-alt1',
-      steps: [{ type: 'yarg', cue: 'Stomp', durationMs: 400, keyframes }],
+      steps: [{ type: 'yarg', cue: 'Stomp', durationMs: 400, events }],
     })
     const dark = await runWireScenario(stomp([]), mockAppData)
     expect(dark.sends.some((send) => Object.values(send.buffer).some((v) => v > 0))).toBe(false)
-    const lit = await runWireScenario(stomp([{ atMs: 200, keyframe: 'Next' }]), mockAppData)
+    const lit = await runWireScenario(stomp([{ atMs: 200, event: 'keyframe-next' }]), mockAppData)
     const firstLit = lit.sends.find((send) => Object.values(send.buffer).some((v) => v > 0))
     expect(firstLit?.ms).toBeGreaterThanOrEqual(200)
   })

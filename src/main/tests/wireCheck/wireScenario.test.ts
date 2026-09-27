@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals'
 import { rigFiles, scenarioProblems } from '../../wireCheck/wireScenario'
-import { levelAt, stageKitBytes } from '../../../photonics-dmx/sim/wire/playStep'
+import { applyFrameEvent, levelAt, stageKitBytes } from '../../../photonics-dmx/sim/wire/playStep'
+import type { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
+import { DrumNoteType, InstrumentNoteType } from '../../../photonics-dmx/cues/types/cueTypes'
 
 interface WrittenRig {
   rigs: Array<{
@@ -93,6 +95,29 @@ describe('wire scenarios', () => {
         lights: [{ id: 'A', template: 'gone', group: 'front', address: 1 }],
       }),
     ).toThrow("Light A names template 'gone', which is not listed")
+  })
+
+  it('sets the frame fields a YARG event names, and carries the vocal state', () => {
+    const frame: Partial<CueData> = {}
+    expect(applyFrameEvent('drum-red', frame, false)).toBe(false)
+    expect(applyFrameEvent('drum-kick', frame, false)).toBe(false)
+    applyFrameEvent('guitar-blue', frame, false)
+    applyFrameEvent('bass-green', frame, false)
+    applyFrameEvent('keys-open', frame, false)
+    applyFrameEvent('keyframe-previous', frame, false)
+    expect(frame).toEqual({
+      drumNotes: [DrumNoteType.RedDrum, DrumNoteType.Kick],
+      guitarNotes: [InstrumentNoteType.Blue],
+      bassNotes: [InstrumentNoteType.Green],
+      keysNotes: [InstrumentNoteType.Open],
+      keyframe: 'Previous',
+    })
+    expect(applyFrameEvent('vocal-note', frame, false)).toBe(true)
+    expect(applyFrameEvent('drum-red', frame, true)).toBe(true)
+    expect(applyFrameEvent('vocal-note-off', frame, true)).toBe(false)
+    expect(() => applyFrameEvent('drum-cowbell', frame, false)).toThrow(
+      "Unknown YARG event 'drum-cowbell'",
+    )
   })
 
   it('writes StageKit commands as the datagram bytes RB3E sends', () => {
