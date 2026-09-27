@@ -34,7 +34,7 @@ export interface SacnSenderConfig extends BaseSenderConfig {
   unicastDestination?: string
   /** Max output rate in Hz (0 = no limit) */
   maxOutputRate?: number
-  /** sACN library min refresh when payload unchanged (Hz), aligns with `maxOutputRate` when set from prefs. */
+  /** How often (Hz) the last frame is resent while nothing new goes out, aligns with `maxOutputRate` when set from prefs. */
   minRefreshRate?: number
   /** Unified preference field (Hz), normalized on IPC enable into `maxOutputRate` and `minRefreshRate`. */
   refreshRateHz?: number
