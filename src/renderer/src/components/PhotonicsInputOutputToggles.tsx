@@ -40,7 +40,6 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
   }, [startOpen])
 
   const hasInvalidConfig = useMemo(() => validDmxLights.length === 0, [validDmxLights.length])
-  const togglesDisabled = hasInvalidConfig || lifecycleLocked
   // With no active rig the controllers run an empty chain, so the switches work and nothing lights.
   const noActiveRig = rigsLoaded && !hasInvalidConfig && !rigs.some((rig) => rig.active)
 
@@ -59,9 +58,19 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
           <div className="mb-6">
             <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">Input</h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
-              <ListenerToggle listener="yarg" disabled={togglesDisabled} />
-              <ListenerToggle listener="rb3" disabled={togglesDisabled} />
-              {showAudioToggle && <AudioToggle disabled={togglesDisabled} />}
+              <ListenerToggle
+                listener="yarg"
+                notReady={hasInvalidConfig}
+                disabled={lifecycleLocked}
+              />
+              <ListenerToggle
+                listener="rb3"
+                notReady={hasInvalidConfig}
+                disabled={lifecycleLocked}
+              />
+              {showAudioToggle && (
+                <AudioToggle notReady={hasInvalidConfig} disabled={lifecycleLocked} />
+              )}
             </div>
           </div>
 

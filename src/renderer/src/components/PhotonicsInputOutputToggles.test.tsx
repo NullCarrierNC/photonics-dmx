@@ -10,7 +10,9 @@ import {
   dmxRigsLoadedAtom,
   lightingPrefsAtom,
   myDmxLightsAtom,
+  rb3eListenerEnabledAtom,
   senderSacnEnabledAtom,
+  yargListenerEnabledAtom,
 } from '../atoms'
 import type { DmxFixture, DmxRig } from '../../../photonics-dmx/types'
 import { ConfigStrobeType, FixtureTypes } from '../../../photonics-dmx/types'
@@ -65,6 +67,8 @@ interface Seed {
   audioRunning?: boolean
   lights?: DmxFixture[]
   sacnRunning?: boolean
+  yargRunning?: boolean
+  rb3Running?: boolean
 }
 
 async function renderToggles({
@@ -74,6 +78,8 @@ async function renderToggles({
   audioRunning = false,
   lights = [validLight],
   sacnRunning = false,
+  yargRunning = false,
+  rb3Running = false,
 }: Seed = {}) {
   renderWithProviders(<DmxSettingsAccordion startOpen />, {
     seed: (set) => {
@@ -91,6 +97,8 @@ async function renderToggles({
       })
       set(audioListenerEnabledAtom, audioRunning)
       set(senderSacnEnabledAtom, sacnRunning)
+      set(yargListenerEnabledAtom, yargRunning)
+      set(rb3eListenerEnabledAtom, rb3Running)
     },
   })
   await waitFor(() => expect(ipcApi.getLifecyclePhase).toHaveBeenCalled())
@@ -156,6 +164,53 @@ describe('DmxSettingsAccordion', () => {
     fireEvent.click(button)
 
     await waitFor(() => expect(ipcApi.disableSender).toHaveBeenCalledWith({ sender: 'sacn' }))
+  })
+
+  it.each(['Enable YARG', 'Enable RB3E'])(
+    'holds the stopped %s switch off while no lights are set up',
+    async (name) => {
+      await renderToggles({ lights: [] })
+
+      const button = screen.getByRole('switch', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+    },
+  )
+
+  it('holds the stopped audio switch off while no lights are set up', async () => {
+    await renderToggles({ lights: [], advanced: true })
+
+    const button = screen.getByRole('switch', { name: 'Enable Audio' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+
+  it.each([
+    ['YARG', { yargRunning: true }, 'disableYarg'],
+    ['RB3E', { rb3Running: true }, 'disableRb3'],
+  ] as const)(
+    'stops a running %s listener while no lights are set up',
+    async (name, seed, call) => {
+      await renderToggles({ lights: [], ...seed })
+
+      // The switch is locked until the lifecycle phase read lands as running.
+      const button = screen.getByRole('switch', { name: `Enable ${name}` }) as HTMLButtonElement
+      await waitFor(() => expect(button.disabled).toBe(false))
+      fireEvent.click(button)
+
+      expect(ipcApi[call]).toHaveBeenCalled()
+      expect(button.getAttribute('aria-checked')).toBe('false')
+    },
+  )
+
+  it('stops running audio while no lights are set up', async () => {
+    await renderToggles({ lights: [], advanced: true, audioRunning: true })
+
+    // The switch is locked until the lifecycle phase read lands as running.
+    const button = screen.getByRole('switch', { name: 'Enable Audio' }) as HTMLButtonElement
+    await waitFor(() => expect(button.disabled).toBe(false))
+    fireEvent.click(button)
+
+    await waitFor(() => expect(ipcApi.setAudioEnabled).toHaveBeenCalledWith(false))
+    expect(button.getAttribute('aria-checked')).toBe('false')
   })
 
   it('says nothing about rigs before they have been read', async () => {

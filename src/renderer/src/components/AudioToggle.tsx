@@ -9,16 +9,19 @@ import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioGameMode, setAudioEnabled, setAudioGameMode } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { isRunSwitchHeld } from './controls/runSwitchHold'
 
 const log = createLogger('AudioToggle')
 
 interface AudioToggleProps {
+  /** Holds the switch off for a reason outside audio. Running audio can still be switched off. */
+  notReady?: boolean
   disabled?: boolean
   /** Overrides default wrapper layout (e.g. Audio Preview header row). */
   className?: string
 }
 
-const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
+const AudioToggle = ({ notReady = false, disabled = false, className }: AudioToggleProps) => {
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
   const isYargEnabled = useAtomValue(yargListenerEnabledAtom)
   const isRb3Enabled = useAtomValue(rb3eListenerEnabledAtom)
@@ -26,6 +29,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
   const [gameModeSaving, setGameModeSaving] = useState(false)
   const labelId = useId()
+  const held = isRunSwitchHeld(isAudioEnabled, notReady, isYargEnabled || isRb3Enabled || disabled)
 
   const refreshGameMode = useCallback(async () => {
     try {
@@ -51,7 +55,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   }, [isAudioEnabled, refreshGameMode])
 
   const handleToggle = async () => {
-    if (isSaving || disabled) return
+    if (isSaving || held) return
 
     const newState = !isAudioEnabled
     setIsAudioEnabled(newState)
@@ -98,9 +102,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
         <label
           id={labelId}
           className={`mr-4 text-lg font-semibold ${
-            isYargEnabled || isRb3Enabled || disabled
-              ? 'text-gray-500'
-              : 'text-gray-900 dark:text-gray-100'
+            held ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
           }`}>
           Enable Audio
         </label>
@@ -110,13 +112,11 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
           aria-checked={isAudioEnabled}
           aria-labelledby={labelId}
           onClick={() => void handleToggle()}
-          disabled={isYargEnabled || isRb3Enabled || disabled || isSaving}
+          disabled={held || isSaving}
           className={`w-12 h-6 rounded-full ${
             isAudioEnabled ? 'bg-green-500' : 'bg-gray-400'
           } relative focus:outline-none ${
-            isYargEnabled || isRb3Enabled || disabled || isSaving
-              ? 'opacity-50 cursor-not-allowed'
-              : 'cursor-pointer'
+            held || isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
           }`}>
           <div
             className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
