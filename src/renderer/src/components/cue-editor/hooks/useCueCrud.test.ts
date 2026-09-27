@@ -16,31 +16,36 @@ import { resolveCueKindSelection } from '../lib/cueKindSync'
 import * as ipcApi from '../../../ipcApi'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import type { UseCueCrudParams } from './useCueCrud'
-import type { EffectFile, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  EffectFile,
+  NetNodeCueDefinition,
+  NodeCueFile,
+  YargEffectDefinition,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import {
+  cue,
+  cueFileOf,
+  cueSummary,
+  effect,
+  effectFileOf,
+} from '@renderer/tests/helpers/cueEditorFiles'
 import { getLastActiveMode, getLastFilePathForMode } from './useLastCueFilePath'
 import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
 
-const cueDoc = (cues?: Array<Record<string, unknown>>): EditorDocument =>
-  ({
-    mode: 'cue',
-    path: '/cues/file.json',
-    file: {
-      mode: 'yarg',
-      group: { id: 'g', name: 'Group' },
-      cues: cues ?? [
-        { id: 'light-1', kind: 'lighting', name: 'Lighting A' },
-        { id: 'motion-1', kind: 'motion', name: 'Motion A' },
-        { id: 'motion-2', kind: 'motion', name: 'Motion B' },
-      ],
-    },
-  }) as unknown as EditorDocument
+const cueDoc = (
+  cues: NetNodeCueDefinition[] = [
+    cue('light-1', 'lighting', 'Lighting A'),
+    cue('motion-1', 'motion', 'Motion A'),
+    cue('motion-2', 'motion', 'Motion B'),
+  ],
+): EditorDocument => ({ mode: 'cue', path: '/cues/file.json', file: cueFileOf(...cues) })
 
 /** One motion cue only, so deleting it must fall back across kinds. */
 const singleMotionDoc = (): EditorDocument =>
   cueDoc([
-    { id: 'motion-1', kind: 'motion', name: 'Motion A' },
-    { id: 'light-b', kind: 'lighting', name: 'Bravo' },
-    { id: 'light-a', kind: 'lighting', name: 'Alpha' },
+    cue('motion-1', 'motion', 'Motion A'),
+    cue('light-b', 'lighting', 'Bravo'),
+    cue('light-a', 'lighting', 'Alpha'),
   ])
 
 const setup = (
@@ -138,19 +143,13 @@ describe('useCueCrud removeCue', () => {
   })
 })
 
-const effectDoc = (effects?: Array<Record<string, unknown>>): EditorDocument =>
-  ({
-    mode: 'effect',
-    path: '/effects/file.json',
-    file: {
-      mode: 'yarg',
-      group: { id: 'fx', name: 'Effects' },
-      effects: effects ?? [
-        { id: 'e1', name: 'Bravo' },
-        { id: 'e2', name: 'Alpha' },
-      ],
-    },
-  }) as unknown as EditorDocument
+const effectDoc = (
+  effects: YargEffectDefinition[] = [effect('e1', 'Bravo'), effect('e2', 'Alpha')],
+): EditorDocument => ({
+  mode: 'effect',
+  path: '/effects/file.json',
+  file: { ...effectFileOf(...effects), group: { id: 'fx', name: 'Effects' } },
+})
 
 const NEW_FILE = {
   groupId: 'stage',
@@ -278,7 +277,7 @@ describe('useCueCrud new files', () => {
 
   it('refuses a group id another file of the same mode already uses', async () => {
     const crud = renderCrud({
-      files: [{ mode: 'yarg', groupId: ' Stage ' }] as unknown as UseCueCrudParams['files'],
+      files: [cueSummary({ mode: 'yarg', groupId: ' Stage ', path: '/cues/yarg/friday.json' })],
     })
     await act(async () => {
       await crud.result.current.handleCreateNewFile(NEW_FILE)
@@ -317,7 +316,7 @@ describe('useCueCrud new files', () => {
 
   it('allows a group id that only a file of another mode uses', async () => {
     const crud = renderCrud({
-      files: [{ mode: 'audio', groupId: 'stage' }] as unknown as UseCueCrudParams['files'],
+      files: [cueSummary({ mode: 'audio', groupId: 'stage', path: '/cues/audio/friday.json' })],
     })
     await act(async () => {
       await crud.result.current.handleCreateNewFile(NEW_FILE)
@@ -436,7 +435,7 @@ describe('useCueCrud additions and effect removal', () => {
     const crud = renderCrud({ editorDoc: effectDoc(), selectedCueId: 'e1' })
     act(() => crud.result.current.removeEffect('e1'))
     expect(crud.setSelectedCueId).toHaveBeenCalledWith('e2')
-    expect(crud.loadCueIntoFlow).toHaveBeenCalledWith({ id: 'e2', name: 'Alpha' })
+    expect(crud.loadCueIntoFlow).toHaveBeenCalledWith(effect('e2', 'Alpha'))
     expect(crud.setIsDirty).toHaveBeenCalledWith(true)
   })
 
@@ -448,8 +447,8 @@ describe('useCueCrud additions and effect removal', () => {
   })
 
   it.each([
-    ['effect', 'removeEffect', effectDoc([{ id: 'only', name: 'Only' }])],
-    ['cue', 'removeCue', cueDoc([{ id: 'only', kind: 'lighting', name: 'Only' }])],
+    ['effect', 'removeEffect', effectDoc([effect('only', 'Only')])],
+    ['cue', 'removeCue', cueDoc([cue('only', 'lighting', 'Only')])],
   ] as const)('keeps the last %s in a file', (_case, method, doc) => {
     const crud = renderCrud({ editorDoc: doc, selectedCueId: 'only' })
     act(() => crud.result.current[method]('only'))

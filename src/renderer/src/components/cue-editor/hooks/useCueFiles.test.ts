@@ -12,8 +12,8 @@ import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { getLastActiveMode, setLastActiveMode, type EditorModeKey } from './useLastCueFilePath'
 import { isCueTypeSelectable, suggestNonConflictingGroupId } from '../lib/cueUtils'
 import type { EditorDocument } from '../lib/types'
-import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
-import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
+import type { EffectMode, NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { cue, cueFileOf, cueSummary, effectSummary } from '@renderer/tests/helpers/cueEditorFiles'
 import type { EffectFile, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
 import { useCueFiles } from './useCueFiles'
@@ -39,58 +39,35 @@ jest.mock(
     ).ipcListenerStub,
 )
 
-function cueSummary(mode: string, groupId: string): NodeCueFileSummary {
-  return {
-    mode,
-    groupId,
-    path: `/cues/${mode}/${groupId.toLowerCase()}.json`,
-  } as unknown as NodeCueFileSummary
-}
+const listedCues = (mode: NodeCueMode, groupId: string) =>
+  cueSummary({ mode, groupId, path: `/cues/${mode}/${groupId.toLowerCase()}.json` })
 
-function effectSummary(mode: string, groupId: string): EffectFileSummary {
-  return { mode, groupId, path: `/fx/${mode}/${groupId}.json` } as unknown as EffectFileSummary
-}
+const listedEffects = (mode: EffectMode, groupId: string) =>
+  effectSummary({ mode, groupId, path: `/fx/${mode}/${groupId}.json` })
 
 const CUE_LISTS = {
-  yarg: [cueSummary('yarg', 'stage'), cueSummary('yarg', ' Club ')],
-  audio: [cueSummary('audio', 'disco')],
-  rb3: [cueSummary('rb3', 'mirror')],
+  yarg: [listedCues('yarg', 'stage'), listedCues('yarg', ' Club ')],
+  audio: [listedCues('audio', 'disco')],
+  rb3: [listedCues('rb3', 'mirror')],
 }
-const EFFECT_LISTS = { yarg: [effectSummary('yarg', 'core')], audio: [] }
+const EFFECT_LISTS = { yarg: [listedEffects('yarg', 'core')], audio: [] }
 const CUE_TYPES = ['Default', 'Menu', 'Chorus', 'Verse']
 
-const OPEN_DOC = {
+const OPEN_DOC: EditorDocument = {
   mode: 'cue',
   path: '/cues/yarg/stage.json',
   file: {
-    mode: 'yarg',
+    ...cueFileOf(cue('l1', 'lighting', 'Wash'), cue('m1', 'motion', 'Sweep')),
     group: { id: 'stage', name: 'Stage' },
-    cues: [
-      {
-        id: 'l1',
-        kind: 'lighting',
-        name: 'Wash',
-        nodes: { events: [], actions: [] },
-        connections: [],
-      },
-      {
-        id: 'm1',
-        kind: 'motion',
-        name: 'Sweep',
-        nodes: { events: [], actions: [] },
-        connections: [],
-      },
-    ],
   },
-} as unknown as EditorDocument
+}
 
-const IMPORTED = {
+const IMPORTED: NodeCueFile = {
+  ...cueFileOf(),
   bundled: true,
   cueVersion: 4,
-  mode: 'yarg',
   group: { id: 'Stage', name: 'Imported' },
-  cues: [],
-} as unknown as NodeCueFile
+}
 
 beforeEach(() => {
   resetIpcApiMock()
@@ -173,14 +150,14 @@ describe('useCueFiles file lists from main', () => {
     act(() =>
       emitIpc(RENDERER_RECEIVE.NODE_CUES_CHANGED, {
         yarg: [],
-        audio: [cueSummary('audio', 'rock')],
+        audio: [listedCues('audio', 'rock')],
         rb3: [],
       }),
     )
     act(() =>
       emitIpc(RENDERER_RECEIVE.EFFECTS_CHANGED, {
         yarg: [],
-        audio: [effectSummary('audio', 'pulse')],
+        audio: [listedEffects('audio', 'pulse')],
       }),
     )
     expect(view.result.current.files.map((f) => f.path)).toEqual(['/cues/audio/rock.json'])
