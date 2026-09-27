@@ -4,7 +4,6 @@ import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycl
 import type { ControllerGraph } from './ControllerGraph'
 import type { ListenerLifecycleController } from './ListenerLifecycleController'
 import type { SenderLifecycleController } from './SenderLifecycleController'
-import type { ConsoleModeController } from './ConsoleModeController'
 import type { MotionCueSimulator } from './MotionCueSimulator'
 import { createLogger } from '../../shared/logger'
 
@@ -16,7 +15,6 @@ export interface ControllerRestartContext {
   graph: ControllerGraph
   listenerLifecycle: ListenerLifecycleController
   senderLifecycle: SenderLifecycleController
-  consoleMode: ConsoleModeController
   motionCueSimulator: MotionCueSimulator
   init(): Promise<void>
   isInitialized(): boolean
@@ -27,7 +25,7 @@ export interface ControllerRestartContext {
 
 /**
  * The restart routine: dequeue race checks, listener and graph teardown, restart-listener fan-out,
- * reinit, and listener/sender/console restore. Runs inside the lifecycle's shared-restart
+ * reinit, and listener and sender restore. Runs inside the lifecycle's shared-restart
  * operation on the op queue; the context carries the manager surfaces it drives.
  */
 /**
@@ -131,10 +129,6 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
   try {
     await ctx.init()
     abortIfShuttingDown(ctx.lifecycle, 'during reinitialization')
-    // The console page can close while the controllers restart, so its state is read here.
-    const consoleOpen = ctx.consoleMode.getConsoleRestore() !== null
-    ctx.lifecycle.settlePhase(consoleOpen ? 'consoleMode' : 'running', faultMark)
-    ctx.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
     // A fault that arose during this restart holds the graph failed, so the inputs it snapshotted
     // stay off.

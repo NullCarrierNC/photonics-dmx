@@ -22,6 +22,7 @@ import {
   lifecycleBlockedOn,
   lifecycleShuttingDownOn,
   listenerStub,
+  restartGraph,
   senderLifecycleStub,
   stubConfig,
   stubbedManager,
@@ -237,34 +238,58 @@ describe('ControllerManager restart', () => {
     expect(listeners.audio.enableAudio).not.toHaveBeenCalled()
   })
 
-  it('hands back to an open DMX console and returns to its phase', async () => {
-    const consoleMode = consoleModeStub()
-    consoleMode.getConsoleRestore.mockReturnValue({ yarg: false, rb3: false, audio: false })
-    const { manager, lifecycle } = stubbedManager({
-      lifecycle: lifecycleAt('consoleMode'),
-      consoleMode,
+  describe('with the DMX console open', () => {
+    /** A manager that builds its own graph over a publisher recording whether output is manual. */
+    function consoleManager(onRegistryLoad: () => Promise<void> = async () => {}) {
+      const output = { manual: false }
+      const graph = restartGraph({
+        setManualBuffer: () => {
+          output.manual = true
+        },
+        clearManualBuffer: () => {
+          output.manual = false
+        },
+      })
+      const registryInit = {
+        initializeCueRegistry: jest.fn(() => onRegistryLoad()),
+        initializeEffectLoader: jest.fn(async () => {}),
+        initializeNodeCueLoader: jest.fn(async () => {}),
+      }
+      const config = Object.assign(stubConfig({ cueDomains: {} }), {
+        updateCueDomain: jest.fn(async () => {}),
+      })
+      const { manager } = stubbedManager({
+        graph,
+        ownConsoleMode: true,
+        ownInit: { registryInit, config },
+      })
+      return { manager, output }
+    }
+
+    it('hands the rebuilt publisher back to the console and returns to its phase', async () => {
+      const { manager, output } = consoleManager()
+      await manager.enableConsoleMode('rig-1')
+      output.manual = false
+
+      await manager.restartControllers()
+
+      expect(output.manual).toBe(true)
+      expect(manager.getLifecyclePhase()).toBe('consoleMode')
     })
 
-    await manager.restartControllers()
+    it('returns to running when the console closes while the controllers restart', async () => {
+      let closeConsole = async () => {}
+      const { manager, output } = consoleManager(() => closeConsole())
+      await manager.enableConsoleMode('rig-1')
+      closeConsole = async () => {
+        await manager.disableConsoleMode()
+      }
 
-    expect(consoleMode.onControllersReinitializedWhileConsoleOpen).toHaveBeenCalled()
-    expect(lifecycle.phase).toBe('consoleMode')
-  })
+      await manager.restartControllers()
 
-  it('returns to running when the console closes while the controllers restart', async () => {
-    const consoleMode = consoleModeStub()
-    consoleMode.getConsoleRestore.mockReturnValue({ yarg: false, rb3: false, audio: false })
-    const { manager, lifecycle } = stubbedManager({
-      lifecycle: lifecycleAt('consoleMode'),
-      consoleMode,
-      init: async () => {
-        consoleMode.getConsoleRestore.mockReturnValue(null)
-      },
+      expect(output.manual).toBe(false)
+      expect(manager.getLifecyclePhase()).toBe('running')
     })
-
-    await manager.restartControllers()
-
-    expect(lifecycle.phase).toBe('running')
   })
 
   it('aborts without rebuilding when a shutdown begins between teardown and rebuild', async () => {
