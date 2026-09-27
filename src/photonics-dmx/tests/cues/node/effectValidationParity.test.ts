@@ -189,3 +189,51 @@ describe('effect validation parity (cycles + conditional valid values)', () => {
     })
   })
 })
+
+describe('effect validation warnings', () => {
+  const literal = (value: unknown): Record<string, unknown> => ({ source: 'literal', value })
+
+  /** An audio effect that waits on a song event and compares a light-array variable. */
+  const waitingEffect = baseEffect('audio', {
+    variables: [{ name: 'lights', type: 'light-array', scope: 'cue', initialValue: [] }],
+    nodes: {
+      events: [],
+      actions: [
+        {
+          id: 'paint',
+          type: 'action',
+          effectType: 'set-color',
+          target: { groups: literal('front'), filter: literal('all') },
+          color: { name: literal('blue'), brightness: literal('max') },
+          timing: {
+            waitForCondition: literal('none'),
+            waitForTime: literal(0),
+            duration: literal(100),
+            waitUntilCondition: literal('measure'),
+            waitUntilTime: literal(0),
+          },
+        },
+      ],
+      logic: [
+        {
+          id: 'gate',
+          type: 'logic',
+          logicType: 'conditional',
+          comparator: '>',
+          left: { source: 'variable', name: 'lights' },
+          right: literal(0),
+        },
+      ],
+    },
+  })
+
+  it('warns about a wait the mode never raises and a compare of an array', () => {
+    const result = validateAudioEffectFile(effectFile('audio', [waitingEffect]))
+
+    expect(result.valid).toBe(true)
+    expect(result.warnings).toEqual([
+      "effect 'Effect One': action 'paint' timing.waitUntilCondition 'measure' never fires in audio mode, so this wait does not end on it.",
+      "effect 'Effect One': conditional 'gate': 'lights' is a light-array variable, which a compare reads as 0. An array-length node gives its size.",
+    ])
+  })
+})

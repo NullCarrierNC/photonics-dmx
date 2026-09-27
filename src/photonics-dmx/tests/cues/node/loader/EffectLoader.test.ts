@@ -228,6 +228,56 @@ describe('EffectLoader folder mode', () => {
   })
 })
 
+describe('EffectLoader validation warnings', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-warnings-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('lists a wait the mode never raises on the summary', async () => {
+    const file = minimalYargEffectFixture('grp-waits')
+    file.effects[0].nodes.actions = [
+      {
+        id: 'paint',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'max' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'led-3' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      },
+    ]
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await loader.saveFile('yarg', 'waits.json', file)
+    } finally {
+      warn.mockRestore()
+    }
+
+    expect(loader.getSummary().yarg[0].warnings).toEqual([
+      "effect 'Test Effect': action 'paint' timing.waitUntilCondition 'led-3' never fires in yarg mode, so this wait does not end on it.",
+    ])
+  })
+})
+
 describe('EffectLoader compile errors surface on the summary', () => {
   let tmpDir: string
   let loader: EffectLoader

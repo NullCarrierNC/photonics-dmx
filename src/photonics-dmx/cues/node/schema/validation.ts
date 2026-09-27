@@ -13,10 +13,12 @@ import {
   prepareAudioNodeCueFileForValidation,
 } from './migrations'
 import type {
+  ActionNode,
   AudioNodeCueFile,
   AudioEffectFile,
   EffectDefinition,
   EffectFile,
+  LogicNode,
   NodeCueFile,
   NodeCueMode,
   NetNodeCueFile,
@@ -116,39 +118,61 @@ function checkEventVocabulary(file: NodeCueFile, _errors: string[], warnings: st
   }
 }
 
+/** One cue or effect graph, as the warning checks read it. */
+interface WarnedGraph {
+  /** How a warning names the graph, e.g. `cue 'Strobe'`. */
+  label: string
+  mode: NodeCueMode
+  actions: readonly ActionNode[]
+  logic: readonly LogicNode[]
+  variables: readonly VariableDefinition[]
+}
+
 /**
  * Warn about action literals the cue value rules pass with a warning, such as a wait condition that
- * never fires in the file's mode. A literal the rules refuse fails its cue at compile.
+ * never fires in the graph's mode. A literal the rules refuse fails its graph at compile.
  */
-function checkActionLiteralWarnings(
-  file: NodeCueFile,
-  _errors: string[],
-  warnings: string[],
-): void {
-  for (const cue of file.cues) {
-    for (const action of cue.nodes.actions ?? []) {
-      for (const { field, issue } of actionLiteralIssues(action, file.mode)) {
-        if (issue.severity !== 'warning') continue
-        warnings.push(
-          `cue '${cue.name}': action '${action.label ?? action.id}' ${field} ${issue.message}.`,
-        )
-      }
+function actionLiteralWarnings(graph: WarnedGraph, warnings: string[]): void {
+  for (const action of graph.actions) {
+    for (const { field, issue } of actionLiteralIssues(action, graph.mode)) {
+      if (issue.severity !== 'warning') continue
+      warnings.push(
+        `${graph.label}: action '${action.label ?? action.id}' ${field} ${issue.message}.`,
+      )
     }
   }
 }
 
 /** Warn about a conditional that compares an array variable, which reads as 0. */
-function checkArrayCompares(file: NodeCueFile, _errors: string[], warnings: string[]): void {
-  for (const cue of file.cues) {
-    const variables = [...(file.group.variables ?? []), ...(cue.variables ?? [])]
-    for (const node of cue.nodes.logic ?? []) {
-      if (node.logicType !== 'conditional') continue
-      for (const side of [node.left, node.right]) {
-        const issue = compareOperandIssue(side, variables)
-        if (issue) warnings.push(`cue '${cue.name}': conditional '${node.id}': ${issue.message}.`)
-      }
+function arrayCompareWarnings(graph: WarnedGraph, warnings: string[]): void {
+  for (const node of graph.logic) {
+    if (node.logicType !== 'conditional') continue
+    for (const side of [node.left, node.right]) {
+      const issue = compareOperandIssue(side, graph.variables)
+      if (issue) warnings.push(`${graph.label}: conditional '${node.id}': ${issue.message}.`)
     }
   }
+}
+
+const cueGraphs = (file: NodeCueFile): WarnedGraph[] =>
+  file.cues.map((cue) => ({
+    label: `cue '${cue.name}'`,
+    mode: file.mode,
+    actions: cue.nodes.actions ?? [],
+    logic: cue.nodes.logic ?? [],
+    variables: [...(file.group.variables ?? []), ...(cue.variables ?? [])],
+  }))
+
+function checkActionLiteralWarnings(
+  file: NodeCueFile,
+  _errors: string[],
+  warnings: string[],
+): void {
+  for (const graph of cueGraphs(file)) actionLiteralWarnings(graph, warnings)
+}
+
+function checkArrayCompares(file: NodeCueFile, _errors: string[], warnings: string[]): void {
+  for (const graph of cueGraphs(file)) arrayCompareWarnings(graph, warnings)
 }
 
 /**
@@ -453,32 +477,26 @@ function validateEffectFileForMode<T extends EffectFile>(
     }
   }
 
+  const graphs: WarnedGraph[] = file.effects.map((effect) => ({
+    label: `effect '${effect.name}'`,
+    mode,
+    actions: effect.nodes?.actions ?? [],
+    logic: effect.nodes?.logic ?? [],
+    variables: effect.variables ?? [],
+  }))
+  const warnings = file.effects.flatMap((effect) =>
+    initialValueWarnings(`effect '${effect.name}'`, effect.variables ?? []),
+  )
+  for (const graph of graphs) actionLiteralWarnings(graph, warnings)
+  for (const graph of graphs) arrayCompareWarnings(graph, warnings)
+
   return {
     valid: true,
     data: file,
     errors: [],
-    warnings: file.effects.flatMap(effectWarnings),
+    warnings,
     mode,
   }
-}
-
-/**
- * The warnings for one effect: its initial values, and the action literals the rules pass with a
- * warning in any mode, such as a colour name this build does not know.
- */
-function effectWarnings(effect: EffectDefinition): string[] {
-  const label = `effect '${effect.name}'`
-  return [
-    ...initialValueWarnings(label, effect.variables ?? []),
-    ...(effect.nodes?.actions ?? []).flatMap((action) =>
-      actionLiteralIssues(action)
-        .filter(({ issue }) => issue.severity === 'warning')
-        .map(
-          ({ field, issue }) =>
-            `${label}: action '${action.label ?? action.id}' ${field} ${issue.message}.`,
-        ),
-    ),
-  ]
 }
 
 export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> =>
