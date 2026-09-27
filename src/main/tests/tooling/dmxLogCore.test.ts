@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const {
+  parseArtDmx,
   parseChannelSpec,
   diffFrame,
   changeRows,
@@ -39,6 +40,47 @@ const strobeRows = (): Row[] => [
   { ms: 150, u: 1, src: 's', ch: { 2: 0 } },
   { ms: 400, end: true },
 ]
+
+/** An Art-Net packet laid out as dmxnet sends it. */
+const artNet = (
+  values: number[],
+  { opcode = 0x5000, net = 0, subuni = 1, sequence = 7 } = {},
+): Buffer => {
+  const header = Buffer.alloc(18)
+  header.write('Art-Net\0', 0, 'latin1')
+  header.writeUInt16LE(opcode, 8)
+  header.writeUInt16BE(14, 10)
+  header[12] = sequence
+  header[14] = subuni
+  header[15] = net
+  header.writeUInt16BE(values.length, 16)
+  return Buffer.concat([header, Buffer.from(values)])
+}
+
+describe('Art-Net packets', () => {
+  it('reads the universe, sequence and channel data of an ArtDmx packet', () => {
+    const packet = parseArtDmx(artNet([255, 0, 9]))
+    expect(packet.u).toBe(1)
+    expect(packet.sequence).toBe(7)
+    expect([...packet.dmx]).toEqual([255, 0, 9])
+  })
+
+  it('puts Net above SubUni in the Port-Address', () => {
+    expect(parseArtDmx(artNet([1], { net: 2, subuni: 0x31 })).u).toBe(0x231)
+  })
+
+  it('ignores other Art-Net packets and anything that is not Art-Net', () => {
+    expect(parseArtDmx(artNet([1], { opcode: 0x2000 }))).toBeNull()
+    expect(parseArtDmx(Buffer.from('not art-net at all, just some bytes'))).toBeNull()
+    expect(parseArtDmx(artNet([]).subarray(0, 12))).toBeNull()
+  })
+
+  it('reads no further than the stated length', () => {
+    const packet = artNet([1, 2, 3, 4])
+    packet.writeUInt16BE(2, 16)
+    expect([...parseArtDmx(packet).dmx]).toEqual([1, 2])
+  })
+})
 
 describe('channel spec', () => {
   it('reads single channels and ranges, sorted and unique', () => {

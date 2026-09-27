@@ -11,6 +11,32 @@
 
 const DMX_CHANNELS = 512
 
+/** Every Art-Net packet starts with this ID, and ArtDmx carries opcode 0x5000. */
+const ART_NET_ID = Buffer.from('Art-Net\0', 'latin1')
+const OP_DMX = 0x5000
+const ART_DMX_HEADER = 18
+
+/**
+ * Reads an ArtDmx packet. `u` is the 15-bit Port-Address: Net in the high byte, SubUni in the low.
+ * @param {Buffer} packet
+ * @returns {{ u: number, sequence: number, dmx: Buffer } | null} null for anything but ArtDmx
+ */
+function parseArtDmx(packet) {
+  if (
+    packet.length < ART_DMX_HEADER ||
+    !packet.subarray(0, ART_NET_ID.length).equals(ART_NET_ID) ||
+    packet.readUInt16LE(8) !== OP_DMX
+  ) {
+    return null
+  }
+  const length = Math.min(packet.readUInt16BE(16), DMX_CHANNELS)
+  return {
+    u: ((packet[15] & 0x7f) << 8) | packet[14],
+    sequence: packet[12],
+    dmx: packet.subarray(ART_DMX_HEADER, ART_DMX_HEADER + length),
+  }
+}
+
 /**
  * @param {string | undefined} spec such as "1-12,20"; empty or undefined means all 512
  * @returns {number[]} sorted, unique channel numbers from 1 to 512
@@ -247,6 +273,7 @@ function checkExpectations(rows, expect, options = {}) {
 }
 
 module.exports = {
+  parseArtDmx,
   parseChannelSpec,
   diffFrame,
   createRecorder,
