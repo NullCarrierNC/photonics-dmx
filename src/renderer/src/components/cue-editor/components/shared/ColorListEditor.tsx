@@ -1,23 +1,27 @@
 import React from 'react'
 import { COLOR_OPTIONS, isColor, type Color } from '../../../../../../photonics-dmx/types'
 
-export interface ColorListEditorProps {
-  colors: Color[]
-  onColorsChange: (colors: Color[]) => void
+export interface ColorListEditorProps<T extends string> {
+  /** The stored list, which may hold a name this build does not know. */
+  colors: readonly T[]
+  onColorsChange: (colors: Array<T | Color>) => void
   label?: string
   emptyMessage?: string
 }
 
-/** Edits an ordered list of colours via COLOR_OPTIONS dropdowns (add/remove). Used for color-array
- * literals and palettes; dropdown-only entry means invalid colour names can't be authored. */
-const ColorListEditor: React.FC<ColorListEditorProps> = ({
+/**
+ * Edits an ordered list of colours with COLOR_OPTIONS dropdowns, adding and removing entries. Used
+ * for color-array literals and palettes. Only listed colours can be picked, and a stored name the
+ * list leaves out stays shown as it is.
+ */
+function ColorListEditor<T extends string>({
   colors,
   onColorsChange,
   label = 'Palette (one colour per step, in order)',
   emptyMessage = 'No colours yet — add at least one.',
-}) => {
+}: ColorListEditorProps<T>): React.JSX.Element {
   const updateColorAt = (index: number, value: Color): void => {
-    const next = [...colors]
+    const next: Array<T | Color> = [...colors]
     next[index] = value
     onColorsChange(next)
   }
@@ -44,6 +48,11 @@ const ColorListEditor: React.FC<ColorListEditorProps> = ({
             onChange={(event) => {
               if (isColor(event.target.value)) updateColorAt(index, event.target.value)
             }}>
+            {!isColor(color) && (
+              <option value={color} disabled>
+                {color}
+              </option>
+            )}
             {COLOR_OPTIONS.map((c) => (
               <option key={c} value={c}>
                 {c}

@@ -36,7 +36,7 @@ export interface VariableDefinition {
   name: string
   type: VariableType
   scope: 'cue' | 'cue-group'
-  initialValue: number | boolean | string | Color[]
+  initialValue: number | boolean | string | string[]
   description?: string
   isParameter?: boolean
   /** Constrained set of allowed literal values, driving a selector in the effect-raiser parameter UI */

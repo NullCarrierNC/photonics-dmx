@@ -132,6 +132,36 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
+  it('leaves colour initial values as they are and stores other values as they read', () => {
+    const file = {
+      group: {
+        id: 'g',
+        name: 'G',
+        variables: [
+          { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 'mauve' },
+          {
+            name: 'palette',
+            type: 'color-array',
+            scope: 'cue-group',
+            initialValue: ['red', 'Bleu'],
+          },
+          { name: 'steps', type: 'number', scope: 'cue-group', initialValue: '4' },
+        ],
+      },
+      cues: [],
+    }
+
+    const changes = migrateOlderNodeFile(file)
+
+    expect(file.group.variables.map((v) => v.initialValue)).toEqual(['mauve', ['red', 'Bleu'], 4])
+    expect(changes).toEqual({
+      older: [
+        "Initial values their type cannot hold now hold what the cue reads: 'steps' is now 4.",
+      ],
+      unknown: [],
+    })
+  })
+
   it('leaves an action blend mode this version does not know as it is', () => {
     const lit = (value: unknown) => ({ source: 'literal', value })
     const file = {

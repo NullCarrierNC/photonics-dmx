@@ -105,7 +105,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
       return
     }
     const initialIssue = initialValueIssue(formData.type, formData.initialValue)
-    if (initialIssue) {
+    if (initialIssue?.severity === 'error') {
       showToast(`Initial value: ${initialIssue.message}.`, 'error')
       return
     }

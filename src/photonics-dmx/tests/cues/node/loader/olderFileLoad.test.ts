@@ -196,8 +196,6 @@ describe('loading cue and effect files older builds wrote', () => {
       const file = userCopyOfAlt1('user-initials')
       dischordOf(file).variables = [
         ...(dischordOf(file).variables ?? []),
-        { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['red', 'Bleu'] },
-        { name: 'accent', type: 'color', scope: 'cue', initialValue: 'mauve' },
         { name: 'armed', type: 'boolean', scope: 'cue', initialValue: 'true' },
         { name: 'steps', type: 'number', scope: 'cue', initialValue: '4' },
       ]
@@ -208,18 +206,42 @@ describe('loading cue and effect files older builds wrote', () => {
       expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
       expect(yarg.getGroup('user-initials')?.cues.size).toBe(24)
       expect(result.migrations).toEqual(
-        expect.arrayContaining([
-          expect.stringMatching(/^user-initials\.json: .*'palette'.*'accent'.*'armed'.*'steps'/),
-        ]),
+        expect.arrayContaining([expect.stringMatching(/^user-initials\.json: .*'armed'.*'steps'/)]),
       )
       const stored = dischordOf(readJson(path.join(cuesDir, 'user-initials.json'))).variables
       expect(Object.fromEntries((stored ?? []).map((v) => [v.name, v.initialValue]))).toEqual(
-        expect.objectContaining({
-          palette: ['red', 'blue'],
-          accent: 'blue',
-          armed: true,
-          steps: 4,
-        }),
+        expect.objectContaining({ armed: true, steps: 4 }),
+      )
+    })
+
+    it('keeps colours this version does not know in the file and warns about each', async () => {
+      const file = userCopyOfAlt1('user-colours')
+      dischordOf(file).variables = [
+        ...(dischordOf(file).variables ?? []),
+        { name: 'palette', type: 'color-array', scope: 'cue', initialValue: ['red', 'Bleu'] },
+        { name: 'accent', type: 'color', scope: 'cue', initialValue: 'mauve' },
+      ]
+      const filePath = path.join(cuesDir, 'user-colours.json')
+      writeJson(filePath, file)
+
+      const first = await loader.loadAll()
+      const stored = fs.readFileSync(filePath, 'utf-8')
+      const second = await loader.loadAll()
+
+      expect(first).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(second.migrations).toEqual([])
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(stored)
+      const variables = dischordOf(JSON.parse(stored)).variables ?? []
+      expect(Object.fromEntries(variables.map((v) => [v.name, v.initialValue]))).toEqual(
+        expect.objectContaining({ palette: ['red', 'Bleu'], accent: 'mauve' }),
+      )
+      expect(yarg.getGroup('user-colours')?.cues.size).toBe(24)
+      const [summary] = loader.getSummary().yarg
+      expect(summary.warnings).toEqual(
+        expect.arrayContaining([
+          "cue 'Dischord': variable 'palette' initial value 'Bleu' is not a known Color and the list plays without it.",
+          "cue 'Dischord': variable 'accent' initial value 'mauve' is not a known Color and plays as blue.",
+        ]),
       )
     })
   })

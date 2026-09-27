@@ -2,8 +2,8 @@
  * Brings a parsed cue or effect file an older build wrote onto what this build accepts, before
  * validation: a cue with no kind reads as lighting, a retired blend mode as replace, an unknown
  * easing as the default, an unused wait count is dropped, a variable name the editor once accepted
- * is renamed with every use of it, and an initial value takes its type. Values this build does not
- * know are noted apart from what an older build wrote.
+ * is renamed with every use of it, and an initial value other than a colour takes its type. Values
+ * this build does not know are noted apart from what an older build wrote.
  */
 import { VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { VariableType } from '../../types/nodeCueTypes'
@@ -220,14 +220,21 @@ const isVariableType = (value: unknown): value is VariableType =>
   (VARIABLE_TYPES as readonly unknown[]).includes(value)
 
 /**
+ * Colour initial values are left to validation. Every build offered only the colours this one
+ * knows, so another name comes from a hand edit.
+ */
+const COLOR_TYPES: ReadonlySet<unknown> = new Set(['color', 'color-array'])
+
+/**
  * An initial value its variable's type cannot hold is read by the runtime as something else, so it
- * is stored as what the runtime reads: an unknown colour as blue, an unreadable number as 0.
+ * is stored as what the runtime reads, such as an unreadable number as 0.
  */
 function conformInitialValues(declarations: readonly JsonObject[]): string | null {
   const changed: string[] = []
   for (const declaration of declarations) {
     const { type, initialValue, name } = declaration
-    if (!isVariableType(type) || initialValueIssue(type, initialValue) === null) continue
+    if (!isVariableType(type) || COLOR_TYPES.has(type)) continue
+    if (initialValueIssue(type, initialValue) === null) continue
     declaration.initialValue = initialValueAsRead(type, initialValue)
     changed.push(`'${String(name)}' is now ${JSON.stringify(declaration.initialValue)}`)
   }

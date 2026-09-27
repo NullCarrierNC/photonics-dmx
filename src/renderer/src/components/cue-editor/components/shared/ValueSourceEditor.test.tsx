@@ -32,6 +32,26 @@ describe('ValueSourceEditor with a constrained literal', () => {
   })
 })
 
+describe('ValueSourceEditor with the colour rule', () => {
+  it('warns that a colour this version does not know plays as blue', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="Colour"
+        value={{ source: 'literal', value: 'bleu' }}
+        onChange={jest.fn()}
+        expected="string"
+        rule="color"
+        availableVariables={[]}
+      />,
+    )
+
+    const select = screen.getByRole('combobox', { name: 'Colour' })
+    expect(select).toHaveDisplayValue('bleu')
+    expect(select.getAttribute('aria-invalid')).toBeNull()
+    expect(select).toHaveAccessibleDescription("'bleu' is not a known Color and plays as blue")
+  })
+})
+
 describe('ValueSourceEditor with an optional field', () => {
   it('shows an absent value as the default, unflagged', () => {
     renderWithProviders(

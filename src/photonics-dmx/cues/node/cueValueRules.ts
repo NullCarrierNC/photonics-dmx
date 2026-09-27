@@ -130,7 +130,9 @@ export function literalIssue(
         return error('must be a non-empty string')
       return isLightTarget(value) ? null : error(`'${value}' is not a known LightTarget`)
     case 'color':
-      return isColor(value) ? null : error(`'${String(value)}' is not a known Color`)
+      return isColor(value)
+        ? null
+        : warning(`'${String(value)}' is not a known Color and plays as blue`)
     case 'brightness':
       return isBrightness(value) ? null : error(`'${String(value)}' is not a known Brightness`)
     case 'blend-mode':
@@ -338,7 +340,7 @@ export function initialValueAsRead(type: VariableType, raw: unknown): unknown {
     case 'color':
       return isColor(raw) ? raw : 'blue'
     case 'color-array':
-      return Array.isArray(raw) ? raw.map((entry) => (isColor(entry) ? entry : 'blue')) : []
+      return Array.isArray(raw) ? raw.filter(isColor) : []
     case 'light-array':
       return []
     default:
@@ -347,20 +349,32 @@ export function initialValueAsRead(type: VariableType, raw: unknown): unknown {
 }
 
 /**
+ * A colour name this build does not know in a colour or colour list initial value. The cue plays it
+ * as blue, or leaves it out of the list, so it loads with a warning.
+ */
+function unknownColorIssue(type: VariableType, value: unknown): ValueIssue | null {
+  if (type === 'color' && typeof value === 'string') {
+    return warning(`'${value}' is not a known Color and plays as blue`)
+  }
+  if (type !== 'color-array' || !Array.isArray(value)) return null
+  if (!value.every((entry): entry is string => typeof entry === 'string')) return null
+  const unknown = value.find((entry) => !isColor(entry))
+  return unknown === undefined
+    ? null
+    : warning(`'${unknown}' is not a known Color and the list plays without it`)
+}
+
+/**
  * Whether a variable of `type` may start as `value`: it must be the value it reads as, so a file
- * never says one thing while the cue runs another.
+ * never says one thing while the cue runs another. A colour name this build does not know is a
+ * warning.
  */
 export function initialValueIssue(type: VariableType, value: unknown): ValueIssue | null {
   const read = initialValueAsRead(type, value)
   if (JSON.stringify(read) === JSON.stringify(value)) return null
+  const colorIssue = unknownColorIssue(type, value)
+  if (colorIssue) return colorIssue
   const shown = (v: unknown) => (typeof v === 'string' ? `'${v}'` : JSON.stringify(v))
-  if (type === 'color' || type === 'color-array') {
-    const entries = Array.isArray(value) ? value : [value]
-    const unknown = entries.find((entry) => !isColor(entry))
-    if (unknown !== undefined && (type === 'color' || Array.isArray(value))) {
-      return error(`${shown(unknown)} is not a known Color`)
-    }
-  }
   return error(`${shown(value)} is not a ${type} value, it reads as ${shown(read)}`)
 }
 

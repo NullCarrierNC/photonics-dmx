@@ -21,6 +21,11 @@ export interface EffectFileSummary {
   mode: EffectMode
   updatedAt: number
   errors?: string[]
+  /**
+   * Non-fatal findings from validation: the file loaded, but something in it will not do what it
+   * looks like it does.
+   */
+  warnings?: string[]
   /** What the load changed in a file an older build wrote, which it then saved. */
   migrations?: string[]
   /** What the load read differently in a file it left as it is on disk, and why it left it. */
@@ -201,6 +206,10 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     }
 
     const saved = await this.writeMigratedFile(filePath, parsed, changes)
+    const warnings = validation.warnings ?? []
+    for (const warning of warnings) {
+      log.warn(`${filePath}: ${warning}`)
+    }
 
     const summary: EffectFileSummary = {
       path: filePath,
@@ -211,6 +220,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
       migrations: saved.migrations,
       unsaved: saved.unsaved,
     }
