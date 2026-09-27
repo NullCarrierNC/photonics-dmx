@@ -270,6 +270,30 @@ describe('ConsoleModeController', () => {
     expect(store.rigPanHome()).toBe(50)
     expect(restarts).toBe(1)
   })
+
+  it('restarts and names the template when a template that landed cannot be put back', async () => {
+    const store = fixtureEditStore({ failTemplateWritesAfter: 1, failRealign: true })
+    let restarts = 0
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: store.getConfig,
+        restartControllers: async () => {
+          restarts++
+        },
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig(panHomeEdit)
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        'dmxRigs.json is read-only. The fixture template change could not be undone and is still saved.',
+    })
+    expect(store.templatePanHome()).toBe(50)
+    expect(store.rigPanHome()).toBeUndefined()
+    expect(restarts).toBe(1)
+  })
 })
 
 const panHomeEdit = {
@@ -288,10 +312,17 @@ type StoredTemplate = { id: string; fixture: string; config: { panHome?: number 
 
 /**
  * One moving head in one rig and its template, kept in memory. Template writes fail for the first
- * `failTemplateWrites` calls, and rig writes fail once `failRigWritesAfter` of them have landed.
+ * `failTemplateWrites` calls and once `failTemplateWritesAfter` of them have landed, and rig writes
+ * fail once `failRigWritesAfter` of them have landed. With `failRealign`, a template write that
+ * lands then throws, as the rig realign behind it does.
  */
 function fixtureEditStore(
-  options: { failTemplateWrites?: number; failRigWritesAfter?: number } = {},
+  options: {
+    failTemplateWrites?: number
+    failTemplateWritesAfter?: number
+    failRigWritesAfter?: number
+    failRealign?: boolean
+  } = {},
 ) {
   let rig: StoredRig = {
     id: 'rig-1',
@@ -304,6 +335,7 @@ function fixtureEditStore(
   let template: StoredTemplate = { id: 'fixture-1', fixture: 'rgb/mh', config: {} }
   let templateFailures = options.failTemplateWrites ?? 0
   let rigWrites = 0
+  let templateWrites = 0
   const config = {
     getDmxRig: () => rig,
     getUserLights: () => [template],
@@ -319,7 +351,17 @@ function fixtureEditStore(
         templateFailures--
         throw new Error('lights.json is read-only')
       }
+      if (
+        options.failTemplateWritesAfter !== undefined &&
+        templateWrites >= options.failTemplateWritesAfter
+      ) {
+        throw new Error('lights.json is read-only')
+      }
+      templateWrites++
       template = change(template)
+      if (options.failRealign) {
+        throw new Error('dmxRigs.json is read-only')
+      }
     },
   }
   return {
