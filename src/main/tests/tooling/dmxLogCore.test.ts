@@ -10,6 +10,9 @@ const {
   statesOf,
   renderTable,
   checkExpectations,
+  diffRuns,
+  countPacket,
+  packetRates,
 } = require('../../../../tools/dmxLogCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -218,6 +221,60 @@ describe('table', () => {
   })
 })
 
+describe('recording diff', () => {
+  const before = (): Row[] => [
+    { ms: 0, u: 1, ch: { 1: 255 } },
+    { ms: 100, u: 1, ch: { 1: 0 } },
+    { ms: 200, end: true },
+  ]
+
+  it('finds nothing between matching recordings', () => {
+    expect(diffRuns(before(), before(), 1)).toEqual({ channels: {}, differMs: 0 })
+  })
+
+  it('gives each differing channel its first differing time, and how long any differs', () => {
+    const after: Row[] = [
+      { ms: 0, u: 1, ch: { 1: 255 } },
+      { ms: 50, u: 1, ch: { 1: 0, 2: 9 } },
+      { ms: 300, end: true },
+    ]
+    expect(diffRuns(before(), after, 1)).toEqual({ channels: { 1: 50, 2: 50 }, differMs: 150 })
+  })
+
+  it('compares only the time both recordings cover, on the universe asked for', () => {
+    const late: Row[] = [
+      { ms: 20, u: 1, ch: { 1: 255 } },
+      { ms: 20, u: 2, ch: { 1: 7 } },
+      { ms: 100, u: 1, ch: { 1: 0 } },
+      { ms: 150, end: true },
+    ]
+    expect(diffRuns(before(), late, 1)).toEqual({ channels: {}, differMs: 0 })
+    expect(diffRuns(before(), late, 2).channels).toEqual({ 1: 20 })
+  })
+})
+
+describe('packet rates', () => {
+  it('counts packets from the first lit one', () => {
+    let seen = countPacket(undefined, 0, frame())
+    seen = countPacket(seen, 1000, frame({ 3: 9 }))
+    seen = countPacket(seen, 1023, frame())
+    expect(seen).toEqual({ count: 3, firstMs: 0, lastMs: 1023, litMs: 1000, litCount: 2 })
+  })
+
+  it('rates each source from its first lit packet, or its first packet when none lit', () => {
+    const counts = new Map([
+      ['a', { count: 46, firstMs: 0, lastMs: 1100, litMs: 100, litCount: 45 }],
+      ['b', { count: 3, firstMs: 0, lastMs: 100, litMs: null, litCount: 0 }],
+      ['c', { count: 1, firstMs: 50, lastMs: 50, litMs: 50, litCount: 1 }],
+    ])
+    expect(packetRates(counts)).toEqual([
+      { source: 'a', count: 46, spanMs: 1000, perSecond: 44 },
+      { source: 'b', count: 3, spanMs: 100, perSecond: 20 },
+      { source: 'c', count: 1, spanMs: 0, perSecond: 0 },
+    ])
+  })
+})
+
 describe('expectations', () => {
   it('passes states that appear in order within the time tolerance', () => {
     const result = checkExpectations(strobeRows(), {
@@ -295,5 +352,64 @@ describe('expectations', () => {
     ]
     expect(checkExpectations(rows, { states: [{ ch: { 1: 3 } }] }).ok).toBe(false)
     expect(checkExpectations(rows, { universe: 3, states: [{ ch: { 1: 3 } }] }).ok).toBe(true)
+  })
+
+  it('reads a range key as every channel in it', () => {
+    const rows: Row[] = [
+      { ms: 0, u: 1, ch: { 1: 255, 2: 255, 3: 255 } },
+      { ms: 10, end: true },
+    ]
+    expect(checkExpectations(rows, { states: [{ ch: { '1-3': 255, '4-6': 0 } }] }).ok).toBe(true)
+    expect(checkExpectations(rows, { states: [{ ch: { '1-4': 255 } }] }).ok).toBe(false)
+  })
+
+  it('leaves the walk in place when a state misses its time', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [
+        { ch: { 2: 255 }, atMs: 300 },
+        { ch: { 2: 255 }, atMs: 20 },
+      ],
+    })
+    expect(result.lines).toEqual([
+      'FAIL state 1: reached at 22 ms, expected 300 ± 30 ms',
+      'PASS state 2: reached at 22 ms',
+    ])
+  })
+
+  it('fails a never state shown inside its window, and passes one shown only outside it', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [
+        { never: { 2: 255 }, fromMs: 60, toMs: 100, label: 'dark between flashes' },
+        { never: { 2: 255 }, fromMs: 60, toMs: 120 },
+        { never: { 2: 128 } },
+      ],
+    })
+    expect(result.lines).toEqual([
+      'PASS state 1 (dark between flashes): never shown',
+      'FAIL state 2: shown at 110 ms, expected never',
+      'PASS state 3: never shown',
+    ])
+  })
+
+  it('fails an always state that any listed channel leaves inside its window', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [
+        { always: { '1-3': 0 }, toMs: 22 },
+        { always: { '1-3': 0 }, fromMs: 60, toMs: 110 },
+        { always: { 2: 0 }, fromMs: 60, toMs: 111 },
+      ],
+    })
+    expect(result.lines).toEqual([
+      'PASS state 1: held throughout',
+      'PASS state 2: held throughout',
+      'FAIL state 3: left at 110 ms with 2=255',
+    ])
+  })
+
+  it('does not move the walk for never and always states', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [{ ch: { 2: 255 }, atMs: 110 }, { never: { 2: 128 } }, { ch: { 2: 0 }, atMs: 150 }],
+    })
+    expect(result.ok).toBe(true)
   })
 })

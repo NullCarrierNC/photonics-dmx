@@ -80,6 +80,15 @@ describe('SacnSender', () => {
     expect(mockClose).toHaveBeenCalled()
   })
 
+  it('binds and sends on the sACN port unless given another', async () => {
+    await sender.start()
+    const custom = new SacnSender({ port: 5599 })
+    await custom.start()
+    expect(jest.mocked(Sender).mock.calls.map(([options]) => options.port)).toEqual([5568, 5599])
+    expect([sender.getConfiguredPort(), custom.getConfiguredPort()]).toEqual([5568, 5599])
+    await custom.stop()
+  })
+
   it('getUniverse returns configured universe', () => {
     expect(sender.getUniverse()).toBe(5)
   })
