@@ -12,6 +12,7 @@ jest.mock('../../utils/windowUtils', () => ({
   mainRuntimeBroadcaster: { emit: jest.fn() },
 }))
 
+import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import {
   listenerStub,
@@ -311,5 +312,46 @@ describe('the uncaught-fault hold against work already under way', () => {
     await Promise.all([rebuilding, retry])
 
     expect(manager.getLifecyclePhase()).toBe('running')
+  })
+})
+
+describe('a Retry restart asked for during the fault response', () => {
+  /** A rebuild longer than the fault response waits on the running op. */
+  function slowInit(lifecycle: ControllerLifecycle): Promise<void> {
+    return sleep(PAST_THE_WAIT_MS).then(() => lifecycle.setPhase('running'))
+  }
+
+  it.each(['yarg', 'audio'] as const)(
+    'lifts the hold and leaves %s off when its rebuild outlasts the fault response wait',
+    async (input) => {
+      const { listeners, on } = statefulListeners()
+      on[input] = true
+      const { manager } = stubbedManager({ listeners, init: slowInit })
+
+      manager.handleUncaughtException(new Error('frame path threw'))
+      await manager.restartControllers()
+      await settle()
+
+      expect(manager.getLifecyclePhase()).toBe('running')
+      expect(on[input]).toBe(false)
+    },
+  )
+
+  it('lifts the hold and leaves YARG off when it arrives while the inputs stop', async () => {
+    const { listeners, on } = statefulListeners()
+    on.yarg = true
+    listeners.yargRb3.disableYarg.mockImplementation(async () => {
+      await sleep(50)
+      on.yarg = false
+    })
+    const { manager } = stubbedManager({ listeners })
+
+    manager.handleUncaughtException(new Error('frame path threw'))
+    await sleep(20)
+    await manager.restartControllers()
+    await sleep(100)
+
+    expect(manager.getLifecyclePhase()).toBe('running')
+    expect(on.yarg).toBe(false)
   })
 })
