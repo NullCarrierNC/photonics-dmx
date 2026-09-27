@@ -132,6 +132,8 @@ export abstract class BaseSender {
     const now = performance.now()
     const elapsed = now - this.lastSendTimeMs
     if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
+      // The held frame is newer than the one a resend would repeat, and its flush re-arms it.
+      this.cancelRefresh()
       this.pendingBuffer = { ...universeBuffer }
       if (!this.flushTimer) {
         this.flushTimer = setTimeout(() => {
@@ -159,6 +161,40 @@ export abstract class BaseSender {
     }
     this.pendingBuffer = null
     this.lastSendTimeMs = 0
+  }
+
+  // --- Resending the held look, shared by the network senders ---
+
+  /**
+   * Resend the last frame after this long with nothing sent. 0 = no resends. A resend fires only
+   * after a full interval with nothing sent, so resends and new frames together stay within the
+   * max output rate.
+   */
+  protected refreshIntervalMs: number = 0
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+  /**
+   * Arms the resend of this frame for one refresh interval from now, replacing any earlier one.
+   * The frame is copied because the publisher reuses and mutates its buffer in place.
+   */
+  protected scheduleRefresh(universeBuffer: Record<number, number>): void {
+    this.cancelRefresh()
+    if (this.refreshIntervalMs <= 0) {
+      return
+    }
+    const frame = { ...universeBuffer }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null
+      void this.send(frame)
+    }, this.refreshIntervalMs)
+  }
+
+  /** Drop a pending resend. A sender cancels it before closing its connection. */
+  protected cancelRefresh(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = null
+    }
   }
 
   /**
