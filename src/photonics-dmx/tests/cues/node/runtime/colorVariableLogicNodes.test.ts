@@ -46,6 +46,20 @@ const setColor = (value: ValueSource): LogicNode => ({
   value,
 })
 
+const compareWith = (left: ValueSource, right: ValueSource): LogicNode => ({
+  id: 'cond',
+  type: 'logic',
+  logicType: 'conditional',
+  comparator: '==',
+  left,
+  right,
+})
+
+const branches: Connection[] = [
+  { from: 'cond', to: 'matched', fromPort: 'true' },
+  { from: 'cond', to: 'missed', fromPort: 'false' },
+]
+
 describe('colour variable logic nodes', () => {
   it('stores a known colour a set node writes', () => {
     const { run, cueStore } = harness()
@@ -70,19 +84,21 @@ describe('colour variable logic nodes', () => {
     const { run } = harness()
     run(setColor({ source: 'literal', value: 'mauve' }))
     const next = run(
-      {
-        id: 'cond',
-        type: 'logic',
-        logicType: 'conditional',
-        comparator: '==',
-        left: { source: 'variable', name: 'c' },
-        right: { source: 'literal', value: 'blue' },
-      },
-      [
-        { from: 'cond', to: 'matched', fromPort: 'true' },
-        { from: 'cond', to: 'missed', fromPort: 'false' },
-      ],
+      compareWith({ source: 'variable', name: 'c' }, { source: 'literal', value: 'blue' }),
+      branches,
     )
     expect(next).toEqual(['matched'])
   })
+
+  it.each([
+    ['right', { source: 'variable', name: 'c' }, { source: 'literal', value: 'mauve' }],
+    ['left', { source: 'literal', value: 'mauve' }, { source: 'variable', name: 'c' }],
+  ] as const)(
+    'compares an unknown colour on the %s of a colour variable as blue',
+    (_side, left, right) => {
+      const { run } = harness()
+      run(setColor({ source: 'literal', value: 'blue' }))
+      expect(run(compareWith(left, right), branches)).toEqual(['matched'])
+    },
+  )
 })

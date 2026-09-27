@@ -71,6 +71,21 @@ const palettePick = {
   assignTo: 'tint',
 }
 
+const tintSet = {
+  logicType: 'variable',
+  mode: 'set',
+  varName: 'tint',
+  valueType: 'color',
+  value: literal('mauve'),
+}
+
+const tintCompare = {
+  logicType: 'conditional',
+  comparator: '==',
+  left: { source: 'variable', name: 'tint' },
+  right: literal('mauve'),
+}
+
 describe('loading a hand-edited file holding a colour this version does not know', () => {
   let baseDir: string
   let yarg: CueRegistry
@@ -133,6 +148,33 @@ describe('loading a hand-edited file holding a colour this version does not know
       expect(fs.readFileSync(filePath, 'utf-8')).toBe(text)
       expect(effectLoader.getSummary().yarg[0].warnings).toEqual([
         "effect 'Tinted': color-from-index 'logic-1' colors 'mauve' is not a known Color and the list plays without it.",
+      ])
+    })
+  })
+
+  describe('as a logic node literal', () => {
+    it('loads the cue as it is on disk and warns once', async () => {
+      const { filePath, text } = store('cues', cueFile(tintSet))
+
+      const result = await loader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(yarg.getGroup('user-colours')?.cues.has(CueType.Chorus)).toBe(true)
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(text)
+      expect(loader.getSummary().yarg[0].warnings).toEqual([
+        "cue 'Chorus': variable 'logic-1' value 'mauve' is not a known Color and plays as blue.",
+      ])
+    })
+
+    it('loads the effect as it is on disk and warns once', async () => {
+      const { filePath, text } = store('effects', effectFile(tintCompare))
+
+      const result = await effectLoader.loadAll()
+
+      expect(result).toEqual(expect.objectContaining({ loaded: 1, failed: 0 }))
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe(text)
+      expect(effectLoader.getSummary().yarg[0].warnings).toEqual([
+        "effect 'Tinted': conditional 'logic-1' right 'mauve' is not a known Color and plays as blue.",
       ])
     })
   })

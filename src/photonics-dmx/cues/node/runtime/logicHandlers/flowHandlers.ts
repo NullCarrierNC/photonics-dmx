@@ -11,7 +11,7 @@ import {
   type ValueSource,
   type VariableType,
 } from '../../../types/nodeCueTypes'
-import { resolveNumber, resolveBoolean, resolveString } from '../valueResolver'
+import { resolveNumber, resolveBoolean, resolveString, parseColor } from '../valueResolver'
 import { extractCueDataValue } from '../dataExtractors'
 import { log, type HandlerCtx, type LogicHandler } from './handlerContext'
 
@@ -80,8 +80,14 @@ export const conditionalHandler: LogicHandler<'conditional'> = (logicNode, ctx) 
       const right = resolveBoolean(logicNode.right, context, variableDefinitions)
       outcome = logicNode.comparator === '==' ? left === right : left !== right
     } else if (useStringCompare) {
-      const left = resolveString(logicNode.left, context, variableDefinitions)
-      const right = resolveString(logicNode.right, context, variableDefinitions)
+      // A side compared as a colour reads as the colour it plays, so a name this build does not
+      // know compares as blue.
+      const text = (source: ValueSource | undefined, type: VariableType): string => {
+        const value = resolveString(source, context, variableDefinitions)
+        return type === 'color' ? parseColor(value) : value
+      }
+      const left = text(logicNode.left, leftType)
+      const right = text(logicNode.right, rightType)
       outcome = logicNode.comparator === '==' ? left === right : left !== right
     } else {
       const left = resolveNumber(logicNode.left, context, variableDefinitions)

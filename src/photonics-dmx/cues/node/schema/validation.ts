@@ -179,12 +179,16 @@ function checkInitialValues(file: NodeCueFile, _errors: string[], warnings: stri
 }
 
 /**
- * Warn about logic node literals the rules pass with a warning, such as a palette colour this build
- * does not know. `label` names the cue or effect holding them.
+ * Warn about logic node literals the rules pass with a warning, such as a colour this build does
+ * not know. `label` names the cue or effect holding them, and `variables` are those it declares.
  */
-function logicLiteralWarnings(label: string, logic: readonly LogicNode[]): string[] {
+function logicLiteralWarnings(
+  label: string,
+  logic: readonly LogicNode[],
+  variables: readonly VariableDefinition[],
+): string[] {
   return logic.flatMap((node) =>
-    logicLiteralIssues(node)
+    logicLiteralIssues(node, variables)
       .filter(({ issue }) => issue.severity === 'warning')
       .map(
         ({ field, issue }) => `${label}: ${node.logicType} '${node.id}' ${field} ${issue.message}.`,
@@ -194,7 +198,8 @@ function logicLiteralWarnings(label: string, logic: readonly LogicNode[]): strin
 
 function checkLogicLiteralWarnings(file: NodeCueFile, _errors: string[], warnings: string[]): void {
   for (const cue of file.cues) {
-    warnings.push(...logicLiteralWarnings(`cue '${cue.name}'`, cue.nodes.logic ?? []))
+    const variables = [...(file.group.variables ?? []), ...(cue.variables ?? [])]
+    warnings.push(...logicLiteralWarnings(`cue '${cue.name}'`, cue.nodes.logic ?? [], variables))
   }
 }
 
@@ -506,7 +511,7 @@ function effectWarnings(effect: EffectDefinition): string[] {
             `${label}: action '${action.label ?? action.id}' ${field} ${issue.message}.`,
         ),
     ),
-    ...logicLiteralWarnings(label, effect.nodes?.logic ?? []),
+    ...logicLiteralWarnings(label, effect.nodes?.logic ?? [], effect.variables ?? []),
   ]
 }
 
