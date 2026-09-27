@@ -18,13 +18,23 @@ export interface SacnConfig {
   unicastDestination?: string
   /** Max packets per second (Hz). 0 = no limit. Default 44. */
   maxOutputRate?: number
-  /** Passed to sacn `Sender` as minRefreshRate (Hz). Defaults to effective max output rate. */
+  /**
+   * How often (Hz) the last frame is resent while nothing new goes out. Defaults to the effective
+   * max output rate. 0 = no resends.
+   */
   minRefreshRate?: number
 }
 
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined
   private config: SacnConfig
+  /**
+   * A resend fires only after a full interval with nothing sent, so resends and new frames
+   * together stay within the max output rate. The sacn library's own `minRefreshRate` resends on
+   * a fixed timer alongside new frames, which doubles the packet rate while the look changes.
+   */
+  private readonly refreshIntervalMs: number
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(config: SacnConfig = {}) {
     super()
@@ -34,6 +44,9 @@ export class SacnSender extends BaseSender {
         ? config.maxOutputRate
         : config.minRefreshRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
     this.minIntervalMs = hzToThrottleIntervalMs(throttleHz)
+    this.refreshIntervalMs = hzToThrottleIntervalMs(
+      config.minRefreshRate ?? config.maxOutputRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE,
+    )
   }
 
   public async start(): Promise<void> {
@@ -46,14 +59,10 @@ export class SacnSender extends BaseSender {
     const validUniverse = Math.max(0, Math.min(63999, Number(universe)))
 
     // Configure sender options (sacn library does not export types for Sender options)
-    const minRefreshHz =
-      this.config.minRefreshRate ?? this.config.maxOutputRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
-
     const senderOptions: {
       universe: number
       port: number
       reuseAddr: boolean
-      minRefreshRate: number
       defaultPacketOptions: { sourceName: string; useRawDmxValues: boolean }
       iface?: string
       useUnicastDestination?: string
@@ -61,7 +70,6 @@ export class SacnSender extends BaseSender {
       universe: validUniverse,
       port: 5568,
       reuseAddr: true,
-      minRefreshRate: minRefreshHz,
       defaultPacketOptions: {
         sourceName: 'Photonics-DMX',
         useRawDmxValues: true,
@@ -127,6 +135,7 @@ export class SacnSender extends BaseSender {
     } catch (error) {
       log.error('Failed to send zero values before stopping:', error)
     } finally {
+      this.cancelRefresh()
       this.sender.close()
       this.sender = undefined
     }
@@ -137,15 +146,44 @@ export class SacnSender extends BaseSender {
       this.verifySenderStarted()
 
       if (this.throttleSend(universeBuffer)) {
+        // The held frame is newer than the one a resend would repeat, and its flush re-arms it.
+        this.cancelRefresh()
         return true
       }
 
+      this.scheduleRefresh(universeBuffer)
       await this.sender!.send({ payload: universeBuffer })
       return true
     } catch (err: unknown) {
+      this.cancelRefresh()
       log.error('SacnSender error:', err)
       this.emitSenderError(this.toSenderError(err, 'sacn'))
       return false
+    }
+  }
+
+  /**
+   * Arms the resend of this frame for one refresh interval from now, replacing any earlier one.
+   * The frame is copied because the publisher reuses and mutates its buffer in place.
+   */
+  private scheduleRefresh(universeBuffer: Record<number, number>): void {
+    this.cancelRefresh()
+    if (this.refreshIntervalMs <= 0) {
+      return
+    }
+    const frame = { ...universeBuffer }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null
+      if (this.sender) {
+        void this.send(frame)
+      }
+    }, this.refreshIntervalMs)
+  }
+
+  private cancelRefresh(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = null
     }
   }
 
