@@ -15,8 +15,6 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
-
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
@@ -34,7 +32,8 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
         label="Source Variable (light-array)"
         value={node.sourceVariable}
         onChange={(name) => updateNode({ sourceVariable: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
         placeholder="-- Select light-array --"
       />
 
@@ -42,7 +41,8 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
         label="Assign To (light-array variable)"
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
       />
 
       <p className="text-[10px] text-gray-500 italic">

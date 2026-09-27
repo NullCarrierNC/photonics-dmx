@@ -1,9 +1,14 @@
 import React, { useId } from 'react'
 import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isLocationGroup, LOCATION_OPTIONS } from '../../../../../../photonics-dmx/types'
-import { groupNames, literalIssue } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
+import {
+  GROUPS_VARIABLE_TYPES,
+  groupNames,
+  groupsVariableIssue,
+  literalIssue,
+} from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import { isVariableSource } from './nodeEditorUtils'
-import { issueAttributes } from './FieldIssue'
+import FieldIssue, { issueAttributes } from './FieldIssue'
 
 interface TargetGroupsMultiSelectEditorProps {
   label: string
@@ -30,7 +35,11 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
   const literalGroups = isLiteral ? groupNames(source.value) : []
   const selectedGroups = literalGroups.filter(isLocationGroup)
   const unknownGroups = literalGroups.filter((g) => !isLocationGroup(g))
-  const issue = isLiteral ? literalIssue('groups', source.value) : null
+  const selectedName = isVariableSource(source) ? source.name : ''
+  const offeredVariables = availableVariables.filter((v) => GROUPS_VARIABLE_TYPES.includes(v.type))
+  const issue = isLiteral
+    ? literalIssue('groups', source.value)
+    : groupsVariableIssue(selectedName, availableVariables)
 
   // Check if group is selected
   const isSelected = (group: (typeof LOCATION_OPTIONS)[number]) => selectedGroups.includes(group)
@@ -51,10 +60,7 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
   // Handle switch toggle
   const handleToggleVar = (checked: boolean) => {
     if (checked) {
-      onChange({
-        source: 'variable',
-        name: isVariableSource(source) ? source.name ?? 'var1' : 'var1',
-      })
+      onChange({ source: 'variable', name: selectedName })
     } else {
       // Switch to literal mode - use current selection or default to front
       const currentValue = isLiteral && typeof source.value === 'string' ? source.value : 'front'
@@ -126,24 +132,29 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
           <label className="flex flex-col font-medium text-xs">
             Variable
             <select
+              aria-label={`${label} variable`}
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={isVariableSource(source) ? source.name ?? '' : ''}
-              onChange={(event) =>
-                onChange({
-                  source: 'variable',
-                  name: event.target.value || 'var1',
-                })
-              }>
+              value={selectedName}
+              onChange={(event) => onChange({ source: 'variable', name: event.target.value })}
+              {...issueAttributes(issue, issueId)}>
               <option value="">-- Select --</option>
-              {availableVariables
-                .filter((v) => v.type === 'string' || v.type === 'light-array')
-                .map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name} ({v.type})
-                  </option>
-                ))}
+              {selectedName !== '' && !offeredVariables.some((v) => v.name === selectedName) && (
+                <option value={selectedName} disabled>
+                  {selectedName} (
+                  {availableVariables.some((v) => v.name === selectedName)
+                    ? 'wrong type'
+                    : 'not declared'}
+                  )
+                </option>
+              )}
+              {offeredVariables.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name} ({v.type})
+                </option>
+              ))}
             </select>
           </label>
+          <FieldIssue issue={issue} id={issueId} />
         </div>
       )}
     </div>

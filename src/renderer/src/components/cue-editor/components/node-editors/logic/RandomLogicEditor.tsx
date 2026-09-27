@@ -19,8 +19,6 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
 }) => {
   const mode = node.mode ?? 'random-integer'
   const choices = node.choices ?? []
-  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
-  const assignToVars = availableVariables
 
   const addChoice = (value: string) => {
     if (value && !choices.includes(value)) {
@@ -104,7 +102,8 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
             label="Source Variable (light-array)"
             value={node.sourceVariable ?? ''}
             onChange={(name) => updateNode({ sourceVariable: name || undefined })}
-            variables={lightArrayVars}
+            variables={availableVariables}
+            types={['light-array']}
             placeholder="-- Select light-array --"
           />
           <ValueSourceEditor
@@ -120,7 +119,7 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
         label="Assign To"
         value={node.assignTo ?? ''}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={assignToVars}
+        variables={availableVariables}
         showType
       />
       <p className="text-[10px] text-gray-500 italic">

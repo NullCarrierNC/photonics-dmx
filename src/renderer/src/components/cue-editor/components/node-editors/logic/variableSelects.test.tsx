@@ -12,6 +12,15 @@ import MathLogicEditor from './MathLogicEditor'
 import PulseLogicEditor from './PulseLogicEditor'
 import VariableLogicEditor from './VariableLogicEditor'
 import SelectFromListLogicEditor from './SelectFromListLogicEditor'
+import ArrayLengthLogicEditor from './ArrayLengthLogicEditor'
+import ArrayReorderLogicEditor from './ArrayReorderLogicEditor'
+import BuildRingLogicEditor from './BuildRingLogicEditor'
+import ColorFromIndexLogicEditor from './ColorFromIndexLogicEditor'
+import ConcatArraysLogicEditor from './ConcatArraysLogicEditor'
+import CreatePairsLogicEditor from './CreatePairsLogicEditor'
+import ForEachLightLogicEditor from './ForEachLightLogicEditor'
+import LightsFromIndexLogicEditor from './LightsFromIndexLogicEditor'
+import RandomLogicEditor from './RandomLogicEditor'
 
 const variables = [
   { name: 'level', type: 'number', scope: 'cue' as const },
@@ -25,12 +34,16 @@ type AnyEditor = React.FC<{
   activeMode: 'yarg'
 }>
 
-function renderEditor(Editor: unknown, logicType: LogicNode['logicType']) {
+function renderEditor(
+  Editor: unknown,
+  logicType: LogicNode['logicType'],
+  fields: Record<string, unknown> = {},
+) {
   const updateNode = jest.fn()
   const Component = Editor as AnyEditor
   render(
     <Component
-      node={LOGIC_NODE_FACTORIES[logicType]('n1')}
+      node={Object.assign(LOGIC_NODE_FACTORIES[logicType]('n1'), fields)}
       availableVariables={variables}
       updateNode={updateNode}
       activeMode="yarg"
@@ -89,6 +102,87 @@ describe('logic editor variable selects', () => {
     renderEditor(MathLogicEditor, 'math')
 
     expect(selectLabelled('Assign To (optional)')).toHaveDisplayValue('result (not declared here)')
+  })
+
+  it.each([
+    [ForEachLightLogicEditor, 'for-each-light', 'Source Variable (light-array)', 'sourceVariable'],
+    [
+      ForEachLightLogicEditor,
+      'for-each-light',
+      /^Current Light Variable \(light-array\)/,
+      'currentLightVariable',
+    ],
+    [BuildRingLogicEditor, 'build-ring', 'Ring (light-array variable)', 'assignTo'],
+    [CreatePairsLogicEditor, 'create-pairs', 'Source Variable (light-array)', 'sourceVariable'],
+    [CreatePairsLogicEditor, 'create-pairs', 'Assign To (light-array variable)', 'assignTo'],
+    [
+      LightsFromIndexLogicEditor,
+      'lights-from-index',
+      'Source Variable (light-array)',
+      'sourceVariable',
+    ],
+    [LightsFromIndexLogicEditor, 'lights-from-index', 'Assign To', 'assignTo'],
+    [
+      ArrayLengthLogicEditor,
+      'array-length',
+      'Source Variable (light-array or color-array)',
+      'sourceVariable',
+    ],
+    [ColorFromIndexLogicEditor, 'color-from-index', 'Assign To (colour variable)', 'assignTo'],
+    [ConcatArraysLogicEditor, 'concat-lights', 'Assign To (light-array variable)', 'assignTo'],
+    [ArrayReorderLogicEditor, 'reverse-lights', 'Source Variable (light-array)', 'sourceVariable'],
+    [ArrayReorderLogicEditor, 'reverse-lights', 'Assign To (light-array variable)', 'assignTo'],
+  ] as const)(
+    '%p %s names the type of a declared number variable in %s',
+    (Editor, logicType, label, field) => {
+      renderEditor(Editor, logicType, { [field]: 'level' })
+
+      expect(selectLabelled(label)).toHaveDisplayValue('level (number, does not fit this field)')
+    },
+  )
+
+  it.each([
+    [
+      ForEachLightLogicEditor,
+      'for-each-light',
+      'Current Index Variable (number)',
+      'currentIndexVariable',
+    ],
+    [BuildRingLogicEditor, 'build-ring', 'Group Size (number variable)', 'assignGroupSize'],
+    [ArrayLengthLogicEditor, 'array-length', 'Assign To (number variable)', 'assignTo'],
+  ] as const)(
+    '%p %s names the type of a declared light-array variable in %s',
+    (Editor, logicType, label, field) => {
+      renderEditor(Editor, logicType, { [field]: 'ring' })
+
+      expect(selectLabelled(label)).toHaveDisplayValue(
+        'ring (light-array, does not fit this field)',
+      )
+    },
+  )
+
+  it('names the type of a declared variable in the random light source', () => {
+    renderEditor(RandomLogicEditor, 'random', { mode: 'random-light', sourceVariable: 'level' })
+
+    expect(selectLabelled('Source Variable (light-array)')).toHaveDisplayValue(
+      'level (number, does not fit this field)',
+    )
+  })
+
+  it('offers only the variables of the types a field takes', () => {
+    renderEditor(ForEachLightLogicEditor, 'for-each-light')
+
+    expect(
+      Array.from(selectLabelled('Source Variable (light-array)').options).map((o) => o.textContent),
+    ).toEqual(['-- Select light-array --', 'ring (cue-group)'])
+  })
+
+  it('shows a name no variable declares as undeclared in a typed field', () => {
+    renderEditor(ForEachLightLogicEditor, 'for-each-light', { sourceVariable: 'scratch' })
+
+    expect(selectLabelled('Source Variable (light-array)')).toHaveDisplayValue(
+      'scratch (not declared here)',
+    )
   })
 
   it('keeps the lower-case placeholder on Select From List', () => {

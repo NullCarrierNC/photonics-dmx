@@ -170,6 +170,43 @@ describe('VariableRegistry', () => {
     expect(screen.getByPlaceholderText('variableName')).toHaveValue('speed')
   })
 
+  it('keeps the valid values of a variable it edits', () => {
+    const section: VariableDefinition = {
+      name: 'section',
+      type: 'string',
+      scope: 'cue-group',
+      initialValue: 'verse',
+      validValues: ['verse', 'chorus'],
+    }
+    const { onVariablesChange } = renderRegistry([section])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByPlaceholderText('What this variable is for'), {
+      target: { value: 'Song part' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onVariablesChange).toHaveBeenCalledWith([{ ...section, description: 'Song part' }], [])
+  })
+
+  it('drops the valid values of a variable whose type changes', () => {
+    const { onVariablesChange } = renderRegistry([
+      {
+        name: 'section',
+        type: 'string',
+        scope: 'cue-group',
+        initialValue: 'verse',
+        validValues: ['verse', 'chorus'],
+      },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByDisplayValue('String'), { target: { value: 'number' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const [[saved]] = onVariablesChange.mock.calls as [[VariableDefinition[]]]
+    expect(saved[0]).toMatchObject({ name: 'section', type: 'number', initialValue: 0 })
+    expect(saved[0]).not.toHaveProperty('validValues')
+  })
+
   it('refuses to save an initial value its type cannot hold', async () => {
     const { onVariablesChange } = renderRegistry([
       { name: 'accent', type: 'color', scope: 'cue-group', initialValue: 5 },

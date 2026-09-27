@@ -96,7 +96,8 @@ const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
         label={`Assign To (${arrayType} variable)`}
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={arrayVars}
+        variables={availableVariables}
+        types={[arrayType]}
       />
 
       <p className="text-[10px] text-gray-500 italic">{description}</p>

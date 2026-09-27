@@ -50,15 +50,14 @@ const ArrayReorderLogicEditor: React.FC<ArrayReorderLogicEditorProps> = ({
   updateNode,
 }) => {
   const { arrayType, description } = REORDERS[node.logicType]
-  const arrayVars = availableVariables.filter((v) => v.type === arrayType)
-
   return (
     <div className="space-y-2 text-xs">
       <VariableSelect
         label={`Source Variable (${arrayType})`}
         value={node.sourceVariable}
         onChange={(name) => updateNode({ sourceVariable: name })}
-        variables={arrayVars}
+        variables={availableVariables}
+        types={[arrayType]}
         placeholder={`-- Select ${arrayType} --`}
       />
 
@@ -66,7 +65,8 @@ const ArrayReorderLogicEditor: React.FC<ArrayReorderLogicEditorProps> = ({
         label={`Assign To (${arrayType} variable)`}
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={arrayVars}
+        variables={availableVariables}
+        types={[arrayType]}
       />
 
       <p className="text-[10px] text-gray-500 italic">{description}</p>

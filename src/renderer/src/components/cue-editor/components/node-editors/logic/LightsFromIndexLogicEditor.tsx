@@ -13,15 +13,14 @@ const LightsFromIndexLogicEditor: React.FC<LightsFromIndexLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
-
   return (
     <div className="space-y-2 text-xs">
       <VariableSelect
         label="Source Variable (light-array)"
         value={node.sourceVariable}
         onChange={(name) => updateNode({ sourceVariable: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
         placeholder="-- Select light-array --"
       />
 
@@ -46,7 +45,8 @@ const LightsFromIndexLogicEditor: React.FC<LightsFromIndexLogicEditorProps> = ({
         label="Assign To"
         value={node.assignTo}
         onChange={(name) => updateNode({ assignTo: name })}
-        variables={lightArrayVars}
+        variables={availableVariables}
+        types={['light-array']}
       />
 
       <p className="text-[10px] text-gray-500 italic">
