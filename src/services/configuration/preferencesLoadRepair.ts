@@ -7,6 +7,8 @@ import {
 import { clampSacnUniverse } from '../../shared/sacnUniverse'
 import { isPlainObject } from '../../shared/plainObject'
 import { clampClockRateMs } from '../../shared/clockRate'
+import { isBrightness, isColor } from '../../photonics-dmx/types'
+import { DEFAULT_AUDIO_IDLE_DETECTION } from '../../photonics-dmx/listeners/Audio/AudioConfig'
 import {
   CUE_DOMAINS,
   type CueDomain,
@@ -46,6 +48,38 @@ export function healStoredClockRate(prefs: AppPreferences): AppPreferences {
   }
   const rate = clampClockRateMs(stored)
   return rate === stored ? prefs : { ...prefs, clockRate: rate }
+}
+
+/**
+ * Brings a stored audio idle colour or brightness this build does not know back to its default.
+ * Both reach the idle look's colour lookup, which has no reading for a name it does not know.
+ *
+ * @param report Told which fields were reset, when any were.
+ */
+export function healStoredAudioIdleLook(
+  prefs: AppPreferences,
+  report?: (message: string) => void,
+): AppPreferences {
+  const audioConfig = prefs?.audioConfig
+  const idle = audioConfig?.idleDetection
+  if (!isPlainObject(idle)) {
+    return prefs
+  }
+  const healed = { ...idle }
+  const reset: string[] = []
+  if (idle.idleColor !== undefined && !isColor(idle.idleColor)) {
+    healed.idleColor = DEFAULT_AUDIO_IDLE_DETECTION.idleColor
+    reset.push('audioConfig.idleDetection.idleColor')
+  }
+  if (idle.idleBrightness !== undefined && !isBrightness(idle.idleBrightness)) {
+    healed.idleBrightness = DEFAULT_AUDIO_IDLE_DETECTION.idleBrightness
+    reset.push('audioConfig.idleDetection.idleBrightness')
+  }
+  if (reset.length === 0) {
+    return prefs
+  }
+  report?.(`Reset to default: ${reset.join(', ')}`)
+  return { ...prefs, audioConfig: { ...audioConfig, idleDetection: healed } }
 }
 
 /**

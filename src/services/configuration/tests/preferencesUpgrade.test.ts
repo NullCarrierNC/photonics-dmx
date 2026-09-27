@@ -9,6 +9,7 @@ jest.mock('electron', () => ({
 
 import { PreferencesConfigFile } from '../PreferencesConfigFile'
 import { DEFAULT_PREFERENCES } from '../configurationDefaults'
+import { DEFAULT_AUDIO_CONFIG } from '../../../photonics-dmx/listeners/Audio'
 import { createDefaultCueDomains } from '../cueDomainTypes'
 import { normalizeLagCompensationMs } from '../../../shared/lagCompensation'
 
@@ -47,6 +48,35 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(onCorruptRecovery).toHaveBeenCalledWith(expect.objectContaining({ reason: 'repaired' }))
     const files = fs.readdirSync(path.join(appData, 'Photonics.rocks'))
     expect(files.filter((f) => f.includes('.corrupt-'))).toEqual([])
+  })
+
+  it('loads an audio idle colour and brightness this build does not know as the defaults', () => {
+    const appData = freshAppData()
+    const idleDetection = {
+      ...DEFAULT_AUDIO_CONFIG.idleDetection,
+      thresholdPct: 35,
+      idleColor: 'mauve',
+      idleBrightness: 'blinding',
+    }
+    seedPrefs(appData, 7, {
+      ...DEFAULT_PREFERENCES,
+      audioConfig: { ...DEFAULT_AUDIO_CONFIG, sensitivity: 4, idleDetection },
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(prefs.audioConfig?.idleDetection).toEqual({
+      ...DEFAULT_AUDIO_CONFIG.idleDetection,
+      thresholdPct: 35,
+    })
+    expect(prefs.audioConfig?.sensitivity).toBe(4)
+    expect(onCorruptRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'repaired',
+        message: expect.stringContaining('audioConfig.idleDetection.idleColor'),
+      }),
+    )
   })
 
   it('migrates a stored v5 file (four domains) without corrupt-recovery and seeds rb3', () => {
