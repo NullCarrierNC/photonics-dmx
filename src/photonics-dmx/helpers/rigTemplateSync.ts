@@ -1,5 +1,5 @@
 import equal from 'fast-deep-equal'
-import { clampDerivedDmxChannel, DMX_CHANNEL_MAX, FixtureTypes } from '../types'
+import { clampDerivedDmxChannel, DMX_CHANNEL_MAX, FixtureTypes, isValidDmxChannel } from '../types'
 import { isRgbFamilyWithStrobeChannel } from './strobeChannelRigInspection'
 import type {
   DmxFixture,
@@ -29,13 +29,16 @@ import type {
  *    `rigMasterDimmer + (templateChannel - templateMasterDimmer)` — the same offset model
  *    {@link createDmxLightInstance} and LightChannelsConfig use. Re-laying-out channel offsets in
  *    a template therefore propagates to every rig light using it. An unassigned (0) template
- *    channel stays 0, and a rig light with no usable master address derives every channel as 0.
+ *    channel stays 0. A template with no master (0) gives its channels no offset, so its rig
+ *    lights keep their own master, derive every other channel as 0 and are `unplaced` until it
+ *    has one. A rig light with no usable master address derives every channel as 0.
  *  - Default `strobeValues` (when the rig has no per-light override)
  *  - `extraChannels`: user-added channels beyond the archetype map. `type`/`value`/`scale` are
  *    copied verbatim; each `channel` is offset-derived from the template the same way the base
  *    channels are (see {@link deriveExtraChannelsForMaster}).
  *  - `brightnessScaling`: the colour trim. No per-rig override, so the template's value replaces
  *    whatever the snapshot held.
+ *  - `unplaced`: set while the template has no master ({@link templatePlacesRigLights}).
  *  - `config` defaults when the rig has none and the template provides them (e.g. fixture-type
  *    change RGB→RGBMH adds moving-head defaults). Existing rig calibration is preserved.
  *
@@ -48,21 +51,31 @@ import type {
  *  - `isStrobeEnabled` — this is a layout-level toggle (LightChannelsConfig's "Use as strobe"),
  *    not a template property after creation
  *
- * Orphaned rig lights (whose `fixtureId` no longer resolves to a template) are returned unchanged.
+ * Orphaned rig lights (whose `fixtureId` resolves to no template) keep their stored channels and
+ * `unplaced` flag while their master is an address, and have every channel at 0 without one.
  */
 
 /**
  * Places a template channel on a rig light addressed at `master`, by its offset from the template's
- * own master. A template channel of 0 is unassigned and stays 0. A master that is not an address
- * (0, or outside 1-512) gives every channel 0, since the light has no place in the universe. A
- * result outside 1-512 collapses to 0 through {@link clampDerivedDmxChannel}.
+ * own master. A template channel of 0 is unassigned and stays 0. Every channel is 0 when either
+ * master is not an address (0, or outside 1-512): a template with no master gives its channels no
+ * offset, and a light with no master has no place in the universe. A result outside 1-512
+ * collapses to 0 through {@link clampDerivedDmxChannel}.
  */
 function channelAtOffset(templateMaster: number, master: number): (channel: number) => number {
   const address = clampDerivedDmxChannel(master)
+  const placed = address !== 0 && isValidDmxChannel(templateMaster)
   return (channel) =>
-    channel === 0 || address === 0
-      ? 0
-      : clampDerivedDmxChannel(address + (channel - templateMaster))
+    channel === 0 || !placed ? 0 : clampDerivedDmxChannel(address + (channel - templateMaster))
+}
+
+/**
+ * Whether a template gives its rig lights a place in the universe: its own master is an address,
+ * so every other channel has an offset from it. A rig light of a template that does not is
+ * `unplaced`, and nothing is written for it.
+ */
+export function templatePlacesRigLights(template: DmxFixture): boolean {
+  return isValidDmxChannel(template.channels.masterDimmer)
 }
 
 /**
@@ -83,11 +96,13 @@ export function deriveExtraChannelsForMaster(
 
 /**
  * Widest offset above the master dimmer that a template occupies, counting base channels and added
- * channels alike. An unassigned (0) extra occupies nothing.
+ * channels alike. An unassigned (0) extra occupies nothing, and a template with no master places
+ * nothing above it ({@link channelAtOffset}).
  */
 export function templateChannelSpan(template: DmxFixture): number {
   const templateChannels = template.channels
-  const templateMaster = templateChannels.masterDimmer ?? 0
+  const templateMaster = templateChannels.masterDimmer
+  if (!isValidDmxChannel(templateMaster)) return 0
   let span = 0
   for (const [channelName, value] of Object.entries(templateChannels)) {
     if (channelName === 'masterDimmer') continue
@@ -126,8 +141,8 @@ export function maxMasterDimmerForTemplate(template: DmxFixture): number {
 /**
  * The template's fixture type with every base channel derived from a master dimmer using the
  * template's own offsets ({@link channelAtOffset}). Results land in the persisted 0/1-512 domain,
- * with an unassigned template channel at 0 and every channel at 0 for a master that is not an
- * address.
+ * with an unassigned template channel at 0, every channel but the master at 0 for a template with
+ * no master, and every channel at 0 for a master that is not an address.
  */
 export function deriveChannelLayoutForMaster(
   template: DmxFixture,
@@ -169,15 +184,32 @@ export function deriveChannelLayoutForMaster(
 }
 
 /**
+ * A rig light whose template is gone. With a master it keeps its stored channels and `unplaced`
+ * flag, and with none it has no place in the universe, so every channel, added ones included, is 0.
+ */
+function syncOrphanedLight(light: DmxLight): { light: DmxLight; changed: boolean } {
+  if (isValidDmxChannel(light.channels.masterDimmer)) {
+    return { light, changed: false }
+  }
+  const synced: DmxLight = { ...light, ...deriveChannelLayoutForMaster(light, 0) }
+  const extraChannels = deriveExtraChannelsForMaster(light.extraChannels, 0, 0)
+  if (extraChannels !== undefined) {
+    synced.extraChannels = extraChannels
+  }
+  return equal(light, synced) ? { light, changed: false } : { light: synced, changed: true }
+}
+
+/**
  * Aligns a single rig light to its current template. Returns the input unchanged (same reference,
- * `changed: false`) when the rig already matches the template OR when no template is found.
+ * `changed: false`) when the rig already matches the template, or when no template is found and
+ * the light has a master ({@link syncOrphanedLight}).
  */
 export function syncDmxLightWithTemplate(
   light: DmxLight,
   template: DmxFixture | undefined,
 ): { light: DmxLight; changed: boolean } {
   if (!template) {
-    return { light, changed: false }
+    return syncOrphanedLight(light)
   }
 
   const rigChannels = light.channels
@@ -259,6 +291,11 @@ export function syncDmxLightWithTemplate(
     synced.brightnessScaling = nextBrightnessScaling
   } else {
     delete synced.brightnessScaling
+  }
+  if (templatePlacesRigLights(template)) {
+    delete synced.unplaced
+  } else {
+    synced.unplaced = true
   }
 
   return equal(light, synced) ? { light, changed: false } : { light: synced, changed: true }

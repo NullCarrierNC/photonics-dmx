@@ -87,19 +87,23 @@ const MyLights = () => {
   }
 
   /**
-   * Asks before saving a light that rigs use while one of its base channels is still at 0, since
-   * the rig lights built from it leave that channel undriven. The user can still save it.
+   * Asks before saving a light that rigs use while one of its base channels is still at 0. The rig
+   * lights built from it leave that channel undriven, and with no master they stay dark. The user
+   * can still save it.
    */
   const confirmUnassignedChannels = async (light: DmxFixture): Promise<boolean> => {
     const unassigned = unassignedBaseChannelLabels(light)
     if (unassigned.length === 0 || !light.id || !placedInARig(rigs, light.id)) return true
     const one = unassigned.length === 1
+    const effect =
+      light.channels.masterDimmer === 0
+        ? `Lights in your rigs that use ${light.name} stay dark until ${light.name} has a ` +
+          `Master Dimmer.`
+        : `Lights in your rigs that use ${light.name} won't drive ${one ? 'it' : 'them'} until ` +
+          `you set ${one ? 'it' : 'them'}.`
     return confirm({
       title: one ? 'Channel not set' : 'Channels not set',
-      message:
-        `${joinNames(unassigned)} ${one ? 'has' : 'have'} no DMX channel yet. Lights in your ` +
-        `rigs that use ${light.name} won't drive ${one ? 'it' : 'them'} until you set ` +
-        `${one ? 'it' : 'them'}.`,
+      message: `${joinNames(unassigned)} ${one ? 'has' : 'have'} no DMX channel yet. ${effect}`,
       confirmLabel: 'Save anyway',
       cancelLabel: 'Keep editing',
     })

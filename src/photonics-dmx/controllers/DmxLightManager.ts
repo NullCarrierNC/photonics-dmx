@@ -91,6 +91,8 @@ export class DmxLightManager {
 
   /**
    * Initializes the _dmxLights map by mapping each light's ID to its corresponding DmxLight object.
+   * An `unplaced` light has no place in the universe, so it has no fixture here and the publisher
+   * writes nothing for it. Cues still target it.
    */
   private initializeDmxLights(): void {
     const allDmxLights = [
@@ -100,7 +102,7 @@ export class DmxLightManager {
     ]
 
     allDmxLights.forEach((light) => {
-      this._dmxLights.set(light.id, light)
+      if (light.unplaced !== true) this._dmxLights.set(light.id, light)
     })
   }
 

@@ -540,6 +540,7 @@ const LightsLayout = () => {
             allPrimaryLights={allPrimaryLights}
             currentLightingConfig={currentLightingConfig}
             myFixtures={myFixtures}
+            fixtureLibrary={myFixtureLibrary}
             activeRigId={activeRigId}
             highlightedLight={highlightedLight}
             onLightClick={handleLightClick}

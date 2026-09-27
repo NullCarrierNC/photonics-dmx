@@ -49,10 +49,22 @@ const baseRgbTemplate: RgbFixture = {
 }
 
 describe('syncDmxLightWithTemplate', () => {
-  it('returns the input unchanged when no template is found (orphaned light)', () => {
+  it('returns an orphaned light with a master unchanged', () => {
     const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, undefined)
     expect(changed).toBe(false)
     expect(light).toBe(baseRgbLight)
+  })
+
+  it('leaves every channel of an orphaned light with no master at 0', () => {
+    const orphan: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, strobeChannel: 4 },
+      extraChannels: [{ type: 'fixed', channel: 5, value: 200 }],
+    }
+    const { light, changed } = syncDmxLightWithTemplate(orphan, undefined)
+    expect(changed).toBe(true)
+    expect(light.channels).toEqual({ masterDimmer: 0, red: 0, green: 0, blue: 0, strobeChannel: 0 })
+    expect(light.extraChannels).toEqual([{ type: 'fixed', channel: 0, value: 200 }])
   })
 
   it('returns same reference when rig already matches template', () => {
@@ -383,6 +395,34 @@ describe('syncDmxLightWithTemplate', () => {
     expect(light.extraChannels).toEqual([{ type: 'fixed', channel: 0, value: 200 }])
   })
 
+  it('leaves a rig light unplaced at its own master while its template has no master', () => {
+    const shifted: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 5, red: 7, green: 8, blue: 9 },
+    }
+    const noMaster: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 },
+      extraChannels: [{ type: 'fixed', channel: 6, value: 200 }],
+    }
+    const { light, changed } = syncDmxLightWithTemplate(shifted, noMaster)
+    expect(changed).toBe(true)
+    expect(light).toMatchObject({ unplaced: true })
+    expect(light.channels).toEqual({ masterDimmer: 5, red: 0, green: 0, blue: 0 })
+    expect(light.extraChannels).toEqual([{ type: 'fixed', channel: 0, value: 200 }])
+  })
+
+  it('places a rig light from its kept master once its template has a master again', () => {
+    const noMaster: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 },
+    }
+    const unplaced = syncDmxLightWithTemplate(baseRgbLight, noMaster).light
+    const { light } = syncDmxLightWithTemplate(unplaced, baseRgbTemplate)
+    expect(light).toEqual(baseRgbLight)
+    expect('unplaced' in light).toBe(false)
+  })
+
   it('removes rig extraChannels when the template drops them', () => {
     const rigLight: DmxLight = {
       ...baseRgbLight,
@@ -562,6 +602,16 @@ describe('templateChannelSpan / maxMasterDimmerForTemplate', () => {
     expect(templateChannelSpan(template)).toBe(3)
   })
 
+  it('gives a template with no master no span, since it places nothing above the master', () => {
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 0, red: 2, green: 3, blue: 4 },
+      extraChannels: [{ type: 'amber', channel: 9 }],
+    }
+    expect(templateChannelSpan(template)).toBe(0)
+    expect(maxMasterDimmerForTemplate(template)).toBe(512)
+  })
+
   it('never returns a max below 1, even for an absurdly wide template', () => {
     const template: DmxFixture = {
       ...baseRgbTemplate,
@@ -614,6 +664,19 @@ describe('deriveChannelLayoutForMaster', () => {
       channels: { masterDimmer: 0, red: 0, green: 0, blue: 0, strobeChannel: 0 },
     })
   })
+  it.each([0, -1, 2.5, 513])(
+    'derives every channel but the master as 0 for template master %p',
+    (templateMaster) => {
+      const noMaster: DmxFixture = {
+        ...baseRgbTemplate,
+        channels: { masterDimmer: templateMaster, red: 2, green: 3, blue: 4, strobeChannel: 5 },
+      }
+      expect(deriveChannelLayoutForMaster(noMaster, 5)).toEqual({
+        fixture: FixtureTypes.RGB,
+        channels: { masterDimmer: 5, red: 0, green: 0, blue: 0, strobeChannel: 0 },
+      })
+    },
+  )
 })
 
 describe('deriveExtraChannelsForMaster', () => {
@@ -626,5 +689,10 @@ describe('deriveExtraChannelsForMaster', () => {
       { type: 'white', channel: 0 },
       { type: 'fixed', channel: 0, value: 40 },
     ])
+  })
+
+  it('derives every added channel as 0 when the template has no master', () => {
+    const extras: ExtraChannel[] = [{ type: 'white', channel: 5 }]
+    expect(deriveExtraChannelsForMaster(extras, 0, 11)).toEqual([{ type: 'white', channel: 0 }])
   })
 })

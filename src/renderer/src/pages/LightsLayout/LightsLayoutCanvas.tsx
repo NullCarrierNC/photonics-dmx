@@ -1,14 +1,19 @@
 /**
- * The layout canvas: the rows of lights, the shared-channel and missing-address warnings above
- * them, and the overlay that follows a light while it is dragged.
+ * The layout canvas: the rows of lights, the shared-channel, missing-address and template-master
+ * warnings above them, and the overlay that follows a light while it is dragged.
  */
 import React, { useMemo } from 'react'
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core'
 import LightChannelAssignmentSection from './LightChannelAssignmentSection'
-import { isTwoRowPrimaryLayout } from './lightsLayoutHelpers'
+import { isTwoRowPrimaryLayout, lightsOfTemplatesWithoutMaster } from './lightsLayoutHelpers'
 import type { LightsLayoutDrag } from './useLightsLayoutDrag'
 import { ConfigStrobeType } from '../../../../photonics-dmx/types'
-import type { DmxLight, LightingConfiguration, SavedFixture } from '../../../../photonics-dmx/types'
+import type {
+  DmxFixture,
+  DmxLight,
+  LightingConfiguration,
+  SavedFixture,
+} from '../../../../photonics-dmx/types'
 
 interface LightsLayoutCanvasProps {
   drag: LightsLayoutDrag
@@ -20,6 +25,8 @@ interface LightsLayoutCanvasProps {
   allPrimaryLights: DmxLight[]
   currentLightingConfig: LightingConfiguration
   myFixtures: SavedFixture[]
+  /** Every template in My Lights, including the ones a rig cannot use yet. */
+  fixtureLibrary: DmxFixture[]
   activeRigId: string | null
   highlightedLight: number | null
   onLightClick: (position: number) => void
@@ -48,6 +55,7 @@ const LightsLayoutCanvas: React.FC<LightsLayoutCanvasProps> = ({
   allPrimaryLights,
   currentLightingConfig,
   myFixtures,
+  fixtureLibrary,
   activeRigId,
   highlightedLight,
   onLightClick: handleLightClick,
@@ -73,6 +81,11 @@ const LightsLayoutCanvas: React.FC<LightsLayoutCanvasProps> = ({
         .map((l) => l.position)
         .sort((a, b) => a - b),
     [allPrimaryLights],
+  )
+
+  const withoutTemplateMaster = useMemo(
+    () => lightsOfTemplatesWithoutMaster(allPrimaryLights, fixtureLibrary),
+    [allPrimaryLights, fixtureLibrary],
   )
 
   return (
@@ -103,6 +116,16 @@ const LightsLayoutCanvas: React.FC<LightsLayoutCanvasProps> = ({
               : `The lights at positions ${joinPositions(unaddressedPositions)} have no DMX address and stay dark. Set each one's Master Dimmer channel to use them.`}
           </div>
         )}
+        {withoutTemplateMaster.map(({ templateId, name, positions }) => (
+          <div
+            key={templateId}
+            role="status"
+            className="rounded border border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+            {positions.length === 1
+              ? `The light at position ${positions[0]} stays dark until ${name} has a Master Dimmer channel in My Lights.`
+              : `The lights at positions ${joinPositions(positions)} stay dark until ${name} has a Master Dimmer channel in My Lights.`}
+          </div>
+        ))}
         <LightChannelAssignmentSection
           title={
             selectedLayout === 'stacked'

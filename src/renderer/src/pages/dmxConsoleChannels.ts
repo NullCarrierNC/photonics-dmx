@@ -16,6 +16,7 @@ import {
 import {
   deriveChannelLayoutForMaster,
   deriveExtraChannelsForMaster,
+  templatePlacesRigLights,
 } from '../../../photonics-dmx/helpers/rigTemplateSync'
 
 export function channelSortKey(name: string): number {
@@ -35,29 +36,40 @@ function numberedChannels(view: ChannelView): Record<string, number> {
 }
 
 /**
+ * The master a light whose template is gone places its stored layout from: its own, or 0 when it is
+ * unplaced and drives nothing.
+ */
+function orphanMaster(light: DmxLight): number {
+  return light.unplaced === true ? 0 : light.channels.masterDimmer
+}
+
+/**
  * Resolves the channel set to display for a rig light. The shape (which channels exist) comes from
  * the live fixture template, so enabling "Strobe Channel?" on a template in MyLights surfaces the
  * new channel here immediately, without needing to re-pick the fixture in LightsLayout. The
  * channel numbers come from {@link deriveChannelLayoutForMaster}, the derivation template sync
- * writes to the rig, applied to the light's master dimmer.
+ * writes to the rig, applied to the light's master dimmer. A light whose template has no master is
+ * unplaced and drives nothing, so every channel, its master included, reads 0.
  *
- * Falls back to the light's persisted channels when no template is found (legacy / orphaned light).
+ * A light whose template is gone keeps its persisted channels, and has every channel at 0 when it
+ * has no master or is unplaced, matching what the publisher writes for it.
  */
 export function getTemplateAlignedChannels(
   light: DmxLight,
   templates: DmxFixture[],
 ): Record<string, number> {
   const template = templates.find((t) => t.id === light.fixtureId)
-  if (!template) return numberedChannels(light.channels)
-  return numberedChannels(
-    deriveChannelLayoutForMaster(template, light.channels.masterDimmer).channels,
-  )
+  if (!template) {
+    return numberedChannels(deriveChannelLayoutForMaster(light, orphanMaster(light)).channels)
+  }
+  const master = templatePlacesRigLights(template) ? light.channels.masterDimmer : 0
+  return numberedChannels(deriveChannelLayoutForMaster(template, master).channels)
 }
 
 /**
  * Offset-aligned extra channels for a console light, derived from its live template the same way
- * {@link getTemplateAlignedChannels} derives the base channels. Falls back to the light's persisted
- * extras when no template resolves.
+ * {@link getTemplateAlignedChannels} derives the base channels. A light whose template is gone
+ * keeps its persisted extras, at 0 when it has no master or is unplaced.
  */
 export function getTemplateAlignedExtraChannels(
   light: DmxLight,
@@ -65,7 +77,13 @@ export function getTemplateAlignedExtraChannels(
 ): ExtraChannel[] {
   const template = templates.find((t) => t.id === light.fixtureId)
   if (!template) {
-    return light.extraChannels ?? []
+    return (
+      deriveExtraChannelsForMaster(
+        light.extraChannels,
+        light.channels.masterDimmer,
+        orphanMaster(light),
+      ) ?? []
+    )
   }
   return (
     deriveExtraChannelsForMaster(

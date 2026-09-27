@@ -48,7 +48,8 @@ const BASE_CHANNEL_LABELS: Readonly<Record<string, string>> = {
 
 /**
  * Display names of the base channels a fixture carries with no DMX number (0), in display order.
- * Rig lights built from the fixture leave these channels undriven.
+ * Rig lights built from the fixture leave these channels undriven, and with the master dimmer
+ * among them they drive nothing at all.
  */
 export function unassignedBaseChannelLabels(fixture: DmxFixture): string[] {
   const entries: Array<[string, number]> = Object.entries(fixture.channels)

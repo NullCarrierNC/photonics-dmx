@@ -81,6 +81,31 @@ describe('saving a light a rig uses with a channel still at 0', () => {
     expect(saveMyLights).not.toHaveBeenCalled()
   })
 
+  it('says the rig lights stay dark while the master is unset', async () => {
+    const noMaster = { ...PAR, channels: { ...PAR.channels, masterDimmer: 0 } }
+    renderPage([noMaster], [rigUsing('par')])
+
+    fireEvent.click(screen.getByText('Front PAR'))
+    fireEvent.click(screen.getByText('Save'))
+
+    const prompt = await screen.findByRole('alertdialog')
+    expect(prompt).toHaveTextContent(
+      'Master Dimmer has no DMX channel yet. Lights in your rigs that use Front PAR stay dark until Front PAR has a Master Dimmer.',
+    )
+  })
+
+  it('names every unset channel and says an unset master leaves the rig lights dark', async () => {
+    const noMaster = { ...PAR, channels: { ...PAR.channels, masterDimmer: 0 } }
+    renderPage([noMaster], [rigUsing('par')])
+
+    saveWithStrobeUnset()
+
+    const prompt = await screen.findByRole('alertdialog')
+    expect(prompt).toHaveTextContent(
+      'Master Dimmer and Strobe Speed have no DMX channel yet. Lights in your rigs that use Front PAR stay dark until Front PAR has a Master Dimmer.',
+    )
+  })
+
   it('saves the light as it stands when the user saves anyway', async () => {
     renderPage([PAR], [rigUsing('par')])
 
