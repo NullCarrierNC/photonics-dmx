@@ -15,6 +15,7 @@ export interface ArtNetSenderOptions {
   subnet?: number
   subuni?: number
   port?: number
+  /** How long (ms) nothing new goes out before the last frame is resent. Default 1000. */
   base_refresh_interval?: number
   /** Max packets per second (Hz). 0 = no limit. */
   maxOutputRate?: number
@@ -36,20 +37,16 @@ export class ArtNetSender extends DmxTsSender {
     super('ArtNet', log)
     const rate = this.options.maxOutputRate ?? ARTNET_DEFAULT_MAX_OUTPUT_RATE
     this.minIntervalMs = hzToThrottleIntervalMs(rate)
+    this.refreshIntervalMs = this.options.base_refresh_interval ?? 1000
   }
 
   public async start(): Promise<void> {
     try {
-      this.universe = await this.dmx.addUniverse(
-        'artnet-universe',
-        // dmx-ts reads the keepalive as `unchangedDataInterval` (it maps that onto dmxnet's
-        // base_refresh_interval internally); the config side carries the value under the dmxnet
-        // name, so translate here where the driver is constructed.
-        new ArtnetDriver(this.host, {
-          ...this.options,
-          unchangedDataInterval: this.options.base_refresh_interval,
-        }),
-      )
+      const driver = new ArtnetDriver(this.host, this.options)
+      this.universe = await this.dmx.addUniverse('artnet-universe', driver)
+      // dmxnet resends on a fixed timer alongside new frames, which doubles the packet rate while
+      // the look changes, and has no setting to turn it off. send() arms the resends instead.
+      clearInterval(driver.universe?.interval)
     } catch (err) {
       const errorEvent = new SenderError(err, { senderId: 'artnet' })
       this.emitSenderError(errorEvent)
@@ -84,9 +81,11 @@ export class ArtNetSender extends DmxTsSender {
         convertedBuffer[channel - 1] = universeBuffer[channel]
       }
 
+      this.scheduleRefresh(universeBuffer)
       this.universe!.update(convertedBuffer)
       return true
     } catch (err: unknown) {
+      this.cancelRefresh()
       log.error('ArtNetSender error:', err)
       this.emitSenderError(this.toSenderError(err, 'artnet'))
       return false

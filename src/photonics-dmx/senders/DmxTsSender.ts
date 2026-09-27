@@ -56,6 +56,7 @@ export abstract class DmxTsSender extends BaseSender {
 
       // Give the blackout time to leave before the connection goes.
       await new Promise((resolve) => setTimeout(resolve, this.blackoutSettleMs()))
+      this.cancelRefresh()
 
       try {
         this.removeAllSendErrorListeners()

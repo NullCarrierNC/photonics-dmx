@@ -13,6 +13,9 @@ const mockUpdate = jest.fn((channels: Record<number, number>) => {
   }
 })
 
+// The id of dmxnet's own resend timer, which the sender clears once started.
+const mockDmxnetTimer = 4242
+
 // Mock the dmx-ts library
 jest.mock('dmx-ts', () => ({
   DMX: jest.fn().mockImplementation(() => ({
@@ -26,6 +29,7 @@ jest.mock('dmx-ts', () => ({
   ArtnetDriver: jest.fn().mockImplementation(() => ({
     init: jest.fn().mockResolvedValue(undefined),
     close: jest.fn().mockResolvedValue(undefined),
+    universe: { interval: mockDmxnetTimer },
   })),
   IUniverseDriver: jest.fn(),
 }))
@@ -195,15 +199,69 @@ describe('ArtNetSender', () => {
     })
   })
 
-  describe('driver options', () => {
-    it('passes the keepalive to the driver as unchangedDataInterval', async () => {
-      const { ArtnetDriver } = jest.requireMock('dmx-ts') as { ArtnetDriver: jest.Mock }
-      ArtnetDriver.mockClear()
-      const sender = new ArtNetSender('127.0.0.1', { universe: 1, base_refresh_interval: 250 })
+  describe('resending the last frame', () => {
+    /** Started at 50 Hz with a 20 ms refresh, the mocked clock moved off 0 ("never sent"). */
+    const started = async (): Promise<ArtNetSender> => {
+      const sender = new ArtNetSender('127.0.0.1', {
+        universe: 1,
+        maxOutputRate: 50,
+        base_refresh_interval: 20,
+      })
       await sender.start()
-      const optionsArg = ArtnetDriver.mock.calls[0][1] as { unchangedDataInterval?: number }
-      expect(optionsArg.unchangedDataInterval).toBe(250)
-      await sender.stop().catch(() => {})
+      jest.advanceTimersByTime(1000)
+      mockUpdate.mockClear()
+      return sender
+    }
+
+    const stopped = async (sender: ArtNetSender): Promise<void> => {
+      const stopping = sender.stop()
+      await jest.advanceTimersByTimeAsync(500)
+      await stopping
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it("clears dmxnet's own resend timer once started", async () => {
+      const clear = jest.spyOn(global, 'clearInterval')
+      const sender = await started()
+      expect(clear).toHaveBeenCalledWith(mockDmxnetTimer)
+      clear.mockRestore()
+      await stopped(sender)
+    })
+
+    it('resends a held look once per refresh interval', async () => {
+      const sender = await started()
+      await sender.send({ 1: 10 })
+      jest.advanceTimersByTime(40)
+      expect(mockUpdate.mock.calls).toEqual([[{ 0: 10 }], [{ 0: 10 }], [{ 0: 10 }]])
+      await stopped(sender)
+    })
+
+    it('stays within the output rate while the look changes', async () => {
+      const sender = await started()
+      for (let frame = 1; frame <= 20; frame++) {
+        await sender.send({ 1: frame })
+        jest.advanceTimersByTime(10)
+      }
+      const sent = mockUpdate.mock.calls.map((call) => call[0])
+      expect(sent.length).toBeLessThanOrEqual(11)
+      sent.slice(1).forEach((payload, i) => expect(payload).not.toEqual(sent[i]))
+      await stopped(sender)
+    })
+
+    it('stops resending once stopped', async () => {
+      const sender = await started()
+      await sender.send({ 1: 10 })
+      await stopped(sender)
+      const count = mockUpdate.mock.calls.length
+      jest.advanceTimersByTime(1000)
+      expect(mockUpdate).toHaveBeenCalledTimes(count)
     })
   })
 })
