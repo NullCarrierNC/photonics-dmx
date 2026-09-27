@@ -1,7 +1,9 @@
 /**
  * The wire check's worker: runs the scenarios cueSimWatchdog.cjs sends it through the real
  * ConfigurationManager, cue handlers and DmxPublisher, each in a fresh app-data folder with
- * Math.random seeded, and sends back the recorded publisher sends.
+ * Math.random seeded, and sends back the recorded publisher sends. A scenario sent with a loopback
+ * target also goes out through a real sender to this machine, in real time. That sender resends
+ * until the watchdog ends the worker, so it never sends the blackout a stop would.
  */
 /* eslint-disable @typescript-eslint/no-require-imports -- ts-node's hook loads the engine */
 const { join } = require('node:path')
@@ -29,6 +31,7 @@ Module._load = function loadWithElectronStub(request, ...rest) {
 
 require('ts-node').register({ project: join(root, 'tsconfig.sim.json'), transpileOnly: true })
 const { runWireScenario } = require('../src/main/wireCheck/runWireScenario')
+const { loopbackSender } = require('../src/main/wireCheck/loopbackSender')
 const { seededRandom } = require('./cueSimCore.cjs')
 
 /**
@@ -44,13 +47,21 @@ function seededOutsideFileWrites(key, realRandom) {
     /writeAtomic|writeFileAtomic/.test(new Error().stack ?? '') ? realRandom() : seeded()
 }
 
-/** @param {{ name: string, seed?: string }} scenario */
-async function run(scenario) {
+/**
+ * @param {{ name: string, seed?: string }} scenario
+ * @param {{ protocol: 'sacn' | 'artnet', port: number, universe?: number } | undefined} loopback
+ */
+async function run(scenario, loopback) {
   appDataDir = mkdtempSync(join(tmpdir(), 'wire-check-'))
   const realRandom = Math.random
   Math.random = seededOutsideFileWrites(scenario.seed ?? scenario.name, realRandom)
   try {
-    return await runWireScenario(scenario, appDataDir)
+    if (loopback === undefined) {
+      return await runWireScenario(scenario, appDataDir)
+    }
+    const sender = loopbackSender(loopback)
+    await sender.start()
+    return await runWireScenario(scenario, appDataDir, { forward: (buffer) => sender.send(buffer) })
   } finally {
     Math.random = realRandom
     rmSync(appDataDir, { recursive: true, force: true })
@@ -58,10 +69,10 @@ async function run(scenario) {
 }
 
 process.on('message', async ({ cues }) => {
-  for (const { key, scenario } of cues) {
+  for (const { key, scenario, loopback } of cues) {
     process.send({ type: 'start', key })
     try {
-      process.send({ type: 'result', key, value: await run(scenario) })
+      process.send({ type: 'result', key, value: await run(scenario, loopback) })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       process.send({ type: 'failed', key, message })

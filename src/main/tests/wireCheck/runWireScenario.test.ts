@@ -195,6 +195,28 @@ describe('runWireScenario', () => {
     expect(check.lines).toEqual([expect.stringMatching(/^PASS/)])
   })
 
+  it('forwards each send to a real sender in real time, and not the closing blackout', async () => {
+    const forwarded: Array<Record<number, number>> = []
+    const recording = await runWireScenario(
+      {
+        name: 'forward',
+        rig: twoPars,
+        steps: [{ type: 'yarg', cue: 'Flare_Slow', durationMs: 150 }],
+      },
+      mockAppData,
+      {
+        forward: (buffer) => {
+          forwarded.push({ ...buffer })
+          return Promise.resolve(true)
+        },
+      },
+    )
+    expect(recording.endMs).toBeGreaterThanOrEqual(150)
+    expect(Number.isInteger(recording.sends[0].ms)).toBe(true)
+    expect(forwarded).toEqual(recording.sends.map((send) => send.buffer))
+    expect(forwarded.at(-1)).toMatchObject({ 1: 255, 5: 255 })
+  })
+
   it('refuses a scenario with no rig', async () => {
     await expect(
       runWireScenario({ name: 'empty', steps: [{ type: 'idle', durationMs: 10 }] }, mockAppData),

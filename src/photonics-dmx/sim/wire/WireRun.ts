@@ -8,7 +8,7 @@ import { AudioCueRegistry } from '../../cues/registries/AudioCueRegistry'
 import { getCueRegistry } from '../../cues/registries/cueRegistries'
 import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
 import type { DmxRig } from '../../types'
-import type { VirtualTime } from '../VirtualTime'
+import type { WireClock } from './RealTimeClock'
 
 /** One buffer as it left the publisher for the wire, stamped with the virtual clock. */
 export interface WireSend {
@@ -18,9 +18,11 @@ export interface WireSend {
 
 export interface WireRunOptions {
   rig: DmxRig
-  clock: VirtualTime
+  clock: WireClock
   /** Receives every buffer the publisher sends to its one wire slot. */
   onSend: (send: WireSend) => void
+  /** Also hands each buffer to a real sender, whose result the publisher sees. */
+  forward?: (buffer: Record<number, number>) => Promise<boolean>
   /** The publisher's output rate. The app's default is 44 Hz. */
   outputRateHz?: number
   /** The YARG lighting library the registry is limited to. */
@@ -45,7 +47,7 @@ export class WireRun {
   private listener: YargNetworkListener | null = null
 
   constructor(private readonly options: WireRunOptions) {
-    const { rig, clock, onSend } = options
+    const { rig, clock, onSend, forward } = options
     this.chain = new RigChain({ rigId: rig.id, rigLabel: rig.name, config: rig.config, clock })
     const senders: PublisherSenders = {
       getEnabledWireSenders: () => ['sacn'],
@@ -53,7 +55,7 @@ export class WireRun {
       sendIpc: () => {},
       send: (_wireId, buffer) => {
         onSend({ ms: clock.getCurrentTimeMs(), buffer: { ...buffer } })
-        return Promise.resolve(true)
+        return forward ? forward(buffer) : Promise.resolve(true)
       },
     }
     this.publisher = new DmxPublisher(senders, null, this.strobe, {

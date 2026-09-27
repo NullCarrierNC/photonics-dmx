@@ -7,7 +7,7 @@ import {
 } from '../../cues/types/cueTypes'
 import { AudioFrameDriver } from '../AudioFrameDriver'
 import type { VenueSize } from '../types'
-import type { VirtualTime } from '../VirtualTime'
+import type { WireClock } from './RealTimeClock'
 import type { WireRun } from './WireRun'
 
 /** A steady level, a list of levels cycled frame by frame, or a high level on every Nth frame. */
@@ -89,10 +89,10 @@ function yargFrame(step: GameStep, cue: CueType, beat: CueData['beat']): CueData
 }
 
 /**
- * Plays one step on the virtual clock. A frame lands on the first clock step at or after its due
+ * Plays one step on the run's clock. A frame lands on the first clock step at or after its due
  * time, and beats start on the step's first frame, so each step starts on a downbeat.
  */
-export async function playStep(run: WireRun, clock: VirtualTime, step: PlayStep): Promise<void> {
+export async function playStep(run: WireRun, clock: WireClock, step: PlayStep): Promise<void> {
   const stepMs = clock.getIntervalMs()
   const start = clock.getCurrentTimeMs()
   const elapsed = (): number => clock.getCurrentTimeMs() - start

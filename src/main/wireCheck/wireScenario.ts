@@ -66,6 +66,8 @@ export interface WireScenario {
   expect?: { states: unknown[]; universe?: number }
   timeTolMs?: number
   valueTol?: number
+  /** For `wire:check --transport`: the packet rate dmx-log must hear, and its time tolerance. */
+  wire?: { rateHz?: { min?: number; max?: number }; timeTolMs?: number }
 }
 
 const STEP_TYPES = new Set(['yarg', 'audio', 'idle', 'saveTemplates'])
