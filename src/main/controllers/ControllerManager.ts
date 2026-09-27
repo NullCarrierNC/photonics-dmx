@@ -360,14 +360,7 @@ export class ControllerManager {
    * a shutdown has begun the op is refused, since the shutdown stops every sender.
    */
   public runSenderOp<T>(op: (senders: SenderManager) => Promise<T>): Promise<T> {
-    return this.lifecycle.runQueuedOp(() => {
-      if (this.lifecycle.isShuttingDown()) {
-        throw new LifecycleAbortedError(
-          `Sender change refused: shutdown in progress or already complete (phase=${this.lifecycle.phase})`,
-        )
-      }
-      return op(this.getSenderManager())
-    })
+    return this.lifecycle.runQueuedChange('Sender change', () => op(this.getSenderManager()))
   }
 
   /** The sender lifecycle surface (status, error tracking, restore). */
@@ -553,10 +546,11 @@ export class ControllerManager {
    * when RB3 is enabled, so a change while it runs is applied by ending the session and starting
    * it again, as one queued op so no toggle or restart interleaves. A session already on the
    * saved mode, no session, or a graph held failed (its fault response is switching RB3 off, and
-   * the saved mode applies at the next enable) is left alone.
+   * the saved mode applies at the next enable) is left alone. It is refused once a shutdown has
+   * begun.
    */
   public async applyRb3ProcessingMode(): Promise<void> {
-    await this.lifecycle.runQueuedOp(async () => {
+    await this.lifecycle.runQueuedChange('RB3 mode change', async () => {
       const rb3 = this.listenerLifecycle.yargRb3
       if (!rb3.getIsRb3Enabled() || this.lifecycle.isFaulted()) return
       const saved = normalizeRb3ProcessingMode(

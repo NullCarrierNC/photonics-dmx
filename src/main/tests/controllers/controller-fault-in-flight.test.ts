@@ -84,6 +84,20 @@ function registryHeldOn(hold: Promise<void>) {
   }
 }
 
+/** Registry loaders whose cue registry load takes `ms`, as a load from disk does. */
+function registryTaking(ms: number) {
+  return {
+    initializeCueRegistry: jest.fn(() => sleep(ms)),
+    initializeEffectLoader: jest.fn(async () => {}),
+    initializeNodeCueLoader: jest.fn(async () => {}),
+  }
+}
+
+/** A sender change holding the lifecycle queue for `ms`. */
+function senderChangeTaking(manager: ControllerManager, ms: number): Promise<void> {
+  return manager.runSenderOp(() => sleep(ms))
+}
+
 function initConfig() {
   return Object.assign(stubConfig({ cueDomains: {} }), {
     updateCueDomain: jest.fn(async () => {}),
@@ -204,5 +218,98 @@ describe('the uncaught-fault hold against work already under way', () => {
 
     expect(manager.getLifecyclePhase()).toBe('running')
     expect(on.yarg).toBe(true)
+  })
+
+  it.each([0, 50])(
+    'refuses a restart asked for before the fault that starts after it, with a %i ms rebuild',
+    async (rebuildMs) => {
+      const { listeners, on } = statefulListeners()
+      on.yarg = true
+      const { manager } = stubbedManager({
+        listeners,
+        ownInit: { registryInit: registryTaking(rebuildMs), config: initConfig() },
+      })
+
+      const holding = senderChangeTaking(manager, 200)
+      const restarting = manager.restartControllers()
+      await sleep(20)
+      manager.handleUncaughtException(new Error('frame path threw'))
+      await holding
+      const refusal = await restarting.then(
+        () => null,
+        (error: Error) => error.message,
+      )
+      await sleep(rebuildMs + 50)
+
+      expect(manager.getLifecyclePhase()).toBe('failed')
+      expect(on.yarg).toBe(false)
+      expect(refusal).toMatch(/restart them first/i)
+      await expect(manager.enableYarg()).rejects.toThrow(/restart/i)
+    },
+  )
+
+  it('refuses a follow-up restart asked for before the fault that starts after it', async () => {
+    const hold = barrier()
+    const { listeners, on } = statefulListeners()
+    on.yarg = true
+    const { manager } = stubbedManager({
+      listeners,
+      ownInit: { registryInit: registryHeldOn(hold.wait), config: initConfig() },
+    })
+
+    const rebuilding = manager.restartControllers()
+    await sleep(20)
+    const followUp = manager.restartControllers()
+    manager.handleUncaughtException(new Error('cue file load threw'))
+    await settle()
+    hold.release()
+    await rebuilding
+    const refusal = await followUp.then(
+      () => null,
+      (error: Error) => error.message,
+    )
+
+    expect(manager.getLifecyclePhase()).toBe('failed')
+    expect(on.yarg).toBe(false)
+    expect(refusal).toMatch(/restart them first/i)
+  })
+
+  it('lifts the hold for a restart asked for after the fault that joins one still queued', async () => {
+    const { listeners } = statefulListeners()
+    const { manager } = stubbedManager({
+      listeners,
+      ownInit: { registryInit: registryTaking(0), config: initConfig() },
+    })
+
+    const holding = senderChangeTaking(manager, 200)
+    const beforeFault = manager.restartControllers()
+    await sleep(20)
+    manager.handleUncaughtException(new Error('frame path threw'))
+    const retry = manager.restartControllers()
+    await holding
+    await Promise.all([beforeFault, retry])
+
+    expect(manager.getLifecyclePhase()).toBe('running')
+    await manager.enableYarg()
+    expect(manager.getIsYargEnabled()).toBe(true)
+  })
+
+  it('lifts the hold for a restart asked for after the fault while one crossed by it rebuilds', async () => {
+    const hold = barrier()
+    const { listeners } = statefulListeners()
+    const { manager } = stubbedManager({
+      listeners,
+      ownInit: { registryInit: registryHeldOn(hold.wait), config: initConfig() },
+    })
+
+    const rebuilding = manager.restartControllers()
+    await sleep(20)
+    manager.handleUncaughtException(new Error('cue file load threw'))
+    await settle()
+    const retry = manager.restartControllers()
+    hold.release()
+    await Promise.all([rebuilding, retry])
+
+    expect(manager.getLifecyclePhase()).toBe('running')
   })
 })

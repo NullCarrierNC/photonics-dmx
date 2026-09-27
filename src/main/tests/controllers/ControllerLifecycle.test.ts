@@ -206,6 +206,22 @@ describe('ControllerLifecycle', () => {
       expect(lifecycle.settlePhase('running', mark)).toBe(true)
       expect(lifecycle.faultedSince(mark)).toBe(false)
     })
+
+    it('judges work ahead of a queued restart from the fault count as that work starts', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      let release!: () => void
+      const held = new Promise<void>((r) => {
+        release = r
+      })
+      const ahead = lifecycle.runOp(() => held)
+      const restart = lifecycle.runSharedRestart(async () => {})
+      lifecycle.markFaulted()
+
+      expect(lifecycle.settlePhase('running', lifecycle.faultMark())).toBe(true)
+      release()
+      await Promise.all([ahead, restart])
+    })
   })
 
   describe('runSharedRestart', () => {

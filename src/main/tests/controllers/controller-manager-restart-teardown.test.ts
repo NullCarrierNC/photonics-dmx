@@ -13,6 +13,7 @@ import { ChainFanout } from '../../controllers/ChainFanout'
 import { VenueFrameProcessor } from '../../../photonics-dmx/controllers/VenueFrameProcessor'
 import { MasterOutputState } from '../../../photonics-dmx/controllers/MasterOutputState'
 import { SenderManager } from '../../../photonics-dmx/controllers/SenderManager'
+import { playCueThatFailsToStop } from '../../../photonics-dmx/tests/helpers/cueThatFailsToStop'
 import { stubbedManager, stubConfig } from './lifecycleStub'
 
 /** A graph built over no active rigs, which leaves it one real rig chain. */
@@ -59,10 +60,8 @@ describe('ControllerManager restart when teardown fails', () => {
     })
     graph = builtGraph()
     const [chain] = graph.getChains()
-    const disposeFailure = new Error('sequencer shutdown failed')
-    const sequencerShutdown = jest.spyOn(chain.sequencer, 'shutdown').mockImplementation(() => {
-      throw disposeFailure
-    })
+    const disposeFailure = new Error('cue failed to stop')
+    await playCueThatFailsToStop(chain, disposeFailure)
     const shutdownPublisher = jest.spyOn(graph, 'shutdownPublisher')
     const { manager, lifecycle, listeners, init } = stubbedManager({ graph })
 
@@ -79,8 +78,5 @@ describe('ControllerManager restart when teardown fails', () => {
     expect(init).not.toHaveBeenCalled()
     expect(lifecycle.phase).toBe('failed')
     expect(manager.getIsInitialized()).toBe(false)
-
-    sequencerShutdown.mockRestore()
-    chain.sequencer.shutdown()
   })
 })
