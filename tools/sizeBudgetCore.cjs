@@ -170,7 +170,7 @@ function renderBaseline(sizes, limit) {
   const header = [
     `limit ${limit}`,
     'Auto-generated: non-test sources under src/ that exceed the line limit.',
-    'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in a commit of its own.',
+    'Regenerate after a split with node tools/size-budget.mjs --write, which only lowers or removes entries. Raise or add one by hand, in the commit whose code needs it.',
   ]
   const body = overLimitEntries(sizes, limit).map(([path, lines]) => `${lines} ${path}`)
   return `${[...header, ...body].join('\n')}\n`

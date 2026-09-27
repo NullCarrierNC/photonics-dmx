@@ -12,8 +12,8 @@ import {
 } from '../../photonics-dmx/types'
 import { createLogger } from '../../shared/logger'
 import { ipcError, restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
-import type { LifecyclePhase } from '../../shared/ipcTypes'
-import { FAULT_HELD_MESSAGE } from './ControllerLifecycle'
+import type { IpcErrorResult, IpcSuccessResult, LifecyclePhase } from '../../shared/ipcTypes'
+import { FAULT_HELD_MESSAGE, type ControllerLifecycle } from './ControllerLifecycle'
 
 const log = createLogger('ConsoleModeController')
 
@@ -32,9 +32,48 @@ const CONSOLE_LEFT_AFTER_FAULT_MESSAGE = `The DMX console closed. ${FAULT_HELD_M
  * Why a console entry that has brought the graph up cannot open in `phase`, or null when it can.
  * A graph that is up and `failed` holds an uncaught fault, which only a restart clears.
  */
-export function consoleEntryRefusal(phase: LifecyclePhase): string | null {
+function consoleEntryRefusal(phase: LifecyclePhase): string | null {
   if (phase === 'running' || phase === 'consoleMode') return null
   return phase === 'failed' ? FAULT_HELD_MESSAGE : CONSOLE_UNAVAILABLE_MESSAGE
+}
+
+/** The lifecycle surface console entry and exit move the phase through. */
+type ConsolePhaseLifecycle = Pick<
+  ControllerLifecycle,
+  'phase' | 'runQueuedOp' | 'faultMark' | 'settlePhase' | 'setPhase'
+>
+
+/**
+ * Enter console mode as a queued lifecycle op once the graph is up, moving the phase to
+ * `consoleMode` unless a fault arose while the console opened.
+ */
+export function enterConsoleMode(
+  lifecycle: ConsolePhaseLifecycle,
+  consoleMode: Pick<ConsoleModeController, 'enableConsoleMode'>,
+  rigId: string,
+  init: () => Promise<void>,
+): Promise<IpcSuccessResult | IpcErrorResult> {
+  return lifecycle.runQueuedOp(async () => {
+    await init()
+    const refusal = consoleEntryRefusal(lifecycle.phase)
+    if (refusal) return { success: false as const, error: refusal }
+    const faultMark = lifecycle.faultMark()
+    const r = await consoleMode.enableConsoleMode(rigId)
+    if (r.success) lifecycle.settlePhase('consoleMode', faultMark)
+    return r
+  })
+}
+
+/** Leave console mode, returning the phase to `running` when the console held it. */
+export async function leaveConsoleMode(
+  lifecycle: ConsolePhaseLifecycle,
+  consoleMode: Pick<ConsoleModeController, 'disableConsoleMode'>,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const r = await consoleMode.disableConsoleMode()
+  if (r.success && lifecycle.phase === 'consoleMode') {
+    lifecycle.setPhase('running')
+  }
+  return r
 }
 
 export interface ConsoleModeControllerDeps {

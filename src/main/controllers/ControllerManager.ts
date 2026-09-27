@@ -1,5 +1,4 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
-import { normalizeRb3ProcessingMode } from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
@@ -21,7 +20,8 @@ import { TestEffectRunner } from './TestEffectRunner'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import { SenderLifecycleController } from './SenderLifecycleController'
-import { ConsoleModeController, consoleEntryRefusal } from './ConsoleModeController'
+import { ConsoleModeController, enterConsoleMode, leaveConsoleMode } from './ConsoleModeController'
+import { cycleRb3OntoSavedMode } from './ListenerCoordinator'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { ControllerGraph } from './ControllerGraph'
@@ -428,16 +428,7 @@ export class ControllerManager {
     return this.motionCueSimulator
   }
 
-  /**
-   * Idempotent: ensures every active rig chain has a cue handler in the domain's slot, creating one
-   * bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is still null.
-   * Used by the simulation IPC path and `TestEffectRunner` to bring secondary chains up to par with
-   * the primary so cues dispatched through `ChainFanout` reach every rig, even when no real network
-   * listener has run.
-   *
-   * Safe to call after a listener has enabled (no-op for chains that already have handlers) and
-   * after it is disabled (rebuilds the chain slots from scratch).
-   */
+  /** Gives every rig chain a cue handler for `domain`, see the graph's method of the same name. */
   public ensureChainsHaveHandlersForSimulation(domain: NetCueMode): void {
     this.graph.ensureChainsHaveHandlersForSimulation(domain)
   }
@@ -541,25 +532,13 @@ export class ControllerManager {
     this.listenerLifecycle.yargRb3.getProcessorManager()?.refreshRb3PrimaryGroup()
   }
 
-  /**
-   * Bring a running RB3 session onto the saved processing mode. The coordinator reads the mode
-   * when RB3 is enabled, so a change while it runs is applied by ending the session and starting
-   * it again, as one queued op so no toggle or restart interleaves. A session already on the
-   * saved mode, no session, or a graph held failed (its fault response is switching RB3 off, and
-   * the saved mode applies at the next enable) is left alone. It is refused once a shutdown has
-   * begun.
-   */
+  /** Bring a running RB3 session onto the saved processing mode, as one queued op. */
   public async applyRb3ProcessingMode(): Promise<void> {
-    await this.lifecycle.runQueuedChange('RB3 mode change', async () => {
-      const rb3 = this.listenerLifecycle.yargRb3
-      if (!rb3.getIsRb3Enabled() || this.lifecycle.isFaulted()) return
-      const saved = normalizeRb3ProcessingMode(
-        this.config.getPreference('rb3Prefs')?.processingMode,
-      )
-      if (rb3.getRb3Mode() === saved) return
-      // RB3 already holds the rig: audio is off and no simulation can have started.
-      await rb3.disableRb3()
-      await rb3.enableRb3(this.isInitialized, () => this.init())
+    await cycleRb3OntoSavedMode(this.listenerLifecycle.yargRb3, {
+      lifecycle: this.lifecycle,
+      config: this.config,
+      isInitialized: () => this.isInitialized,
+      init: () => this.init(),
     })
   }
 
@@ -599,25 +578,13 @@ export class ControllerManager {
   }
 
   public async enableConsoleMode(rigId: string): Promise<IpcSuccessResult | IpcErrorResult> {
-    return this.lifecycle.runQueuedOp(async () => {
-      await this.init()
-      const refusal = consoleEntryRefusal(this.lifecycle.phase)
-      if (refusal) return { success: false as const, error: refusal }
-      const faultMark = this.lifecycle.faultMark()
-      const r = await this.consoleMode.enableConsoleMode(rigId)
-      if (r.success) this.lifecycle.settlePhase('consoleMode', faultMark)
-      return r
-    })
+    return enterConsoleMode(this.lifecycle, this.consoleMode, rigId, () => this.init())
   }
 
   public async disableConsoleMode(): Promise<
     { success: true } | { success: false; error: string }
   > {
-    const r = await this.consoleMode.disableConsoleMode()
-    if (r.success && this.lifecycle.phase === 'consoleMode') {
-      this.lifecycle.setPhase('running')
-    }
-    return r
+    return leaveConsoleMode(this.lifecycle, this.consoleMode)
   }
 }
 
