@@ -5,13 +5,18 @@ import {
   OPEN_DMX_REFRESH_RATE_HZ_MIN,
 } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
-import { DraftNumberField, DraftTextField, type CommitOutcome } from '../controls/DraftField'
+import {
+  DraftNumberField,
+  DraftTextField,
+  type CommitOutcome,
+  type NumberCommitOutcome,
+} from '../controls/DraftField'
 
 interface OpenDmxConfigCardProps {
   comPort: string
   refreshRate: number
   onComPortChange: (port: string) => CommitOutcome
-  onRefreshRateChange: (hz: number) => CommitOutcome
+  onRefreshRateChange: (hz: number) => NumberCommitOutcome
   expanded: boolean
   onToggle: () => void
 }
@@ -46,7 +51,7 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
           Refresh Rate:
         </label>
-        {/* The field accepts 0, which the rate parser turns into the default rate. */}
+        {/* The field accepts 0, which saves and then shows the default rate. */}
         <DraftNumberField
           aria-label="Refresh Rate"
           value={refreshRate}

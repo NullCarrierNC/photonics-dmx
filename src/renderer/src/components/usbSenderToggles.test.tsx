@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { ipcApiMock, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
-import { enttecProComPortAtom, lightingPrefsAtom, openDmxComPortAtom } from '../atoms'
+import {
+  enttecProComPortAtom,
+  lightingPrefsAtom,
+  openDmxComPortAtom,
+  senderEnttecProEnabledAtom,
+  senderOpenDmxEnabledAtom,
+} from '../atoms'
 import EnttecProToggle from './EnttecProToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 
@@ -26,6 +32,7 @@ const cases = [
     sender: 'enttecpro',
     Toggle: EnttecProToggle,
     portAtom: enttecProComPortAtom,
+    runningAtom: senderEnttecProEnabledAtom,
     flag: 'enttecProEnabled',
   },
   {
@@ -34,14 +41,16 @@ const cases = [
     sender: 'opendmx',
     Toggle: OpenDmxToggle,
     portAtom: openDmxComPortAtom,
+    runningAtom: senderOpenDmxEnabledAtom,
     flag: 'openDmxEnabled',
   },
 ] as const
 
-function renderUsbToggle(c: (typeof cases)[number], port: string): void {
+function renderUsbToggle(c: (typeof cases)[number], port: string, running = false): void {
   renderWithProviders(<c.Toggle />, {
     seed: (set) => {
       set(c.portAtom, port)
+      set(c.runningAtom, running)
       set(lightingPrefsAtom, {
         dmxOutputConfig: {
           sacnEnabled: false,
@@ -68,6 +77,16 @@ describe.each(cases)('$name output switch', (c) => {
 
     expect(button.disabled).toBe(true)
     expect(ipcApiMock.enableSender).not.toHaveBeenCalled()
+  })
+
+  it('stops the running sender while no port is set', async () => {
+    renderUsbToggle(c, '', true)
+    const button = screen.getByRole('switch', { name: c.label }) as HTMLButtonElement
+
+    fireEvent.click(button)
+
+    await waitFor(() => expect(ipcApiMock.disableSender).toHaveBeenCalledWith({ sender: c.sender }))
+    expect(button.getAttribute('aria-checked')).toBe('false')
   })
 
   it('starts the sender on the port that is set', async () => {

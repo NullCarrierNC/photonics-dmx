@@ -129,6 +129,15 @@ describe('SenderToggle', () => {
     )
   })
 
+  it('stops a running sender that is not ready to start', async () => {
+    const store = renderToggle({ running: true, notReady: true })
+
+    fireEvent.click(screen.getByRole('switch', { name: 'sACN Out' }))
+
+    await waitFor(() => expect(disableSender).toHaveBeenCalledWith({ sender: 'sacn' }))
+    expect(store.get(runningAtom)).toBe(false)
+  })
+
   it('announces itself as a switch and whether it is on', () => {
     renderToggle({ running: true })
 

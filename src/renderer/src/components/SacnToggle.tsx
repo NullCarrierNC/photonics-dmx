@@ -4,12 +4,17 @@ import { enableSender } from '../ipcApi'
 import SenderToggle from './controls/SenderToggle'
 
 interface SacnToggleProps {
+  /**
+   * Holds the switch off for a reason outside this sender's own settings. A running sender can
+   * still be switched off.
+   */
+  notReady?: boolean
   disabled?: boolean
   /** Smaller label and switch for inline rows (e.g. calibration wizard). */
   compact?: boolean
 }
 
-const SacnToggle = ({ disabled = false, compact = false }: SacnToggleProps) => {
+const SacnToggle = ({ notReady = false, disabled = false, compact = false }: SacnToggleProps) => {
   const [sacnConfig] = useAtom(sacnConfigAtom)
 
   return (
@@ -18,6 +23,7 @@ const SacnToggle = ({ disabled = false, compact = false }: SacnToggleProps) => {
       label="sACN Out"
       runningAtom={senderSacnEnabledAtom}
       prefsFlag="sacnEnabled"
+      notReady={notReady}
       disabled={disabled}
       compact={compact}
       enable={() =>

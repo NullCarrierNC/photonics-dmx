@@ -4,11 +4,20 @@ import { enableSender } from '../ipcApi'
 import SenderToggle from './controls/SenderToggle'
 
 interface ArtNetToggleProps {
+  /**
+   * Holds the switch off for a reason outside this sender's own settings. A running sender can
+   * still be switched off.
+   */
+  notReady?: boolean
   disabled?: boolean
   compact?: boolean
 }
 
-const ArtNetToggle = ({ disabled = false, compact = false }: ArtNetToggleProps) => {
+const ArtNetToggle = ({
+  notReady = false,
+  disabled = false,
+  compact = false,
+}: ArtNetToggleProps) => {
   const [artNetConfig] = useAtom(artNetConfigAtom)
 
   return (
@@ -18,7 +27,7 @@ const ArtNetToggle = ({ disabled = false, compact = false }: ArtNetToggleProps) 
       runningAtom={senderArtNetEnabledAtom}
       prefsFlag="artNetEnabled"
       // Nothing to send to until the host is a plausible address.
-      notReady={artNetConfig.host.length < 7}
+      notReady={notReady || artNetConfig.host.length < 7}
       disabled={disabled}
       compact={compact}
       enable={() => enableSender({ sender: 'artnet', ...artNetConfig })}
