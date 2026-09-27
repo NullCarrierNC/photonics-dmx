@@ -83,6 +83,23 @@ describe('toggle switches', () => {
     expect(ipcApiMock.setAudioEnabled).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['YARG', yargListenerEnabledAtom],
+    ['RB3E', rb3eListenerEnabledAtom],
+  ] as const)('stops running audio while the %s listener also runs', async (_name, other) => {
+    renderWithProviders(<AudioToggle />, {
+      seed: (set) => {
+        set(audioListenerEnabledAtom, true)
+        set(other, true)
+      },
+    })
+
+    fireEvent.click(switchNamed('Enable Audio'))
+
+    await waitFor(() => expect(ipcApiMock.setAudioEnabled).toHaveBeenCalledWith(false))
+    expect(switchNamed('Enable Audio')).toHaveAttribute('aria-checked', 'false')
+  })
+
   it('names the smoothing switch and reports whether it is on', () => {
     renderWithProviders(<AudioSmoothingSettings />)
     expect(switchNamed('Enable Smoothing')).toHaveAttribute('aria-checked', 'true')
@@ -115,4 +132,26 @@ describe('toggle switches', () => {
 
     expect(switchNamed(name)).toBeDisabled()
   })
+
+  it.each([
+    ['yarg', 'Enable YARG', yargListenerEnabledAtom, rb3eListenerEnabledAtom, 'disableYarg'],
+    ['rb3', 'Enable RB3E', rb3eListenerEnabledAtom, yargListenerEnabledAtom, 'disableRb3'],
+    ['yarg', 'Enable YARG', yargListenerEnabledAtom, audioListenerEnabledAtom, 'disableYarg'],
+    ['rb3', 'Enable RB3E', rb3eListenerEnabledAtom, audioListenerEnabledAtom, 'disableRb3'],
+  ] as const)(
+    'stops the running %s listener while another listener also runs',
+    (listener, name, own, other, disableCall) => {
+      renderWithProviders(<ListenerToggle listener={listener} />, {
+        seed: (set) => {
+          set(own, true)
+          set(other, true)
+        },
+      })
+
+      fireEvent.click(switchNamed(name))
+
+      expect(ipcApiMock[disableCall]).toHaveBeenCalled()
+      expect(switchNamed(name)).toHaveAttribute('aria-checked', 'false')
+    },
+  )
 })

@@ -4,6 +4,7 @@ import { lightingPrefsAtom, type LightingPreferences } from '../../atoms'
 import { disableSender } from '../../ipcApi'
 import { applySenderRunState } from '../../ipc/senderSwitch'
 import { RoutedRigsHint } from '../RoutedRigsHint'
+import { isRunSwitchHeld } from './runSwitchHold'
 import { ToggleSwitch } from './ToggleSwitch'
 import type { WireSenderId } from '../../../../photonics-dmx/types'
 
@@ -66,7 +67,7 @@ const SenderToggle: React.FC<SenderToggleProps> = ({
         label={label}
         checked={isRunning}
         onToggle={handleToggle}
-        disabled={(notReady && !isRunning) || disabled || inFlight}
+        disabled={isRunSwitchHeld(isRunning, notReady, disabled || inFlight)}
         compact={compact}
       />
       <RoutedRigsHint senderId={senderId} compact={compact} />
