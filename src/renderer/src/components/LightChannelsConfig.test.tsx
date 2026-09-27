@@ -355,3 +355,43 @@ describe('LightChannelsConfig calibration', () => {
     expect(screen.getByText('Calibration needs a DMX channel for Pan and Tilt.')).toBeTruthy()
   })
 })
+
+describe('LightChannelsConfig strobe speed values', () => {
+  const strobeLight = (): RgbLight =>
+    light({ isStrobeEnabled: true, channels: { ...light().channels, strobeChannel: 5 } })
+  const strobeTemplate = (): SavedFixture =>
+    template({ channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 5 } })
+  const slowBox = (): HTMLInputElement => screen.getByLabelText<HTMLInputElement>('Strobe Slow:')
+
+  it('names each speed box by its label', () => {
+    renderCard({ light: strobeLight(), templates: [strobeTemplate()] })
+
+    for (const label of ['Strobe Slow', 'Strobe Medium', 'Strobe Fast', 'Strobe Fastest']) {
+      expect(screen.getByLabelText(`${label}:`)).toHaveValue(
+        { 'Strobe Slow': 64, 'Strobe Medium': 128, 'Strobe Fast': 192, 'Strobe Fastest': 255 }[
+          label
+        ],
+      )
+    }
+  })
+
+  it('stores nothing while a speed box is emptied, and shows the stored value when left empty', () => {
+    const { onChange } = renderCard({ light: strobeLight(), templates: [strobeTemplate()] })
+
+    fireEvent.change(slowBox(), { target: { value: '' } })
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.blur(slowBox())
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(slowBox().value).toBe('64')
+  })
+
+  it('stores a typed speed once the box is left', () => {
+    const { onChange } = renderCard({ light: strobeLight(), templates: [strobeTemplate()] })
+
+    fireEvent.change(slowBox(), { target: { value: '90' } })
+    fireEvent.blur(slowBox())
+
+    expect(lastLight(onChange).strobeValues?.slow).toBe(90)
+  })
+})

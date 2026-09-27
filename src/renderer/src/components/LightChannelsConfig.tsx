@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useId } from 'react'
 import {
   DmxFixture,
   DmxLight,
@@ -100,6 +100,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   // Added channels, offset-derived from the template like the base channels. Display-only here.
   const [localExtraChannels, setLocalExtraChannels] = useState<ExtraChannel[] | null>(null)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const strobeFieldId = useId()
   /**
    * Explains a master-dimmer entry that was capped to keep the fixture inside the universe. Tagged
    * with the light it describes so selecting another light drops it without an effect writing state.
@@ -283,14 +284,12 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
    * Handles per-light overrides for a strobe speed slot. The fixture template provides defaults;
    * setting a value here overrides for this light only.
    */
-  const handleStrobeValueChange = (key: keyof StrobeChannelValues, raw: string) => {
+  const handleStrobeValueChange = (key: keyof StrobeChannelValues, value: number) => {
     if (!light) return
-    const parsed = Number(raw)
-    const clamped = Math.max(0, Math.min(255, Number.isFinite(parsed) ? Math.round(parsed) : 0))
     const base = light.strobeValues ?? { ...DEFAULT_STROBE_CHANNEL_VALUES }
     onChange({
       ...light,
-      strobeValues: { ...base, [key]: clamped },
+      strobeValues: { ...base, [key]: value },
     })
   }
 
@@ -548,14 +547,13 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                   key={key}
                   className="flex justify-between items-center"
                   onClick={(e) => e.stopPropagation()}>
-                  <span>{label}:</span>
-                  <input
-                    type="number"
+                  <label htmlFor={`${strobeFieldId}-${key}`}>{label}:</label>
+                  <DraftNumberField
+                    id={`${strobeFieldId}-${key}`}
                     min={0}
                     max={255}
                     value={v}
-                    onChange={(e) => handleStrobeValueChange(key, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
+                    onCommit={(value) => handleStrobeValueChange(key, value)}
                     className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                   />
                 </div>
