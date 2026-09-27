@@ -1,7 +1,13 @@
 import equal from 'fast-deep-equal'
 import { isSavedFixture, type DmxFixture, type DmxLight, type DmxRig } from '../types'
 import { isStorableBrightnessScale } from './brightnessScaling'
-import { loadDmxFixture, loadDmxLight, parseFixtureList, type FixtureFault } from './fixtureParsing'
+import {
+  loadDmxFixture,
+  loadDmxLight,
+  parseFixtureList,
+  storedLightIdMint,
+  type FixtureFault,
+} from './fixtureParsing'
 import { isPlainObject } from '../../shared/plainObject'
 
 /**
@@ -217,10 +223,17 @@ function loadRigFixtures(file: RigExportEnvelope, faults: FixtureFault[]): RigEx
     return { ok: true, rig: file.rig, templates: templates.value }
   }
   const loadedConfig: Record<string, unknown> = { ...config }
+  const mintFor = storedLightIdMint()
   for (const list of ['frontLights', 'backLights', 'strobeLights'] as const) {
     const lights = config[list]
     if (!Array.isArray(lights)) continue
-    const loaded = parseFixtureList(lights, `rig.config.${list}`, loadDmxLight, faults)
+    const mintId = mintFor(list)
+    const loaded = parseFixtureList(
+      lights,
+      `rig.config.${list}`,
+      (raw, at, report) => loadDmxLight(raw, at, report, mintId),
+      faults,
+    )
     if (!loaded.ok) {
       return loaded
     }

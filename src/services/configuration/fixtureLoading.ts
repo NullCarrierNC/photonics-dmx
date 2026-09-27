@@ -10,6 +10,7 @@ import {
   loadDmxFixture,
   loadDmxLight,
   parseFixtureList,
+  storedLightIdMint,
   type FixtureFault,
   type FixtureFaultKind,
   type FixtureFaultReport,
@@ -64,9 +65,19 @@ function loadLightingConfiguration(
   path: string,
   faults: FixtureFault[],
 ): LightingConfiguration {
+  const mintFor = storedLightIdMint()
   // A list that is not an array is left for the file's validator to reject.
-  const lights = (list: LightingConfiguration['frontLights'], name: string) =>
-    Array.isArray(list) ? loadList(list, `${path}${name}`, loadDmxLight, faults) : list
+  const lights = (list: LightingConfiguration['frontLights'], name: string) => {
+    const mintId = mintFor(name)
+    return Array.isArray(list)
+      ? loadList(
+          list,
+          `${path}${name}`,
+          (raw, at, report) => loadDmxLight(raw, at, report, mintId),
+          faults,
+        )
+      : list
+  }
   return {
     ...config,
     frontLights: lights(config.frontLights, 'frontLights'),
