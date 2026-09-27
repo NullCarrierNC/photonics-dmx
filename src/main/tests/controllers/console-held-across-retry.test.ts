@@ -32,6 +32,7 @@ import {
 } from '../../../photonics-dmx/tests/helpers/testFixtures'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { listenerStub, senderLifecycleStub, stubConfig } from './lifecycleStub'
+import { setLogSink } from '../../../shared/logger'
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -148,6 +149,28 @@ describe('a Retry after a restart fails with the DMX console open', () => {
       RENDERER_RECEIVE.CONSOLE_LEFT,
       expect.anything(),
     )
+  })
+
+  /** The lifecycle warnings logged while `run` settles. */
+  async function transitionWarnings(run: () => Promise<unknown>): Promise<string[]> {
+    const warnings: string[] = []
+    setLogSink((entry) => {
+      if (entry.level === 'warn' && entry.message.includes('lifecycle transition')) {
+        warnings.push(entry.message)
+      }
+    })
+    try {
+      await run()
+    } finally {
+      setLogSink(undefined)
+    }
+    return warnings
+  }
+
+  it('settles in console mode through transitions the lifecycle expects', async () => {
+    expect(await transitionWarnings(retry)).toEqual([])
+    expect(await transitionWarnings(() => manager.restartControllers())).toEqual([])
+    expect(manager.getLifecyclePhase()).toBe('consoleMode')
   })
 
   it('keeps cue frames off the wire and puts the console page frames on it', async () => {
