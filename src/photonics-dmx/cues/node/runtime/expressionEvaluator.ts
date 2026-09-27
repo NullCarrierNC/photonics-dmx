@@ -66,7 +66,10 @@ export class ExpressionParseError extends Error {
 }
 
 // --- tokenizer -------------------------------------------------------------
-type Tok = { t: 'num'; v: number } | { t: 'id'; v: string } | { t: 'op'; v: string }
+/** A token and `at`, the offset in the source it starts at. */
+type Tok = ({ t: 'num'; v: number } | { t: 'id'; v: string } | { t: 'op'; v: string }) & {
+  at: number
+}
 
 function tokenize(src: string): Tok[] {
   const toks: Tok[] = []
@@ -83,19 +86,19 @@ function tokenize(src: string): Tok[] {
       const num = Number(src.slice(i, j))
       if (!Number.isFinite(num))
         throw new ExpressionParseError(`invalid number '${src.slice(i, j)}'`)
-      toks.push({ t: 'num', v: num })
+      toks.push({ t: 'num', v: num, at: i })
       i = j
       continue
     }
     if (/[a-zA-Z_]/.test(c)) {
       let j = i + 1
       while (j < src.length && /[a-zA-Z0-9_]/.test(src[j])) j++
-      toks.push({ t: 'id', v: src.slice(i, j) })
+      toks.push({ t: 'id', v: src.slice(i, j), at: i })
       i = j
       continue
     }
     if ('+-*/%(),'.includes(c)) {
-      toks.push({ t: 'op', v: c })
+      toks.push({ t: 'op', v: c, at: i })
       i++
       continue
     }
@@ -263,6 +266,34 @@ export function compileExpression(src: string): CompiledExpression {
     cache.set(src, e)
     throw e
   }
+}
+
+/**
+ * `src` with each identifier it reads as a variable renamed by `renames`, and every other character
+ * as it was. A name followed by `(` is the function and a constant is always the constant, so
+ * neither changes. Text that does not tokenize is returned as it is.
+ */
+export function renameExpressionVariables(
+  src: string,
+  renames: ReadonlyMap<string, string>,
+): string {
+  let toks: Tok[]
+  try {
+    toks = tokenize(src)
+  } catch {
+    return src
+  }
+  let out = ''
+  let copied = 0
+  toks.forEach((tk, index) => {
+    const next = toks[index + 1]
+    if (tk.t !== 'id' || tk.v in CONSTANTS || (next?.t === 'op' && next.v === '(')) return
+    const name = renames.get(tk.v)
+    if (name === undefined) return
+    out += src.slice(copied, tk.at) + name
+    copied = tk.at + tk.v.length
+  })
+  return out + src.slice(copied)
 }
 
 /** Parse-only: the distinct variable identifiers an expression references (for validation). Returns [] on

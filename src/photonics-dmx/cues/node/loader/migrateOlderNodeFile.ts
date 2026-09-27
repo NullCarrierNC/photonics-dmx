@@ -7,6 +7,7 @@
  */
 import { VARIABLE_NAME_PATTERN, VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { VariableType } from '../../types/nodeCueTypes'
+import { renameExpressionVariables } from '../runtime/expressionEvaluator'
 import {
   DEFAULT_EASING,
   initialValueAsRead,
@@ -246,7 +247,10 @@ function conformInitialValues(declarations: readonly JsonObject[]): string | nul
     : null
 }
 
-/** Renames every variable use under `node`: variable value sources and logic node name fields. */
+/**
+ * Renames every variable use under `node`: variable value sources, logic node name fields and the
+ * identifiers an expression reads as variables.
+ */
 function renameUses(node: unknown, renames: ReadonlyMap<string, string>): void {
   if (Array.isArray(node)) {
     for (const item of node) renameUses(item, renames)
@@ -255,6 +259,9 @@ function renameUses(node: unknown, renames: ReadonlyMap<string, string>): void {
   if (!isObject(node)) return
   if (node.source === 'variable' && typeof node.name === 'string') {
     node.name = renames.get(node.name) ?? node.name
+  }
+  if (node.logicType === 'expression' && typeof node.expression === 'string') {
+    node.expression = renameExpressionVariables(node.expression, renames)
   }
   for (const field of NAME_FIELDS) {
     const value = node[field]

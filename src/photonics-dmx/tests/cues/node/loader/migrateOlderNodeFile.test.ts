@@ -96,6 +96,43 @@ describe('migrateOlderNodeFile', () => {
     ])
   })
 
+  it('renames a bare use of a variable named like a built-in function in expression text', () => {
+    const expression = (id: string, text: string) => ({
+      id,
+      logicType: 'expression',
+      expression: text,
+      assignTo: 'a',
+    })
+    const file = {
+      group: { id: 'g', name: 'G' },
+      cues: [
+        {
+          id: 'c1',
+          name: 'One',
+          kind: 'lighting',
+          variables: ['min', 'pi', 'a', 'b'].map((name) => variable(name)),
+          nodes: {
+            events: [],
+            actions: [],
+            logic: [
+              expression('l1', 'min(a,b)*2.50+  min /pi'),
+              expression('l2', 'max(min, 1)'),
+              expression('l3', 'min (a) + pi'),
+            ],
+          },
+        },
+      ],
+    }
+
+    migrateOlderNodeFile(file)
+
+    expect(file.cues[0].nodes.logic.map((node) => node.expression)).toEqual([
+      'min(a,b)*2.50+  min_2 /pi',
+      'max(min_2, 1)',
+      'min (a) + pi',
+    ])
+  })
+
   it('renames an effect raiser parameter the effect file renames', () => {
     const file = {
       group: { id: 'g', name: 'G' },

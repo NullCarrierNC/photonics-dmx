@@ -324,11 +324,11 @@ describe('loading cue and effect files older builds wrote', () => {
       initialValue: 3,
       isParameter,
     })
-    const expressionNode = (assignTo: string) => ({
+    const expressionNode = (assignTo: string, reads = 'min') => ({
       id: 'x1',
       type: 'logic',
       logicType: 'expression',
-      expression: 'min(a, b) + pi',
+      expression: `min(a, b) + ${reads} + pi`,
       assignTo,
     })
 
@@ -415,7 +415,7 @@ describe('loading cue and effect files older builds wrote', () => {
       expect(namesOf(cue)).toEqual(['min_2', 'pi_2', 'a', 'b'])
       expect(cue.nodes).toEqual(
         expect.objectContaining({
-          logic: [expressionNode('min_2')],
+          logic: [expressionNode('min_2', 'min_2')],
           effectRaisers: [
             expect.objectContaining({
               parameterValues: { min_3: { source: 'variable', name: 'min_2' } },
@@ -423,10 +423,13 @@ describe('loading cue and effect files older builds wrote', () => {
           ],
         }),
       )
-      expect(effect.nodes).toEqual(expect.objectContaining({ logic: [expressionNode('pi_2')] }))
+      expect(effect.nodes).toEqual(
+        expect.objectContaining({ logic: [expressionNode('pi_2', 'min_3')] }),
+      )
       const compiled = compileExpression(cue.nodes.logic?.[0].expression ?? '')
-      expect(compiled.variables).toEqual(['a', 'b'])
-      expect(compiled.evaluate((name) => (name === 'a' ? 4 : 9))).toBe(4 + Math.PI)
+      expect(compiled.variables).toEqual(['a', 'b', 'min_2'])
+      const values: Record<string, number> = { a: 4, b: 9, min_2: 20 }
+      expect(compiled.evaluate((name) => values[name])).toBe(4 + 20 + Math.PI)
     })
   })
 })
