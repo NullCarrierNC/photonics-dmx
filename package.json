@@ -24,6 +24,7 @@
     "size:budget": "node tools/size-budget.mjs",
     "paths:check": "node tools/referenced-paths-check.mjs",
     "cue-sim:check": "node tools/cue-sim-check.mjs",
+    "dmx:log": "node tools/dmx-log.mjs",
     "coverage:check": "node tools/coverage-threshold-check.mjs",
     "pushed:check": "node tools/pushed-tree-check.mjs",
     "verify:quick": "node tools/verify-quick.mjs",
