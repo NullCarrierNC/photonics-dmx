@@ -8,18 +8,16 @@ import type {
   ActionNode as ActionPayload,
   ValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import {
-  getPaletteColorCssRgb,
-  validateColorString,
-} from '../../../../../../photonics-dmx/helpers/dmxHelpers'
+import { getPaletteColorCssRgb } from '../../../../../../photonics-dmx/helpers/dmxHelpers'
+import { parseColor } from '../../../../../../photonics-dmx/cues/node/runtime/valueResolver'
 
 const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
   const action = data.payload as ActionPayload
 
-  // Handle color which is now ValueSource
+  // A literal colour shows as the colour it plays, and a colour variable on white.
   const colorValue = action.color?.name
   const isColorVariable = colorValue?.source === 'variable'
-  const colorName = colorValue?.source === 'literal' ? String(colorValue.value) : 'white'
+  const colorName = colorValue?.source === 'literal' ? parseColor(colorValue.value) : 'white'
   const colorVarName = isColorVariable ? colorValue.name : null
   const textColor = isColorVariable ? '#333' : getTextColorForBg(colorName)
 
@@ -80,9 +78,7 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
   // When transparent is selected, use semi-transparent black (50%) for the node UI so it remains visible.
   // Otherwise use RGB from the palette map — names like `amber` are not valid CSS colour keywords.
   const bgColorForNode =
-    colorName === 'transparent'
-      ? 'rgba(0,0,0,0.5)'
-      : getPaletteColorCssRgb(validateColorString(colorName))
+    colorName === 'transparent' ? 'rgba(0,0,0,0.5)' : getPaletteColorCssRgb(colorName)
   const textColorForNode = colorName === 'transparent' ? '#f9fafb' : textColor
 
   return (

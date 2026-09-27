@@ -1,4 +1,4 @@
-import { BlendMode, Brightness, Color, isColor, RGBIO } from '../types'
+import { BlendMode, Brightness, Color, RGBIO } from '../types'
 
 /**
  * A universe buffer holding only addresses that exist, at values a fixture can take.
@@ -190,17 +190,6 @@ const colorMap: { [key in Color]: { r: number; g: number; b: number } } = {
   white: { r: 255, g: 255, b: 255 },
   black: { r: 0, g: 0, b: 0 },
   transparent: { r: 0, g: 0, b: 0 },
-}
-
-/**
- * Validates a string, case-insensitively, and converts it to a Color type.
- *
- * @param colorString - The color string to validate
- * @returns A valid Color type, or 'white' as fallback if invalid
- */
-export const validateColorString = (colorString: string): Color => {
-  const normalizedColor = colorString.toLowerCase()
-  return isColor(normalizedColor) ? normalizedColor : 'white'
 }
 
 /**
