@@ -82,4 +82,15 @@ describe('CueSimulator secondary step', () => {
       sim.dispose()
     }
   })
+
+  it('refuses a secondary cue that only the default library carries', async () => {
+    const sim = await CueSimulator.create({ library: 'yarg-fade', bpm: 0 })
+    try {
+      sim.setCue('Default')
+      sim.schedule({ at: 100, secondary: 'Strobe_Fast' })
+      await expect(sim.run(300)).rejects.toThrow(/Unknown cue 'Strobe_Fast' in 'yarg-fade'/)
+    } finally {
+      sim.dispose()
+    }
+  })
 })

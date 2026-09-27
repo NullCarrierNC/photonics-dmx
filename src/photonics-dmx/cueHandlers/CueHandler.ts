@@ -5,6 +5,7 @@ import {
   DrumNoteType,
   InstrumentNoteType,
   cueTypeToStrobeSlot,
+  isHandlerOwnedCueType,
   isStrobeCueType,
   isVocalActive,
 } from '../cues/types/cueTypes'
@@ -337,34 +338,40 @@ class CueHandler extends EventEmitter {
     // primary-cue accounting for strobe cues so a held strobe does not thrash it.
     const historicCueData = this.addHistoryToCueData(cueType, parameters)
 
-    // Special cases that need to be handled differently
-    switch (cueType) {
-      case CueType.Blackout_Fast:
-      case CueType.Blackout_Spotlight:
-      case CueType.NoCue:
-        this.pendingSlowBlackoutEnd = false
-        this.chartBlackoutHeld = true
-        this.stopCurrentCue()
-        void this._sequencer.blackout(0)
-        this.emit('cueHandled', historicCueData)
-        return
-      case CueType.Blackout_Slow:
-        this.pendingSlowBlackoutEnd = true
-        this.chartBlackoutHeld = true
-        this.stopCurrentCue()
-        void this._sequencer.blackout(500)
-        this.emit('cueHandled', historicCueData)
-        return
-      case CueType.Strobe_Off:
-        this.stopActiveStrobe()
-        this.emit('cueHandled', historicCueData)
-        return
-      case CueType.Keyframe_First:
-      case CueType.Keyframe_Next:
-      case CueType.Keyframe_Previous:
-        this.handleKeyframe()
-        this.emit('cueHandled', historicCueData)
-        return
+    // Cues the handler acts on itself never reach the registry.
+    if (isHandlerOwnedCueType(cueType)) {
+      switch (cueType) {
+        case CueType.Blackout_Fast:
+        case CueType.Blackout_Spotlight:
+        case CueType.NoCue:
+          this.pendingSlowBlackoutEnd = false
+          this.chartBlackoutHeld = true
+          this.stopCurrentCue()
+          void this._sequencer.blackout(0)
+          this.emit('cueHandled', historicCueData)
+          return
+        case CueType.Blackout_Slow:
+          this.pendingSlowBlackoutEnd = true
+          this.chartBlackoutHeld = true
+          this.stopCurrentCue()
+          void this._sequencer.blackout(500)
+          this.emit('cueHandled', historicCueData)
+          return
+        case CueType.Strobe_Off:
+          this.stopActiveStrobe()
+          this.emit('cueHandled', historicCueData)
+          return
+        case CueType.Keyframe_First:
+        case CueType.Keyframe_Next:
+        case CueType.Keyframe_Previous:
+          this.handleKeyframe()
+          this.emit('cueHandled', historicCueData)
+          return
+        default: {
+          const unhandled: never = cueType
+          throw new Error(`Handler-owned cue type '${String(unhandled)}' has no case`)
+        }
+      }
     }
 
     if (incomingIsStrobe && this.chartBlackoutHeld) {

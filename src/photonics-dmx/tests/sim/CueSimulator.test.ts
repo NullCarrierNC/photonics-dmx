@@ -258,4 +258,37 @@ describe('CueSimulator', () => {
       expect(await stompLit([0, 400], [200, 600])).toEqual([false, true])
     })
   })
+
+  it('refuses a cue that only the default library carries', async () => {
+    const sim = await CueSimulator.create({ library: 'yarg-alt1', bpm: 0 })
+    try {
+      expect(() => sim.setCue('Warm_Automatic')).toThrow(
+        /Unknown cue 'Warm_Automatic' in 'yarg-alt1'/,
+      )
+    } finally {
+      sim.dispose()
+    }
+  })
+
+  it('refuses a scenario cue change to a cue that only the default library carries', async () => {
+    const sim = await CueSimulator.create({ library: 'yarg-alt1', bpm: 0 })
+    try {
+      sim.setCue('Cool_Automatic')
+      sim.schedule({ at: 100, cue: 'Warm_Automatic' })
+      await expect(sim.run(300)).rejects.toThrow(/Unknown cue 'Warm_Automatic' in 'yarg-alt1'/)
+    } finally {
+      sim.dispose()
+    }
+  })
+
+  it('runs a cue the handler acts on itself in a library that carries no such cue', async () => {
+    const sim = await CueSimulator.create({ library: 'yarg-fade', bpm: 0 })
+    try {
+      sim.setCue('Blackout_Fast')
+      const timeline = await sim.run(300)
+      expect(timeline.cue).toBe('Blackout_Fast')
+    } finally {
+      sim.dispose()
+    }
+  })
 })
