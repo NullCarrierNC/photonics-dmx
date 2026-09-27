@@ -10,6 +10,7 @@ import { unassignedBaseChannelLabels } from '../components/lightChannelDisplay'
 import { saveMyLights } from '../ipcApi'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
+import { useUnloadGuard } from '../hooks/useUnloadGuard'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('MyLights')
@@ -46,6 +47,8 @@ const MyLights = () => {
    */
   const [editorBaseline, setEditorBaseline] = useState<DmxFixture | null>(null)
   const [saving, setSaving] = useState(false)
+  const hasUnsavedChanges = !equal(currentLight, editorBaseline)
+  useUnloadGuard(hasUnsavedChanges)
 
   const openEditor = (light: DmxFixture) => {
     setCurrentLight(light)
@@ -157,7 +160,7 @@ const MyLights = () => {
   }
 
   const handleCancel = async () => {
-    if (!equal(currentLight, editorBaseline)) {
+    if (hasUnsavedChanges) {
       const discard = await confirm({
         title: 'Discard changes?',
         message: 'This light has unsaved changes. Closing the editor will lose them.',
