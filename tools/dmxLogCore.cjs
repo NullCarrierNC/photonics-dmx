@@ -334,6 +334,18 @@ function checkExpectations(rows, expect, options = {}) {
   return { ok, lines }
 }
 
+/**
+ * Each source's packet count and rate, from its first packet to its last.
+ * @param {Map<string, { count: number, firstMs: number, lastMs: number }>} packetCounts
+ * @returns {Array<{ source: string, count: number, spanMs: number, perSecond: number }>}
+ */
+function packetRates(packetCounts) {
+  return [...packetCounts].map(([source, { count, firstMs, lastMs }]) => {
+    const spanMs = lastMs - firstMs
+    return { source, count, spanMs, perSecond: spanMs > 0 ? ((count - 1) * 1000) / spanMs : 0 }
+  })
+}
+
 module.exports = {
   parseArtDmx,
   parseChannelSpec,
@@ -344,4 +356,5 @@ module.exports = {
   statesOf,
   renderTable,
   checkExpectations,
+  packetRates,
 }

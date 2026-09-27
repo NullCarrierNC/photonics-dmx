@@ -10,6 +10,7 @@ const {
   statesOf,
   renderTable,
   checkExpectations,
+  packetRates,
 } = require('../../../../tools/dmxLogCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -214,6 +215,19 @@ describe('table', () => {
       '|---|---|---|---|',
       '| 0 | 1 | 2 | 0 |',
       '| 0 | 2 | 1 | 0 |',
+    ])
+  })
+})
+
+describe('packet rates', () => {
+  it('counts each source from its first packet to its last', () => {
+    const counts = new Map([
+      ['a', { count: 45, firstMs: 100, lastMs: 1100 }],
+      ['b', { count: 1, firstMs: 50, lastMs: 50 }],
+    ])
+    expect(packetRates(counts)).toEqual([
+      { source: 'a', count: 45, spanMs: 1000, perSecond: 44 },
+      { source: 'b', count: 1, spanMs: 0, perSecond: 0 },
     ])
   })
 })

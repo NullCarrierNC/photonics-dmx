@@ -13,14 +13,20 @@
  * address reaches only the first socket on the port, which is the app's. Point the app's Art-Net
  * host at a broadcast address, such as the subnet's .255, to hear it here.
  *
+ * Unicast to this machine on a spare `--port` (sACN needs `--unicast`) is heard as long as the
+ * logger binds the port before the sender does. The "Listening" line goes out once it has.
+ *
  * Flags:
  *   --protocol sacn|artnet   what to listen to (default sacn)
  *   --universe 1[,2]      sACN universes (default 1) or Art-Net Port-Addresses (default all)
  *   --channels 1-12,20    channels to watch (default all 512)
  *   --iface <ip>          sACN only: local IPv4 address of the interface to join multicast on
+ *   --port <n>            the UDP port to listen on (default 5568 for sACN, 6454 for Art-Net)
+ *   --unicast             sACN only: take packets sent straight to this machine, joining no group
  *   --duration <ms>       stop after this long
  *   --until-idle <ms>     stop once nothing has changed for this long after the first lit frame
  *   --out <file>          write the rows as NDJSON here
+ *   --stats <file>        write each source's packet count and rate as JSON here
  *   --replay <file>       read rows from an earlier --out instead of listening
  *   --t0 first-change|first-packet   where 0 ms sits (default first-change)
  *   --table               print the rows as a markdown table
@@ -39,7 +45,7 @@ import { performance } from 'node:perf_hooks'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { Receiver } = require('sacn')
+const { Receiver, Packet } = require('sacn')
 const {
   parseArtDmx,
   parseChannelSpec,
@@ -47,6 +53,7 @@ const {
   rebase,
   renderTable,
   checkExpectations,
+  packetRates,
 } = require('./dmxLogCore.cjs')
 
 /** @param {string[]} argv */
@@ -83,30 +90,55 @@ function num(value, fallback) {
   return parsed
 }
 
+const SACN_PORT = 5568
 const ART_NET_PORT = 6454
 
-/**
- * Joins the sACN multicast groups. Each packet reaches `events.packet` as `{ u, src, key, dmx }`,
- * where `key` names the source in the summary.
- */
-function openSacn({ universes, iface }, events) {
-  const receiver = new Receiver({ universes, iface, reuseAddr: true })
-  receiver.on('packet', (packet) => {
-    const src = `${packet.sourceName} @ ${packet.sourceAddress}`
-    const key = `u${packet.universe} ${src} (priority ${packet.priority})`
-    events.packet({ u: packet.universe, src, key, dmx: packet.payloadAsBuffer ?? [] })
-  })
+/** Passes one parsed sACN packet on as `{ u, src, key, dmx }`, where `key` names the source. */
+function sacnPacket(packet, events) {
+  const src = `${packet.sourceName} @ ${packet.sourceAddress}`
+  const key = `u${packet.universe} ${src} (priority ${packet.priority})`
+  events.packet({ u: packet.universe, src, key, dmx: packet.payloadAsBuffer ?? [] })
+}
+
+/** Joins the sACN multicast groups. The receiver binds as it is made. */
+function openSacn({ universes, iface, port }, events) {
+  const receiver = new Receiver({ universes, iface, port, reuseAddr: true })
+  receiver.on('packet', (packet) => sacnPacket(packet, events))
   receiver.on('PacketOutOfOrder', () => events.outOfOrder())
   receiver.on('PacketCorruption', () => events.corrupt())
   receiver.on('error', (error) => events.error(error))
   return {
     what: `sACN on universe ${universes.join(', ')}`,
+    ready: Promise.resolve(),
     close: (done) => receiver.close(done),
   }
 }
 
+/** Binds a port and passes on the sACN packets sent straight to it, joining no group. */
+function openSacnUnicast({ universes, port }, events) {
+  const socket = createSocket({ type: 'udp4', reuseAddr: true })
+  socket.on('message', (message, remote) => {
+    let packet
+    try {
+      packet = new Packet(message, remote.address)
+    } catch {
+      events.corrupt()
+      return
+    }
+    if (universes.includes(packet.universe)) {
+      sacnPacket(packet, events)
+    }
+  })
+  socket.on('error', (error) => events.error(error))
+  return {
+    what: `sACN unicast on port ${port}, universe ${universes.join(', ')}`,
+    ready: new Promise((resolve) => socket.bind(port, resolve)),
+    close: (done) => socket.close(done),
+  }
+}
+
 /** Binds the Art-Net port and passes on ArtDmx packets for the chosen Port-Addresses, or all. */
-function openArtNet({ universes }, events) {
+function openArtNet({ universes, port }, events) {
   const socket = createSocket({ type: 'udp4', reuseAddr: true })
   socket.on('message', (message, remote) => {
     const packet = parseArtDmx(message)
@@ -117,10 +149,10 @@ function openArtNet({ universes }, events) {
     events.packet({ u: packet.u, src, key: `u${packet.u} ${src}`, dmx: packet.dmx })
   })
   socket.on('error', (error) => events.error(error))
-  socket.bind(ART_NET_PORT)
   const which = universes === null ? 'every universe' : `universe ${universes.join(', ')}`
   return {
-    what: `Art-Net on port ${ART_NET_PORT}, ${which}`,
+    what: `Art-Net on port ${port}, ${which}`,
+    ready: new Promise((resolve) => socket.bind(port, resolve)),
     close: (done) => socket.close(done),
   }
 }
@@ -187,7 +219,11 @@ function listen({ open, channels, durationMs, idleMs }) {
       )
     }
     const stop = [durationMs && `${durationMs} ms`, idleMs && `${idleMs} ms idle`, 'Ctrl-C']
-    console.error(`Listening for ${source.what}, stopping at ${stop.filter(Boolean).join(' or ')}`)
+    source.ready.then(() =>
+      console.error(
+        `Listening for ${source.what}, stopping at ${stop.filter(Boolean).join(' or ')}`,
+      ),
+    )
   })
 }
 
@@ -197,10 +233,9 @@ function summarize(run, protocolName) {
   if (run.packetCounts.size === 0) {
     console.error(`No ${protocolName} packets arrived`)
   }
-  for (const [source, { count, firstMs, lastMs }] of run.packetCounts) {
-    const rate = lastMs > firstMs ? ((count - 1) * 1000) / (lastMs - firstMs) : 0
+  for (const { source, count, spanMs, perSecond } of packetRates(run.packetCounts)) {
     console.error(
-      `  ${source}: ${count} packets over ${lastMs - firstMs} ms, ${rate.toFixed(1)} per second`,
+      `  ${source}: ${count} packets over ${spanMs} ms, ${perSecond.toFixed(1)} per second`,
     )
   }
   if (run.packetCounts.size > 1) {
@@ -234,6 +269,11 @@ async function main() {
     if (artNet && flags.iface !== undefined) {
       throw new Error('--iface is for sACN only. Art-Net listens on every interface')
     }
+    const unicast = bools.has('unicast')
+    if (artNet && unicast) {
+      throw new Error('--unicast is for sACN only. Art-Net always takes unicast')
+    }
+    const port = num(flags.port, artNet ? ART_NET_PORT : SACN_PORT)
     const [lowest, highest] = artNet ? [0, 32767] : [1, 63999]
     const universeSpec = flags.universe ?? (artNet ? undefined : '1')
     const universes =
@@ -249,13 +289,23 @@ async function main() {
     const run = await listen({
       open: (events) =>
         artNet
-          ? openArtNet({ universes }, events)
-          : openSacn({ universes, iface: flags.iface }, events),
+          ? openArtNet({ universes, port }, events)
+          : unicast
+            ? openSacnUnicast({ universes, port }, events)
+            : openSacn({ universes, iface: flags.iface, port }, events),
       channels: channels ?? parseChannelSpec(undefined),
       durationMs: num(flags.duration, undefined),
       idleMs: num(flags['until-idle'], undefined),
     })
     summarize(run, artNet ? 'Art-Net' : 'sACN')
+    if (flags.stats !== undefined) {
+      const stats = {
+        sources: packetRates(run.packetCounts),
+        outOfOrder: run.outOfOrder,
+        corrupt: run.corrupt,
+      }
+      writeFileSync(flags.stats, JSON.stringify(stats, null, 2) + '\n')
+    }
     rows = run.rows
   }
   rows = rebase(rows, t0)
