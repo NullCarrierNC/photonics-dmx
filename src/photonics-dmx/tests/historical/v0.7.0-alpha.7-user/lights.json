@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "data": {
+    "lights": [
+      {
+        "id": "701a406c-a444-43d1-b1ce-bdbc6248f98f",
+        "fixture": "rgb",
+        "name": "PAR",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 0,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      },
+      {
+        "id": "fd0a1fa8-5a89-4338-a160-d84b93ee3aeb",
+        "fixture": "rgb/mh",
+        "name": "Spot",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "pan": 5,
+          "tilt": 6
+        },
+        "config": {
+          "panHome": 50,
+          "panMin": 0,
+          "panMax": 255,
+          "panRangeDeg": 540,
+          "panDirectionCW": true,
+          "panStageDeg": 270,
+          "tiltHome": 50,
+          "tiltMin": 0,
+          "tiltMax": 255,
+          "tiltRangeDeg": 180,
+          "tiltStageDeg": 90,
+          "invertPan": false,
+          "invertTilt": false
+        }
+      },
+      {
+        "id": "81fcb775-ed47-4f3c-a177-f3407580af50",
+        "fixture": "strobe",
+        "name": "Strobe",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 1,
+          "strobeChannel": 2
+        }
+      },
+      {
+        "id": "d679b818-d95f-42cf-ab72-7aee5c1be8c8",
+        "fixture": "rgb",
+        "name": "PAR S",
+        "position": -1,
+        "label": "An RGB Light",
+        "isStrobeEnabled": false,
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "strobeChannel": 5
+        },
+        "strobeValues": {
+          "slow": 64,
+          "medium": 128,
+          "fast": 192,
+          "fastest": 255
+        }
+      }
+    ]
+  }
+}

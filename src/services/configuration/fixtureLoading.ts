@@ -5,12 +5,14 @@
  */
 import equal from 'fast-deep-equal'
 import { isSavedFixture } from '../../photonics-dmx/types'
-import type { DmxRigsConfig, LightingConfiguration } from '../../photonics-dmx/types'
+import type { DmxFixture, DmxRigsConfig, LightingConfiguration } from '../../photonics-dmx/types'
 import {
   loadDmxFixture,
   loadDmxLight,
   parseFixtureList,
+  rigLightLoader,
   storedLightIdMint,
+  type DmxLightLoader,
   type FixtureFault,
   type FixtureFaultKind,
   type FixtureFaultReport,
@@ -63,6 +65,7 @@ function settle<T>(
 function loadLightingConfiguration(
   config: LightingConfiguration,
   path: string,
+  load: DmxLightLoader,
   faults: FixtureFault[],
 ): LightingConfiguration {
   const mintFor = storedLightIdMint()
@@ -70,12 +73,7 @@ function loadLightingConfiguration(
   const lights = (list: LightingConfiguration['frontLights'], name: string) => {
     const mintId = mintFor(name)
     return Array.isArray(list)
-      ? loadList(
-          list,
-          `${path}${name}`,
-          (raw, at, report) => loadDmxLight(raw, at, report, mintId),
-          faults,
-        )
+      ? loadList(list, `${path}${name}`, (raw, at, report) => load(raw, at, report, mintId), faults)
       : list
   }
   return {
@@ -114,20 +112,34 @@ export function loadLightingLayoutFixtures(
     return data
   }
   const faults: FixtureFault[] = []
-  return settle(data, loadLightingConfiguration(data, '', faults), faults, reportRepair)
+  return settle(
+    data,
+    loadLightingConfiguration(data, '', loadDmxLight, faults),
+    faults,
+    reportRepair,
+  )
 }
 
+/**
+ * Rig lights take their fixture type from the loaded `templates` they name, as the rig's template
+ * sync does after the load.
+ */
 export function loadDmxRigsFixtures(
   data: DmxRigsConfig,
+  templates: readonly DmxFixture[],
   reportRepair: ConfigRepairReport,
 ): DmxRigsConfig {
   if (!Array.isArray(data?.rigs)) {
     return data
   }
   const faults: FixtureFault[] = []
+  const load = rigLightLoader(templates)
   const rigs = data.rigs.map((rig, i) =>
     typeof rig?.config === 'object' && rig.config !== null
-      ? { ...rig, config: loadLightingConfiguration(rig.config, `rigs[${i}].config.`, faults) }
+      ? {
+          ...rig,
+          config: loadLightingConfiguration(rig.config, `rigs[${i}].config.`, load, faults),
+        }
       : rig,
   )
   return settle(data, { ...data, rigs }, faults, reportRepair)

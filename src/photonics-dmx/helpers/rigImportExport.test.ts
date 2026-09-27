@@ -218,6 +218,23 @@ describe('loadRigExportFixtures', () => {
     expect(config.strobeLights[0].id).toBe(config.frontLights[0].id)
   })
 
+  it('loads a rig light as the fixture type of the template it names', () => {
+    const file = buildRigExportFile(rig, [rgbTemplate, rgbwTemplate])
+    const [first, ...rest] = rig.config.frontLights
+    const stored = { ...first, fixture: FixtureTypes.STROBE }
+    const faults: string[] = []
+    const loaded = loadRigExportFixtures(
+      { ...file, rig: { ...file.rig, config: { ...rig.config, frontLights: [stored, ...rest] } } },
+      faults,
+    )
+    if (!loaded.ok) throw new Error(loaded.error)
+
+    expect(loaded.rig.config).toMatchObject({ frontLights: [first, ...rest] })
+    expect(faults).toEqual([
+      "rig.config.frontLights[0].fixture 'strobe' is now its template's 'rgb'",
+    ])
+  })
+
   it('loads a file on the current schema as it is', () => {
     const file = buildRigExportFile(rig, [rgbTemplate, rgbwTemplate])
     const faults: string[] = []

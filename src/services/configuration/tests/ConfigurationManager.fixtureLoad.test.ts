@@ -261,6 +261,58 @@ describe('ConfigurationManager fixture loading', () => {
     expect(reportsFor(cm, 'dmxRigs.json')).toEqual([])
   })
 
+  describe('a rig light stored as another fixture type than its template', () => {
+    const at = 'rigs[0].config.strobeLights[0]'
+
+    /** Boots on one rig whose strobe row holds a light of template tpl-1 stored as `stored`. */
+    const bootRig = (tpl: Record<string, unknown>, stored: Record<string, unknown>) => {
+      const light = { ...template({ id: 'l1', group: 'strobe', ...stored }), fixtureId: 'tpl-1' }
+      const rig = {
+        id: 'rig-1',
+        name: 'Rig 1',
+        active: true,
+        config: { ...layoutWith([]), strobeLights: [light] },
+      }
+      return boot({ lights: [tpl], rigsText: JSON.stringify({ schemaVersion: 8, rigs: [rig] }) })
+    }
+    const rigReports = (cm: ConfigurationManager) =>
+      reportsFor(cm, 'dmxRigs.json').map((r) => `${r.reason}: ${r.message}`)
+
+    it('keeps the channels of its template type and reports the type it now has', () => {
+      const cm = bootRig(template({}), {
+        fixture: FixtureTypes.STROBE,
+        channels: { masterDimmer: 31, red: 32, green: 33, blue: 34 },
+      })
+
+      expect(cm.getDmxRigs()[0].config.strobeLights[0]).toMatchObject({
+        fixture: FixtureTypes.RGB,
+        channels: { masterDimmer: 31, red: 32, green: 33, blue: 34 },
+      })
+      expect(rigReports(cm)).toEqual([
+        `repaired: ${at}.fixture 'strobe' is now its template's 'rgb'`,
+      ])
+    })
+
+    it('drops the channels its template type does not have', () => {
+      const cm = bootRig(
+        template({ fixture: FixtureTypes.STROBE, channels: { masterDimmer: 1, strobeChannel: 2 } }),
+        { fixture: FixtureTypes.RGB, channels: { masterDimmer: 31, red: 32, green: 33, blue: 34 } },
+      )
+
+      expect(cm.getDmxRigs()[0].config.strobeLights[0]).toMatchObject({
+        fixture: FixtureTypes.STROBE,
+        channels: { masterDimmer: 31, strobeChannel: 32 },
+      })
+      const dropped = ['red', 'green', 'blue'].map(
+        (key) => `${at}.channels.${key} is not a channel of a strobe fixture`,
+      )
+      expect(rigReports(cm)).toEqual([
+        `repaired: ${at}.fixture 'rgb' is now its template's 'strobe', ${at}.channels.strobeChannel is missing`,
+        `keysDropped: ${dropped.join(', ')}`,
+      ])
+    })
+  })
+
   it('reports a dropped key apart from a value put back to its default', () => {
     const cm = boot({
       layoutLights: [

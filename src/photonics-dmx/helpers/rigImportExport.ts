@@ -3,8 +3,8 @@ import { isSavedFixture, type DmxFixture, type DmxLight, type DmxRig } from '../
 import { isStorableBrightnessScale } from './brightnessScaling'
 import {
   loadDmxFixture,
-  loadDmxLight,
   parseFixtureList,
+  rigLightLoader,
   storedLightIdMint,
   type FixtureFault,
 } from './fixtureParsing'
@@ -196,8 +196,8 @@ export function validateRigExportFile(
 
 /**
  * Loads an imported file's templates and rig lights, in whichever build's fixture schema the file
- * was written, collecting the repairs in `faults`. A file holding a fixture of a type no build
- * wrote is refused.
+ * was written, collecting the repairs in `faults`. A rig light reads as the fixture type of the
+ * file's template it names. A file holding a fixture of a type no build wrote is refused.
  */
 export function loadRigExportFixtures(
   file: RigExportEnvelope,
@@ -223,6 +223,7 @@ function loadRigFixtures(file: RigExportEnvelope, faults: FixtureFault[]): RigEx
     return { ok: true, rig: file.rig, templates: templates.value }
   }
   const loadedConfig: Record<string, unknown> = { ...config }
+  const load = rigLightLoader(templates.value)
   const mintFor = storedLightIdMint()
   for (const list of ['frontLights', 'backLights', 'strobeLights'] as const) {
     const lights = config[list]
@@ -231,7 +232,7 @@ function loadRigFixtures(file: RigExportEnvelope, faults: FixtureFault[]): RigEx
     const loaded = parseFixtureList(
       lights,
       `rig.config.${list}`,
-      (raw, at, report) => loadDmxLight(raw, at, report, mintId),
+      (raw, at, report) => load(raw, at, report, mintId),
       faults,
     )
     if (!loaded.ok) {

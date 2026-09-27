@@ -109,7 +109,8 @@ export class ConfigurationManager {
     this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1, {
       onCorruptRecovery: onCorrupt,
       validate: validateDmxRigsData,
-      normalizeLoaded: loadDmxRigsFixtures,
+      normalizeLoaded: (data, reportRepair) =>
+        loadDmxRigsFixtures(data, this.getUserLights(), reportRepair),
     })
 
     runStartupMigrations({
