@@ -296,4 +296,63 @@ describe('expectations', () => {
     expect(checkExpectations(rows, { states: [{ ch: { 1: 3 } }] }).ok).toBe(false)
     expect(checkExpectations(rows, { universe: 3, states: [{ ch: { 1: 3 } }] }).ok).toBe(true)
   })
+
+  it('reads a range key as every channel in it', () => {
+    const rows: Row[] = [
+      { ms: 0, u: 1, ch: { 1: 255, 2: 255, 3: 255 } },
+      { ms: 10, end: true },
+    ]
+    expect(checkExpectations(rows, { states: [{ ch: { '1-3': 255, '4-6': 0 } }] }).ok).toBe(true)
+    expect(checkExpectations(rows, { states: [{ ch: { '1-4': 255 } }] }).ok).toBe(false)
+  })
+
+  it('leaves the walk in place when a state misses its time', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [
+        { ch: { 2: 255 }, atMs: 300 },
+        { ch: { 2: 255 }, atMs: 20 },
+      ],
+    })
+    expect(result.lines).toEqual([
+      'FAIL state 1: reached at 22 ms, expected 300 ± 30 ms',
+      'PASS state 2: reached at 22 ms',
+    ])
+  })
+
+  it('fails a never state shown inside its window, and passes one shown only outside it', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [
+        { never: { 2: 255 }, fromMs: 60, toMs: 100, label: 'dark between flashes' },
+        { never: { 2: 255 }, fromMs: 60, toMs: 120 },
+        { never: { 2: 128 } },
+      ],
+    })
+    expect(result.lines).toEqual([
+      'PASS state 1 (dark between flashes): never shown',
+      'FAIL state 2: shown at 110 ms, expected never',
+      'PASS state 3: never shown',
+    ])
+  })
+
+  it('fails an always state that any listed channel leaves inside its window', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [
+        { always: { '1-3': 0 }, toMs: 22 },
+        { always: { '1-3': 0 }, fromMs: 60, toMs: 110 },
+        { always: { 2: 0 }, fromMs: 60, toMs: 111 },
+      ],
+    })
+    expect(result.lines).toEqual([
+      'PASS state 1: held throughout',
+      'PASS state 2: held throughout',
+      'FAIL state 3: left at 110 ms with 2=255',
+    ])
+  })
+
+  it('does not move the walk for never and always states', () => {
+    const result = checkExpectations(strobeRows(), {
+      states: [{ ch: { 2: 255 }, atMs: 110 }, { never: { 2: 128 } }, { ch: { 2: 0 }, atMs: 150 }],
+    })
+    expect(result.ok).toBe(true)
+  })
 })

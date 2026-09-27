@@ -24,7 +24,9 @@
  *   --replay <file>       read rows from an earlier --out instead of listening
  *   --t0 first-change|first-packet   where 0 ms sits (default first-change)
  *   --table               print the rows as a markdown table
- *   --expect <file>       hold the rows to {universe?, states: [{ch, atMs?, holdMs?, label?}]}
+ *   --expect <file>       hold the rows to {universe?, states: [...]}, each state being
+ *                         {ch, atMs?, holdMs?, label?}, {never: ch, fromMs?, toMs?} or
+ *                         {always: ch, fromMs?, toMs?}, where a ch key can be a range ("1-12")
  *   --time-tol <ms>       tolerance on atMs (default 30)
  *   --value-tol <n>       tolerance on each expected channel value (default 0)
  *

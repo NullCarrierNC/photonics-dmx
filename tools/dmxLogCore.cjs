@@ -201,6 +201,22 @@ function renderTable(rows, channels) {
 }
 
 /**
+ * An expected channel list with each range key ("1-12") given as its channels.
+ * @param {Record<string, number>} want
+ * @returns {Record<string, number>}
+ */
+function expandChannels(want) {
+  /** @type {Record<string, number>} */
+  const expanded = {}
+  for (const [key, value] of Object.entries(want)) {
+    for (const ch of parseChannelSpec(key)) {
+      expanded[ch] = value
+    }
+  }
+  return expanded
+}
+
+/**
  * @param {Map<number, number>} values
  * @param {Record<string, number>} want
  * @param {number} valueTol
@@ -212,12 +228,33 @@ function matches(values, want, valueTol) {
 }
 
 /**
+ * The first state for which `test` holds while it overlaps `fromMs` to `toMs`, or null.
+ * @param {Array<{ ms: number, values: Map<number, number> }>} states
+ * @param {{ fromMs?: number, toMs?: number }} window
+ * @param {(values: Map<number, number>) => boolean} test
+ */
+function firstInWindow(states, window, test) {
+  const fromMs = window.fromMs ?? -Infinity
+  const toMs = window.toMs ?? Infinity
+  return (
+    states.find((state, i) => {
+      const untilMs = i + 1 < states.length ? states[i + 1].ms : Infinity
+      return state.ms < toMs && untilMs > fromMs && test(state.values)
+    }) ?? null
+  )
+}
+
+/**
  * Walks the expected states in order. Each must appear at or after the previous one. `atMs`, when
  * given, must be within `timeTolMs` of when the state appears, and picks that occurrence when the
- * state appears more than once. `holdMs`, when given, is how long the state must then last before
- * any listed channel leaves it.
+ * state appears more than once. A state that misses its time leaves the walk where it was, so the
+ * states after it are checked as if it had not been listed. `holdMs`, when given, is how long the state must then last before
+ * any listed channel leaves it. A `never` entry instead fails when its channels show those values
+ * at any time from `fromMs` to `toMs` (the whole recording by default), and an `always` entry fails
+ * when any listed channel leaves its value in that window. Neither moves the walk.
+ * A channel key can be a range such as "1-12", which expects every channel in it to hold the value.
  * @param {Array<{ ms: number, u?: number, end?: boolean, ch?: Record<string, number> }>} rows
- * @param {{ universe?: number, states: Array<{ ch: Record<string, number>, atMs?: number, holdMs?: number, label?: string }> }} expect
+ * @param {{ universe?: number, states: Array<{ ch?: Record<string, number>, never?: Record<string, number>, always?: Record<string, number>, atMs?: number, holdMs?: number, fromMs?: number, toMs?: number, label?: string }> }} expect
  * @param {{ timeTolMs?: number, valueTol?: number }} [options]
  * @returns {{ ok: boolean, lines: string[] }}
  */
@@ -229,8 +266,32 @@ function checkExpectations(rows, expect, options = {}) {
   const lines = []
   let ok = true
   let from = 0
-  expect.states.forEach((want, index) => {
-    const name = `state ${index + 1}${want.label ? ` (${want.label})` : ''}`
+  expect.states.forEach((entry, index) => {
+    const name = `state ${index + 1}${entry.label ? ` (${entry.label})` : ''}`
+    if (entry.never !== undefined) {
+      const never = expandChannels(entry.never)
+      const shown = firstInWindow(states, entry, (values) => matches(values, never, valueTol))
+      if (shown !== null) {
+        ok = false
+        lines.push(`FAIL ${name}: shown at ${shown.ms} ms, expected never`)
+      } else {
+        lines.push(`PASS ${name}: never shown`)
+      }
+      return
+    }
+    if (entry.always !== undefined) {
+      const always = expandChannels(entry.always)
+      const left = firstInWindow(states, entry, (values) => !matches(values, always, valueTol))
+      if (left !== null) {
+        ok = false
+        const shown = Object.keys(always).map((ch) => `${ch}=${left.values.get(Number(ch)) ?? 0}`)
+        lines.push(`FAIL ${name}: left at ${left.ms} ms with ${shown.join(' ')}`)
+      } else {
+        lines.push(`PASS ${name}: held throughout`)
+      }
+      return
+    }
+    const want = { ...entry, ch: expandChannels(entry.ch ?? {}) }
     const reached = states
       .map((state, i) => i)
       .filter((i) => i >= from && matches(states[i].values, want.ch, valueTol))
@@ -243,11 +304,12 @@ function checkExpectations(rows, expect, options = {}) {
       lines.push(`FAIL ${name}: never reached ${JSON.stringify(want.ch)}`)
       return
     }
-    from = at
     const reachedMs = states[at].ms
     const problems = []
     if (want.atMs !== undefined && Math.abs(reachedMs - want.atMs) > timeTolMs) {
       problems.push(`reached at ${reachedMs} ms, expected ${want.atMs} ± ${timeTolMs} ms`)
+    } else {
+      from = at
     }
     if (want.holdMs !== undefined) {
       const left = states.findIndex(
