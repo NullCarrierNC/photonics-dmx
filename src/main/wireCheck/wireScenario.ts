@@ -25,7 +25,8 @@ interface TemplateSpec {
 interface LightSpec {
   id: string
   template: string
-  group: 'front' | 'back'
+  /** A `strobe` light sits in the strobe row only, as a dedicated strobe. */
+  group: 'front' | 'back' | 'strobe'
   address: number
   /** "Use as strobe" in Lights Layout. */
   strobe?: boolean
@@ -128,7 +129,7 @@ export function rigFiles(spec: RigSpec): Record<string, unknown> {
       fixture: template.fixture,
       label: template.label ?? template.id,
       name: template.label ?? template.id,
-      isStrobeEnabled: light.strobe === true,
+      isStrobeEnabled: light.strobe === true || light.group === 'strobe',
       group: light.group,
       universe: 1,
       mount: 'floor',

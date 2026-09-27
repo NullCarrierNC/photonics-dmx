@@ -13,11 +13,15 @@ import type { WireRun } from './WireRun'
 /** A steady level, a list of levels cycled frame by frame, or a high level on every Nth frame. */
 export type AudioLevel = number | number[] | { every: number; high: number; low: number }
 
-/** YARG frames at `frameMs` carrying `cue`, with beats from `bpm` (every 4th a Measure). */
+/**
+ * YARG frames at `frameMs` carrying `cue`, with beats from `bpm` (every 4th a Measure) and each
+ * keyframe on the first frame at or after its time into the step.
+ */
 interface GameStep {
   type: 'yarg'
   cue: string
   strobe?: StrobeState
+  keyframes?: Array<{ atMs: number; keyframe: 'First' | 'Next' | 'Previous' }>
   bpm?: number
   venue?: VenueSize
   frameMs?: number
@@ -70,7 +74,12 @@ function cueTypeOf(cue: string): CueType {
   return cueType
 }
 
-function yargFrame(step: GameStep, cue: CueType, beat: CueData['beat']): CueData {
+function yargFrame(
+  step: GameStep,
+  cue: CueType,
+  beat: CueData['beat'],
+  keyframe: CueData['keyframe'],
+): CueData {
   return {
     ...defaultCueData,
     datagramVersion: 1,
@@ -83,7 +92,7 @@ function yargFrame(step: GameStep, cue: CueType, beat: CueData['beat']): CueData
     lightingCue: cue,
     strobeState: step.strobe ?? 'Strobe_Off',
     beat,
-    keyframe: 'Off',
+    keyframe,
     trackMode: 'tracked',
   }
 }
@@ -106,6 +115,8 @@ export async function playStep(run: WireRun, clock: WireClock, step: PlayStep): 
   const beatMs = bpm > 0 ? 60000 / bpm : Infinity
   const listener = step.type === 'yarg' ? run.yarg() : null
   const cue = step.type === 'yarg' ? cueTypeOf(step.cue) : null
+  const keyframes =
+    step.type === 'yarg' ? [...(step.keyframes ?? [])].sort((a, b) => a.atMs - b.atMs) : []
   let frameIndex = 0
   let beatIndex = 0
   let level = 0
@@ -130,7 +141,11 @@ export async function playStep(run: WireRun, clock: WireClock, step: PlayStep): 
         beatIndex++
       }
       if (listener && cue && step.type === 'yarg') {
-        listener.processCueData(yargFrame(step, cue, beat))
+        const keyframe =
+          keyframes.length > 0 && keyframes[0].atMs <= elapsed() + EPSILON
+            ? keyframes.shift()?.keyframe ?? 'Off'
+            : 'Off'
+        listener.processCueData(yargFrame(step, cue, beat, keyframe))
       } else if (audio && step.type === 'audio') {
         level = levelAt(step.level, frameIndex)
         void audio.dispatch(beatThisFrame ? { beat: 'Strong' } : {})

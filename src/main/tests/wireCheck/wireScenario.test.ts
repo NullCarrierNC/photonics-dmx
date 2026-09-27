@@ -67,6 +67,25 @@ describe('wire scenarios', () => {
     expect(config.strobeLights).toEqual([expect.objectContaining({ id: 'B' })])
   })
 
+  it('puts a strobe-row light in the strobe row only, as a strobe', () => {
+    const files = rigFiles({
+      strobeType: 'Dedicated',
+      templates: [{ id: 'par', fixture: 'rgb', channels: { masterDimmer: 1, red: 2 } }],
+      lights: [
+        { id: 'F', template: 'par', group: 'front', address: 1 },
+        { id: 'S', template: 'par', group: 'strobe', address: 5 },
+      ],
+    })
+    const written: WrittenRig = JSON.parse(JSON.stringify(files['dmxRigs.json']))
+    const { config } = written.rigs[0]
+    expect(config.frontLights).toHaveLength(1)
+    expect(config.backLights).toEqual([])
+    expect(config.lightLayout).toEqual({ id: 'front', label: 'Front only' })
+    expect(config.strobeLights).toEqual([
+      expect.objectContaining({ id: 'S', isStrobeEnabled: true }),
+    ])
+  })
+
   it('refuses a light whose template is not listed', () => {
     expect(() =>
       rigFiles({
