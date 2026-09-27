@@ -21,6 +21,7 @@ import type { WaitCondition } from '../../types'
 import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
 import type { ActionNode, NodeCueMode, ValueSource, VariableType } from '../types/nodeCueTypes'
+import { RESERVED_VARIABLE_NAMES, VARIABLE_NAME_PATTERN } from '../types/nodeCueTypes'
 
 export interface ValueIssue {
   severity: 'error' | 'warning'
@@ -362,6 +363,21 @@ function unknownColorIssue(type: VariableType, value: unknown): ValueIssue | nul
   return unknown === undefined
     ? null
     : warning(`'${unknown}' is not a known Color and the list plays without it`)
+}
+
+/**
+ * Whether a variable may take `name`: expressions read variables by name, so it fits
+ * {@link VARIABLE_NAME_PATTERN} and is none of the names an expression reads as its own.
+ */
+export function variableNameIssue(name: string): ValueIssue | null {
+  if (!VARIABLE_NAME_PATTERN.test(name)) {
+    return error(
+      `"${name}" is not a valid variable name. Use letters, digits and underscores, starting with a letter or underscore`,
+    )
+  }
+  if (RESERVED_VARIABLE_NAMES.includes(name))
+    return error(`'${name}' is a built-in expression name`)
+  return null
 }
 
 /**
