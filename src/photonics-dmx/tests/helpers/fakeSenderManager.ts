@@ -8,21 +8,21 @@ export type FakeSenderManager = {
 
 /**
  * Senders for suites that drive a DmxPublisher without real transports. By default one sACN wire
- * sender is enabled, IPC is off, and every send reports that its frame reached the wire. A suite
- * passes its own implementation for any member.
+ * sender is enabled, IPC is off, and a send reports whether its slot is among the enabled wire
+ * senders, as SenderManager's does. A suite passes its own implementation for any member.
  */
 export function fakeSenderManager(overrides: Partial<PublisherSenders> = {}): FakeSenderManager {
-  const members: PublisherSenders = {
-    send: () => Promise.resolve(true),
-    sendIpc: () => {},
-    getEnabledWireSenders: () => ['sacn'],
-    isIpcEnabled: () => false,
-    ...overrides,
+  const fake: FakeSenderManager = {
+    send: jest.fn<PublisherSenders['send']>(
+      overrides.send ?? ((slot) => Promise.resolve(fake.getEnabledWireSenders().includes(slot))),
+    ),
+    sendIpc: jest.fn<PublisherSenders['sendIpc']>(overrides.sendIpc ?? (() => {})),
+    getEnabledWireSenders: jest.fn<PublisherSenders['getEnabledWireSenders']>(
+      overrides.getEnabledWireSenders ?? (() => ['sacn']),
+    ),
+    isIpcEnabled: jest.fn<PublisherSenders['isIpcEnabled']>(
+      overrides.isIpcEnabled ?? (() => false),
+    ),
   }
-  return {
-    send: jest.fn(members.send),
-    sendIpc: jest.fn(members.sendIpc),
-    getEnabledWireSenders: jest.fn(members.getEnabledWireSenders),
-    isIpcEnabled: jest.fn(members.isIpcEnabled),
-  }
+  return fake
 }

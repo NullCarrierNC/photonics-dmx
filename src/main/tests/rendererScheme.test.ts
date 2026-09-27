@@ -126,6 +126,14 @@ describe('renderer scheme', () => {
     expect(rendererFileFor(url, rendererDir)).toBeNull()
   })
 
+  it.each([
+    'photonics://renderer/assets\\index-abc.js',
+    'photonics://renderer/index.html%00',
+    'photonics://renderer/assets/index-abc.js%00.png',
+  ])('maps %s, which holds a literal backslash or NUL, to no file', (url) => {
+    expect(rendererFileFor(url, rendererDir)).toBeNull()
+  })
+
   it('maps a URL naming the folder itself to no file', () => {
     expect(rendererFileFor('photonics://renderer//', rendererDir)).toBeNull()
   })
