@@ -9,6 +9,7 @@ import { NodeCueCompiler } from '../../cues/node/compiler/NodeCueCompiler'
 import { CueType, defaultCueData, type CueData } from '../../cues/types/cueTypes'
 import type { NetMotionNodeCueDefinition } from '../../cues/types/nodeCueTypes'
 import { createSequencerHarness, type SequencerHarness } from '../helpers/sequencerHarness'
+import { DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../types/movingHead'
 
 const MOTION_FILE = path.join(
   __dirname,
@@ -56,7 +57,7 @@ function midSwings(pans: Array<{ t: number; pan: number }>): number[] {
   return crossings
 }
 
-describe('the bundled YARG Cross Beat Half motion cue', () => {
+describe('the bundled YARG beat-counting motion cues', () => {
   let harness: SequencerHarness
   let handler: CueHandler
 
@@ -107,24 +108,48 @@ describe('the bundled YARG Cross Beat Half motion cue', () => {
   it.each([
     ['with a lighting cue', lightingCue],
     ['with no lighting cue', null],
-  ])('moves on the first beat and every second beat after it %s', async (_label, lighting) => {
-    jest.spyOn(CueRegistry.getInstance(), 'getCueImplementation').mockReturnValue(lighting)
+  ])(
+    'Cross Beat Half moves on the first beat and every second beat after it %s',
+    async (_label, lighting) => {
+      jest.spyOn(CueRegistry.getInstance(), 'getCueImplementation').mockReturnValue(lighting)
+      handler = new CueHandler(harness.lightManager, harness.sequencer, {
+        getMotionCueMinimumHoldMs: () => 0,
+        getMotionCueProbabilityPercent: () => 100,
+      })
+
+      const heads = await play(6500)
+
+      for (const pans of heads) {
+        const panAt = (t: number): number | undefined => pans.find((sample) => sample.t === t)?.pan
+        // The first beat aims the head, and it holds that bearing until the third beat.
+        expect(panAt(100)).toBe(panAt(900))
+        expect(panAt(100)).not.toBe(panAt(1900))
+        const swings = midSwings(pans).filter((t) => t > 200)
+        expect(Math.round(swings[0]! / 500)).toBe(3)
+        const beatsApart = swings.slice(1).map((swing, i) => Math.round((swing - swings[i]!) / 500))
+        expect(beatsApart).toEqual(beatsApart.map(() => 2))
+      }
+    },
+  )
+
+  it('Searchlights wanders from the first beat', async () => {
+    jest
+      .spyOn(CueRegistry.getInstance(), 'getRandomMotionCue')
+      .mockReturnValue(bundledMotionCue('motion-searchlights'))
+    jest.spyOn(CueRegistry.getInstance(), 'getCueImplementation').mockReturnValue(lightingCue)
     handler = new CueHandler(harness.lightManager, harness.sequencer, {
       getMotionCueMinimumHoldMs: () => 0,
       getMotionCueProbabilityPercent: () => 100,
     })
 
-    const heads = await play(6500)
+    const heads = await play(1900)
 
+    // The first beat sends each head off home, and the next wander waits for the fifth beat.
+    const home = DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.panHome
+    const offHome = heads.filter((pans) => pans.find((sample) => sample.t === 250)?.pan !== home)
+    expect(offHome.length).toBeGreaterThan(0)
     for (const pans of heads) {
-      const panAt = (t: number): number | undefined => pans.find((sample) => sample.t === t)?.pan
-      // The first beat aims the head, and it holds that bearing until the third beat.
-      expect(panAt(100)).toBe(panAt(900))
-      expect(panAt(100)).not.toBe(panAt(1900))
-      const swings = midSwings(pans).filter((t) => t > 200)
-      expect(Math.round(swings[0]! / 500)).toBe(3)
-      const beatsApart = swings.slice(1).map((swing, i) => Math.round((swing - swings[i]!) / 500))
-      expect(beatsApart).toEqual(beatsApart.map(() => 2))
+      expect(new Set(pans.filter((sample) => sample.t >= 250).map((s) => s.pan)).size).toBe(1)
     }
   })
 })

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 3,
+  "cueVersion": 4,
   "mode": "yarg",
   "group": {
     "id": "yarg-motion-default",
@@ -1865,66 +1865,6 @@
         ],
         "logic": [
           {
-            "id": "srch-init-beat-count",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchBeatCount",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-mod",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchMod",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-current-index",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchCurrentIndex",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-pan",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchPan",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-tilt",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchTilt",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
             "id": "srch-init-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
@@ -1987,7 +1927,7 @@
             },
             "right": {
               "source": "literal",
-              "value": 0
+              "value": 1
             }
           },
           {
@@ -2066,26 +2006,6 @@
       "connections": [
         {
           "from": "srch-event-start",
-          "to": "srch-init-beat-count"
-        },
-        {
-          "from": "srch-init-beat-count",
-          "to": "srch-init-mod"
-        },
-        {
-          "from": "srch-init-mod",
-          "to": "srch-init-current-index"
-        },
-        {
-          "from": "srch-init-current-index",
-          "to": "srch-init-pan"
-        },
-        {
-          "from": "srch-init-pan",
-          "to": "srch-init-tilt"
-        },
-        {
-          "from": "srch-init-tilt",
           "to": "srch-init-beat-ms"
         },
         {
@@ -2148,26 +2068,6 @@
           "srch-action-pos": {
             "x": 15.240913394902464,
             "y": 947.6657194380487
-          },
-          "srch-init-beat-count": {
-            "x": -380.29969866369385,
-            "y": 45.167222411304806
-          },
-          "srch-init-mod": {
-            "x": -397.1753118650968,
-            "y": 111.4181762801536
-          },
-          "srch-init-current-index": {
-            "x": -402.8005162655644,
-            "y": 181.41926641598104
-          },
-          "srch-init-pan": {
-            "x": -393.42517559811836,
-            "y": 257.045560952276
-          },
-          "srch-init-tilt": {
-            "x": -395.30024373160757,
-            "y": 342.047196156017
           },
           "srch-init-beat-ms": {
             "x": -395.30024373160757,
