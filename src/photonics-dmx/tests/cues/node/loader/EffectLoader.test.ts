@@ -400,6 +400,23 @@ describe('EffectLoader with a group id two files on disk share', () => {
     ])
   })
 
+  it('serves group ids that differ only in case from their own files', async () => {
+    const write = (name: string, groupId: string, effectName: string): void => {
+      const file = minimalYargEffectFixture(groupId)
+      file.effects = file.effects.map((effect) => ({ ...effect, name: effectName }))
+      fs.writeFileSync(path.join(yargDir, name), JSON.stringify(file), 'utf-8')
+    }
+    write('a.json', 'Foo', 'From a')
+    write('b.json', 'foo', 'From b')
+
+    const result = await loader.loadAll()
+
+    expect(result.errors).toEqual([])
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+    expect(byGroupId.get('Foo')?.effects[0].name).toBe('From a')
+    expect(byGroupId.get('foo')?.effects[0].name).toBe('From b')
+  })
+
   it('hands the id to the refused file when the file holding it is deleted', async () => {
     const holder = writeEffectFile('a.json', 'From a')
     writeEffectFile('b.json', 'From b')

@@ -717,6 +717,23 @@ describe('NodeCueLoader', () => {
       expect(errorsOf('b.json')).toEqual([refusal('b.json', 'a.json').slice('b.json: '.length)])
     })
 
+    it('serves group ids that differ only in case from their own files', async () => {
+      const upper = yargMotionOnlyFile()
+      upper.group = { ...upper.group, id: 'Foo' }
+      const lower = yargMotionOnlyFile()
+      lower.group = { ...lower.group, id: 'foo' }
+      const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      fs.mkdirSync(yargDir, { recursive: true })
+      fs.writeFileSync(path.join(yargDir, 'a.json'), JSON.stringify(upper), 'utf-8')
+      fs.writeFileSync(path.join(yargDir, 'b.json'), JSON.stringify(lower), 'utf-8')
+
+      const result = await loader.loadAll()
+
+      expect(result.errors).toEqual([])
+      expect(yargRegistry.getGroup('Foo')).toBeDefined()
+      expect(yargRegistry.getGroup('foo')).toBeDefined()
+    })
+
     it('hands the group to the refused file when the file holding it is deleted', async () => {
       const holder = writeMotionFile('a.json', 'from-a')
       writeMotionFile('b.json', 'from-b')

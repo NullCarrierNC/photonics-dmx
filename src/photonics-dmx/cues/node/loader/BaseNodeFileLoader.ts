@@ -66,10 +66,11 @@ export interface GroupIdClaim<TMode extends string> {
   groupId: string
 }
 
+/** Group ids match exactly, as the registries and effect references look them up. */
 const sameGroupId = <TMode extends string>(
   a: GroupIdClaim<TMode>,
   b: GroupIdClaim<TMode>,
-): boolean => a.mode === b.mode && a.groupId.trim().toLowerCase() === b.groupId.trim().toLowerCase()
+): boolean => a.mode === b.mode && a.groupId === b.groupId
 
 const errorCode = (error: unknown): unknown =>
   typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
