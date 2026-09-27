@@ -1,7 +1,7 @@
 import {
   RGBIO,
   DmxRig,
-  FixtureTypes,
+  isMovingHead,
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
   WireSenderId,
   type WhiteChannelMixMode,
@@ -616,8 +616,7 @@ export class DmxPublisher {
           intensity = scaleDmxValueByPercent(intensity, masterPercent)
         }
 
-        const isMovingHead = dmxLight.fixture === FixtureTypes.RGBMH
-        const { panOut, tiltOut } = isMovingHead
+        const { panOut, tiltOut } = isMovingHead(dmxLight)
           ? resolveMovingHeadAxes(dmxLight, rig, pan, tilt)
           : {
               panOut: pan ?? dmxLight.config?.panHome ?? 0,

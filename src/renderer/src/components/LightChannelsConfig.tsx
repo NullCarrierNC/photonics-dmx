@@ -12,6 +12,7 @@ import {
   FixtureConfigNumberField,
   fixtureConfigFieldBounds,
   isFixtureConfigFlagField,
+  isMovingHead,
   isValidDmxChannel,
   normalizeFixtureConfig,
   LightingConfiguration,
@@ -300,8 +301,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
 
   // A saved moving head in a rig is what the calibration wizard opens for.
-  const calibration =
-    light?.fixture === FixtureTypes.RGBMH && light.id && rigId ? { light, rigId } : null
+  const calibration = light && isMovingHead(light) && light.id && rigId ? { light, rigId } : null
   // The wizard aims the head through its pan and tilt channels, so it needs both.
   const canCalibrate =
     calibration !== null &&
@@ -433,7 +433,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light && localConfig && (
         <div className="mt-2 w-full">
           <h3 className="text-lg font-bold">Config</h3>
-          {light.fixture === FixtureTypes.RGBMH && (
+          {isMovingHead(light) && (
             <>
               <p className="text-xs text-gray-600 dark:text-gray-200 mb-2">
                 Use the Calibrate button below to configure these fields interactively.
@@ -475,22 +475,21 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                 </li>
               )
             })}
-            {light.fixture === FixtureTypes.RGBMH &&
-              localConfig.invertPan === localConfig.invertTilt && (
-                <li className="flex flex-col items-stretch pt-1">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleFiringDirection()
-                    }}
-                    className="text-xs px-2 py-1 rounded border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 w-full">
-                    {localConfig.invertPan && localConfig.invertTilt
-                      ? 'Down firing (invert pan + tilt)'
-                      : 'Up firing (normal pan + tilt)'}
-                  </button>
-                </li>
-              )}
+            {isMovingHead(light) && localConfig.invertPan === localConfig.invertTilt && (
+              <li className="flex flex-col items-stretch pt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleFiringDirection()
+                  }}
+                  className="text-xs px-2 py-1 rounded border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 w-full">
+                  {localConfig.invertPan && localConfig.invertTilt
+                    ? 'Down firing (invert pan + tilt)'
+                    : 'Up firing (normal pan + tilt)'}
+                </button>
+              </li>
+            )}
           </ul>
         </div>
       )}
@@ -516,7 +515,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       )}
 
       {/* Separator for moving head fixtures if present */}
-      {light?.fixture === FixtureTypes.RGBMH ? <hr /> : null}
+      {light && isMovingHead(light) ? <hr /> : null}
 
       {/* Strobe Toggle */}
       {light && (
