@@ -109,6 +109,7 @@ function resolveLightArray(
   return existing.type === 'light-array' ? existing.value : []
 }
 
+/** A colour list. A literal list plays without the names this build does not know. */
 export function resolveColorArray(
   source: ValueSource | undefined,
   context: ExecutionContext,
@@ -116,7 +117,7 @@ export function resolveColorArray(
 ): Color[] {
   if (!source) return []
   if (source.source === 'literal') {
-    return Array.isArray(source.value) ? source.value : []
+    return Array.isArray(source.value) ? source.value.filter(isColor) : []
   }
   const existing = lookupVariable(source.name, context, variableDefinitions)
   return existing.type === 'color-array' ? existing.value : []

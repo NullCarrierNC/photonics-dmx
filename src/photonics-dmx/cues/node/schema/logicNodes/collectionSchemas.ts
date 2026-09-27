@@ -52,8 +52,7 @@ export const colorFromIndexLogicSchema = {
       nullable: true,
       items: { type: 'string' },
     },
-    // Palette: an inline literal Color[] (each entry enum-validated against COLOR_OPTIONS, so
-    // typos are rejected at load) or a reference to a color-array variable.
+    // Palette: an inline list of colour names or a reference to a color-array variable.
     colors: colorArrayValueSourceSchema,
     index: valueSourceSchema,
     assignTo: { type: 'string' },

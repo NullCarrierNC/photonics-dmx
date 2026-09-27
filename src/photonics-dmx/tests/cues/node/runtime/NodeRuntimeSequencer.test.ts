@@ -329,7 +329,8 @@ describe('Node runtime with real Sequencer', () => {
     }
   })
 
-  it('selects palette colours by index with color-from-index (wraps around)', () => {
+  /** A cue that lights each front light with the palette entry at its index. */
+  const paletteByIndexCue = (colors: string[]): NetNodeCueDefinition => {
     const configNode: LogicNode = {
       id: 'config-1',
       type: 'logic',
@@ -351,45 +352,57 @@ describe('Node runtime with real Sequencer', () => {
       id: 'pick-1',
       type: 'logic',
       logicType: 'color-from-index',
-      colors: { source: 'literal', value: ['red', 'green', 'blue'] as Color[] },
+      colors: { source: 'literal', value: colors },
       index: { source: 'variable', name: 'idx' },
       assignTo: 'curColor',
     }
 
+    return defineCue({
+      id: 'color-index',
+      name: 'Color Index',
+      nodes: {
+        actions: [
+          setColorAction(
+            'action-1',
+            { source: 'variable', name: 'curColor' },
+            { groups: { source: 'variable', name: 'curLight' } },
+          ),
+        ],
+        logic: [configNode, eachNode, pickNode],
+      },
+      connections: [
+        { from: 'event-1', to: 'config-1' },
+        { from: 'config-1', to: 'each-1' },
+        { from: 'each-1', to: 'pick-1', fromPort: 'each' },
+        { from: 'pick-1', to: 'action-1' },
+      ],
+      variables: [
+        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
+      ],
+    })
+  }
+
+  it('selects palette colours by index with color-from-index (wraps around)', () => {
     const palette = ['red', 'green', 'blue'] as const
 
-    startCue(
-      defineCue({
-        id: 'color-index',
-        name: 'Color Index',
-        nodes: {
-          actions: [
-            setColorAction(
-              'action-1',
-              { source: 'variable', name: 'curColor' },
-              { groups: { source: 'variable', name: 'curLight' } },
-            ),
-          ],
-          logic: [configNode, eachNode, pickNode],
-        },
-        connections: [
-          { from: 'event-1', to: 'config-1' },
-          { from: 'config-1', to: 'each-1' },
-          { from: 'each-1', to: 'pick-1', fromPort: 'each' },
-          { from: 'pick-1', to: 'action-1' },
-        ],
-        variables: [
-          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
-          { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
-        ],
-      }),
-    )
+    startCue(paletteByIndexCue([...palette]))
 
     // 4 front lights, 3-colour palette: light 3 wraps to palette[0], proving modulo wraparound.
     harness.frontLightIds.forEach((lightId, i) => {
       expectLit(harness.getLightState(lightId), palette[i % palette.length])
+    })
+  })
+
+  it('leaves a palette colour this version does not know out of the palette', () => {
+    const played = ['red', 'blue'] as const
+
+    startCue(paletteByIndexCue(['red', 'mauve', 'blue']))
+
+    harness.frontLightIds.forEach((lightId, i) => {
+      expectLit(harness.getLightState(lightId), played[i % played.length])
     })
   })
 

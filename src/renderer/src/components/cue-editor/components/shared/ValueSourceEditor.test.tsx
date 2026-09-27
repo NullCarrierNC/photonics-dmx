@@ -125,4 +125,22 @@ describe('ValueSourceEditor for a colour-array value', () => {
 
     expect(screen.getByRole('checkbox')).toBeTruthy()
   })
+
+  it('shows a listed colour this version does not know and warns that it is left out', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="palette (color-array)"
+        value={{ source: 'literal', value: ['red', 'mauve'] }}
+        onChange={jest.fn()}
+        expected="color-array"
+        listLiteral
+        availableVariables={[]}
+      />,
+    )
+
+    expect(screen.getByDisplayValue('mauve')).toBeTruthy()
+    expect(
+      screen.getByText("'mauve' is not a known Color and the list plays without it"),
+    ).toBeTruthy()
+  })
 })

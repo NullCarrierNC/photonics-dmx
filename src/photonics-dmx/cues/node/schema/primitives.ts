@@ -10,7 +10,6 @@ import {
   ValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
-import { COLOR_OPTIONS } from '../../../types'
 export const stringIdSchema: JSONSchemaType<string> = {
   type: 'string',
   minLength: 1,
@@ -52,8 +51,9 @@ export const valueSourceSchema: JSONSchemaType<ValueSource> = {
   ],
 } as unknown as JSONSchemaType<ValueSource>
 
-// A ValueSource constrained to a colour palette: either an inline literal Color[] (each entry
-// enum-validated against COLOR_OPTIONS at load) or a reference to a color-array variable.
+// A ValueSource constrained to a colour palette: either an inline list of colour names or a
+// reference to a color-array variable. A name this build does not know passes here, and validation
+// warns about it.
 export const colorArrayValueSourceSchema = {
   oneOf: [
     {
@@ -65,7 +65,7 @@ export const colorArrayValueSourceSchema = {
         value: {
           type: 'array',
           minItems: 1,
-          items: { type: 'string', enum: COLOR_OPTIONS },
+          items: { type: 'string' },
         },
       },
     },

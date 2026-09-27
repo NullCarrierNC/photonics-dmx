@@ -17,6 +17,7 @@ import type {
   AudioEffectFile,
   EffectDefinition,
   EffectFile,
+  LogicNode,
   NodeCueFile,
   NodeCueMode,
   NetNodeCueFile,
@@ -27,7 +28,12 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 import { getCueDomain } from '../../domains'
 import { checkContinuousCueCalledWaits } from './audioEventPolicyCheck'
-import { actionLiteralIssues, compareOperandIssue, initialValueIssue } from '../cueValueRules'
+import {
+  actionLiteralIssues,
+  compareOperandIssue,
+  initialValueIssue,
+  logicLiteralIssues,
+} from '../cueValueRules'
 
 export type { StructuredValidationError } from './helpers'
 
@@ -92,6 +98,7 @@ export function __resetCueSemanticChecksForTests(): void {
   registerCueSemanticCheck(checkActionLiteralWarnings)
   registerCueSemanticCheck(checkArrayCompares)
   registerCueSemanticCheck(checkInitialValues)
+  registerCueSemanticCheck(checkLogicLiteralWarnings)
 }
 
 /**
@@ -171,11 +178,32 @@ function checkInitialValues(file: NodeCueFile, _errors: string[], warnings: stri
   }
 }
 
+/**
+ * Warn about logic node literals the rules pass with a warning, such as a palette colour this build
+ * does not know. `label` names the cue or effect holding them.
+ */
+function logicLiteralWarnings(label: string, logic: readonly LogicNode[]): string[] {
+  return logic.flatMap((node) =>
+    logicLiteralIssues(node)
+      .filter(({ issue }) => issue.severity === 'warning')
+      .map(
+        ({ field, issue }) => `${label}: ${node.logicType} '${node.id}' ${field} ${issue.message}.`,
+      ),
+  )
+}
+
+function checkLogicLiteralWarnings(file: NodeCueFile, _errors: string[], warnings: string[]): void {
+  for (const cue of file.cues) {
+    warnings.push(...logicLiteralWarnings(`cue '${cue.name}'`, cue.nodes.logic ?? []))
+  }
+}
+
 registerCueSemanticCheck(checkEventVocabulary)
 registerCueSemanticCheck(checkContinuousCueCalledWaits)
 registerCueSemanticCheck(checkActionLiteralWarnings)
 registerCueSemanticCheck(checkArrayCompares)
 registerCueSemanticCheck(checkInitialValues)
+registerCueSemanticCheck(checkLogicLiteralWarnings)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,
@@ -463,8 +491,8 @@ function validateEffectFileForMode<T extends EffectFile>(
 }
 
 /**
- * The warnings for one effect: its initial values, and the action literals the rules pass with a
- * warning in any mode, such as a colour name this build does not know.
+ * The warnings for one effect: its initial values, and the action and logic node literals the rules
+ * pass with a warning in any mode, such as a colour name this build does not know.
  */
 function effectWarnings(effect: EffectDefinition): string[] {
   const label = `effect '${effect.name}'`
@@ -478,6 +506,7 @@ function effectWarnings(effect: EffectDefinition): string[] {
             `${label}: action '${action.label ?? action.id}' ${field} ${issue.message}.`,
         ),
     ),
+    ...logicLiteralWarnings(label, effect.nodes?.logic ?? []),
   ]
 }
 

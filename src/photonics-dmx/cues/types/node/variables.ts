@@ -1,7 +1,6 @@
 /**
  * Variable and event declarations a cue graph carries.
  */
-import type { Color } from '../../../types'
 
 /** Every variable/value type, the single source both the schema enums and the editor dropdowns derive
  *  from so they cannot drift from the VariableType union. */
@@ -28,8 +27,9 @@ export function isVariableName(name: string): boolean {
   return VARIABLE_NAME_PATTERN.test(name)
 }
 
+/** A literal list is a palette's colour names, which may hold a name this build does not know. */
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean | string | Color[] }
+  | { source: 'literal'; value: number | boolean | string | string[] }
   | { source: 'variable'; name: string }
 
 export interface VariableDefinition {

@@ -20,7 +20,13 @@ import {
 import type { WaitCondition } from '../../types'
 import { EasingType, isEasingType } from '../../easing'
 import { STAGE_DIRECTION_BEARING_DEG } from '../../helpers/stageDirections'
-import type { ActionNode, NodeCueMode, ValueSource, VariableType } from '../types/nodeCueTypes'
+import type {
+  ActionNode,
+  LogicNode,
+  NodeCueMode,
+  ValueSource,
+  VariableType,
+} from '../types/nodeCueTypes'
 
 export interface ValueIssue {
   severity: 'error' | 'warning'
@@ -180,6 +186,25 @@ export function actionLiteralIssues(
     const issue = literalIssue(rule, source.value, mode)
     return issue ? [{ field, issue }] : []
   })
+}
+
+/**
+ * Whether a colour list may hold `value`. The list plays without a name this build does not know,
+ * so one is a warning.
+ */
+export function colorListIssue(value: unknown): ValueIssue | null {
+  if (!Array.isArray(value)) return null
+  const unknown = value.find((entry) => !isColor(entry))
+  return unknown === undefined
+    ? null
+    : warning(`'${String(unknown)}' is not a known Color and the list plays without it`)
+}
+
+/** Each issue the rules find in a logic node's literals, named by the field holding it. */
+export function logicLiteralIssues(node: LogicNode): { field: string; issue: ValueIssue }[] {
+  if (node.logicType !== 'color-from-index' || node.colors?.source !== 'literal') return []
+  const issue = colorListIssue(node.colors.value)
+  return issue ? [{ field: 'colors', issue }] : []
 }
 
 /** Whether a literal is one of a field's own choices, for a field no rule here covers. */
@@ -357,11 +382,8 @@ function unknownColorIssue(type: VariableType, value: unknown): ValueIssue | nul
     return warning(`'${value}' is not a known Color and plays as blue`)
   }
   if (type !== 'color-array' || !Array.isArray(value)) return null
-  if (!value.every((entry): entry is string => typeof entry === 'string')) return null
-  const unknown = value.find((entry) => !isColor(entry))
-  return unknown === undefined
-    ? null
-    : warning(`'${unknown}' is not a known Color and the list plays without it`)
+  if (!value.every((entry) => typeof entry === 'string')) return null
+  return colorListIssue(value)
 }
 
 /**

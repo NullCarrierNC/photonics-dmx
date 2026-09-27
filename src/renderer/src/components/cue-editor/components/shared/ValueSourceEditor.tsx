@@ -5,6 +5,7 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   choiceIssue,
+  colorListIssue,
   literalChoices,
   literalDefault,
   literalIssue,
@@ -133,6 +134,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     constrainedLiteralChoices?.some((opt) => opt.value === literalText) ?? false
   const literalProblem = ((): ValueIssue | null => {
     if (!isLiteral || isDefaulted) return null
+    if (isColorArray) return colorListIssue(source.value)
     if (rule && !validLiterals && !validLiteralOptions) {
       return literalIssue(rule, source.value, activeMode)
     }
