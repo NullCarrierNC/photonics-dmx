@@ -97,7 +97,7 @@ describe('ListenerCoordinator listener announcements', () => {
     ])
   })
 
-  it('tells every window when RB3 starts and stops', async () => {
+  it('tells every window when RB3 starts and stops, with the mode its session runs', async () => {
     const deps = makeDeps()
     const lc = new ListenerCoordinator(deps)
     coordinators.push(lc)
@@ -106,8 +106,8 @@ describe('ListenerCoordinator listener announcements', () => {
     await lc.disableRb3()
 
     expect(announcements(deps)).toEqual([
-      { listener: 'rb3', enabled: true },
-      { listener: 'rb3', enabled: false },
+      { listener: 'rb3', enabled: true, mode: 'direct' },
+      { listener: 'rb3', enabled: false, mode: 'none' },
     ])
   })
 
@@ -122,7 +122,7 @@ describe('ListenerCoordinator listener announcements', () => {
     expect(announcements(deps)).toEqual([
       { listener: 'yarg', enabled: true },
       { listener: 'yarg', enabled: false },
-      { listener: 'rb3', enabled: true },
+      { listener: 'rb3', enabled: true, mode: 'direct' },
     ])
   })
 })
@@ -181,9 +181,9 @@ describe('ListenerCoordinator RB3 processing mode across a cycle', () => {
     expect(handler).not.toBeNull()
     expect(deps.setRb3CueHandlerRef).toHaveBeenLastCalledWith(handler)
     expect(announcements(deps)).toEqual([
-      { listener: 'rb3', enabled: true },
-      { listener: 'rb3', enabled: false },
-      { listener: 'rb3', enabled: true },
+      { listener: 'rb3', enabled: true, mode: 'direct' },
+      { listener: 'rb3', enabled: false, mode: 'none' },
+      { listener: 'rb3', enabled: true, mode: 'cue' },
     ])
 
     const shutdown = jest.spyOn(handler!, 'shutdown')

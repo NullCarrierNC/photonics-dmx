@@ -5,7 +5,8 @@ import { renderHookWithProviders } from '@renderer/tests/helpers/renderWithProvi
 import { ipcApiMock, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcHelpers from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { rb3eListenerEnabledAtom, yargListenerEnabledAtom } from '../atoms'
+import { rb3eListenerEnabledAtom, rb3RunningModeAtom, yargListenerEnabledAtom } from '../atoms'
+import type { Rb3RunningMode } from '../../../shared/ipc/listenerTypes'
 import { useListenerEnabledSync } from './useListenerEnabledSync'
 
 jest.mock(
@@ -18,8 +19,12 @@ jest.mock(
 
 const handlers = new Map<string, (payload: never) => void>()
 
-function status(isYargEnabled: boolean, isRb3Enabled: boolean): never {
-  return { success: true, isYargEnabled, isRb3Enabled } as never
+function status(
+  isYargEnabled: boolean,
+  isRb3Enabled: boolean,
+  rb3Mode: Rb3RunningMode = isRb3Enabled ? 'cue' : 'none',
+): never {
+  return { success: true, isYargEnabled, isRb3Enabled, rb3Mode } as never
 }
 
 beforeEach(() => {
@@ -68,11 +73,34 @@ describe('useListenerEnabledSync', () => {
       handlers.get(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED)!({
         listener: 'rb3',
         enabled: true,
+        mode: 'cue',
       } as never)
     })
 
     expect(store.get(yargListenerEnabledAtom)).toBe(false)
     expect(store.get(rb3eListenerEnabledAtom)).toBe(true)
+  })
+
+  it('keeps the mode of the RB3 session main runs beside its switch', async () => {
+    ipcApiMock.getSystemStatus.mockResolvedValue(status(false, true, 'direct'))
+    const { store } = renderHookWithProviders(() => useListenerEnabledSync())
+    await waitFor(() => expect(store.get(rb3RunningModeAtom)).toBe('direct'))
+
+    act(() => {
+      handlers.get(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED)!({
+        listener: 'rb3',
+        enabled: false,
+        mode: 'none',
+      } as never)
+      handlers.get(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED)!({
+        listener: 'rb3',
+        enabled: true,
+        mode: 'cue',
+      } as never)
+    })
+
+    expect(store.get(rb3eListenerEnabledAtom)).toBe(true)
+    expect(store.get(rb3RunningModeAtom)).toBe('cue')
   })
 
   it('keeps an announcement over a read that was already under way', async () => {

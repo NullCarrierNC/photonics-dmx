@@ -6,6 +6,7 @@
 
 import { LIGHT } from '../ipcChannels'
 import type { CueType } from '../../photonics-dmx/cues/types/cueTypes'
+import type { Rb3RunningMode } from './listenerTypes'
 import type {
   IpcErrorResult,
   IpcSuccessResult,
@@ -27,6 +28,7 @@ export interface LightingInvokeMap {
           success: true
           isYargEnabled: boolean
           isRb3Enabled: boolean
+          rb3Mode: Rb3RunningMode
           senderStatus: {
             sacn: boolean
             artnet: boolean

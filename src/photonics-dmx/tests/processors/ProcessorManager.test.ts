@@ -10,6 +10,7 @@ import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { createMockLightingConfig } from '../helpers/testFixtures'
 import { fakeLightingController } from '../helpers/fakeLightingController'
+import { normalizeRb3ProcessingMode } from '../../../services/configuration/configurationDefaults'
 
 describe('ProcessorManager', () => {
   let mockLightManager: DmxLightManager
@@ -81,6 +82,11 @@ describe('ProcessorManager', () => {
     manager.destroy()
     const stats = manager.getProcessorStats()
     expect(stats.stageKitProcessorActive).toBe(false)
+  })
+
+  it('runs the mode a missing RB3 preference runs when built with none', () => {
+    const unset = new ProcessorManager(chainFanout)
+    expect(unset.getCurrentMode()).toBe(normalizeRb3ProcessingMode(undefined))
   })
 
   it('reports cue as the current mode when constructed in cue mode', () => {

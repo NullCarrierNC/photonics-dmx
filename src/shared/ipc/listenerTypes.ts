@@ -6,6 +6,10 @@
 
 import { CUE } from '../ipcChannels'
 import type { IpcErrorResult, IpcSuccessResult } from './common'
+import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
+
+/** The processing mode of the running RB3 session, or 'none' while RB3 is off. */
+export type Rb3RunningMode = ProcessingMode | 'none'
 
 export interface ListenerInvokeMap {
   // ---- Cue / listeners ----
@@ -19,7 +23,7 @@ export interface ListenerInvokeMap {
   }
   [CUE.RB3E_GET_MODE]: {
     request: void
-    response: 'direct' | 'cue' | 'none' | IpcErrorResult
+    response: Rb3RunningMode | IpcErrorResult
   }
   [CUE.RB3E_GET_STATS]: {
     request: void

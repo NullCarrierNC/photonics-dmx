@@ -10,11 +10,13 @@ import { act, screen } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
-import { rb3eListenerEnabledAtom } from '../atoms'
+import { rb3eListenerEnabledAtom, rb3RunningModeAtom } from '../atoms'
+import type { Rb3RunningMode } from '../../../shared/ipc/listenerTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import CuePreviewRb3e, { nextColorBanks } from './CuePreviewRb3e'
 import { defaultCueData, type CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { emitIpc, resetIpcListenerStub } from '@renderer/tests/helpers/ipcListenerStub'
+import { useListenerEnabledSync } from '../hooks/useListenerEnabledSync'
 
 jest.mock(
   '../utils/ipcHelpers',
@@ -104,18 +106,29 @@ async function fire(channel: string, payload?: unknown): Promise<void> {
   })
 }
 
-function renderEnabled() {
+/** The preview beside the hook that keeps the listener atoms on main, as WindowShell mounts it. */
+function PreviewFollowingMain() {
+  useListenerEnabledSync()
+  return <CuePreviewRb3e />
+}
+
+function renderEnabled(mode: Rb3RunningMode = 'cue') {
   return renderWithProviders(<CuePreviewRb3e />, {
-    seed: (set) => set(rb3eListenerEnabledAtom, true),
+    seed: (set) => {
+      set(rb3eListenerEnabledAtom, true)
+      set(rb3RunningModeAtom, mode)
+    },
   }).store
 }
 
-async function setListenerEnabled(
+async function setSession(
   store: ReturnType<typeof renderEnabled>,
   enabled: boolean,
+  mode: Rb3RunningMode,
 ): Promise<void> {
   await act(async () => {
     store.set(rb3eListenerEnabledAtom, enabled)
+    store.set(rb3RunningModeAtom, mode)
   })
 }
 
@@ -125,7 +138,6 @@ describe('CuePreviewRb3e game-mode display', () => {
     resetIpcApiMock()
     jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(true)
     jest.mocked(ipcApi.getActiveRb3MotionCue).mockResolvedValue(null as never)
-    jest.mocked(ipcApi.getRb3Mode).mockResolvedValue('cue')
     jest
       .mocked(ipcApi.getRb3CueGroups)
       .mockResolvedValue([{ id: 'rb3-stagekit', name: 'StageKit Mirror' }] as never)
@@ -189,8 +201,7 @@ describe('CuePreviewRb3e game-mode display', () => {
   })
 
   it('reads DIRECT MODE for the primary cue in direct mode, with no motion rows', async () => {
-    jest.mocked(ipcApi.getRb3Mode).mockResolvedValue('direct')
-    renderEnabled()
+    renderEnabled('direct')
     await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
 
     expect(await screen.findByText('DIRECT MODE')).toBeInTheDocument()
@@ -198,14 +209,12 @@ describe('CuePreviewRb3e game-mode display', () => {
   })
 
   it('shows the primary group again once the session comes back in cue mode', async () => {
-    jest.mocked(ipcApi.getRb3Mode).mockResolvedValue('direct')
-    const store = renderEnabled()
+    const store = renderEnabled('direct')
     await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
     expect(await screen.findByText('DIRECT MODE')).toBeInTheDocument()
 
-    jest.mocked(ipcApi.getRb3Mode).mockResolvedValue('cue')
-    await setListenerEnabled(store, false)
-    await setListenerEnabled(store, true)
+    await setSession(store, false, 'none')
+    await setSession(store, true, 'cue')
     await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
     await fire(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, { groupId: 'rb3-stagekit' })
 
@@ -213,23 +222,36 @@ describe('CuePreviewRb3e game-mode display', () => {
     expect(screen.queryByText('DIRECT MODE')).toBeNull()
   })
 
-  it('ignores a mode answer from a session that has since ended', async () => {
-    let answerFirst!: (mode: 'direct') => void
-    jest.mocked(ipcApi.getRb3Mode).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          answerFirst = resolve
-        }),
-    )
-    const store = renderEnabled()
-    await setListenerEnabled(store, false)
-    await setListenerEnabled(store, true)
+  it('follows a mode switch whose stop and start reach one render', async () => {
+    jest.mocked(ipcApi.getRb3Mode).mockResolvedValue('direct')
+    jest.mocked(ipcApi.getSystemStatus).mockResolvedValue({
+      success: true,
+      isYargEnabled: false,
+      isRb3Enabled: true,
+      rb3Mode: 'direct',
+    } as never)
+    renderWithProviders(<PreviewFollowingMain />)
+    await act(async () => {}) // let the status read land
     await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
+    expect(await screen.findByText('DIRECT MODE')).toBeInTheDocument()
 
+    jest.mocked(ipcApi.getRb3Mode).mockResolvedValue('cue')
     await act(async () => {
-      answerFirst('direct')
+      emitIpc(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, {
+        listener: 'rb3',
+        enabled: false,
+        mode: 'none',
+      })
+      emitIpc(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, {
+        listener: 'rb3',
+        enabled: true,
+        mode: 'cue',
+      })
     })
+    await fire(RENDERER_RECEIVE.CUE_HANDLED, gameplayFrame())
+    await fire(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, { groupId: 'rb3-stagekit' })
 
+    expect(await screen.findByText('StageKit Mirror')).toBeInTheDocument()
     expect(screen.queryByText('DIRECT MODE')).toBeNull()
   })
 })

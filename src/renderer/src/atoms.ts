@@ -9,6 +9,7 @@ import {
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import type { Rb3RunningMode } from '../../shared/ipc/listenerTypes'
 import { Pages } from './types'
 import {
   clampDmxOutputRefreshRateHz,
@@ -192,6 +193,9 @@ export const senderSacnEnabledAtom = atom<boolean>(false)
 export const yargListenerEnabledAtom = atom<boolean>(false)
 
 export const rb3eListenerEnabledAtom = atom<boolean>(false)
+
+/** The processing mode of the RB3 session main is running, kept beside rb3eListenerEnabledAtom. */
+export const rb3RunningModeAtom = atom<Rb3RunningMode>('none')
 
 export const audioListenerEnabledAtom = atom<boolean>(false)
 
