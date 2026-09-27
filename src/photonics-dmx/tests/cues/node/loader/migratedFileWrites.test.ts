@@ -286,6 +286,94 @@ describe('writing back cue and effect files a load brings forward', () => {
     })
   })
 
+  describe('an effect whose parameter names meet once renamed', () => {
+    const literal = (value: unknown): { source: string; value: unknown } => ({
+      source: 'literal',
+      value,
+    })
+
+    /** An effect declaring `beat_count` and `beat-count`, as an older editor let it. */
+    const effectFileText = JSON.stringify({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'fx', name: 'FX' },
+      effects: [
+        {
+          id: 'e1',
+          name: 'Counter',
+          mode: 'yarg',
+          nodes: { events: [], actions: [] },
+          connections: [],
+          variables: [
+            {
+              name: 'beat_count',
+              type: 'number',
+              scope: 'cue',
+              initialValue: 1,
+              isParameter: true,
+            },
+            {
+              name: 'beat-count',
+              type: 'number',
+              scope: 'cue',
+              initialValue: 2,
+              isParameter: true,
+            },
+          ],
+        },
+      ],
+    })
+
+    /** A cue raising that effect with only `beat-count` set, as an older editor wrote it. */
+    const cueFileText = JSON.stringify({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'raises-fx', name: 'Raises FX' },
+      cues: [
+        {
+          kind: 'lighting',
+          id: 'c1',
+          name: 'Raiser',
+          cueType: 'Default',
+          style: 'primary',
+          effects: [{ effectFileId: 'fx', effectId: 'e1', name: 'Counter' }],
+          nodes: {
+            events: [{ id: 'ev', type: 'event', eventType: 'cue-called' }],
+            actions: [],
+            logic: [],
+            effectRaisers: [
+              {
+                id: 'r1',
+                type: 'effect-raiser',
+                effectId: 'e1',
+                parameterValues: { 'beat-count': literal(7) },
+              },
+            ],
+          },
+          connections: [{ from: 'ev', to: 'r1' }],
+        },
+      ],
+    })
+
+    it('passes the raised value under the name the effect gave it', async () => {
+      fs.writeFileSync(path.join(effectsDir, 'fx.json'), effectFileText)
+      fs.writeFileSync(path.join(cuesDir, 'raises-fx.json'), cueFileText)
+
+      await effectLoader.loadAll()
+      await loader.loadAll()
+
+      const effect = JSON.parse(fs.readFileSync(path.join(effectsDir, 'fx.json'), 'utf-8'))
+      const cue = JSON.parse(fs.readFileSync(path.join(cuesDir, 'raises-fx.json'), 'utf-8'))
+      expect(effect.effects[0].variables.map((v: { name: string }) => v.name)).toEqual([
+        'beat_count',
+        'beat_count_2',
+      ])
+      expect(cue.cues[0].nodes.effectRaisers[0].parameterValues).toEqual({
+        beat_count_2: literal(7),
+      })
+    })
+  })
+
   describe('saving over a file', () => {
     it('keeps the file as it was when the disk fills partway through the save', async () => {
       const filePath = path.join(cuesDir, 'mine.json')

@@ -2,7 +2,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { validateEffectFile, validateEffectFileInFolder } from '../schema/validation'
 import { EffectCompiler } from '../compiler/EffectCompiler'
-import { migrateOlderNodeFile } from './migrateOlderNodeFile'
+import { migrateOlderNodeFile, variableRenamesOf } from './migrateOlderNodeFile'
 import { EffectFile, EffectMode } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import {
@@ -10,6 +10,7 @@ import {
   BaseListSummary,
   BaseLoadResult,
   isJsonFile,
+  type GroupIdClaim,
 } from './BaseNodeFileLoader'
 const log = createLogger('EffectLoader')
 
@@ -42,20 +43,18 @@ interface EffectLoaderOptions {
 }
 
 export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSummary> {
-  /** The group id each loaded effect file holds, by path. A file refused at load holds none. */
-  private readonly groupHolders = new Map<string, { mode: EffectMode; groupId: string }>()
+  /** The group id each loaded effect file holds, by path. A file that fails its load holds none. */
+  private readonly groupHolders = new Map<string, GroupIdClaim<EffectMode>>()
+
+  /** The renames a load gave each loaded file's variable names, by path. */
+  private readonly variableRenames = new Map<string, ReadonlyMap<string, string>>()
 
   constructor(options: EffectLoaderOptions) {
-    super(options.baseDir, 'effects', ['yarg', 'audio'])
+    super(options.baseDir, 'effects', ['yarg', 'audio'], 'effect')
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
-    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
-    const mode = this.getModeFromPath(resolvedPath)
-    if (!mode) {
-      throw new Error('Unsupported effect file path.')
-    }
-
+    const { filePath: resolvedPath, mode } = this.resolveExistingEffectFilePath(filePath)
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed: unknown = JSON.parse(data)
     migrateOlderNodeFile(parsed)
@@ -78,7 +77,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
    * export) and must not trust the raw IPC string.
    */
   public resolveEffectFilePathForIpc(filePath: string): string {
-    return this.resolveExistingEffectFilePath(filePath)
+    return this.resolveExistingEffectFilePath(filePath).filePath
   }
 
   /**
@@ -113,20 +112,15 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     )
     await this.loadFile(mode, filePath)
 
-    this.emit('changed', this.getSummary())
+    await this.publishChanges()
     return { success: true, path: filePath }
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
-    const mode = this.getModeFromPath(resolvedPath)
-    if (!mode) {
-      throw new Error('Unsupported effect file path.')
-    }
-
+    const { filePath: resolvedPath } = this.resolveExistingEffectFilePath(filePath)
     await fs.rm(resolvedPath, { force: true })
-    this.removeRegistration(resolvedPath)
-    this.emit('changed', this.getSummary())
+    this.forgetFile(resolvedPath)
+    await this.publishChanges()
     return { success: true }
   }
 
@@ -161,10 +155,19 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return byGroupId
   }
 
-  protected async loadFile(mode: EffectMode, filePath: string): Promise<EffectFileSummary | null> {
-    this.groupHolders.delete(path.resolve(filePath))
+  protected async readAndRegister(mode: EffectMode, filePath: string): Promise<EffectFileSummary> {
+    try {
+      return await this.readAndHold(mode, filePath)
+    } catch (error) {
+      this.removeRegistration(filePath)
+      throw error
+    }
+  }
+
+  private async readAndHold(mode: EffectMode, filePath: string): Promise<EffectFileSummary> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
+    const renames = variableRenamesOf(parsed)
     const changes = migrateOlderNodeFile(parsed)
     const validation = validateEffectFileInFolder(mode, parsed)
 
@@ -175,6 +178,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     const file = validation.data
 
     if (!file) {
+      this.removeRegistration(filePath)
       return {
         path: filePath,
         errors: ['Validation returned no data'],
@@ -183,14 +187,13 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       } as EffectFileSummary
     }
 
-    // The file already holding the group id keeps it. A full load goes in name order.
-    this.assertGroupIdFree(
-      filePath,
-      mode,
-      file.group.id,
-      'Import this file to give it a group ID of its own.',
-    )
-    this.groupHolders.set(path.resolve(filePath), { mode, groupId: file.group.id })
+    const displaced = this.claimGroupId(filePath, mode, file.group.id)
+    if (displaced !== undefined) {
+      this.groupHolders.delete(displaced)
+      this.refuseGroupId(displaced, mode, file.group.id, filePath)
+    }
+    this.holdGroupId(filePath, { mode, groupId: file.group.id })
+    if (renames.size > 0) this.variableRenames.set(filePath, renames)
 
     // Compile each effect at load (and so at save, which calls loadFile) so invalid action
     // payloads surface on the file summary for the editor rather than only at runtime when a
@@ -229,43 +232,36 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return summary
   }
 
-  /** Throw when another file in the mode holds the group id, ending the message with `advice`. */
-  private assertGroupIdFree(
-    filePath: string,
+  /**
+   * The renames a load gave the variable names of the effect file holding a group id. A cue file an
+   * older build wrote still passes that effect's parameters by their old names.
+   */
+  public variableRenamesFor(
     mode: EffectMode,
     groupId: string,
-    advice: string,
-  ): void {
-    const holder = this.groupIdHolder(filePath, mode, groupId)
-    if (holder) {
-      throw new Error(
-        `The ${mode} effect file ${path.basename(holder)} already uses group id '${groupId}'. ${advice}`,
-      )
-    }
-  }
-
-  /** The path of another loaded file in the mode that holds this group id, if one does. */
-  private groupIdHolder(targetPath: string, mode: EffectMode, groupId: string): string | undefined {
-    const normalizedTarget = path.resolve(targetPath)
-    const key = groupId.trim().toLowerCase()
-    if (!key) {
-      return undefined
-    }
-    for (const [holderPath, holder] of this.groupHolders) {
-      if (
-        holder.mode === mode &&
-        holderPath !== normalizedTarget &&
-        holder.groupId.trim().toLowerCase() === key
-      ) {
-        return holderPath
-      }
+  ): ReadonlyMap<string, string> | undefined {
+    for (const [filePath, held] of this.groupHolders) {
+      if (held.mode === mode && held.groupId === groupId) return this.variableRenames.get(filePath)
     }
     return undefined
   }
 
+  private holdGroupId(filePath: string, claim: GroupIdClaim<EffectMode>): void {
+    const held = this.groupHolders.get(filePath)
+    if (held && held.groupId !== claim.groupId) this.releaseGroupId(held.mode, held.groupId)
+    this.groupHolders.set(filePath, claim)
+  }
+
+  protected heldGroupIds(): Iterable<[string, GroupIdClaim<EffectMode>]> {
+    return this.groupHolders
+  }
+
   protected removeRegistration(filePath: string): void {
-    this.groupHolders.delete(path.resolve(filePath))
-    this.removeSummary(filePath)
+    this.variableRenames.delete(filePath)
+    const held = this.groupHolders.get(filePath)
+    if (!held) return
+    this.groupHolders.delete(filePath)
+    this.releaseGroupId(held.mode, held.groupId)
   }
 
   protected makeErrorSummary(
@@ -288,7 +284,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     log.error('Failed to reload effect file', filePath, error)
   }
 
-  private resolveExistingEffectFilePath(userPath: string): string {
+  private resolveExistingEffectFilePath(userPath: string): { filePath: string; mode: EffectMode } {
     return this.resolveExistingFilePath(
       userPath,
       'Effect file path',

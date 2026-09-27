@@ -129,6 +129,26 @@ describe('EffectLoader.loadAll', () => {
       warn.mockRestore()
     }
   })
+
+  it('reads no effect file through a link into the other mode folder', async () => {
+    const yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    const audioDir = path.join(tmpDir, 'node-data', 'effects', 'audio')
+    fs.mkdirSync(yargDir, { recursive: true })
+    fs.mkdirSync(audioDir, { recursive: true })
+    const yargFile = minimalYargEffectFixture('grp-audio')
+    const audioFile = {
+      ...yargFile,
+      mode: 'audio',
+      effects: yargFile.effects.map((effect) => ({ ...effect, mode: 'audio' })),
+    }
+    fs.writeFileSync(path.join(audioDir, 'pulse.json'), JSON.stringify(audioFile), 'utf-8')
+    fs.symlinkSync(path.join(audioDir, 'pulse.json'), path.join(yargDir, 'linked.json'))
+
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+
+    expect([...byGroupId.keys()]).toEqual([])
+    expect([...(await loader.readEffectFilesByGroupId('audio')).keys()]).toEqual(['grp-audio'])
+  })
 })
 
 describe('EffectLoader.saveFile group id uniqueness', () => {
@@ -205,6 +225,56 @@ describe('EffectLoader folder mode', () => {
 
     const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('pulse.json'))
     expect(summary?.errors?.join(' ')).toMatch(/mode/)
+  })
+})
+
+describe('EffectLoader validation warnings', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-warnings-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('lists a wait the mode never raises on the summary', async () => {
+    const file = minimalYargEffectFixture('grp-waits')
+    file.effects[0].nodes.actions = [
+      {
+        id: 'paint',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'max' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'led-3' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      },
+    ]
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await loader.saveFile('yarg', 'waits.json', file)
+    } finally {
+      warn.mockRestore()
+    }
+
+    expect(loader.getSummary().yarg[0].warnings).toEqual([
+      "effect 'Test Effect': action 'paint' timing.waitUntilCondition 'led-3' never fires in yarg mode, so this wait does not end on it.",
+    ])
   })
 })
 
@@ -291,16 +361,35 @@ describe('EffectLoader watcher reports', () => {
     expect(changes).toHaveBeenCalledTimes(2)
     expect(loader.getSummary().yarg[0].groupName).toBe('Edited')
   })
+
+  it('drops a file the watcher reports once it links outside the effect folder', async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-outside-'))
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { path: saved } = await loader.saveFile('yarg', 'e.json', minimalYargEffectFixture('g'))
+      const target = path.join(outside, 'elsewhere.json')
+      fs.writeFileSync(target, JSON.stringify(minimalYargEffectFixture('elsewhere')), 'utf-8')
+      fs.rmSync(saved)
+      fs.symlinkSync(target, saved)
+
+      await loader.reportChange(saved)
+
+      expect(loader.getSummary().yarg).toEqual([])
+    } finally {
+      warn.mockRestore()
+      fs.rmSync(outside, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('EffectLoader with a group id two files on disk share', () => {
   let tmpDir: string
-  let loader: EffectLoader
+  let loader: WatchedEffectLoader
   let yargDir: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-shared-'))
-    loader = new EffectLoader({ baseDir: tmpDir })
+    loader = new WatchedEffectLoader({ baseDir: tmpDir })
     yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
     fs.mkdirSync(yargDir, { recursive: true })
   })
@@ -310,11 +399,18 @@ describe('EffectLoader with a group id two files on disk share', () => {
   })
 
   /** An effect file in the shared group whose one effect has the given name. */
-  function writeEffectFile(name: string, effectName: string): void {
+  function writeEffectFile(name: string, effectName: string): string {
     const file = minimalYargEffectFixture('shared-effects')
     file.effects = file.effects.map((effect) => ({ ...effect, name: effectName }))
-    fs.writeFileSync(path.join(yargDir, name), JSON.stringify(file), 'utf-8')
+    const filePath = path.join(yargDir, name)
+    fs.writeFileSync(filePath, JSON.stringify(file), 'utf-8')
+    return filePath
   }
+
+  const servedName = async (): Promise<string | undefined> =>
+    (await loader.readEffectFilesByGroupId('yarg')).get('shared-effects')?.effects[0].name
+  const errorsOf = (name: string): string[] | undefined =>
+    loader.getSummary().yarg.find((s) => path.basename(s.path) === name)?.errors
 
   it('loads the first in name order and refuses the other, naming the file that holds it', async () => {
     writeEffectFile('a.json', 'From a')
@@ -329,7 +425,7 @@ describe('EffectLoader with a group id two files on disk share', () => {
     expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From a')
   })
 
-  it('hands cue builds the file holding the id when an earlier-named file arrives', async () => {
+  it('gives the id to an earlier-named file that arrives on reload', async () => {
     writeEffectFile('b.json', 'From b')
     await loader.loadAll()
 
@@ -337,9 +433,59 @@ describe('EffectLoader with a group id two files on disk share', () => {
     const result = await loader.reload()
 
     expect(result.errors).toEqual([
-      "a.json: The yarg effect file b.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+      "b.json: The yarg effect file a.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
     ])
+    expect(await servedName()).toBe('From a')
+  })
+
+  it('gives the id to an earlier-named file the watcher reports', async () => {
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    await loader.reportChange(writeEffectFile('a.json', 'From a'))
+
+    expect(await servedName()).toBe('From a')
+    expect(errorsOf('b.json')).toEqual([
+      "The yarg effect file a.json already uses group id 'shared-effects'. Import this file to give it a group ID of its own.",
+    ])
+  })
+
+  it('serves group ids that differ only in case from their own files', async () => {
+    const write = (name: string, groupId: string, effectName: string): void => {
+      const file = minimalYargEffectFixture(groupId)
+      file.effects = file.effects.map((effect) => ({ ...effect, name: effectName }))
+      fs.writeFileSync(path.join(yargDir, name), JSON.stringify(file), 'utf-8')
+    }
+    write('a.json', 'Foo', 'From a')
+    write('b.json', 'foo', 'From b')
+
+    const result = await loader.loadAll()
+
+    expect(result.errors).toEqual([])
     const byGroupId = await loader.readEffectFilesByGroupId('yarg')
-    expect(byGroupId.get('shared-effects')?.effects[0].name).toBe('From b')
+    expect(byGroupId.get('Foo')?.effects[0].name).toBe('From a')
+    expect(byGroupId.get('foo')?.effects[0].name).toBe('From b')
+  })
+
+  it('hands the id to the refused file when the file holding it is deleted', async () => {
+    const holder = writeEffectFile('a.json', 'From a')
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    await loader.deleteFile(holder)
+
+    expect(await servedName()).toBe('From b')
+    expect(errorsOf('b.json')).not.toContainEqual(expect.stringContaining('already uses'))
+  })
+
+  it('hands the id to the refused file when the holder is saved under a new id', async () => {
+    writeEffectFile('a.json', 'From a')
+    writeEffectFile('b.json', 'From b')
+    await loader.loadAll()
+
+    await loader.saveFile('yarg', 'a.json', minimalYargEffectFixture('renamed'))
+
+    expect(await servedName()).toBe('From b')
+    expect(errorsOf('b.json')).not.toContainEqual(expect.stringContaining('already uses'))
   })
 })

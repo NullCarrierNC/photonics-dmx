@@ -94,6 +94,44 @@ describe('migrateOlderNodeFile', () => {
     })
   })
 
+  it('renames a raiser key as its own file renames the effect it raises', () => {
+    const file = {
+      group: { id: 'fx', name: 'FX' },
+      effects: [
+        {
+          id: 'counter',
+          name: 'Counter',
+          variables: [
+            { name: 'beat_count', type: 'number', initialValue: 1, isParameter: true },
+            { name: 'beat-count', type: 'number', initialValue: 2, isParameter: true },
+          ],
+          nodes: {},
+        },
+        {
+          id: 'outer',
+          name: 'Outer',
+          nodes: {
+            effectRaisers: [
+              {
+                id: 'r1',
+                type: 'effect-raiser',
+                effectId: 'counter',
+                parameterValues: { 'beat-count': { source: 'literal', value: 4 } },
+              },
+            ],
+          },
+        },
+      ],
+    }
+
+    migrateOlderNodeFile(file)
+
+    expect(file.effects[0].variables?.map((v) => v.name)).toEqual(['beat_count', 'beat_count_2'])
+    expect(file.effects[1].nodes.effectRaisers?.[0].parameterValues).toEqual({
+      beat_count_2: { source: 'literal', value: 4 },
+    })
+  })
+
   it('reads an unknown easing as the default, in a value source or a bare string', () => {
     const file = {
       effects: [

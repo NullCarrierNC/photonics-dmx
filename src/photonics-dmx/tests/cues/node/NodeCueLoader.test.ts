@@ -202,11 +202,23 @@ function audioLightingFile(groupId: string, cueTypeId: string): AudioNodeCueFile
   } as AudioNodeCueFile
 }
 
+class WatchedNodeCueLoader extends NodeCueLoader {
+  /** Reports a file change the way the directory watcher does. */
+  public reportChange(filePath: string): Promise<void> {
+    return this.handleFileChange(filePath)
+  }
+
+  /** Reports a file removal the way the directory watcher does. */
+  public reportRemoval(filePath: string): Promise<void> {
+    return this.handleFileRemoved(filePath)
+  }
+}
+
 describe('NodeCueLoader', () => {
   let tmpDir: string
   let yargRegistry: CueRegistry
   let audioRegistry: AudioCueRegistry
-  let loader: NodeCueLoader
+  let loader: WatchedNodeCueLoader
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'node-cue-loader-'))
@@ -217,7 +229,7 @@ describe('NodeCueLoader', () => {
     // The RB3 registry is a module singleton; reset it so rb3 groups don't leak across tests.
     getCueRegistry('rb3').reset()
 
-    loader = new NodeCueLoader({
+    loader = new WatchedNodeCueLoader({
       runtimeBroadcaster: noopRuntimeBroadcaster(),
       baseDir: tmpDir,
       registries: { yarg: yargRegistry, rb3: getCueRegistry('rb3'), audio: audioRegistry },
@@ -520,6 +532,66 @@ describe('NodeCueLoader', () => {
     expect(audioRegistry.getEnabledGroups()).not.toContain('loader-test-audio-motion')
   })
 
+  describe('a cue file whose link leads outside the cue folder', () => {
+    let outside: string
+    let yargDir: string
+
+    beforeEach(() => {
+      outside = fs.mkdtempSync(path.join(os.tmpdir(), 'node-cue-outside-'))
+      yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      fs.mkdirSync(yargDir, { recursive: true })
+    })
+
+    afterEach(() => {
+      fs.rmSync(outside, { recursive: true, force: true })
+    })
+
+    /** The motion-only file with one motion cue of the given id, raising an effect from `fx`. */
+    function motionFileText(cueId: string): string {
+      const file = yargMotionOnlyFile()
+      file.cues = file.cues.map((cue) => ({
+        ...cue,
+        id: cueId,
+        effects: [{ effectFileId: 'fx', effectId: 'e1', name: 'E' }],
+      }))
+      return JSON.stringify(file)
+    }
+
+    /** Loads a.json from the cue folder, then puts a link to a file outside in its place. */
+    async function loadThenLinkOutside(): Promise<string> {
+      const filePath = path.join(yargDir, 'a.json')
+      fs.writeFileSync(filePath, motionFileText('from-a'), 'utf-8')
+      await loader.loadAll()
+      const target = path.join(outside, 'elsewhere.json')
+      fs.writeFileSync(target, motionFileText('from-outside'), 'utf-8')
+      fs.rmSync(filePath)
+      fs.symlinkSync(target, filePath)
+      return filePath
+    }
+
+    const served = (): string[] => [
+      ...(yargRegistry.getGroup('loader-test-yarg-motion')?.motionCues?.keys() ?? []),
+    ]
+
+    it('drops the file when the watcher reports it', async () => {
+      const filePath = await loadThenLinkOutside()
+
+      await loader.reportChange(filePath)
+
+      expect(served()).toEqual([])
+      expect(loader.getSummary().yarg).toEqual([])
+    })
+
+    it('drops the file when an effect it raises changes', async () => {
+      await loadThenLinkOutside()
+
+      await loader.reloadFilesUsingEffects(new Set(['fx']))
+
+      expect(served()).toEqual([])
+      expect(loader.getSummary().yarg).toEqual([])
+    })
+  })
+
   describe('cue file path resolution', () => {
     it('rejects readFile for paths outside YARG/audio cue directories', async () => {
       await expect(loader.readFile('/etc/passwd')).rejects.toThrow(
@@ -619,15 +691,101 @@ describe('NodeCueLoader', () => {
       expect([...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]).toEqual(['from-a'])
     })
 
-    it('leaves the id with the file holding it when an earlier-named file arrives', async () => {
+    const served = (): string[] => [...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]
+    const errorsOf = (name: string): string[] | undefined =>
+      loader.getSummary().yarg.find((s) => path.basename(s.path) === name)?.errors
+
+    it('gives the id to an earlier-named file that arrives on reload', async () => {
       writeMotionFile('b.json', 'from-b')
       await loader.loadAll()
 
       writeMotionFile('a.json', 'from-a')
       const result = await loader.reload()
 
-      expect(result.errors).toEqual([refusal('a.json', 'b.json')])
-      expect([...(yargRegistry.getGroup(shared)?.motionCues?.keys() ?? [])]).toEqual(['from-b'])
+      expect(result.errors).toEqual([refusal('b.json', 'a.json')])
+      expect(served()).toEqual(['from-a'])
+    })
+
+    it('gives the id to an earlier-named file the watcher reports', async () => {
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      await loader.reportChange(writeMotionFile('a.json', 'from-a'))
+
+      expect(served()).toEqual(['from-a'])
+      expect(errorsOf('a.json')).toBeUndefined()
+      expect(errorsOf('b.json')).toEqual([refusal('b.json', 'a.json').slice('b.json: '.length)])
+    })
+
+    it('serves group ids that differ only in case from their own files', async () => {
+      const upper = yargMotionOnlyFile()
+      upper.group = { ...upper.group, id: 'Foo' }
+      const lower = yargMotionOnlyFile()
+      lower.group = { ...lower.group, id: 'foo' }
+      const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      fs.mkdirSync(yargDir, { recursive: true })
+      fs.writeFileSync(path.join(yargDir, 'a.json'), JSON.stringify(upper), 'utf-8')
+      fs.writeFileSync(path.join(yargDir, 'b.json'), JSON.stringify(lower), 'utf-8')
+
+      const result = await loader.loadAll()
+
+      expect(result.errors).toEqual([])
+      expect(yargRegistry.getGroup('Foo')).toBeDefined()
+      expect(yargRegistry.getGroup('foo')).toBeDefined()
+    })
+
+    it('hands the group to the refused file when the file holding it is deleted', async () => {
+      const holder = writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      await loader.deleteFile(holder)
+
+      expect(served()).toEqual(['from-b'])
+      expect(errorsOf('b.json')).toBeUndefined()
+    })
+
+    it('hands the group to the refused file when the watcher reports the holder removed', async () => {
+      const holder = writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      fs.rmSync(holder)
+      await loader.reportRemoval(holder)
+
+      expect(served()).toEqual(['from-b'])
+      expect(loader.getSummary().yarg.map((s) => path.basename(s.path))).toEqual(['b.json'])
+    })
+
+    it('hands the group to the refused file when the holder is saved under a new id', async () => {
+      writeMotionFile('a.json', 'from-a')
+      writeMotionFile('b.json', 'from-b')
+      await loader.loadAll()
+
+      const renamed = yargMotionOnlyFile()
+      renamed.group = { ...renamed.group, id: 'renamed' }
+      await loader.saveFile('yarg', 'a.json', renamed)
+
+      expect(served()).toEqual(['from-b'])
+      expect(errorsOf('b.json')).toBeUndefined()
+    })
+
+    it('keeps an audio group turned off when an earlier-named file takes its id', async () => {
+      const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+      fs.mkdirSync(audioDir, { recursive: true })
+      const write = (name: string, cueTypeId: string): string => {
+        const filePath = path.join(audioDir, name)
+        fs.writeFileSync(filePath, JSON.stringify(audioLightingFile('audio-shared', cueTypeId)))
+        return filePath
+      }
+      write('b.json', 'from-b')
+      await loader.loadAll()
+      audioRegistry.disableGroup('audio-shared')
+
+      await loader.reportChange(write('a.json', 'from-a'))
+
+      expect([...(audioRegistry.getGroup('audio-shared')?.cues.keys() ?? [])]).toEqual(['from-a'])
+      expect(audioRegistry.getEnabledGroups()).not.toContain('audio-shared')
     })
   })
 

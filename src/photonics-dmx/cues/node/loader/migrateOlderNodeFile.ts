@@ -269,20 +269,49 @@ function renameUses(node: unknown, renames: ReadonlyMap<string, string>): void {
 }
 
 /**
- * An effect raiser passes its parameters by the effect's variable names. The effect file renames a
- * non-conforming one on its own load, so the raiser's key follows the same rule.
+ * The renames an effect file's load gives its declared variable names, by the effect file's group
+ * id. A raiser passes its parameters by those names.
  */
-function renameRaiserParameters(graph: JsonObject, renamed: Map<string, string>): void {
+export type EffectFileRenames = (effectFileId: string) => ReadonlyMap<string, string> | undefined
+
+/**
+ * The renames of the effect file a cue's raiser raises from, found through the cue's references.
+ */
+function referencedRenames(
+  graph: JsonObject,
+  raiser: JsonObject,
+  effectFileRenames: EffectFileRenames | undefined,
+): ReadonlyMap<string, string> | undefined {
+  const references = Array.isArray(graph.effects) ? graph.effects.filter(isObject) : []
+  const reference = references.find((ref) => ref.effectId === raiser.effectId)
+  return typeof reference?.effectFileId === 'string'
+    ? effectFileRenames?.(reference.effectFileId)
+    : undefined
+}
+
+/**
+ * An effect raiser passes its parameters by the effect's variable names. The effect file renames a
+ * non-conforming one on its own load, so the raiser's key takes the name `renamesFor` says the
+ * effect gave it, and follows the same rule when the effect's renames are not known.
+ */
+function renameRaiserParameters(
+  graph: JsonObject,
+  renamesFor: (raiser: JsonObject) => ReadonlyMap<string, string> | undefined,
+  renamed: Map<string, string>,
+): void {
   const raisers = isObject(graph.nodes) ? graph.nodes.effectRaisers : undefined
   if (!Array.isArray(raisers)) return
   for (const raiser of raisers) {
     if (!isObject(raiser) || !isObject(raiser.parameterValues)) continue
     const keys = Object.keys(raiser.parameterValues)
     if (keys.every(isVariableName)) continue
+    const effectRenames = renamesFor(raiser)
     const taken = new Set(keys.filter(isVariableName))
     const next: JsonObject = {}
     for (const [key, value] of Object.entries(raiser.parameterValues)) {
-      const name = isVariableName(key) ? key : conformingVariableName(key, taken)
+      const name = isVariableName(key)
+        ? key
+        : effectRenames?.get(key) ?? conformingVariableName(key, taken)
       taken.add(name)
       if (name !== key) renamed.set(key, name)
       next[name] = value
@@ -291,8 +320,8 @@ function renameRaiserParameters(graph: JsonObject, renamed: Map<string, string>)
   }
 }
 
-function renameVariables(file: JsonObject, graphs: readonly JsonObject[]): string | null {
-  const declarations = declarationsOf(file, graphs)
+/** The name each declared variable a file's load renames takes, by its old name. */
+function declaredRenames(declarations: readonly JsonObject[]): Map<string, string> {
   const names = declarations.flatMap((d) => (typeof d.name === 'string' ? [d.name] : []))
   const taken = new Set(names)
   const renames = new Map<string, string>()
@@ -302,6 +331,21 @@ function renameVariables(file: JsonObject, graphs: readonly JsonObject[]): strin
     taken.add(next)
     renames.set(name, next)
   }
+  return renames
+}
+
+/** The renames {@link migrateOlderNodeFile} gives a parsed file's declared variable names. */
+export function variableRenamesOf(file: unknown): Map<string, string> {
+  return isObject(file) ? declaredRenames(declarationsOf(file, graphsOf(file))) : new Map()
+}
+
+function renameVariables(
+  file: JsonObject,
+  graphs: readonly JsonObject[],
+  effectFileRenames: EffectFileRenames | undefined,
+): string | null {
+  const declarations = declarationsOf(file, graphs)
+  const renames = declaredRenames(declarations)
 
   if (renames.size > 0) {
     for (const declaration of declarations) {
@@ -312,8 +356,19 @@ function renameVariables(file: JsonObject, graphs: readonly JsonObject[]): strin
     for (const graph of graphs) renameUses(graph.nodes, renames)
   }
 
+  // A raiser in an effect file that raises one of the file's own effects takes the file's renames.
+  const ownEffectIds = new Set(Array.isArray(file.effects) ? graphs.map((effect) => effect.id) : [])
   const renamed = new Map(renames)
-  for (const graph of graphs) renameRaiserParameters(graph, renamed)
+  for (const graph of graphs) {
+    renameRaiserParameters(
+      graph,
+      (raiser) =>
+        ownEffectIds.has(raiser.effectId)
+          ? renames
+          : referencedRenames(graph, raiser, effectFileRenames),
+      renamed,
+    )
+  }
   if (renamed.size === 0) return null
   const pairs = [...renamed].map(([from, to]) => `'${from}' is now '${to}'`)
   return `Variable names must use letters, digits and underscores: ${pairs.join(', ')}.`
@@ -324,10 +379,14 @@ const notesOf = (notes: ReadonlyArray<string | null>): string[] =>
 
 /**
  * Rewrites a parsed cue or effect file in place onto what this build reads: what an older build
- * wrote, and values this build does not know. Returns the notes for each, and none for a file
- * already on the current rules.
+ * wrote, and values this build does not know. `effectFileRenames` gives the renames of the effect
+ * files a cue raises from. Returns the notes for each, and none for a file already on the current
+ * rules.
  */
-export function migrateOlderNodeFile(file: unknown): NodeFileChanges {
+export function migrateOlderNodeFile(
+  file: unknown,
+  effectFileRenames?: EffectFileRenames,
+): NodeFileChanges {
   if (!isObject(file)) return { older: [], unknown: [] }
   const graphs = graphsOf(file)
   const unknown = notesOf([replaceUnknownEasings(graphs, false), findUnknownBlendModes(graphs)])
@@ -336,7 +395,7 @@ export function migrateOlderNodeFile(file: unknown): NodeFileChanges {
     retireBlendModes(graphs),
     replaceUnknownEasings(graphs, true),
     dropUncountedWaitCounts(graphs),
-    renameVariables(file, graphs),
+    renameVariables(file, graphs, effectFileRenames),
     conformInitialValues(declarationsOf(file, graphs)),
   ])
   return { older, unknown }
