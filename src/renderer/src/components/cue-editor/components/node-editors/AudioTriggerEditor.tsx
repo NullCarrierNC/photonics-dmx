@@ -142,6 +142,7 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
         Frequency range (Hz)
         <div className="mt-1 flex gap-1">
           <DraftNumberField
+            commitOnUnmount
             aria-label="Lowest frequency (Hz)"
             min={20}
             max={20000}
@@ -163,6 +164,7 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
           />
           <span className="self-center">-</span>
           <DraftNumberField
+            commitOnUnmount
             aria-label="Highest frequency (Hz)"
             min={20}
             max={20000}
@@ -237,6 +239,7 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       <label className="flex flex-col font-medium">
         Hold time (ms)
         <DraftNumberField
+          commitOnUnmount
           aria-label="Hold time (ms)"
           min={0}
           step={10}
@@ -275,6 +278,7 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       <label className="flex flex-col font-medium">
         Attack (ms)
         <DraftOptionalNumberField
+          commitOnUnmount
           aria-label="Attack (ms)"
           min={0}
           step={5}
@@ -295,6 +299,7 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       <label className="flex flex-col font-medium">
         Release (ms)
         <DraftOptionalNumberField
+          commitOnUnmount
           aria-label="Release (ms)"
           min={0}
           step={10}
