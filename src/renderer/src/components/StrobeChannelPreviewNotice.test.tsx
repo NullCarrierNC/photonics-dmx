@@ -61,6 +61,17 @@ describe('StrobeChannelPreviewNotice', () => {
     expect(container.firstChild).toBeNull()
   })
 
+  it('renders nothing for a light whose strobe channel has no address', () => {
+    const unset = makeRgbLight({
+      isStrobeEnabled: true,
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 0 },
+    })
+    const { container } = render(
+      <StrobeChannelPreviewNotice lightingConfig={makeConfig({ frontLights: [unset] })} />,
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
   it('renders a singular count for one strobe-channel light', () => {
     render(
       <StrobeChannelPreviewNotice

@@ -6,17 +6,17 @@ import {
   type ChannelMixPlan,
 } from '../helpers/colorChannelMixer'
 import { buildBrightnessScaleMap, scaleDmxValueByPercent } from '../helpers/brightnessScaling'
-import { isRgbFamilyWithStrobeChannel } from '../helpers/strobeChannelRigInspection'
+import { hasHardwareStrobeChannel } from '../helpers/strobeChannelRigInspection'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('FixtureChannelWriter')
 
 /**
  * Whether a fixture's own strobe-speed channel chops while `slot` is active: a strobe-enabled
- * RGB-family fixture whose template declares one. Dedicated STROBE fixtures are a separate device
- * class (no RGB to latch, no per-cue `strobeValues` model) and never do.
+ * RGB-family fixture whose strobe channel has a DMX address. Dedicated STROBE fixtures are a
+ * separate device class (no RGB to latch, no per-cue `strobeValues` model) and never do.
  */
 export function strobeChannelChops(fixture: DmxFixture, slot: StrobeSpeedSlot | null): boolean {
-  return slot != null && fixture.isStrobeEnabled && isRgbFamilyWithStrobeChannel(fixture)
+  return slot != null && fixture.isStrobeEnabled && hasHardwareStrobeChannel(fixture)
 }
 
 function strobeChannelValue(fixture: DmxFixture, slot: StrobeSpeedSlot): number {
