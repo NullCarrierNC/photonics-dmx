@@ -194,6 +194,7 @@ export function buildControllerCollaborators(
       pauseRb3: () => host.pauseRb3(),
       pauseAudio: () => host.pauseAudio(),
       restartControllers: () => host.restartControllers(),
+      announceConsoleLeft: (reason) => sendToAllWindows(RENDERER_RECEIVE.CONSOLE_LEFT, { reason }),
     })
 
   return {

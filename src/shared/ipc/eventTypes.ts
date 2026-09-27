@@ -122,6 +122,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.NODE_EXECUTION]: NodeExecutionPayload
   [RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR]: NodeCueRuntimeErrorPayload
   [RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED]: LifecyclePhase
+  [RENDERER_RECEIVE.CONSOLE_LEFT]: { reason: string }
 }
 
 export type IpcEventChannel = keyof IpcEventMap

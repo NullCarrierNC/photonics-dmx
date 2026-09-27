@@ -17,6 +17,7 @@ function baseDeps(
     pauseRb3: () => Promise.resolve(),
     pauseAudio: () => Promise.resolve(),
     restartControllers: () => Promise.resolve(),
+    announceConsoleLeft: () => {},
     ...overrides,
   }
 }

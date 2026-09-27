@@ -21,7 +21,7 @@ import { TestEffectRunner } from './TestEffectRunner'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import { SenderLifecycleController } from './SenderLifecycleController'
-import { ConsoleModeController, CONSOLE_UNAVAILABLE_MESSAGE } from './ConsoleModeController'
+import { ConsoleModeController, consoleEntryRefusal } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { ControllerGraph } from './ControllerGraph'
@@ -601,9 +601,8 @@ export class ControllerManager {
   public async enableConsoleMode(rigId: string): Promise<IpcSuccessResult | IpcErrorResult> {
     return this.lifecycle.runQueuedOp(async () => {
       await this.init()
-      if (this.lifecycle.phase !== 'running' && this.lifecycle.phase !== 'consoleMode') {
-        return { success: false as const, error: CONSOLE_UNAVAILABLE_MESSAGE }
-      }
+      const refusal = consoleEntryRefusal(this.lifecycle.phase)
+      if (refusal) return { success: false as const, error: refusal }
       const faultMark = this.lifecycle.faultMark()
       const r = await this.consoleMode.enableConsoleMode(rigId)
       if (r.success) this.lifecycle.settlePhase('consoleMode', faultMark)

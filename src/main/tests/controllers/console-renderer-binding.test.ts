@@ -92,6 +92,7 @@ describe('console mode follows the page that opened it', () => {
       pauseRb3: async () => {},
       pauseAudio: async () => {},
       restartControllers: async () => {},
+      announceConsoleLeft: () => {},
     })
     await consoleMode.enableConsoleMode('rig-1')
     expect(setManualBuffer).toHaveBeenCalled()

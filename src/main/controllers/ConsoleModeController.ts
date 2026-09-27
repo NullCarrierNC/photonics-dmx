@@ -22,8 +22,20 @@ type ListenerChannelSnapshot = { yarg: boolean; rb3: boolean }
 type ConsoleListenerSnapshot = { yarg: boolean; rb3: boolean; audio: boolean }
 
 /** The console page's answer when the controllers are between phases and cannot take the wire. */
-export const CONSOLE_UNAVAILABLE_MESSAGE =
+const CONSOLE_UNAVAILABLE_MESSAGE =
   'The lighting controllers are restarting or shutting down. Try the console again in a moment.'
+
+/** What an open console page shows when the fault response leaves console mode. */
+const CONSOLE_LEFT_AFTER_FAULT_MESSAGE = `The DMX console closed. ${FAULT_HELD_MESSAGE}`
+
+/**
+ * Why a console entry that has brought the graph up cannot open in `phase`, or null when it can.
+ * A graph that is up and `failed` holds an uncaught fault, which only a restart clears.
+ */
+export function consoleEntryRefusal(phase: LifecyclePhase): string | null {
+  if (phase === 'running' || phase === 'consoleMode') return null
+  return phase === 'failed' ? FAULT_HELD_MESSAGE : CONSOLE_UNAVAILABLE_MESSAGE
+}
 
 export interface ConsoleModeControllerDeps {
   getConfig: () => ConfigurationManager
@@ -40,6 +52,8 @@ export interface ConsoleModeControllerDeps {
   pauseRb3: () => Promise<void>
   pauseAudio: () => Promise<void>
   restartControllers: () => Promise<void>
+  /** Tells every open page that main left console mode, and why. */
+  announceConsoleLeft: (reason: string) => void
 }
 
 /**
@@ -117,6 +131,13 @@ export class ConsoleModeController {
     this.consoleRestore = null
     this.deps.getDmxPublisher()?.clearManualBuffer()
     return { success: true }
+  }
+
+  /** Leave console mode for the fault response, and tell the open console page why it closed. */
+  public async leaveAfterFault(): Promise<void> {
+    if (this.consoleRestore === null) return
+    await this.disableConsoleMode()
+    this.deps.announceConsoleLeft(CONSOLE_LEFT_AFTER_FAULT_MESSAGE)
   }
 
   /**

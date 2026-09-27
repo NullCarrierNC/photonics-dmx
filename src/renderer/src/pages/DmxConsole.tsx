@@ -9,6 +9,8 @@ import {
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
 import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
 import { leaveConsole } from '../utils/leaveConsole'
+import { registerIpcListener } from '../utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   consoleRigIdAtom,
   consoleRigIdFor,
@@ -154,6 +156,16 @@ const DmxConsole: React.FC = () => {
         leaveConsole()
       }
     }
+  }, [])
+
+  useEffect(() => {
+    return registerIpcListener(RENDERER_RECEIVE.CONSOLE_LEFT, ({ reason }) => {
+      if (!consoleEnabledRef.current) return
+      setConsoleEnabled(false)
+      setConsoleBuffer({})
+      setChannelOverrides({})
+      setActionError(reason)
+    })
   }, [])
 
   const pushConsoleBuffer = useCallback((next: Record<number, number>) => {

@@ -126,6 +126,14 @@ describe('DmxSettingsAccordion', () => {
     expect(screen.getByRole('switch', { name: 'Enable Audio' })).toBeTruthy()
   })
 
+  it('points to Retry while the controllers are stopped', async () => {
+    jest.mocked(ipcApi.getLifecyclePhase).mockResolvedValue('failed' as never)
+
+    await renderToggles({ rigs: [rig(true)] })
+
+    expect(await screen.findByText(/stopped after an error.*Retry/)).toBeTruthy()
+  })
+
   it('says nothing about rigs before they have been read', async () => {
     await renderToggles({ rigs: [], rigsLoaded: false })
 
