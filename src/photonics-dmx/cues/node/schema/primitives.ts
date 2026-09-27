@@ -223,6 +223,7 @@ export const variableDefinitionSchema = {
     description: { type: 'string', nullable: true },
     isParameter: { type: 'boolean', nullable: true },
     validValues: { type: 'array', items: { type: 'string' }, nullable: true },
+    formerNames: { type: 'array', items: { type: 'string' }, nullable: true },
   },
   // Each type starts as a value of that type, the same rule the editor applies before saving. An
   // older file that breaks it is brought onto it as it loads. A colour name this build does not

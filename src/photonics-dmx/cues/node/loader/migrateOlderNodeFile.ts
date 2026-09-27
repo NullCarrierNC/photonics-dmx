@@ -328,9 +328,21 @@ function declaredRenames(declarations: readonly JsonObject[]): Map<string, strin
   return renames
 }
 
-/** The renames {@link migrateOlderNodeFile} gives a parsed file's declared variable names. */
+/**
+ * The renames a parsed file's declared variable names take: those {@link migrateOlderNodeFile}
+ * gives them, and those an earlier load gave a parameter, which it keeps as its former names.
+ */
 export function variableRenamesOf(file: unknown): Map<string, string> {
-  return isObject(file) ? declaredRenames(declarationsOf(file, graphsOf(file))) : new Map()
+  if (!isObject(file)) return new Map()
+  const declarations = declarationsOf(file, graphsOf(file))
+  const renames = declaredRenames(declarations)
+  for (const { name, formerNames } of declarations) {
+    if (typeof name !== 'string' || !Array.isArray(formerNames)) continue
+    for (const former of formerNames) {
+      if (typeof former === 'string' && !renames.has(former)) renames.set(former, name)
+    }
+  }
+  return renames
 }
 
 function renameVariables(
@@ -343,9 +355,14 @@ function renameVariables(
 
   if (renames.size > 0) {
     for (const declaration of declarations) {
-      if (typeof declaration.name === 'string') {
-        declaration.name = renames.get(declaration.name) ?? declaration.name
+      const renamed = typeof declaration.name === 'string' && renames.get(declaration.name)
+      if (!renamed) continue
+      // A parameter keeps the name it had, so a raiser added on a later load still finds it.
+      if (declaration.isParameter === true) {
+        const formerNames = Array.isArray(declaration.formerNames) ? declaration.formerNames : []
+        declaration.formerNames = [...formerNames, declaration.name]
       }
+      declaration.name = renamed
     }
     for (const graph of graphs) renameUses(graph.nodes, renames)
   }

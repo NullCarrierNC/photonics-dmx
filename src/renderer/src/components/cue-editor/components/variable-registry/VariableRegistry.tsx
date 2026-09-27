@@ -122,6 +122,8 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
       description: formData.description,
       isParameter: formData.isParameter,
       ...(keptValidValues && { validValues: keptValidValues }),
+      // A raiser an older build wrote may still pass the variable by a name it had before.
+      ...(editingVar?.formerNames && { formerNames: editingVar.formerNames }),
     }
 
     if (showDialog === 'group') {

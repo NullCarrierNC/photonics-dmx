@@ -372,6 +372,34 @@ describe('writing back cue and effect files a load brings forward', () => {
         beat_count_2: literal(7),
       })
     })
+
+    it('passes the value from a cue added on a later launch under the name the effect gave it', async () => {
+      fs.writeFileSync(path.join(effectsDir, 'fx.json'), effectFileText)
+      await effectLoader.loadAll()
+      await loader.dispose()
+      await effectLoader.dispose()
+
+      fs.writeFileSync(path.join(cuesDir, 'raises-fx.json'), cueFileText)
+      const nextEffectLoader = new EffectLoader({ baseDir })
+      const nextLoader = new NodeCueLoader({
+        baseDir,
+        registries: { yarg, rb3: CueRegistry.create(), audio: AudioCueRegistry.getInstance() },
+        effectLoader: nextEffectLoader,
+        runtimeBroadcaster: noopRuntimeBroadcaster(),
+      })
+      try {
+        await nextEffectLoader.loadAll()
+        await nextLoader.loadAll()
+
+        const cue = JSON.parse(fs.readFileSync(path.join(cuesDir, 'raises-fx.json'), 'utf-8'))
+        expect(cue.cues[0].nodes.effectRaisers[0].parameterValues).toEqual({
+          beat_count_2: literal(7),
+        })
+      } finally {
+        await nextLoader.dispose()
+        await nextEffectLoader.dispose()
+      }
+    })
   })
 
   describe('saving over a file', () => {
