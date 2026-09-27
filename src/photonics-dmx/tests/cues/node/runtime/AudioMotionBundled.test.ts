@@ -54,11 +54,12 @@ async function driveAt60Hz(
   h: SequencerHarness,
   durationMs: number,
   sample: (t: number) => void,
+  { beatOnFirstFrame = false } = {},
 ): Promise<void> {
   let lastFrame = -1
   let beatPending = false
   for (let t = 0; t < durationMs; t += 10) {
-    if (t > 0 && t % BEAT_MS === 0) {
+    if ((t > 0 || beatOnFirstFrame) && t % BEAT_MS === 0) {
       h.sequencer.onBeat()
       beatPending = true
     }
@@ -115,6 +116,41 @@ describe('bundled audio motion cues under 60 Hz audio frames', () => {
 
   // The beat-driven cues move on every fourth beat, so 8 s gives each at least one move from a
   // position it has already reached.
+  it.each([
+    ['motion-crossbeat-half', 2],
+    ['motion-searchlights', 4],
+    ['motion-vogue-slow', 4],
+  ])('%s moves on the first beat, then every %i beats', async (id, beatsPerMove) => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const cue = (await loadMotionCues()).get(id)
+    if (!cue) throw new Error(`${id} is missing from the bundled motion library`)
+    const h = createSequencerHarness({ frontCount: 4, backCount: 0, movingHead: true })
+    harness = h
+    // A beat cooldown counts from a last trigger of 0, which a running clock is well past.
+    h.advanceBy(1000)
+    const head = h.frontLightIds[0]!
+    const position = (): string => `${h.getLightState(head)?.pan}/${h.getLightState(head)?.tilt}`
+    const home = position()
+    const moves: number[] = []
+    let last = home
+    let settledSince = -Infinity
+    await driveAt60Hz(
+      cue,
+      h,
+      4500,
+      (t) => {
+        const now = position()
+        if (now !== last && t - settledSince >= 150) moves.push(t)
+        if (now !== last) settledSince = t
+        last = now
+      },
+      { beatOnFirstFrame: true },
+    )
+    cue.onStop?.()
+    expect(moves[0]).toBeLessThanOrEqual(50)
+    expect(moves.every((t) => Math.round(t / BEAT_MS) % beatsPerMove === 0)).toBe(true)
+  })
+
   it('every bundled motion cue moves its heads within 8 s', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {})
     const cues = await loadMotionCues()

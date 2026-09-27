@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 3,
+  "cueVersion": 4,
   "mode": "audio",
   "group": {
     "id": "audio-motion-default",
@@ -53,14 +53,6 @@
       ],
       "nodes": {
         "events": [
-          {
-            "id": "vogue-slow-event-start",
-            "type": "event",
-            "eventType": "cue-started",
-            "triggerMode": "edge",
-            "label": "Cue started",
-            "threshold": 0.5
-          },
           {
             "id": "vogue-slow-event-beat",
             "type": "event",
@@ -134,54 +126,6 @@
         ],
         "logic": [
           {
-            "id": "vogue-slow-init-measure-tick",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "vMeasureTick",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "vogue-slow-init-measure-mod",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "vMeasureMod",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "vogue-slow-init-current-index",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "vogueSlowCurrentIndex",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "vogue-slow-init-bearing",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "vogueSlowBearing",
-            "valueType": "string",
-            "value": {
-              "source": "literal",
-              "value": ""
-            }
-          },
-          {
             "id": "vogue-slow-logic-inc",
             "type": "logic",
             "logicType": "math",
@@ -222,7 +166,7 @@
             },
             "right": {
               "source": "literal",
-              "value": 0
+              "value": 1
             }
           },
           {
@@ -265,22 +209,6 @@
       },
       "connections": [
         {
-          "from": "vogue-slow-event-start",
-          "to": "vogue-slow-init-measure-tick"
-        },
-        {
-          "from": "vogue-slow-init-measure-tick",
-          "to": "vogue-slow-init-measure-mod"
-        },
-        {
-          "from": "vogue-slow-init-measure-mod",
-          "to": "vogue-slow-init-current-index"
-        },
-        {
-          "from": "vogue-slow-init-current-index",
-          "to": "vogue-slow-init-bearing"
-        },
-        {
           "from": "vogue-slow-logic-all-lights",
           "to": "vogue-slow-logic-foreach"
         },
@@ -313,10 +241,6 @@
       ],
       "layout": {
         "nodePositions": {
-          "vogue-slow-event-start": {
-            "x": -339.4327616028638,
-            "y": -153.9774334582657
-          },
           "vogue-slow-event-beat": {
             "x": 9.588739022097002,
             "y": -195.27060721654902
@@ -324,22 +248,6 @@
           "vogue-slow-action-pos": {
             "x": -16.342426938578512,
             "y": 574.3604711671978
-          },
-          "vogue-slow-init-measure-tick": {
-            "x": -355.68283847420827,
-            "y": -77.0454405688464
-          },
-          "vogue-slow-init-measure-mod": {
-            "x": -355.6828384742082,
-            "y": 13.182069760763738
-          },
-          "vogue-slow-init-current-index": {
-            "x": -394.0921110792042,
-            "y": 113.75053809941119
-          },
-          "vogue-slow-init-bearing": {
-            "x": -348.2964398963244,
-            "y": 196.5916498511374
           },
           "vogue-slow-logic-inc": {
             "x": -3.2949024694352147,
@@ -2025,66 +1933,6 @@
         ],
         "logic": [
           {
-            "id": "srch-init-beat-count",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchBeatCount",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-mod",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchMod",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-current-index",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchCurrentIndex",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-pan",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchPan",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "srch-init-tilt",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "srchTilt",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
             "id": "srch-init-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
@@ -2147,7 +1995,7 @@
             },
             "right": {
               "source": "literal",
-              "value": 0
+              "value": 1
             }
           },
           {
@@ -2226,26 +2074,6 @@
       "connections": [
         {
           "from": "srch-event-start",
-          "to": "srch-init-beat-count"
-        },
-        {
-          "from": "srch-init-beat-count",
-          "to": "srch-init-mod"
-        },
-        {
-          "from": "srch-init-mod",
-          "to": "srch-init-current-index"
-        },
-        {
-          "from": "srch-init-current-index",
-          "to": "srch-init-pan"
-        },
-        {
-          "from": "srch-init-pan",
-          "to": "srch-init-tilt"
-        },
-        {
-          "from": "srch-init-tilt",
           "to": "srch-init-beat-ms"
         },
         {
@@ -2308,26 +2136,6 @@
           "srch-action-pos": {
             "x": 13.405222455169849,
             "y": 946.5947775448301
-          },
-          "srch-init-beat-count": {
-            "x": -356.54381453462844,
-            "y": -25.876234178146547
-          },
-          "srch-init-mod": {
-            "x": -347.265224960919,
-            "y": 41.959534542981714
-          },
-          "srch-init-current-index": {
-            "x": -358.0902461302466,
-            "y": 115.98102964658301
-          },
-          "srch-init-pan": {
-            "x": -339.5330669828277,
-            "y": 194.64181953703883
-          },
-          "srch-init-tilt": {
-            "x": -344.1723617696825,
-            "y": 267.11688304502195
           },
           "srch-init-beat-ms": {
             "x": -350.35808815215546,
@@ -2581,66 +2389,6 @@
         ],
         "logic": [
           {
-            "id": "cbh-init-tick",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhTick",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cbh-init-mod",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhMod",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cbh-init-flip",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhFlip",
-            "valueType": "number",
-            "value": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cbh-init-even-bearing",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhEvenBearing",
-            "valueType": "string",
-            "value": {
-              "source": "literal",
-              "value": "stage-right"
-            }
-          },
-          {
-            "id": "cbh-init-odd-bearing",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "cbhOddBearing",
-            "valueType": "string",
-            "value": {
-              "source": "literal",
-              "value": "stage-left"
-            }
-          },
-          {
             "id": "cbh-init-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
@@ -2703,7 +2451,7 @@
             },
             "right": {
               "source": "literal",
-              "value": 0
+              "value": 1
             }
           },
           {
@@ -2814,26 +2562,6 @@
       "connections": [
         {
           "from": "cbh-event-start",
-          "to": "cbh-init-tick"
-        },
-        {
-          "from": "cbh-init-tick",
-          "to": "cbh-init-mod"
-        },
-        {
-          "from": "cbh-init-mod",
-          "to": "cbh-init-flip"
-        },
-        {
-          "from": "cbh-init-flip",
-          "to": "cbh-init-even-bearing"
-        },
-        {
-          "from": "cbh-init-even-bearing",
-          "to": "cbh-init-odd-bearing"
-        },
-        {
-          "from": "cbh-init-odd-bearing",
           "to": "cbh-init-beat-ms"
         },
         {
@@ -2917,26 +2645,6 @@
           "cbh-action-odd": {
             "x": 141.46391252866124,
             "y": 907.6508759845115
-          },
-          "cbh-init-tick": {
-            "x": -254.69104995574597,
-            "y": -117.99233588579591
-          },
-          "cbh-init-mod": {
-            "x": -257.5095801427553,
-            "y": -49.80703401570304
-          },
-          "cbh-init-flip": {
-            "x": -258.91884523625987,
-            "y": 18.37826785438972
-          },
-          "cbh-init-even-bearing": {
-            "x": -281.4670867323342,
-            "y": 90.79136500499658
-          },
-          "cbh-init-odd-bearing": {
-            "x": -273.01149617130636,
-            "y": 180.11564327765893
           },
           "cbh-init-beat-ms": {
             "x": -261.7373754232692,
