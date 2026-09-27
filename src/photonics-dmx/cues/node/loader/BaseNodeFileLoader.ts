@@ -25,7 +25,7 @@ const log = createLogger('BaseNodeFileLoader')
  * type, which always carries at least a `path` and `mode`.
  *
  * Subclasses supply only their specifics via the protected abstract hooks:
- * - {@link loadFile} parse + validate + register a single file (per-loader)
+ * - {@link readAndRegister} parse + validate + register a single file (per-loader)
  * - {@link removeRegistration} unregister/forget a single file on unlink
  * - {@link makeErrorSummary} build the placeholder summary for a failed file
  *
@@ -128,9 +128,9 @@ export abstract class BaseNodeFileLoader<
   // ---- per-loader specifics -------------------------------------------------
 
   /** Parse, validate and register a single file; returns its summary. */
-  protected abstract loadFile(mode: TMode, filePath: string): Promise<TSummary | null>
+  protected abstract readAndRegister(mode: TMode, filePath: string): Promise<TSummary>
 
-  /** Remove a file's registration/summary (used on unlink). */
+  /** Remove the registration a file holds. */
   protected abstract removeRegistration(filePath: string): void
 
   /** Build a placeholder summary describing a file that failed to load. */
@@ -203,18 +203,13 @@ export abstract class BaseNodeFileLoader<
       }
 
       const filePath = path.join(dir, file)
-      if (!this.isPathWithinDir(filePath, dir)) {
-        log.warn(`Skipping ${filePath}: it links outside ${dir}.`)
-        continue
-      }
       currentPaths.add(filePath)
       try {
         const summary = await this.loadFile(mode, filePath)
-        if (summary) {
-          summaries.push(summary)
-          for (const note of summary.migrations ?? []) migrations.push(`${file}: ${note}`)
-          for (const note of summary.unsaved ?? []) unsaved.push(`${file}: ${note}`)
-        }
+        if (!summary) continue
+        summaries.push(summary)
+        for (const note of summary.migrations ?? []) migrations.push(`${file}: ${note}`)
+        for (const note of summary.unsaved ?? []) unsaved.push(`${file}: ${note}`)
         loaded++
       } catch (error) {
         failed++
@@ -227,7 +222,7 @@ export abstract class BaseNodeFileLoader<
     // Unregister files present last time but gone now.
     for (const stalePath of previousPaths) {
       if (!currentPaths.has(stalePath)) {
-        this.removeRegistration(stalePath)
+        this.forgetFile(stalePath)
       }
     }
 
@@ -275,6 +270,19 @@ export abstract class BaseNodeFileLoader<
 
     await this.loadFileRecordingErrors(mode, filePath)
     this.emit('changed', this.getSummary())
+  }
+
+  /**
+   * Load one file of a mode. A file whose links lead outside the mode's folder is not loaded, and
+   * whatever it registered before is dropped, so it reads as no file at all. Returns null for it.
+   */
+  protected async loadFile(mode: TMode, filePath: string): Promise<TSummary | null> {
+    if (!this.isPathWithinDir(filePath, this.dirs[mode])) {
+      log.warn(`Skipping ${filePath}: it links outside ${this.dirs[mode]}.`)
+      this.forgetFile(filePath)
+      return null
+    }
+    return this.readAndRegister(mode, filePath)
   }
 
   /**
@@ -360,8 +368,14 @@ export abstract class BaseNodeFileLoader<
   }
 
   protected handleFileRemoved(filePath: string): void {
-    this.removeRegistration(filePath)
+    this.forgetFile(filePath)
     this.emit('changed', this.getSummary())
+  }
+
+  /** Drop a file's registration and its summary. */
+  protected forgetFile(filePath: string): void {
+    this.removeRegistration(filePath)
+    this.removeSummary(filePath)
   }
 
   /** Subclass hook to log a failed watch-triggered reload. */
@@ -387,13 +401,10 @@ export abstract class BaseNodeFileLoader<
 
   // ---- path helpers ---------------------------------------------------------
 
+  /** The mode whose folder holds the path itself, before any link in it is followed. */
   protected getModeFromPath(filePath: string): TMode | null {
-    for (const mode of this.modes) {
-      if (this.isPathWithinDir(filePath, this.dirs[mode])) {
-        return mode
-      }
-    }
-    return null
+    const folder = path.dirname(path.resolve(filePath))
+    return this.modes.find((mode) => path.resolve(this.dirs[mode]) === folder) ?? null
   }
 
   protected sanitizeFilename(filename: string): string {
@@ -412,12 +423,16 @@ export abstract class BaseNodeFileLoader<
   }
 
   /**
-   * Resolves a user-supplied path to an absolute path that must lie under one of
-   * this loader's mode roots. Relative segments are anchored to {@link baseDir} so
-   * paths cannot escape via cwd. The `label` is woven into the error messages so
-   * each loader keeps its existing wording (e.g. "Node cue", "Effect file").
+   * Resolves a user-supplied path to an absolute path to a file in one of this loader's mode
+   * folders, with every link in it leading back into that folder, and that folder's mode. Relative
+   * segments are anchored to {@link baseDir} so paths cannot escape via cwd. The `label` is woven
+   * into the error messages so each loader keeps its existing wording (e.g. "Node cue").
    */
-  protected resolveExistingFilePath(userPath: string, label: string, dirLabel: string): string {
+  protected resolveExistingFilePath(
+    userPath: string,
+    label: string,
+    dirLabel: string,
+  ): { filePath: string; mode: TMode } {
     if (typeof userPath !== 'string' || userPath.trim().length === 0) {
       throw new Error(`${label} is required.`)
     }
@@ -428,10 +443,11 @@ export abstract class BaseNodeFileLoader<
     const resolved = path.isAbsolute(trimmed)
       ? path.resolve(trimmed)
       : path.resolve(this.baseDir, trimmed)
-    if (!this.modes.some((mode) => this.isPathWithinDir(resolved, this.dirs[mode]))) {
+    const mode = this.getModeFromPath(resolved)
+    if (mode === null || !this.isPathWithinDir(resolved, this.dirs[mode])) {
       throw new Error(`${dirLabel}`)
     }
-    return resolved
+    return { filePath: resolved, mode }
   }
 
   protected resolveInDir(baseDir: string, filename: string): string {

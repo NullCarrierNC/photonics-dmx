@@ -179,12 +179,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   }
 
   public async readFile(filePath: string): Promise<NodeCueFile> {
-    const resolvedPath = this.resolveExistingCueFilePath(filePath)
-    const mode = this.getModeFromPath(resolvedPath)
-    if (!mode) {
-      throw new Error('Unsupported node cue path.')
-    }
-
+    const { filePath: resolvedPath, mode } = this.resolveExistingCueFilePath(filePath)
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed: unknown = JSON.parse(data)
     migrateOlderNodeFile(parsed)
@@ -204,7 +199,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
    * not trust the raw IPC string.
    */
   public resolveCueFilePathForIpc(filePath: string): string {
-    return this.resolveExistingCueFilePath(filePath)
+    return this.resolveExistingCueFilePath(filePath).filePath
   }
 
   /**
@@ -244,12 +239,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolveExistingCueFilePath(filePath)
-    const mode = this.getModeFromPath(resolvedPath)
-    if (!mode) {
-      throw new Error('Unsupported node cue path.')
-    }
-
+    const { filePath: resolvedPath } = this.resolveExistingCueFilePath(filePath)
     await fs.rm(resolvedPath, { force: true })
     this.unregisterFile(resolvedPath)
     this.emit('changed', this.getSummary())
@@ -275,10 +265,10 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     ]
   }
 
-  protected async loadFile(
+  protected async readAndRegister(
     mode: NodeCueMode,
     filePath: string,
-  ): Promise<NodeCueFileSummary | null> {
+  ): Promise<NodeCueFileSummary> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
     const changes = migrateOlderNodeFile(parsed)
@@ -542,7 +532,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     log.error('Failed to reload node cue file', filePath, error)
   }
 
-  private resolveExistingCueFilePath(userPath: string): string {
+  private resolveExistingCueFilePath(userPath: string): { filePath: string; mode: NodeCueMode } {
     return this.resolveExistingFilePath(
       userPath,
       'Node cue path',

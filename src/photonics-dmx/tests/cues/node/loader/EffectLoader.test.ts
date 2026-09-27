@@ -129,6 +129,26 @@ describe('EffectLoader.loadAll', () => {
       warn.mockRestore()
     }
   })
+
+  it('reads no effect file through a link into the other mode folder', async () => {
+    const yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    const audioDir = path.join(tmpDir, 'node-data', 'effects', 'audio')
+    fs.mkdirSync(yargDir, { recursive: true })
+    fs.mkdirSync(audioDir, { recursive: true })
+    const yargFile = minimalYargEffectFixture('grp-audio')
+    const audioFile = {
+      ...yargFile,
+      mode: 'audio',
+      effects: yargFile.effects.map((effect) => ({ ...effect, mode: 'audio' })),
+    }
+    fs.writeFileSync(path.join(audioDir, 'pulse.json'), JSON.stringify(audioFile), 'utf-8')
+    fs.symlinkSync(path.join(audioDir, 'pulse.json'), path.join(yargDir, 'linked.json'))
+
+    const byGroupId = await loader.readEffectFilesByGroupId('yarg')
+
+    expect([...byGroupId.keys()]).toEqual([])
+    expect([...(await loader.readEffectFilesByGroupId('audio')).keys()]).toEqual(['grp-audio'])
+  })
 })
 
 describe('EffectLoader.saveFile group id uniqueness', () => {
@@ -290,6 +310,25 @@ describe('EffectLoader watcher reports', () => {
 
     expect(changes).toHaveBeenCalledTimes(2)
     expect(loader.getSummary().yarg[0].groupName).toBe('Edited')
+  })
+
+  it('drops a file the watcher reports once it links outside the effect folder', async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-outside-'))
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { path: saved } = await loader.saveFile('yarg', 'e.json', minimalYargEffectFixture('g'))
+      const target = path.join(outside, 'elsewhere.json')
+      fs.writeFileSync(target, JSON.stringify(minimalYargEffectFixture('elsewhere')), 'utf-8')
+      fs.rmSync(saved)
+      fs.symlinkSync(target, saved)
+
+      await loader.reportChange(saved)
+
+      expect(loader.getSummary().yarg).toEqual([])
+    } finally {
+      warn.mockRestore()
+      fs.rmSync(outside, { recursive: true, force: true })
+    }
   })
 })
 

@@ -50,12 +50,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
-    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
-    const mode = this.getModeFromPath(resolvedPath)
-    if (!mode) {
-      throw new Error('Unsupported effect file path.')
-    }
-
+    const { filePath: resolvedPath, mode } = this.resolveExistingEffectFilePath(filePath)
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed: unknown = JSON.parse(data)
     migrateOlderNodeFile(parsed)
@@ -78,7 +73,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
    * export) and must not trust the raw IPC string.
    */
   public resolveEffectFilePathForIpc(filePath: string): string {
-    return this.resolveExistingEffectFilePath(filePath)
+    return this.resolveExistingEffectFilePath(filePath).filePath
   }
 
   /**
@@ -118,14 +113,9 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
-    const mode = this.getModeFromPath(resolvedPath)
-    if (!mode) {
-      throw new Error('Unsupported effect file path.')
-    }
-
+    const { filePath: resolvedPath } = this.resolveExistingEffectFilePath(filePath)
     await fs.rm(resolvedPath, { force: true })
-    this.removeRegistration(resolvedPath)
+    this.forgetFile(resolvedPath)
     this.emit('changed', this.getSummary())
     return { success: true }
   }
@@ -161,7 +151,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     return byGroupId
   }
 
-  protected async loadFile(mode: EffectMode, filePath: string): Promise<EffectFileSummary | null> {
+  protected async readAndRegister(mode: EffectMode, filePath: string): Promise<EffectFileSummary> {
     this.groupHolders.delete(path.resolve(filePath))
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed: unknown = JSON.parse(contents)
@@ -265,7 +255,6 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
 
   protected removeRegistration(filePath: string): void {
     this.groupHolders.delete(path.resolve(filePath))
-    this.removeSummary(filePath)
   }
 
   protected makeErrorSummary(
@@ -288,7 +277,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     log.error('Failed to reload effect file', filePath, error)
   }
 
-  private resolveExistingEffectFilePath(userPath: string): string {
+  private resolveExistingEffectFilePath(userPath: string): { filePath: string; mode: EffectMode } {
     return this.resolveExistingFilePath(
       userPath,
       'Effect file path',
