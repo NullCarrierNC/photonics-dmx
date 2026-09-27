@@ -10,34 +10,35 @@ import { claimEscape, resetEscapeClaims } from '../utils/escClaims'
 import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
 import type { BlackoutShortcutBinding, BlackoutShortcutKey } from '../../../shared/blackoutShortcut'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import { installWindowApi, type WindowApiStub } from '@renderer/tests/helpers/windowApiStub'
+import { DEFAULT_PREFERENCES } from '../../../services/configuration/configurationDefaults'
+import type { MasterOutputSnapshot } from '../../../photonics-dmx/controllers/MasterOutputState'
 
-const invoke = jest.fn() as jest.MockedFunction<
-  (channel: string, data: unknown) => Promise<unknown>
->
+const FULL: MasterOutputSnapshot = {
+  dimmerPercent: 100,
+  blackout: false,
+  strobeOutputEnabled: true,
+}
 
-const FULL = { dimmerPercent: 100, blackout: false, strobeOutputEnabled: true }
+let api: WindowApiStub
 
-function mockInvoke(binding: Partial<BlackoutShortcutBinding>) {
-  invoke.mockImplementation((channel: string, data: unknown) => {
-    if (channel === CONFIG.GET_PREFS) {
-      return Promise.resolve({
-        blackoutShortcutKey: binding.key,
-        blackoutShortcutScope: binding.scope,
-      })
-    }
-    if (channel === LIGHT.SET_MASTER_OUTPUT) {
-      return Promise.resolve({ success: true, state: { ...FULL, ...(data as object) } })
-    }
-    return Promise.resolve(FULL)
+/** A bridge whose stored preferences hold `binding`. */
+function installBinding(binding: Partial<BlackoutShortcutBinding>): void {
+  api = installWindowApi({
+    [CONFIG.GET_PREFS]: () => ({
+      ...DEFAULT_PREFERENCES,
+      ...(binding.key && { blackoutShortcutKey: binding.key }),
+      ...(binding.scope && { blackoutShortcutScope: binding.scope }),
+    }),
+    [LIGHT.GET_MASTER_OUTPUT]: () => FULL,
+    [LIGHT.SET_MASTER_OUTPUT]: (request) => ({ success: true, state: { ...FULL, ...request } }),
   })
 }
 
 beforeEach(() => {
   jest.clearAllMocks()
   resetEscapeClaims()
-  mockInvoke({ key: 'escape', scope: 'focused' })
-  installWindowApi(invoke)
+  installBinding({ key: 'escape', scope: 'focused' })
 })
 
 afterEach(() => {
@@ -51,14 +52,14 @@ const Harness = () => {
 
 /** Renders the binding and waits for it to have read its preferences. */
 async function mount(binding: Partial<BlackoutShortcutBinding> = {}) {
-  mockInvoke({ key: 'escape', scope: 'focused', ...binding })
+  installBinding({ key: 'escape', scope: 'focused', ...binding })
   const store = createStore()
   const utils = render(
     <Provider store={store}>
       <Harness />
     </Provider>,
   )
-  await waitFor(() => expect(invoke).toHaveBeenCalledWith(CONFIG.GET_PREFS, undefined))
+  await waitFor(() => expect(api.invoke).toHaveBeenCalledWith(CONFIG.GET_PREFS, undefined))
   // A macrotask turn settles the whole promise chain the read sets the binding from.
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
   return { ...utils, store }

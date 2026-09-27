@@ -7,7 +7,12 @@ import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
 import { lightingPrefsAtom } from '../atoms'
 import { LIGHT, CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import {
+  installWindowApi,
+  type WindowApiAnswers,
+  type WindowApiStub,
+} from '@renderer/tests/helpers/windowApiStub'
+import type { MasterOutputSnapshot } from '../../../photonics-dmx/controllers/MasterOutputState'
 import { ToastStack } from './Toast'
 
 /**
@@ -24,29 +29,34 @@ function Sidebar() {
   )
 }
 
-const invoke = jest.fn() as jest.MockedFunction<
-  (channel: string, data: unknown) => Promise<unknown>
->
+const FULL: MasterOutputSnapshot = {
+  dimmerPercent: 100,
+  blackout: false,
+  strobeOutputEnabled: true,
+}
 
-function mockInvoke(state = { dimmerPercent: 100, blackout: false, strobeOutputEnabled: true }) {
-  invoke.mockImplementation((channel: string, data: unknown) => {
-    if (channel === LIGHT.GET_MASTER_OUTPUT) return Promise.resolve(state)
-    if (channel === LIGHT.SET_MASTER_OUTPUT) {
-      return Promise.resolve({
-        success: true,
-        state: { ...state, ...(data as object) },
-      })
-    }
-    if (channel === CONFIG.SAVE_PREFS) return Promise.resolve({ success: true })
-    return Promise.resolve(undefined)
+let answers: WindowApiAnswers
+let api: WindowApiStub
+
+/** Main holding `state`, applying each live update to it and saving prefs. */
+function mainHolding(state: MasterOutputSnapshot = FULL): void {
+  answers[LIGHT.GET_MASTER_OUTPUT] = () => state
+  answers[LIGHT.SET_MASTER_OUTPUT] = (request) => ({
+    success: true,
+    state: { ...state, ...request },
   })
+  answers[CONFIG.SAVE_PREFS] = () => ({ success: true })
 }
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockInvoke()
-  installWindowApi(invoke)
+  answers = {}
+  mainHolding()
+  api = installWindowApi(answers)
 })
+
+const callsOn = (channel: string): unknown[] =>
+  api.invoke.mock.calls.filter((c) => c[0] === channel).map((c) => c[1])
 
 async function renderSidebar() {
   const store = createStore()
@@ -56,21 +66,16 @@ async function renderSidebar() {
       <Sidebar />
     </Provider>,
   )
-  await waitFor(() => expect(invoke).toHaveBeenCalledWith(LIGHT.GET_MASTER_OUTPUT, undefined))
+  await waitFor(() => expect(api.invoke).toHaveBeenCalledWith(LIGHT.GET_MASTER_OUTPUT, undefined))
   return { ...utils, store }
 }
 
-function setsMasterOutput(): unknown[] {
-  return invoke.mock.calls.filter((c) => c[0] === LIGHT.SET_MASTER_OUTPUT).map((c) => c[1])
-}
-
-function savedPrefs(): unknown[] {
-  return invoke.mock.calls.filter((c) => c[0] === CONFIG.SAVE_PREFS).map((c) => c[1])
-}
+const setsMasterOutput = (): unknown[] => callsOn(LIGHT.SET_MASTER_OUTPUT)
+const savedPrefs = (): unknown[] => callsOn(CONFIG.SAVE_PREFS)
 
 describe('MasterOutputSidebar', () => {
   it('seeds itself from main rather than from prefs', async () => {
-    mockInvoke({ dimmerPercent: 45, blackout: true, strobeOutputEnabled: false })
+    mainHolding({ dimmerPercent: 45, blackout: true, strobeOutputEnabled: false })
     await renderSidebar()
 
     await waitFor(() => expect(screen.getByText('45%')).toBeTruthy())
@@ -113,27 +118,11 @@ describe('MasterOutputSidebar', () => {
   })
 
   it('ignores stale master-output reads when a newer read completes first', async () => {
-    const resolvers: Array<(value: unknown) => void> = []
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return new Promise((resolve) => {
-          resolvers.push(resolve)
-        })
-      }
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return Promise.resolve({
-          success: true,
-          state: {
-            dimmerPercent: 100,
-            blackout: false,
-            strobeOutputEnabled: true,
-            ...(data as object),
-          },
-        })
-      }
-      if (channel === CONFIG.SAVE_PREFS) return Promise.resolve({ success: true })
-      return Promise.resolve(undefined)
-    })
+    const resolvers: Array<(value: MasterOutputSnapshot) => void> = []
+    answers[LIGHT.GET_MASTER_OUTPUT] = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve)
+      })
 
     let restartHandler: (() => void) | undefined
     const register = jest
@@ -176,14 +165,13 @@ describe('MasterOutputSidebar', () => {
       return jest.fn()
     })
 
-    mockInvoke({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
     await renderSidebar()
-    expect(invoke).toHaveBeenCalledTimes(1)
+    expect(api.invoke).toHaveBeenCalledTimes(1)
 
-    mockInvoke({ dimmerPercent: 25, blackout: true, strobeOutputEnabled: false })
+    mainHolding({ dimmerPercent: 25, blackout: true, strobeOutputEnabled: false })
     restartHandler?.()
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(api.invoke).toHaveBeenCalledTimes(2))
     // The restart restores the dimmer, the blackout flag and the strobe flag together.
     await waitFor(() => expect(screen.getByText('25%')).toBeTruthy())
     expect(screen.getByText('Blacked Out')).toBeTruthy()
@@ -208,27 +196,11 @@ describe('MasterOutputSidebar', () => {
   })
 
   it('keeps a local interaction that happens while the mount read is still pending', async () => {
-    const resolvers: Array<(value: unknown) => void> = []
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return new Promise((resolve) => {
-          resolvers.push(resolve)
-        })
-      }
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return Promise.resolve({
-          success: true,
-          state: {
-            dimmerPercent: 100,
-            blackout: false,
-            strobeOutputEnabled: true,
-            ...(data as object),
-          },
-        })
-      }
-      if (channel === CONFIG.SAVE_PREFS) return Promise.resolve({ success: true })
-      return Promise.resolve(undefined)
-    })
+    const resolvers: Array<(value: MasterOutputSnapshot) => void> = []
+    answers[LIGHT.GET_MASTER_OUTPUT] = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve)
+      })
 
     const store = createStore()
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
@@ -251,28 +223,10 @@ describe('MasterOutputSidebar', () => {
 
   it('ignores an older live response that resolves after a newer one', async () => {
     const setResolvers: Array<() => void> = []
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return Promise.resolve({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
-      }
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return new Promise((resolve) => {
-          setResolvers.push(() =>
-            resolve({
-              success: true,
-              state: {
-                dimmerPercent: 100,
-                blackout: false,
-                strobeOutputEnabled: true,
-                ...(data as object),
-              },
-            }),
-          )
-        })
-      }
-      if (channel === CONFIG.SAVE_PREFS) return Promise.resolve({ success: true })
-      return Promise.resolve(undefined)
-    })
+    answers[LIGHT.SET_MASTER_OUTPUT] = (request) =>
+      new Promise((resolve) => {
+        setResolvers.push(() => resolve({ success: true, state: { ...FULL, ...request } }))
+      })
 
     const store = createStore()
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
@@ -298,15 +252,11 @@ describe('MasterOutputSidebar', () => {
   })
 
   it('does not apply a read that resolves after unmount', async () => {
-    const resolvers: Array<(value: unknown) => void> = []
-    invoke.mockImplementation((channel: string) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return new Promise((resolve) => {
-          resolvers.push(resolve)
-        })
-      }
-      return Promise.resolve(undefined)
-    })
+    const resolvers: Array<(value: MasterOutputSnapshot) => void> = []
+    answers[LIGHT.GET_MASTER_OUTPUT] = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve)
+      })
 
     const store = createStore()
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
@@ -330,28 +280,13 @@ describe('MasterOutputSidebar', () => {
 
   it('re-reads main when a live update is refused', async () => {
     let failNextSet = false
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return Promise.resolve({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
+    answers[LIGHT.SET_MASTER_OUTPUT] = (request) => {
+      if (failNextSet) {
+        failNextSet = false
+        return { success: false, error: 'refused' }
       }
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        if (failNextSet) {
-          failNextSet = false
-          return Promise.resolve({ success: false, error: 'refused' })
-        }
-        return Promise.resolve({
-          success: true,
-          state: {
-            dimmerPercent: 100,
-            blackout: false,
-            strobeOutputEnabled: true,
-            ...(data as object),
-          },
-        })
-      }
-      if (channel === CONFIG.SAVE_PREFS) return Promise.resolve({ success: true })
-      return Promise.resolve(undefined)
-    })
+      return { success: true, state: { ...FULL, ...request } }
+    }
 
     const store = createStore()
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
@@ -360,9 +295,8 @@ describe('MasterOutputSidebar', () => {
         <Sidebar />
       </Provider>,
     )
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith(LIGHT.GET_MASTER_OUTPUT, undefined))
-    const getCallCount = () =>
-      invoke.mock.calls.filter((c) => c[0] === LIGHT.GET_MASTER_OUTPUT).length
+    await waitFor(() => expect(api.invoke).toHaveBeenCalledWith(LIGHT.GET_MASTER_OUTPUT, undefined))
+    const getCallCount = () => callsOn(LIGHT.GET_MASTER_OUTPUT).length
     const getCallsBefore = getCallCount()
 
     failNextSet = true
@@ -372,25 +306,7 @@ describe('MasterOutputSidebar', () => {
   })
 
   it('says so when the dimmer level it persists is refused, and keeps the live level', async () => {
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return Promise.resolve({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
-      }
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return Promise.resolve({
-          success: true,
-          state: {
-            dimmerPercent: 100,
-            blackout: false,
-            strobeOutputEnabled: true,
-            ...(data as object),
-          },
-        })
-      }
-      if (channel === CONFIG.SAVE_PREFS)
-        return Promise.resolve({ success: false, error: 'disk full' })
-      return Promise.resolve(undefined)
-    })
+    answers[CONFIG.SAVE_PREFS] = () => ({ success: false, error: 'disk full' })
     const { store } = await renderSidebar()
     const fader = screen.getByLabelText('Master dimmer') as HTMLInputElement
 
@@ -403,24 +319,7 @@ describe('MasterOutputSidebar', () => {
   })
 
   it('says so when the strobe gate it persists is refused', async () => {
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.GET_MASTER_OUTPUT) {
-        return Promise.resolve({ dimmerPercent: 100, blackout: false, strobeOutputEnabled: true })
-      }
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return Promise.resolve({
-          success: true,
-          state: {
-            dimmerPercent: 100,
-            blackout: false,
-            strobeOutputEnabled: true,
-            ...(data as object),
-          },
-        })
-      }
-      if (channel === CONFIG.SAVE_PREFS) return Promise.reject(new Error('bridge gone'))
-      return Promise.resolve(undefined)
-    })
+    answers[CONFIG.SAVE_PREFS] = () => Promise.reject(new Error('bridge gone'))
     await renderSidebar()
 
     fireEvent.click(screen.getByText('Strobes Enabled'))

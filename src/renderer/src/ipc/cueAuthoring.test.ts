@@ -4,12 +4,12 @@
  * as a verdict too rather than as an error the editor would read fields off.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import { installWindowApiAnswering } from '@renderer/tests/helpers/windowApiStub'
 import { EFFECTS, NODE_CUES } from '../../../shared/ipcChannels'
 import type { EffectFile, NodeCueFile } from '../../../shared/ipcTypes'
 
 const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>()
-installWindowApi(invoke)
+installWindowApiAnswering(invoke)
 
 import { validateEffect, validateNodeCue } from './cueAuthoring'
 

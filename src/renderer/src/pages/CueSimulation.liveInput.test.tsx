@@ -10,25 +10,26 @@ import {
   yargListenerEnabledAtom,
   previewRigIdAtom,
 } from '../atoms'
-import { LIGHT, CONFIG } from '../../../shared/ipcChannels'
+import {
+  cueSimulationAnswers,
+  listingGroups,
+  offeringVerse,
+  storingSettings,
+  verseGroup,
+} from '@renderer/tests/helpers/cueSimulationAnswers'
 
-const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>(
-  async (channel: string) => {
-    if (channel === CONFIG.GET_PREFS) {
-      return { simulationSettings: { registryType: 'YARG', groupId: 'alpha', effectId: 'Verse' } }
-    }
-    if (channel === LIGHT.GET_CUE_GROUPS) {
-      return [{ id: 'alpha', name: 'Alpha', description: '', cueTypes: ['Verse'] }]
-    }
-    if (channel === CONFIG.GET_ENABLED_CUE_GROUPS) return ['alpha']
-    if (channel === LIGHT.GET_AVAILABLE_CUES) {
-      return [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
-    }
-    if (channel.startsWith('get-')) return []
-    return undefined
-  },
-)
-installWindowApi(invoke)
+const answers = cueSimulationAnswers()
+listingGroups(answers, [verseGroup('alpha', 'Alpha')])
+offeringVerse(answers)
+storingSettings(answers, {
+  registryType: 'YARG',
+  groupId: 'alpha',
+  effectId: 'Verse',
+  venueSize: 'NoVenue',
+  bpm: 120,
+  instrument: 'guitar',
+})
+installWindowApi(answers)
 
 jest.mock('@renderer/hooks/useDmxPreview', () => ({
   useDmxPreview: () => ({ selectedRig: null, rigConfig: null }),

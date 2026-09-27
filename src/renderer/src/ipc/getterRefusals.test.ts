@@ -1,9 +1,9 @@
 /** @jest-environment jsdom */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import { installWindowApiAnswering } from '@renderer/tests/helpers/windowApiStub'
 
 const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>()
-installWindowApi(invoke)
+installWindowApiAnswering(invoke)
 
 import {
   getActiveRigs,
