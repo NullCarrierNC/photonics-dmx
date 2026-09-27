@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals'
 import { rigFiles, scenarioProblems } from '../../wireCheck/wireScenario'
-import { levelAt } from '../../../photonics-dmx/sim/wire/playStep'
+import { levelAt, stageKitBytes } from '../../../photonics-dmx/sim/wire/playStep'
 
 interface WrittenRig {
   rigs: Array<{
@@ -26,7 +26,7 @@ describe('wire scenarios', () => {
     ).toEqual([
       'name must be a non-empty string',
       'give exactly one of files and rig',
-      'steps[0].type must be one of yarg, audio, idle, saveTemplates',
+      'steps[0].type must be one of yarg, audio, rb3, idle, saveTemplates',
       'steps[1].durationMs must be above 0',
     ])
     expect(scenarioProblems({ name: 'x', files: {}, steps: [] })).toEqual([
@@ -93,6 +93,14 @@ describe('wire scenarios', () => {
         lights: [{ id: 'A', template: 'gone', group: 'front', address: 1 }],
       }),
     ).toThrow("Light A names template 'gone', which is not listed")
+  })
+
+  it('writes StageKit commands as the datagram bytes RB3E sends', () => {
+    expect(stageKitBytes({ atMs: 0, bank: 'red', leds: 0b1111 })).toEqual([15, 0x80])
+    expect(stageKitBytes({ atMs: 0, bank: 'blue', leds: 0x1ff })).toEqual([0xff, 0x20])
+    expect(stageKitBytes({ atMs: 0, strobe: 'fast' })).toEqual([0, 0x05])
+    expect(stageKitBytes({ atMs: 0, strobe: 'off' })).toEqual([0, 0x07])
+    expect(stageKitBytes({ atMs: 0, fog: true })).toEqual([0, 0x01])
   })
 
   it('reads an audio level as steady, cycled or every Nth frame', () => {

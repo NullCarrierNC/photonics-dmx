@@ -51,6 +51,7 @@ export interface WireScenario {
   rig?: RigSpec
   yargLibrary?: string
   audioLibrary?: string
+  rb3Library?: string
   motion?: { groupId: string; cueId: string }
   /** Cue library files laid over a copy of the bundled node data, by path under `node-data`. */
   cueFiles?: Record<string, unknown>
@@ -71,7 +72,7 @@ export interface WireScenario {
   wire?: { rateHz?: { min?: number; max?: number }; timeTolMs?: number }
 }
 
-const STEP_TYPES = new Set(['yarg', 'audio', 'idle', 'saveTemplates'])
+const STEP_TYPES = new Set(['yarg', 'audio', 'rb3', 'idle', 'saveTemplates'])
 
 /** The problems that stop `raw` from being run as a scenario, or none. */
 export function scenarioProblems(raw: unknown): string[] {

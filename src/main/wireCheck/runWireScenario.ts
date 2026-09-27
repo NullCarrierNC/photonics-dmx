@@ -140,6 +140,7 @@ export async function runWireScenario(
         outputRateHz: scenario.outputRateHz,
         yargLibrary: scenario.yargLibrary,
         audioLibrary: scenario.audioLibrary,
+        rb3Library: scenario.rb3Library,
         motion: scenario.motion ?? null,
       })
     }

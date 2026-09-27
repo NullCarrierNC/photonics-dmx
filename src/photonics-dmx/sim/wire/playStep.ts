@@ -5,6 +5,7 @@ import {
   type CueType,
   type StrobeState,
 } from '../../cues/types/cueTypes'
+import { Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
 import { AudioFrameDriver } from '../AudioFrameDriver'
 import type { VenueSize } from '../types'
 import type { WireClock } from './RealTimeClock'
@@ -48,7 +49,47 @@ interface IdleStep {
   mark?: string
 }
 
-export type PlayStep = GameStep | AudioStep | IdleStep
+/** One StageKit command: an LED bank's lit positions (bit 0 is LED 1), a strobe speed, or fog. */
+export type StageKitCommand =
+  | { atMs: number; bank: 'red' | 'green' | 'blue' | 'yellow'; leds: number }
+  | { atMs: number; strobe: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' }
+  | { atMs: number; fog: boolean }
+
+/** RB3E StageKit datagrams, each sent at its time into the step, with RB3 cue mode in game. */
+interface Rb3Step {
+  type: 'rb3'
+  stageKit: StageKitCommand[]
+  durationMs: number
+  mark?: string
+}
+
+export type PlayStep = GameStep | AudioStep | IdleStep | Rb3Step
+
+const BANK_CHANNEL = {
+  red: Rb3RightChannel.RedLeds,
+  green: Rb3RightChannel.GreenLeds,
+  blue: Rb3RightChannel.BlueLeds,
+  yellow: Rb3RightChannel.YellowLeds,
+}
+
+const STROBE_CHANNEL = {
+  slow: Rb3RightChannel.StrobeSlow,
+  medium: Rb3RightChannel.StrobeMedium,
+  fast: Rb3RightChannel.StrobeFast,
+  fastest: Rb3RightChannel.StrobeFastest,
+  off: Rb3RightChannel.StrobeOff,
+}
+
+/** A StageKit command as the datagram's left and right bytes. */
+export function stageKitBytes(command: StageKitCommand): [number, number] {
+  if ('bank' in command) {
+    return [command.leds & 0xff, BANK_CHANNEL[command.bank]]
+  }
+  if ('strobe' in command) {
+    return [0, STROBE_CHANNEL[command.strobe]]
+  }
+  return [0, command.fog ? Rb3RightChannel.FogOn : Rb3RightChannel.FogOff]
+}
 
 const YARG_FRAME_MS = 1000 / 30
 const AUDIO_FRAME_MS = 1000 / 60
@@ -107,6 +148,17 @@ export async function playStep(run: WireRun, clock: WireClock, step: PlayStep): 
   const elapsed = (): number => clock.getCurrentTimeMs() - start
   if (step.type === 'idle') {
     await clock.advance(step.durationMs)
+    return
+  }
+  if (step.type === 'rb3') {
+    const pending = [...step.stageKit].sort((a, b) => a.atMs - b.atMs)
+    while (elapsed() < step.durationMs - EPSILON) {
+      while (pending.length > 0 && pending[0].atMs <= elapsed() + EPSILON) {
+        const command = pending.shift()
+        if (command) run.stageKit(...stageKitBytes(command))
+      }
+      await clock.advance(Math.min(stepMs, step.durationMs - elapsed()))
+    }
     return
   }
 

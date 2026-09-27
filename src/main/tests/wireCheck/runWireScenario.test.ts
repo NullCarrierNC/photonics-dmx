@@ -231,6 +231,44 @@ describe('runWireScenario', () => {
     expect(firstLit?.ms).toBeGreaterThanOrEqual(200)
   })
 
+  it('lights the LEDs a StageKit bank names through RB3 cue mode, and strobes on command', async () => {
+    const scenario: WireScenario = {
+      name: 'rb3',
+      rb3Library: 'rb3-stagekit',
+      rig: {
+        strobeType: 'Dedicated',
+        templates: [{ id: 'par', fixture: 'rgb', channels: RGB }],
+        lights: [
+          { id: 'A', template: 'par', group: 'front', address: 1 },
+          { id: 'B', template: 'par', group: 'front', address: 5 },
+          { id: 'S', template: 'par', group: 'strobe', address: 9 },
+        ],
+      },
+      steps: [
+        {
+          type: 'rb3',
+          durationMs: 1000,
+          mark: 'start',
+          stageKit: [
+            { atMs: 0, bank: 'red', leds: 0b01 },
+            { atMs: 500, strobe: 'fast' },
+          ],
+        },
+      ],
+      channels: '1-12',
+      t0: 'mark:start',
+      expect: {
+        states: [
+          { ch: { '2': 255, '3-4': 0, '5-8': 0 }, atMs: 60, holdMs: 400 },
+          { ch: { '9-12': 255 }, atMs: 520 },
+          { ch: { '9-12': 0 }, atMs: 560 },
+        ],
+      },
+    }
+    const { check } = evaluate(scenario, await runWireScenario(scenario, mockAppData))
+    expect(check.lines.filter((line: string) => line.startsWith('FAIL'))).toEqual([])
+  })
+
   it('refuses a scenario with no rig', async () => {
     await expect(
       runWireScenario({ name: 'empty', steps: [{ type: 'idle', durationMs: 10 }] }, mockAppData),
