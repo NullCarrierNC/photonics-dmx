@@ -10,6 +10,7 @@
  * same StageKit data against their own light layout instead of seeing nothing.
  */
 import { DmxLightManager } from '../controllers/DmxLightManager'
+import { strobeChannelChops } from '../controllers/fixtureChannelWriter'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { StageKitLightMapper } from './StageKitLightMapper'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
@@ -27,6 +28,8 @@ interface ActiveStrobeEffect {
   /** Cancels the run's timers. */
   stop?: () => void
   targetLights: TrackedLight[]
+  /** Strobe-row lights outside the front/back set, which have no colour bank to go back to. */
+  dedicatedLights: TrackedLight[]
 }
 
 interface PendingUpdate {
@@ -104,34 +107,40 @@ export class Rb3StageKitRigProcessor {
   /**
    * Strobe the rig's strobe lights. `startedAt` (monotonic ms) is when the strobe began, which sets
    * the flash phase, so a rig that joins a running strobe flashes with the rigs already on it.
+   *
+   * A light whose own strobe channel chops is left to it: a front/back one keeps its colour banks,
+   * and a strobe-row one holds white until the strobe ends. Every other strobe light flashes white,
+   * a front/back one back to its colour banks and a strobe-row one back to black.
    */
   public applyStrobeEffect(strobeType: StrobeType, startedAt = monotonicNowMs()): void {
     const strobeLights = this.lightManager.getLights(['strobe'], 'all')
-    const allLights = this.lightManager.getLights(['front', 'back'], 'all')
+    const allLights = this.lightManager.getLights(['front', 'back'], 'all') ?? []
 
     if (!strobeLights || strobeLights.length === 0) {
       log.info(`Rig ${this.rigId}: no strobe lights configured`)
       return
     }
-    if (!allLights) {
-      log.info(`Rig ${this.rigId}: no front/back lights configured`)
-      return
-    }
 
+    const channelChops = (light: TrackedLight): boolean => {
+      const fixture = this.lightManager.getDmxLight(light.id)
+      return fixture !== undefined && strobeChannelChops(fixture, strobeType)
+    }
     const targetLights: TrackedLight[] = []
     const dmxLightIndices: number[] = []
+    const dedicatedFlash: TrackedLight[] = []
+    const dedicatedHeld: TrackedLight[] = []
     for (const strobeLight of strobeLights) {
       const idx = allLights.findIndex((light) => light.id === strobeLight.id)
       if (idx !== -1) {
-        targetLights.push(allLights[idx])
-        dmxLightIndices.push(idx)
+        if (!channelChops(strobeLight)) {
+          targetLights.push(allLights[idx])
+          dmxLightIndices.push(idx)
+        }
+      } else if (channelChops(strobeLight)) {
+        dedicatedHeld.push(strobeLight)
       } else {
-        log.info(`Rig ${this.rigId}: strobe light ${strobeLight.id} not found in front/back set`)
+        dedicatedFlash.push(strobeLight)
       }
-    }
-    if (targetLights.length === 0) {
-      log.info(`Rig ${this.rigId}: no matching front/back lights for strobe`)
-      return
     }
 
     const white = getColor('white', 'max')
@@ -184,10 +193,15 @@ export class Rb3StageKitRigProcessor {
       type: strobeType,
       positions: dmxLightIndices,
       targetLights,
+      dedicatedLights: [...dedicatedFlash, ...dedicatedHeld],
     })
+    if (dedicatedHeld.length > 0) {
+      this.sequencer.setState(dedicatedHeld, white, 0)
+    }
     this.startStrobeEffect(
       effectName,
       targetLights,
+      dedicatedFlash,
       white,
       strobeInterval,
       dmxLightIndices,
@@ -204,10 +218,13 @@ export class Rb3StageKitRigProcessor {
   private stopStrobeEffect(effectName: string): void {
     const effectData = this.activeStrobeEffects.get(effectName)
     this.activeStrobeEffects.delete(effectName)
-    if (!effectData?.stop) {
+    if (!effectData) {
       return
     }
-    effectData.stop()
+    effectData.stop?.()
+    if (effectData.dedicatedLights.length > 0) {
+      this.sequencer.setState(effectData.dedicatedLights, getColor('black', 'medium'), 0)
+    }
     if (effectData.targetLights) {
       // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
       // pass the stored DMX indices (effectData.positions).
@@ -344,6 +361,7 @@ export class Rb3StageKitRigProcessor {
   private startStrobeEffect(
     effectName: string,
     targetLights: TrackedLight[],
+    dedicatedLights: TrackedLight[],
     color: RGBIO,
     interval: number,
     dmxLightIndices: number[],
@@ -355,19 +373,26 @@ export class Rb3StageKitRigProcessor {
     for (const lightIndex of dmxLightIndices) {
       this.strobedLights.add(lightIndex)
     }
+    const flashing = [...targetLights, ...dedicatedLights]
+    if (flashing.length === 0) {
+      return
+    }
     if (isOn) {
-      this.sequencer.setState(targetLights, color, 0)
+      this.sequencer.setState(flashing, color, 0)
     }
     const toggle = (): void => {
       if (isOn) {
         try {
           this.restoreColorsAfterStrobe(targetLights, dmxLightIndices)
+          if (dedicatedLights.length > 0) {
+            this.sequencer.setState(dedicatedLights, getColor('black', 'medium'), 0)
+          }
         } catch (err) {
           log.error(`Rig ${this.rigId}: failed to reblend after a strobe:`, err)
         }
         isOn = false
       } else {
-        this.sequencer.setState(targetLights, color, 0)
+        this.sequencer.setState(flashing, color, 0)
         isOn = true
       }
     }

@@ -51,6 +51,42 @@ function makeStrobeLightManager(): DmxLightManager {
   )
 }
 
+/**
+ * Four plain front lights, a front light and a strobe-row light that each have a strobe channel,
+ * and a strobe-row light that has none. All three strobe lights are in the strobe row.
+ */
+function makeMixedStrobeLightManager(): DmxLightManager {
+  const withChannel = { ...rgbLight().channels, strobeChannel: 9 }
+  const front = [
+    rgbLight({
+      id: 'f0',
+      position: 0,
+      fixtureId: 'f0',
+      isStrobeEnabled: true,
+      channels: withChannel,
+    }),
+    rgbLight({ id: 'f1', position: 1, fixtureId: 'f1' }),
+    rgbLight({ id: 'f2', position: 2, fixtureId: 'f2' }),
+    rgbLight({ id: 'f3', position: 3, fixtureId: 'f3' }),
+  ]
+  const plainStrobe = rgbLight({ id: 's0', position: 5, fixtureId: 's0', isStrobeEnabled: true })
+  const channelStrobe = rgbLight({
+    id: 's1',
+    position: 6,
+    fixtureId: 's1',
+    isStrobeEnabled: true,
+    channels: withChannel,
+  })
+  return new DmxLightManager(
+    createMockLightingConfig({
+      numLights: 6,
+      frontLights: front,
+      backLights: [],
+      strobeLights: [front[0], plainStrobe, channelStrobe],
+    }),
+  )
+}
+
 /** The strobe runs this rig currently holds. */
 function runningStrobes(proc: Rb3StageKitRigProcessor): string[] {
   return [
@@ -167,6 +203,33 @@ describe('Rb3StageKitRigProcessor strobe runs', () => {
     proc.clearStrobeEffectsAtPositions([2, 7])
 
     expect(runningStrobes(proc)).toEqual(['stagekit-strobe-rig-1-medium'])
+  })
+
+  it('flashes a strobe-row light, leaves a light whose strobe channel chops to it, and darkens the row when the strobe ends', () => {
+    const mixed = new Rb3StageKitRigProcessor(
+      'rig-1',
+      makeMixedStrobeLightManager(),
+      makeSequencerStub(setState),
+      DEFAULT_STAGEKIT_CONFIG,
+    )
+    const litIds = (): string[][] =>
+      setState.mock.calls.map(([lights]) => (lights as Array<{ id: string }>).map((l) => l.id))
+    const levels = (id: string): number[] =>
+      setState.mock.calls
+        .filter(([lights]) => (lights as Array<{ id: string }>).some((l) => l.id === id))
+        .map(([, color]) => (color as { intensity: number }).intensity)
+
+    mixed.applyStrobeEffect('slow')
+    jest.advanceTimersByTime(1000)
+
+    expect(litIds().flat()).not.toContain('f0')
+    expect(levels('s1')).toEqual([255])
+    expect(new Set(levels('s0'))).toEqual(new Set([255, 0]))
+
+    mixed.clearStrobeEffectsAtPositions([])
+    expect(levels('s0').at(-1)).toBe(0)
+    expect(levels('s1').at(-1)).toBe(0)
+    mixed.dispose()
   })
 
   it('leaves nothing running after dispose', () => {
