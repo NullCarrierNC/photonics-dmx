@@ -2,8 +2,8 @@
  * Listens to sACN and logs what reaches the wire as change rows, so a review can hold the running
  * app's real output to expected values without a rig.
  *
- *   npm run sacn:log -- --channels 1-12 --until-idle 2000 --out run.ndjson --table
- *   npm run sacn:log -- --replay run.ndjson --expect expect.json
+ *   npm run dmx:log -- --channels 1-12 --until-idle 2000 --out run.ndjson --table
+ *   npm run dmx:log -- --replay run.ndjson --expect expect.json
  *
  * The app's multicast output is heard on the same machine, as sACN View hears it. When the app
  * sends on a chosen network interface, pass that interface's IPv4 address as `--iface`.
@@ -37,7 +37,7 @@ const {
   rebase,
   renderTable,
   checkExpectations,
-} = require('./sacnLogCore.cjs')
+} = require('./dmxLogCore.cjs')
 
 /** @param {string[]} argv */
 function parseArgs(argv) {

@@ -9,7 +9,7 @@ const {
   statesOf,
   renderTable,
   checkExpectations,
-} = require('../../../../tools/sacnLogCore.cjs')
+} = require('../../../../tools/dmxLogCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 type Row = { ms: number; u?: number; src?: string; end?: boolean; ch?: Record<string, number> }

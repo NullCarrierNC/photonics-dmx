@@ -1,7 +1,7 @@
 /**
- * The sACN logger's rules: which channels to watch, reducing received packets to change rows,
+ * The DMX wire logger's rules: which channels to watch, reducing received packets to change rows,
  * moving time zero, rendering rows as a table, and holding a recording to an ordered list of
- * expected states. sacn-log.mjs owns the socket, the files and the exit code.
+ * expected states. dmx-log.mjs owns the socket, the files and the exit code.
  *
  * A row is `{ ms, u, src, ch }`: at `ms` the source `src` changed the listed channels of universe
  * `u` to the listed values. The first packet from each source always makes a row that lists every
