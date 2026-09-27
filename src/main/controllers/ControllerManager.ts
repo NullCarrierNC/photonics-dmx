@@ -210,7 +210,9 @@ export class ControllerManager {
   }
 
   /** Initialize all controllers and systems. */
-  public async init(): Promise<void> {
+  /** `afterFaultResponse` waits out a fault response stopping the inputs, as a Retry must. */
+  public async init(options: { afterFaultResponse?: boolean } = {}): Promise<void> {
+    if (options.afterFaultResponse) await this.lifecycle.awaitFaultResponse()
     if (this.isInitialized) {
       return
     }

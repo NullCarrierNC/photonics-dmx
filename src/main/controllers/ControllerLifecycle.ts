@@ -334,7 +334,7 @@ export class ControllerLifecycle {
   }
 
   /** Wait for the fault response in progress to settle, and for any started while it ran. */
-  private async awaitFaultResponse(): Promise<void> {
+  public async awaitFaultResponse(): Promise<void> {
     while (this.faultResponse) {
       try {
         await this.faultResponse
