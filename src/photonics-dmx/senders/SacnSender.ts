@@ -11,11 +11,19 @@ const log = createLogger('SacnSender')
 /** Default sACN output rate in Hz. */
 export const SACN_DEFAULT_MAX_OUTPUT_RATE = 44
 
+/** The UDP port sACN uses. */
+const SACN_PORT = 5568
+
 export interface SacnConfig {
   universe?: number
   networkInterface?: string
   useUnicast?: boolean
   unicastDestination?: string
+  /**
+   * The UDP port the sender binds and sends to. Default 5568. A unicast receiver on this machine
+   * hears the packets only when it binds the port before the sender starts.
+   */
+  port?: number
   /** Max packets per second (Hz). 0 = no limit. Default 44. */
   maxOutputRate?: number
   /**
@@ -63,7 +71,7 @@ export class SacnSender extends BaseSender {
       useUnicastDestination?: string
     } = {
       universe: validUniverse,
-      port: 5568,
+      port: this.getConfiguredPort(),
       reuseAddr: true,
       defaultPacketOptions: {
         sourceName: 'Photonics-DMX',
@@ -166,6 +174,6 @@ export class SacnSender extends BaseSender {
   }
 
   public override getConfiguredPort(): number {
-    return 5568
+    return this.config.port ?? SACN_PORT
   }
 }
