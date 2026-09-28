@@ -316,7 +316,10 @@ function cueVersionProblems(files) {
  *   hasCommit: (sha: string) => boolean,
  *   branchBase: (commit: string, ref: string) => string | null,
  *   mergeBase: (commit: string, other: string) => string | null,
+ *   commitOf: (ref: string) => string | null,
+ *   releaseBefore: () => string | null,
  * }} VersionBaseInput
+ *   `releaseBefore` names the last release tag before HEAD, or null when there is none
  */
 
 /**
@@ -325,11 +328,21 @@ function cueVersionProblems(files) {
  * hook gives them, each pushed commit is held to what the remote already has, or to where it meets
  * its upstream or development when the remote has nothing for it yet. A named base, which CI gives
  * as the commit a push or pull request starts from, also holds the working tree to where HEAD meets
- * it. A base that cannot be found is a problem, so the guard never passes having compared nothing.
+ * it. An all-zero named base names no commit, so HEAD on development's tip is held to the release
+ * before it, as the coverage guard holds it. A base that cannot be found is a problem, so the guard
+ * never passes having compared nothing.
  * @param {VersionBaseInput} input
  * @returns {{ bases: VersionBase[], problems: string[] }}
  */
-function cueVersionBases({ pushed, namedBase, hasCommit, branchBase, mergeBase }) {
+function cueVersionBases({
+  pushed,
+  namedBase,
+  hasCommit,
+  branchBase,
+  mergeBase,
+  commitOf,
+  releaseBefore,
+}) {
   /** @type {VersionBase[]} */
   const bases = []
   /** @type {string[]} */
@@ -364,6 +377,22 @@ function cueVersionBases({ pushed, namedBase, hasCommit, branchBase, mergeBase }
       } else {
         problems.push(noBranchBase(ref.localRef))
       }
+    }
+  }
+  if (namedBase && isMissingCommit(namedBase) && branchBase('HEAD', 'HEAD') === commitOf('HEAD')) {
+    const release = releaseBefore()
+    const base = release === null ? null : commitOf(release)
+    if (base) {
+      bases.push({
+        what: 'the working tree',
+        commit: null,
+        base,
+        against: `the release before HEAD (${release})`,
+      })
+    } else {
+      problems.push(
+        'CUE_VERSION_BASE_REF names no commit, and HEAD is on development with no release before it to compare bundled files with',
+      )
     }
   }
   if (namedBase && !isMissingCommit(namedBase)) {

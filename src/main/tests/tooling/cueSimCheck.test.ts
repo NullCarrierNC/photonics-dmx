@@ -134,13 +134,37 @@ describe('cueVersion guard on development', () => {
     expect(result.stderr).toContain('against its branch base')
   })
 
-  it('checks only the branch base when CI names no commit, as for a tag', () => {
+  it('holds development to the release before HEAD when CI names no commit', () => {
     commitLibrary(3, 'Red')
+    git('tag', 'v0.1.0')
+    commitLibrary(3, 'Blue')
+
+    const result = check({ baseRef: ZERO })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('against the release before HEAD (v0.1.0)')
+  })
+
+  it('accepts a raised cueVersion against the release before HEAD', () => {
+    commitLibrary(3, 'Red')
+    git('tag', 'v0.1.0')
+    commitLibrary(4, 'Blue')
 
     const result = check({ baseRef: ZERO })
 
     expect(result.stderr).toBe('')
     expect(result.status).toBe(0)
+  })
+
+  it('holds a branch to where it meets development when CI names no commit', () => {
+    commitLibrary(3, 'Red')
+    git('checkout', '--quiet', '-b', 'feature')
+    commitLibrary(3, 'Blue')
+
+    const result = check({ baseRef: ZERO })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('against the branch base')
   })
 })
 
@@ -164,6 +188,15 @@ describe('cueVersion guard without a base', () => {
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('CUE_VERSION_BASE_REF names ffffffff')
+  })
+
+  it('refuses development with no release before HEAD when CI names no commit', () => {
+    commitLibrary(3, 'Red')
+
+    const result = check({ baseRef: ZERO })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('CUE_VERSION_BASE_REF names no commit')
   })
 
   it('refuses a working tree with no branch base to compare with', () => {
