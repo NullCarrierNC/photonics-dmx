@@ -1,9 +1,9 @@
 /**
  * Runs every bundled non-motion cue through the simulator and holds each timeline's fingerprint to
  * metrics/cue-sim-fingerprints.txt, and refuses a bundled cue or effect file changed without a
- * higher cueVersion. The bases it compares with are cueVersionBases' in cueSimCore.cjs: `--pushed`
- * reads the refs of a push from stdin, and CI names its base in `CUE_VERSION_BASE_REF`. `--write`
- * rewrites the fingerprint list.
+ * higher cueVersion or a merge that records fingerprints neither parent holds. The bases it
+ * compares with are cueVersionBases' in cueSimCore.cjs: `--pushed` reads the refs of a push from
+ * stdin, and CI names its base in `CUE_VERSION_BASE_REF`. `--write` rewrites the fingerprint list.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -23,6 +23,7 @@ const {
   describeMove,
   cueVersionProblems,
   cueVersionBases,
+  fingerprintMergeProblems,
 } = require('./cueSimCore.cjs')
 const { parsePushedRefs } = require('./coverageThresholdCore.cjs')
 const { runCues } = require('./cueSimWatchdog.cjs')
@@ -71,8 +72,9 @@ function branchBase(commit, ref) {
 }
 
 /**
- * @returns {{ baseProblems: string[], versionProblems: string[] }} bases the guard could not
- *   compare with, and bundled files changed since a base without a cueVersion bump
+ * @returns {{ bases: object[], baseProblems: string[], versionProblems: string[] }} the bases the
+ *   guard compares with, those it could not, and bundled files changed since a base without a
+ *   cueVersion bump
  */
 function checkCueVersions() {
   const { bases, problems: baseProblems } = cueVersionBases({
@@ -106,7 +108,20 @@ function checkCueVersions() {
       versionProblems.push(`${what}: ${problem}, against ${against} (${base.slice(0, 8)})`)
     }
   }
-  return { baseProblems, versionProblems }
+  return { bases, baseProblems, versionProblems }
+}
+
+/** @param {string} base @param {string | null} commit */
+function mergesIn(base, commit) {
+  const listed = git(['rev-list', '--merges', '--parents', `${base}..${commit ?? 'HEAD'}`])
+  if (listed === null) return null
+  return listed
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => {
+      const [sha, ...parents] = line.trim().split(' ')
+      return { sha, parents }
+    })
 }
 
 function bundledCues() {
@@ -121,12 +136,28 @@ function bundledCues() {
   })
 }
 
-const { baseProblems, versionProblems } = checkCueVersions()
-for (const problem of [...baseProblems, ...versionProblems]) console.error(problem)
+const { bases, baseProblems, versionProblems } = checkCueVersions()
+const mergeProblems = fingerprintMergeProblems({
+  bases,
+  mergesIn,
+  remergeTouchesList: (merge) => {
+    const diff = git(['show', '--remerge-diff', '--format=', merge, '--', LIST])
+    return diff === null ? null : diff.trim() !== ''
+  },
+  listAt: (commit) => git(['show', `${commit}:${LIST}`]),
+})
+for (const problem of [...baseProblems, ...versionProblems, ...mergeProblems]) {
+  console.error(problem)
+}
 if (versionProblems.length > 0) {
   console.error('Raise the top-level cueVersion of each file, or installs keep their old copy.')
 }
-if (baseProblems.length + versionProblems.length > 0) process.exit(1)
+if (mergeProblems.length > 0) {
+  console.error(
+    `Keep one parent's list in the merge and re-record the fingerprints in a commit after it: ${WRITE}`,
+  )
+}
+if (baseProblems.length + versionProblems.length + mergeProblems.length > 0) process.exit(1)
 
 const cues = bundledCues()
 const results = await runCues({
@@ -182,7 +213,7 @@ if (moved.length + added.length + missing.length > 0) {
   for (const key of added) console.error(`${key}: a bundled cue the list does not hold`)
   for (const key of missing) console.error(`${key}: listed, but no longer bundled`)
   console.error(
-    `Cue timelines moved. If the change is intended, rewrite the list in the same commit: ${WRITE}`,
+    `Cue timelines moved. If the change is intended, rewrite the list in the same commit, or after a merge in a commit of its own: ${WRITE}`,
   )
   process.exit(1)
 }

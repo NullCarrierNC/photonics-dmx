@@ -186,10 +186,28 @@ const NOTES = [
  * @returns {string} the committed list, sorted by key
  */
 function renderList(entries) {
-  const lines = [...entries]
+  return `${[settingsLine(), ...NOTES, ...entryLines(entries)].join('\n')}\n`
+}
+
+/** @param {Map<string, Fingerprint>} entries @returns {string[]} one line per cue, sorted by key */
+function entryLines(entries) {
+  return [...entries]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([key, fp]) => `${key} ${fp.digest} ${fp.lights.join('.')} ${fp.windows.join('.')}`)
-  return `${[settingsLine(), ...NOTES, ...lines].join('\n')}\n`
+}
+
+/**
+ * @param {string | null} text a fingerprint list, or null for none
+ * @returns {string | null} what the list records: its settings line, its entries sorted by key, and
+ *   any line that does not parse, trimmed and sorted. Lists that hold the same fingerprints read the
+ *   same however their lines are ordered or spaced.
+ */
+function listContent(text) {
+  if (text === null) return null
+  const { entries, malformed } = parseList(text)
+  const settings = text.trim().split(/\r?\n/)[0].trim()
+  const unparsed = malformed.map((line) => line.trim()).sort()
+  return [settings, ...entryLines(entries), ...unparsed].join('\n')
 }
 
 /**
@@ -384,6 +402,57 @@ function cueVersionBases({ pushed, namedBase, hasCommit, branchBase, mergeBase }
   return { bases, problems }
 }
 
+/**
+ * @typedef {{ sha: string, parents: string[] }} MergeCommit
+ * @typedef {{
+ *   bases: VersionBase[],
+ *   mergesIn: (base: string, commit: string | null) => MergeCommit[] | null,
+ *   remergeTouchesList: (merge: string) => boolean | null,
+ *   listAt: (commit: string) => string | null,
+ * }} MergeFingerprintInput
+ *   `mergesIn` lists the merges after `base` up to `commit`, or up to HEAD for the working tree.
+ *   `remergeTouchesList` says whether the merge's list differs from git's own merge of its
+ *   parents, and `listAt` reads the list a commit holds, or null when it holds none. Lists are
+ *   compared by what they record, not by their text.
+ */
+
+/**
+ * Merges in each compared range that record cue fingerprints of their own. A merge whose list
+ * differs from git's merge of its parents and from every parent's list holds fingerprints no
+ * commit recorded. A merge that keeps one parent's list, with the fingerprints re-recorded in a
+ * commit after it, passes. Each merge is reported once, however many ranges hold it.
+ * @param {MergeFingerprintInput} input
+ * @returns {string[]}
+ */
+function fingerprintMergeProblems({ bases, mergesIn, remergeTouchesList, listAt }) {
+  /** @type {string[]} */
+  const problems = []
+  const seen = new Set()
+  for (const { what, commit, base, against } of bases) {
+    const merges = mergesIn(base, commit)
+    if (merges === null) {
+      problems.push(`${what}: git could not list the merges since ${against} (${base.slice(0, 8)})`)
+      continue
+    }
+    for (const { sha, parents } of merges) {
+      if (seen.has(sha)) continue
+      seen.add(sha)
+      const touched = remergeTouchesList(sha)
+      if (touched === false) continue
+      if (touched === null) {
+        problems.push(`${what}: git could not compare merge ${sha.slice(0, 8)} with its parents`)
+        continue
+      }
+      const list = listContent(listAt(sha))
+      if (parents.some((parent) => listContent(listAt(parent)) === list)) continue
+      problems.push(
+        `${what}: merge ${sha.slice(0, 8)} records cue fingerprints neither parent holds`,
+      )
+    }
+  }
+  return problems
+}
+
 module.exports = {
   SETTINGS,
   SIMULATOR_OPTIONS,
@@ -395,8 +464,10 @@ module.exports = {
   fingerprintOf,
   renderList,
   parseList,
+  listContent,
   compareFingerprints,
   describeMove,
   cueVersionProblems,
   cueVersionBases,
+  fingerprintMergeProblems,
 }
