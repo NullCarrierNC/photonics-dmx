@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -10,6 +11,8 @@ const {
   SCENARIOS,
   seededRandom,
   cuesInLibrary,
+  reduceTimeline,
+  fingerprintOf,
 } = require('../../../../tools/cueSimCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -49,6 +52,48 @@ const DARK_BY_DESIGN = new Set([
 const UNLOADED: Record<string, string[]> = {
   // Its one audio cue waits on a condition this build does not know.
   'v0.6.1-alpha.6': ['audio tests'],
+}
+
+/**
+ * A digest of each corpus cue file's seeded timelines, keyed by its corpus path. A change that
+ * moves how an older file plays moves its digest, and the new digest goes here in the same commit.
+ */
+const TIMELINES: Record<string, string> = {
+  'v0.4.0/audio-70s-light-organs.json': 'a87b11511f4a',
+  'v0.4.0/audio-disco.json': '5e9e85426417',
+  'v0.4.0/audio-rock.json': '6bced6fe2f5f',
+  'v0.4.0/audio-stagekit.json': '7dda5ce7f484',
+  'v0.4.0/yarg-alt1.json': '0bf0acebc9f3',
+  'v0.4.0/yarg-stagekit.json': 'bc1977b2d86b',
+  'v0.5.5-alpha.5/audio-70s-light-organs.json': '0780e26125bf',
+  'v0.5.5-alpha.5/audio-disco.json': '5e9e85426417',
+  'v0.5.5-alpha.5/audio-rock.json': '6bced6fe2f5f',
+  'v0.5.5-alpha.5/audio-stagekit.json': 'f3d74034631f',
+  'v0.5.5-alpha.5/yarg-alt1.json': '0bf0acebc9f3',
+  'v0.5.5-alpha.5/yarg-stagekit.json': 'a0282fe883d3',
+  'v0.6.0-alpha.6/audio-70s-light-organs.json': '59a0ee9ca7ec',
+  'v0.6.0-alpha.6/audio-disco.json': '794418f4c111',
+  'v0.6.0-alpha.6/audio-rock.json': '10c21c4f2d21',
+  'v0.6.0-alpha.6/stage-kit-alt-1.json': '3d92a447ced3',
+  'v0.6.0-alpha.6/yarg-alt1.json': '80d9879e2e76',
+  'v0.6.0-alpha.6/yarg-fade.json': '0446adc34e8e',
+  'v0.6.0-alpha.6/yarg-stagekit.json': '91bc069cd249',
+  'v0.6.2-alpha.6/audio-stagekit.json': '1f12b7eed799',
+  'v0.7.0-alpha.7/audio-stagekit.json': '1f12b7eed799',
+  'v0.7.0-alpha.7/rb3-bloom.json': '55a7c89e3491',
+  'v0.7.0-alpha.7/rb3-glow.json': '190cf9e9fc23',
+  'v0.7.0-alpha.7/rb3-mirror-blended.json': '9d4c79a26f65',
+  'v0.7.0-alpha.7/rb3-mirror.json': '7b06ce890da4',
+  'v0.7.0-alpha.7/rb3-stagekit-reversed.json': '302d47fbd87f',
+  'v0.7.0-alpha.7/rb3-stagekit-wash.json': 'a29adbba813a',
+  'v0.7.0-alpha.7/rb3-stagekit.json': '7b33efbeafc4',
+  'v0.7.0-alpha.7/rb3-trail.json': '9072b861f165',
+  'v0.7.0-alpha.7/stage-kit-alt-1.json': '3d92a447ced3',
+  'v0.7.0-alpha.7/yarg-alt1.json': '80d9879e2e76',
+  'v0.7.0-alpha.7/yarg-fade.json': '0446adc34e8e',
+  'v0.7.0-alpha.7/yarg-stagekit.json': '91bc069cd249',
+  'v0.7.0-alpha.7-user/my-alt1.json': 'f34cdffd85fd',
+  'v0.7.0-alpha.7-user/yarg-alt1.json': 'af58e37297a0',
 }
 
 /** The cue files each set holds, each distinct file under the first set that holds it. */
@@ -100,6 +145,8 @@ interface Outcome {
   unloaded: string[]
   dark: string[]
   unknown: string[]
+  /** A digest of each file's cue timelines, keyed by its corpus path. */
+  timelines: Record<string, string>
 }
 
 /**
@@ -108,7 +155,7 @@ interface Outcome {
  * each set's unknown values are reported afresh.
  */
 async function runCues(set: CorpusSet, files: CorpusFile[]): Promise<Outcome> {
-  const outcome: Outcome = { unloaded: [], dark: [], unknown: [] }
+  const outcome: Outcome = { unloaded: [], dark: [], unknown: [], timelines: {} }
   await jest.isolateModulesAsync(async () => {
     const { CueSimulator } = await import('../../sim/CueSimulator')
     const logger = await import('../../../shared/logger')
@@ -122,7 +169,7 @@ async function runCues(set: CorpusSet, files: CorpusFile[]): Promise<Outcome> {
       }
     })
 
-    const run = async (baseDir: string, cue: SimCue): Promise<void> => {
+    const run = async (baseDir: string, cue: SimCue): Promise<string> => {
       const sim = await CueSimulator.create({
         library: cue.library,
         domain: cue.domain,
@@ -134,6 +181,9 @@ async function runCues(set: CorpusSet, files: CorpusFile[]): Promise<Outcome> {
         level: SETTINGS.level,
         sampleIntervalMs: 10,
       })
+      // Seeded once the file has loaded, so what the loader draws never moves the cue's own draws.
+      const realRandom = Math.random
+      Math.random = seededRandom(cue.key)
       try {
         warnings.length = 0
         sim.setCue(cue.cue)
@@ -142,7 +192,9 @@ async function runCues(set: CorpusSet, files: CorpusFile[]): Promise<Outcome> {
         const name = `${cue.library} ${cue.cue}`
         if (!lightsSomething(timeline) && !DARK_BY_DESIGN.has(name)) outcome.dark.push(name)
         outcome.unknown.push(...warnings.map((warning) => `${name}: ${warning}`))
+        return `${cue.cue} ${fingerprintOf(reduceTimeline(timeline.samples)).digest}`
       } finally {
+        Math.random = realRandom
         sim.dispose()
       }
     }
@@ -150,22 +202,25 @@ async function runCues(set: CorpusSet, files: CorpusFile[]): Promise<Outcome> {
     try {
       for (const file of files) {
         const baseDir = seedCueFile(set, file)
+        const digests: string[] = []
         try {
           for (const cue of cuesOf(file)) {
-            const realRandom = Math.random
-            Math.random = seededRandom(cue.key)
             try {
-              await run(baseDir, cue)
+              digests.push(await run(baseDir, cue))
             } catch (error) {
               if (!String(error).includes('not found')) throw error
               const unloaded = `${cue.domain} ${cue.library}`
               if (!outcome.unloaded.includes(unloaded)) outcome.unloaded.push(unloaded)
-            } finally {
-              Math.random = realRandom
             }
           }
         } finally {
           fs.rmSync(baseDir, { recursive: true, force: true })
+        }
+        if (digests.length > 0) {
+          outcome.timelines[file.file] = createHash('sha256')
+            .update(digests.join('\n'))
+            .digest('hex')
+            .slice(0, 12)
         }
       }
     } finally {
@@ -189,5 +244,12 @@ describe.each(firstSetOfEachCueFile())('the cues the %s build left', (id, set, f
 
   it('read only values this build knows', () => {
     expect(outcome.unknown).toEqual([])
+  })
+
+  it('play as they did when pinned', () => {
+    const pinned = Object.fromEntries(
+      Object.keys(outcome.timelines).map((file) => [file, TIMELINES[file]]),
+    )
+    expect(outcome.timelines).toEqual(pinned)
   })
 })
