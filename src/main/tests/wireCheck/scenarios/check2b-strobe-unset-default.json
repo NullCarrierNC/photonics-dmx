@@ -1,0 +1,181 @@
+{
+  "name": "Check 2b: Strobe Fast over the Default look flashes the light with no strobe channel",
+  "rig": {
+    "strobeType": "AllCapable",
+    "templates": [
+      {
+        "id": "par-unset",
+        "fixture": "rgb",
+        "label": "PAR unset",
+        "strobeValues": {
+          "slow": 64,
+          "medium": 128,
+          "fast": 192,
+          "fastest": 255
+        },
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "strobeChannel": 0
+        }
+      },
+      {
+        "id": "par-strobe",
+        "fixture": "rgb",
+        "label": "PAR strobe",
+        "strobeValues": {
+          "slow": 64,
+          "medium": 128,
+          "fast": 192,
+          "fastest": 255
+        },
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "strobeChannel": 5
+        }
+      }
+    ],
+    "lights": [
+      {
+        "id": "U",
+        "template": "par-unset",
+        "group": "front",
+        "address": 1,
+        "strobe": true
+      },
+      {
+        "id": "H",
+        "template": "par-strobe",
+        "group": "front",
+        "address": 5,
+        "strobe": true
+      }
+    ]
+  },
+  "steps": [
+    {
+      "type": "yarg",
+      "cue": "Default",
+      "durationMs": 300,
+      "mark": "lead"
+    },
+    {
+      "type": "yarg",
+      "cue": "Default",
+      "strobe": "Strobe_Fast",
+      "durationMs": 1000,
+      "mark": "strobe"
+    },
+    {
+      "type": "yarg",
+      "cue": "Default",
+      "durationMs": 300,
+      "mark": "off"
+    }
+  ],
+  "channels": "1-9",
+  "t0": "mark:strobe",
+  "expect": {
+    "states": [
+      {
+        "label": "Default look",
+        "ch": {
+          "1": 100,
+          "2": 0,
+          "3": 0,
+          "4": 255,
+          "5": 100,
+          "6": 0,
+          "7": 0,
+          "8": 255,
+          "9": 0
+        }
+      },
+      {
+        "label": "H strobe channel at fast",
+        "ch": {
+          "1": 100,
+          "2": 0,
+          "3": 0,
+          "4": 255,
+          "5": 100,
+          "6": 0,
+          "7": 0,
+          "8": 255,
+          "9": 192
+        },
+        "atMs": 10
+      },
+      {
+        "label": "U white",
+        "ch": {
+          "1": 255,
+          "2": 255,
+          "3": 255,
+          "4": 255,
+          "5": 100,
+          "6": 0,
+          "7": 0,
+          "8": 255
+        },
+        "atMs": 22
+      },
+      {
+        "label": "U back to blue",
+        "ch": {
+          "1": 100,
+          "2": 0,
+          "3": 0,
+          "4": 255
+        },
+        "atMs": 50
+      },
+      {
+        "label": "U white",
+        "ch": {
+          "1": 255,
+          "2": 255,
+          "3": 255,
+          "4": 255
+        },
+        "atMs": 110
+      },
+      {
+        "label": "U back to blue",
+        "ch": {
+          "1": 100,
+          "2": 0,
+          "3": 0,
+          "4": 255
+        },
+        "atMs": 150
+      },
+      {
+        "label": "H holds the blue look, not white",
+        "never": {
+          "6": 255
+        }
+      },
+      {
+        "label": "Strobe Off",
+        "ch": {
+          "1": 100,
+          "2": 0,
+          "3": 0,
+          "4": 255,
+          "5": 100,
+          "6": 0,
+          "7": 0,
+          "8": 255,
+          "9": 0
+        },
+        "atMs": 1000
+      }
+    ]
+  }
+}

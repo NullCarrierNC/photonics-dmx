@@ -1,0 +1,65 @@
+{
+  "name": "Check 5: yarg-alt1 Dischord on 1 light per group",
+  "rig": {
+    "templates": [
+      {
+        "id": "par",
+        "fixture": "rgb",
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ],
+    "lights": [
+      {
+        "id": "F1",
+        "template": "par",
+        "group": "front",
+        "address": 1
+      },
+      {
+        "id": "B1",
+        "template": "par",
+        "group": "back",
+        "address": 5
+      }
+    ]
+  },
+  "yargLibrary": "yarg-alt1",
+  "steps": [
+    {
+      "type": "yarg",
+      "cue": "Dischord",
+      "venue": "Small",
+      "durationMs": 4000,
+      "mark": "start"
+    }
+  ],
+  "channels": "1-8",
+  "t0": "mark:start",
+  "expect": {
+    "states": [
+      {
+        "label": "F1 takes the blue layer",
+        "ch": {
+          "1": 100,
+          "2": 0,
+          "3": 0,
+          "4": 255
+        }
+      },
+      {
+        "label": "B1 takes the blue layer",
+        "ch": {
+          "5": 100,
+          "6": 0,
+          "7": 0,
+          "8": 255
+        }
+      }
+    ]
+  }
+}

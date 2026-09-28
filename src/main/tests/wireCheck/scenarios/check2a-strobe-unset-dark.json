@@ -1,0 +1,154 @@
+{
+  "name": "Check 2a: Strobe Fast over a dark stage flashes the light with no strobe channel",
+  "rig": {
+    "strobeType": "AllCapable",
+    "templates": [
+      {
+        "id": "par-unset",
+        "fixture": "rgb",
+        "label": "PAR unset",
+        "strobeValues": {
+          "slow": 64,
+          "medium": 128,
+          "fast": 192,
+          "fastest": 255
+        },
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "strobeChannel": 0
+        }
+      },
+      {
+        "id": "par-strobe",
+        "fixture": "rgb",
+        "label": "PAR strobe",
+        "strobeValues": {
+          "slow": 64,
+          "medium": 128,
+          "fast": 192,
+          "fastest": 255
+        },
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4,
+          "strobeChannel": 5
+        }
+      }
+    ],
+    "lights": [
+      {
+        "id": "U",
+        "template": "par-unset",
+        "group": "front",
+        "address": 1,
+        "strobe": true
+      },
+      {
+        "id": "H",
+        "template": "par-strobe",
+        "group": "front",
+        "address": 5,
+        "strobe": true
+      }
+    ]
+  },
+  "steps": [
+    {
+      "type": "yarg",
+      "cue": "Score",
+      "durationMs": 300,
+      "mark": "lead"
+    },
+    {
+      "type": "yarg",
+      "cue": "Score",
+      "strobe": "Strobe_Fast",
+      "durationMs": 1000,
+      "mark": "strobe"
+    },
+    {
+      "type": "yarg",
+      "cue": "Score",
+      "durationMs": 300,
+      "mark": "off"
+    }
+  ],
+  "channels": "1-9",
+  "t0": "mark:strobe",
+  "expect": {
+    "states": [
+      {
+        "label": "H strobe channel at fast",
+        "ch": {
+          "1-8": 0,
+          "9": 192
+        },
+        "atMs": 10
+      },
+      {
+        "label": "first flash",
+        "ch": {
+          "1-8": 255,
+          "9": 192
+        },
+        "atMs": 22
+      },
+      {
+        "label": "U dark, H white",
+        "ch": {
+          "1-4": 0,
+          "5-8": 255
+        },
+        "atMs": 50
+      },
+      {
+        "label": "second flash",
+        "ch": {
+          "1-4": 255
+        },
+        "atMs": 110
+      },
+      {
+        "label": "U dark",
+        "ch": {
+          "1-4": 0
+        },
+        "atMs": 150
+      },
+      {
+        "label": "third flash",
+        "ch": {
+          "1-4": 255
+        },
+        "atMs": 210
+      },
+      {
+        "label": "U dark",
+        "ch": {
+          "1-4": 0
+        },
+        "atMs": 250
+      },
+      {
+        "label": "H holds white while strobing",
+        "never": {
+          "5": 0
+        },
+        "fromMs": 60,
+        "toMs": 1000
+      },
+      {
+        "label": "Strobe Off",
+        "ch": {
+          "1-9": 0
+        },
+        "atMs": 1000
+      }
+    ]
+  }
+}
