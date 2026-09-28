@@ -5,6 +5,7 @@ const {
   SETTINGS,
   seededRandom,
   cuesInLibrary,
+  motionCuesInLibrary,
   reduceTimeline,
   fingerprintOf,
   renderList,
@@ -76,6 +77,30 @@ describe('cue listing', () => {
   })
 })
 
+describe('motion cue listing', () => {
+  it('runs each motion cue beside a steady lighting cue of its domain', () => {
+    const library = {
+      group: { id: 'yarg-motion-default' },
+      cues: [{ id: 'motion-still' }, { id: 'motion-nod-slow' }],
+    }
+    expect(motionCuesInLibrary('yarg', 'yarg-motion-default.json', library)).toEqual([
+      {
+        key: 'yarg__yarg-motion-default__motion-still',
+        domain: 'yarg',
+        library: 'yarg-stagekit',
+        cue: 'Cool_Automatic',
+        motion: { groupId: 'yarg-motion-default', cueId: 'motion-still' },
+      },
+      expect.objectContaining({ key: 'yarg__yarg-motion-default__motion-nod-slow' }),
+    ])
+  })
+
+  it('lists nothing for a lighting library', () => {
+    const library = { group: { id: 'yarg-fade' }, cues: [{ cueType: 'Menu' }] }
+    expect(motionCuesInLibrary('yarg', 'yarg-fade.json', library)).toEqual([])
+  })
+})
+
 describe('seeded random', () => {
   it('repeats its sequence for the same cue and differs between cues', () => {
     const first = seededRandom('yarg__a__Menu')
@@ -95,6 +120,17 @@ describe('timeline reduction', () => {
     expect(reduced.lights).toEqual(LIGHTS)
     expect(reduced.changes['front-1'].map(([t]: [number, string]) => t)).toEqual([0, 100, 1100])
     expect(reduced.changes['front-2']).toEqual([[0, 'off']])
+  })
+})
+
+describe('state codes', () => {
+  it('carry pan and tilt only on a light a motion cue aims', () => {
+    const lit = { red: 1, green: 2, blue: 3, intensity: 4, opacity: 1, blendMode: 'replace' }
+    const reduced = reduceTimeline([
+      { timeMs: 0, lights: { 'front-1': lit, 'front-2': { ...lit, pan: 25, tilt: 50.5 } } },
+    ])
+    expect(reduced.changes['front-1']).toEqual([[0, 'rgb 1,2,3 i4 o1 replace']])
+    expect(reduced.changes['front-2']).toEqual([[0, 'rgb 1,2,3 i4 o1 replace p25 t50.5']])
   })
 })
 

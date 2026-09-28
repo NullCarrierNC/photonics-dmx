@@ -90,7 +90,16 @@ function seededRandom(key) {
   }
 }
 
-/** @typedef {{ key: string, domain: string, library: string, cue: string }} SimCue */
+/**
+ * @typedef {{
+ *   key: string,
+ *   domain: string,
+ *   library: string,
+ *   cue: string,
+ *   motion?: { groupId: string, cueId: string },
+ * }} SimCue
+ *   `motion` is a manual motion cue played beside the lighting cue, on moving heads
+ */
 
 /**
  * @param {string} domain
@@ -107,9 +116,38 @@ function cuesInLibrary(domain, fileName, library) {
   })
 }
 
+/** The steady lighting cue each domain's motion cues run beside. */
+const MOTION_BESIDE = {
+  yarg: { library: 'yarg-stagekit', cue: 'Cool_Automatic' },
+  rb3: { library: 'rb3-stagekit', cue: 'RB3' },
+  audio: { library: 'audio-stagekit', cue: 'audio-sk-cool-auto' },
+}
+
+/**
+ * @param {string} domain
+ * @param {string} fileName the library's file name
+ * @param {{ group?: { id?: string }, cues?: Array<Record<string, unknown>> }} library parsed JSON
+ * @returns {SimCue[]} each cue of a motion library, run beside its domain's steady lighting cue,
+ *   or none for a lighting library
+ */
+function motionCuesInLibrary(domain, fileName, library) {
+  const id = library.group?.id ?? fileName.replace(/\.json$/, '')
+  const beside = MOTION_BESIDE[/** @type {keyof typeof MOTION_BESIDE} */ (domain)]
+  if (!id.includes('motion') || !beside) return []
+  return (library.cues ?? []).map((entry) => {
+    const cueId = String(entry.id)
+    return {
+      key: `${domain}__${id}__${cueId}`,
+      domain,
+      ...beside,
+      motion: { groupId: id, cueId },
+    }
+  })
+}
+
 /**
  * @typedef {{ red: number, green: number, blue: number, intensity: number, opacity: number,
- *   blendMode: string } | null} LightState
+ *   blendMode: string, pan?: number, tilt?: number } | null} LightState
  * @typedef {{ timeMs: number, lights: Record<string, LightState> }} Sample
  * @typedef {{ lights: string[], changes: Record<string, Array<[number, string]>> }} Reduced
  */
@@ -117,8 +155,9 @@ function cuesInLibrary(domain, fileName, library) {
 /** @param {LightState} state @returns {string} */
 function stateCode(state) {
   if (!state) return 'off'
-  const { red, green, blue, intensity, opacity, blendMode } = state
-  return `rgb ${red},${green},${blue} i${intensity} o${opacity} ${blendMode}`
+  const { red, green, blue, intensity, opacity, blendMode, pan, tilt } = state
+  const aim = pan === undefined && tilt === undefined ? '' : ` p${pan} t${tilt}`
+  return `rgb ${red},${green},${blue} i${intensity} o${opacity} ${blendMode}${aim}`
 }
 
 /**
@@ -391,6 +430,7 @@ module.exports = {
   DOMAINS,
   seededRandom,
   cuesInLibrary,
+  motionCuesInLibrary,
   reduceTimeline,
   fingerprintOf,
   renderList,
