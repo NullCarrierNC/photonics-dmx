@@ -669,3 +669,75 @@ describe('the files a user saved through the v0.6.2-alpha.6 build', () => {
     ])
   })
 })
+
+describe('the values a user saved, as this build reads them', () => {
+  let baseDir: string
+
+  beforeEach(() => {
+    baseDir = freshAppData()
+  })
+
+  afterEach(async () => {
+    await removeAppData(baseDir)
+  })
+
+  /** Each cue's first action, by cue name, in the file `set` left at `to`, as the loader reads it. */
+  async function firstActions(setId: string, to: string): Promise<Record<string, unknown>> {
+    seed(baseDir, corpusSet(setId), isNodeData)
+    const effectLoader = new EffectLoader({ baseDir })
+    const loader = new NodeCueLoader({
+      baseDir,
+      registries: {
+        yarg: CueRegistry.create(),
+        rb3: CueRegistry.create(),
+        audio: AudioCueRegistry.getInstance(),
+      },
+      effectLoader,
+      runtimeBroadcaster: noopRuntimeBroadcaster(),
+    })
+    try {
+      const file = await loader.readFile(path.join(baseDir, to))
+      return Object.fromEntries(file.cues.map((cue) => [cue.name, cue.nodes.actions[0]]))
+    } finally {
+      await loader.dispose()
+      await effectLoader.dispose()
+      AudioCueRegistry.getInstance().reset()
+    }
+  }
+
+  const literal = (value: unknown) => ({ source: 'literal', value })
+
+  it('reads the motion sizes saved in the v0.6.2-alpha.6 editor', async () => {
+    const actions = await firstActions(
+      'v0.6.2-alpha.6-user',
+      'node-data/cues/audio/audio-motion-fast.json',
+    )
+
+    expect(actions.Pendulum).toMatchObject({ motionPattern: { size: literal(40) } })
+    expect(actions['Figure-8']).toMatchObject({ motionPattern: { size: literal(35) } })
+  })
+
+  it('reads the colours and fade saved in the v0.7.0-alpha.7 editor', async () => {
+    const actions = await firstActions('v0.7.0-alpha.7-user', 'node-data/cues/yarg/yarg-alt1.json')
+
+    expect(actions.Score).toMatchObject({
+      color: { name: literal('orange'), brightness: literal('high') },
+    })
+    expect(actions.Menu).toMatchObject({
+      color: { name: literal('purple') },
+      timing: { duration: literal(500) },
+    })
+  })
+
+  it('reads the imported library with the values the release shipped', async () => {
+    const actions = await firstActions('v0.7.0-alpha.7-user', 'node-data/cues/yarg/my-alt1.json')
+
+    expect(actions.Score).toMatchObject({
+      color: { name: literal('blue'), brightness: literal('medium') },
+    })
+    expect(actions.Menu).toMatchObject({
+      color: { name: literal('blue') },
+      timing: { duration: literal(200) },
+    })
+  })
+})
