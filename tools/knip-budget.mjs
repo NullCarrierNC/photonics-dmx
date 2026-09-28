@@ -1,7 +1,8 @@
 /**
  * Counts what knip reports as unused files, unused exports, unused exported types and duplicate
  * exports against metrics/knip-budget.txt, so none of them grows without a budget update. The same
- * counts in production mode, where an export only tests reach is unused, are reported beside it.
+ * counts in production mode, where an export only tests reach is unused, are advisory: they are
+ * printed beside the budget and never fail the check.
  */
 import { execFileSync } from 'node:child_process'
 import { join, dirname } from 'node:path'

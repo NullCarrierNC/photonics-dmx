@@ -1,8 +1,8 @@
 /**
  * Counts casts through `unknown`, `any` or `never` and the comment directives that switch type
- * checking off, in every source under `src/` with the tests included, against
- * metrics/type-escape-budget.txt. Single casts to `never`, double casts through other middle types
- * and helpers whose body is a cast are reported beside it and never fail the check.
+ * checking off, and single casts to `never`, in every source under `src/` with the tests included,
+ * against metrics/type-escape-budget.txt. Double casts through other middle types and helpers
+ * whose body is a cast are reported beside them and never fail the check.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
@@ -36,17 +36,19 @@ for (const entry of readdirSync(join(root, 'src'), { recursive: true, withFileTy
   }
 }
 
-console.log(`Reported only: single casts to never ${neverCasts}`)
 console.log(`Reported only: double casts through another middle type ${otherDoubleCasts}`)
 for (const helper of castHelpers) {
   console.warn(`warning: ${helper} only casts its parameter. Type what flows or check it`)
 }
 
 runCountBudget({
-  count,
+  counts: new Map([
+    ['escapes', count],
+    ['never-casts', neverCasts],
+  ]),
   budgetFile: 'metrics/type-escape-budget.txt',
-  label: 'Type escapes',
+  label: 'Type',
   counted:
-    'casts through unknown, any or never, and @ts-expect-error, @ts-ignore and @ts-nocheck directives, under src/ with the tests included.',
-  note: 'Lower this when removing type escapes. Do not raise it without a deliberate pass.',
+    'escapes are casts through unknown, any or never, and @ts-expect-error, @ts-ignore and @ts-nocheck directives. never-casts are single casts to never. Both under src/ with the tests included.',
+  note: 'Lower these when removing type escapes or casts to never. Do not raise them without a deliberate pass.',
 })
