@@ -1,9 +1,9 @@
 /**
  * The ratchet behind the per-rule budgets: count how many times one ESLint rule reports under
- * `src/`, compare that to a budget file, and fail when the count has grown. `--write` records the
- * current count, which is how a budget comes down after a deliberate pass, and refuses to record a
- * higher one or any count over a missing or unreadable file. `--init` creates a budget file that
- * does not exist yet.
+ * `src/`, compare that to a budget file, and fail when the count has grown or fallen below it.
+ * `--write` records the current count, which is how a budget comes down after a deliberate pass,
+ * and refuses to record a higher one or any count over a missing or unreadable file. `--init`
+ * creates a budget file that neither the working tree nor the last commit holds.
  * runCountBudget holds any other count to a budget file by the same rules.
  *
  * Rules that cannot go clean in one sitting are set to warn in the ESLint config and held here
@@ -84,6 +84,16 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
   })
 }
 
+/** Whether the last commit holds `path`, relative to the repository root. */
+function isCommitted(path) {
+  try {
+    execFileSync('git', ['cat-file', '-e', `HEAD:${path}`], { cwd: root, stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Hold a count, or several named counts, to the budget a file records, exiting the process with
  * the result. countBudgetCore.cjs decides.
@@ -99,6 +109,7 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
 export function runCountBudget({ count, counts, budgetFile, label, counted, note }) {
   const file = join(root, budgetFile)
   const verdict = budgetVerdict({
+    tracked: isCommitted(budgetFile),
     counts: counts ?? new Map([[label, count]]),
     recordedText: existsSync(file) ? readFileSync(file, 'utf8') : null,
     write: process.argv.includes('--write'),

@@ -17,12 +17,14 @@ const verdict = (
   recordedText: string | null,
   write = false,
   init = false,
+  tracked = false,
 ): { ok: boolean; lines: string[]; write?: string } =>
   budgetVerdict({
     counts,
     recordedText,
     write,
     init,
+    tracked,
     label: counts.size === 1 ? 'Explicit any' : 'Knip',
     file,
     counted: 'reports of the rule.',
@@ -30,12 +32,21 @@ const verdict = (
   })
 
 describe('budgetVerdict', () => {
-  it('passes a count at or below its budget', () => {
+  it('passes a count at its budget', () => {
     expect(verdict(one(21), '21\nAuto-generated: x\nnote\n')).toEqual({
       ok: true,
       lines: ['Explicit any: 21 (budget 21) - ok'],
     })
-    expect(verdict(one(3), '21\n').ok).toBe(true)
+  })
+
+  it('fails a count below its budget, naming --write', () => {
+    expect(verdict(one(3), '21\n')).toEqual({
+      ok: false,
+      lines: [
+        `Explicit any count 3 is below budget 21 (file ${file})`,
+        'The budget is out of date. Lower it by running the same command with --write',
+      ],
+    })
   })
 
   it('fails a count above its budget', () => {
@@ -101,6 +112,16 @@ describe('budgetVerdict', () => {
     expect(partial.write).toBeUndefined()
   })
 
+  it('refuses --init when the last commit tracks the budget file', () => {
+    const result = verdict(one(900), null, false, true, true)
+
+    expect(result.ok).toBe(false)
+    expect(result.write).toBeUndefined()
+    expect(result.lines).toEqual([
+      `${file} is committed. --init only creates a new budget, so restore it from git and lower it with --write`,
+    ])
+  })
+
   it('refuses --init over a budget file that exists, readable or not', () => {
     for (const text of ['21\n', 'twenty\n', '']) {
       const result = verdict(one(3), text, false, true)
@@ -124,7 +145,10 @@ describe('budgetVerdict', () => {
   it('holds each of several counts to its own line', () => {
     const recorded = 'files 4\nexports 115\nAuto-generated: x\nnote\n'
 
-    expect(verdict(several(4, 110), recorded).ok).toBe(true)
+    expect(verdict(several(4, 115), recorded).ok).toBe(true)
+    expect(verdict(several(4, 110), recorded).lines[0]).toBe(
+      `Knip exports count 110 is below budget 115 (file ${file})`,
+    )
     expect(verdict(several(5, 100), recorded)).toEqual({
       ok: false,
       lines: [
