@@ -60,7 +60,9 @@ const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
  * keyframe -> instrument notes -> vocal note edge.
  *
  * Frames carry `trackMode: 'simulated'` + `simulationCueGroup`, pinning cue resolution to the
- * library under test (see {@link CueRegistry.getCueImplementationFromGroup}).
+ * library under test (see {@link CueRegistry.getCueImplementationFromGroup}). A `tracked` driver
+ * sends them as live input does, so the handler runs its motion cue too, and the caller pins the
+ * registry to the library instead.
  */
 export class FrameDriver implements SimDriver {
   constructor(
@@ -68,6 +70,7 @@ export class FrameDriver implements SimDriver {
     private readonly getState: () => FrameState,
     private readonly simulationCueGroup: string,
     private readonly domain: NetCueMode = 'yarg',
+    private readonly tracked = false,
   ) {}
 
   public async dispatch(transient: FrameTransient = {}): Promise<void> {
@@ -160,7 +163,7 @@ export class FrameDriver implements SimDriver {
       beat: transient.beat ?? 'Off',
       keyframe: transient.keyframe ?? 'Off',
       bonusEffect: false,
-      trackMode: 'simulated',
+      trackMode: this.tracked ? 'tracked' : 'simulated',
       simulationCueGroup: this.simulationCueGroup,
     }
   }
@@ -195,7 +198,7 @@ export class FrameDriver implements SimDriver {
       ledPositions: positions,
       beat: transient.beat ?? 'Off',
       keyframe: transient.keyframe ?? 'Off',
-      trackMode: 'simulated',
+      trackMode: this.tracked ? 'tracked' : 'simulated',
       simulationCueGroup: this.simulationCueGroup,
     }
   }

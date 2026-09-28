@@ -52,6 +52,10 @@ export interface SimLightSample {
   intensity: number
   opacity: number
   blendMode: string
+  /** Normalised pan, 0 to 100, on a light a motion cue has aimed. */
+  pan?: number
+  /** Normalised tilt, 0 to 100, on a light a motion cue has aimed. */
+  tilt?: number
 }
 
 /** One recorded row of the simulation: every light's state plus any events that fired. */

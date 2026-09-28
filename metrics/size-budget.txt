@@ -12,4 +12,4 @@ Regenerate after a split with node tools/size-budget.mjs --write, which only low
 613 src/photonics-dmx/controllers/sequencer/EffectManager.ts
 608 src/photonics-dmx/controllers/sequencer/LightTransitionController.ts
 608 src/photonics-dmx/cues/node/loader/NodeCueLoader.ts
-604 src/photonics-dmx/sim/CueSimulator.ts
+641 src/photonics-dmx/sim/CueSimulator.ts

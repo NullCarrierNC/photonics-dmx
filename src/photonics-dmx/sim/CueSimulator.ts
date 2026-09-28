@@ -21,7 +21,10 @@ import {
   getCueTypeFromId,
   isHandlerOwnedCueType,
 } from '../cues/types/cueTypes'
+import type { MotionCueRef } from '../cues/types/cueTypes'
+import { createAudioMotionCoordinator } from '../cueHandlers/audioMotionCoordinator'
 import { VirtualTime } from './VirtualTime'
+import { MANUAL_MOTION_TIMING, holdToLibrary, setManualMotion } from './manualMotion'
 import { buildSimRig } from './simRig'
 import { FrameDriver, FrameState, FrameTransient, SimDriver } from './FrameDriver'
 import { AudioFrameDriver, AudioFrameState } from './AudioFrameDriver'
@@ -63,10 +66,16 @@ export interface CueSimulatorOptions {
   frameStepMs?: number
   /** Audio only: the starting input level from 0 to 1. */
   level?: number
+  /**
+   * A cue from the domain's motion library, played beside every lighting cue as a manual motion
+   * pick is. The front and back rows are then moving heads, and each sample carries pan and tilt.
+   */
+  motion?: MotionCueRef
 }
 
-interface ResolvedOptions extends Required<Omit<CueSimulatorOptions, 'baseDir'>> {
+interface ResolvedOptions extends Required<Omit<CueSimulatorOptions, 'baseDir' | 'motion'>> {
   baseDir: string
+  motion: MotionCueRef | null
 }
 
 const DEFAULT_BASE_DIR = path.resolve(__dirname, '../../../resources/defaults')
@@ -134,7 +143,12 @@ export class CueSimulator {
     this.bpm = opts.bpm
     this.level = opts.level
 
-    const config = buildSimRig(opts.frontCount, opts.backCount, opts.strobeCount)
+    const config = buildSimRig(
+      opts.frontCount,
+      opts.backCount,
+      opts.strobeCount,
+      opts.motion !== null,
+    )
     this.lightManager = new DmxLightManager(config)
     this.lightStateManager = new LightStateManager()
     this.lightTransitionController = new LightTransitionController(this.lightStateManager)
@@ -162,6 +176,7 @@ export class CueSimulator {
       sampling: options.sampling ?? 'interval',
       frameStepMs: options.frameStepMs ?? 10,
       level: options.level ?? 0.6,
+      motion: options.motion ?? null,
     }
 
     const virtualTime = new VirtualTime({ frameStepMs: resolved.frameStepMs })
@@ -222,21 +237,41 @@ export class CueSimulator {
   }
 
   private createDriver(): SimDriver {
+    const { motion } = this.opts
     if (this.opts.domain === 'audio') {
-      AudioCueRegistry.getInstance().setEnabledGroups([this.groupId])
-      const handler = new AudioCueHandler(this.lightManager, this.sequencer)
-      // Simulated YARG frames skip motion, and audio does too: the motion pick is random.
-      handler.setMotionEnabled(false)
+      const registry = AudioCueRegistry.getInstance()
+      registry.setEnabledGroups([this.groupId])
+      const handler = new AudioCueHandler(
+        this.lightManager,
+        this.sequencer,
+        motion ? { motionCoordinator: createAudioMotionCoordinator(MANUAL_MOTION_TIMING) } : {},
+      )
+      // With no manual motion cue, audio motion stays off, since its pick is random.
+      setManualMotion(handler, registry, motion)
       return new AudioFrameDriver(
         handler,
         () => this.getAudioFrameState(),
         () => this.sequencer.onBeat(),
       )
     }
+    const registry = getCueRegistry(this.opts.domain)
     const handler = new CueHandler(this.lightManager, this.sequencer, {
-      registry: getCueRegistry(this.opts.domain),
+      registry,
+      ...(motion ? MANUAL_MOTION_TIMING : {}),
     })
-    return new FrameDriver(handler, () => this.getFrameState(), this.groupId, this.opts.domain)
+    if (motion) {
+      // Motion runs for live frames only, so the frames go as live input sends them, with the
+      // registry held to the library under test.
+      holdToLibrary(registry, this.groupId)
+      setManualMotion(handler, registry, motion)
+    }
+    return new FrameDriver(
+      handler,
+      () => this.getFrameState(),
+      this.groupId,
+      this.opts.domain,
+      motion !== null,
+    )
   }
 
   private selectedCue(): string {
@@ -557,6 +592,8 @@ export class CueSimulator {
             intensity: Math.round(state.intensity),
             opacity: Number(state.opacity.toFixed(3)),
             blendMode: state.blendMode,
+            ...(state.pan === undefined ? {} : { pan: Number(state.pan.toFixed(1)) }),
+            ...(state.tilt === undefined ? {} : { tilt: Number(state.tilt.toFixed(1)) }),
           }
         : null
     }
