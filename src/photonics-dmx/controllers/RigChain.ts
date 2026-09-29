@@ -13,6 +13,7 @@ import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { getCueRegistry } from '../cues/registries/cueRegistries'
 import { applyMirrorToConfig, RigMirror } from '../helpers/mirrorRig'
 import { createLogger } from '../../shared/logger'
+import { TeardownSteps } from '../helpers/teardownSteps'
 
 const log = createLogger('RigChain')
 
@@ -93,15 +94,9 @@ export class RigChain {
    * tear down.
    */
   public dispose(): void {
-    const failures: unknown[] = []
-    const step = (what: string, run: () => void): void => {
-      try {
-        run()
-      } catch (err) {
-        log.error(`Error ${what} for rig ${this.rigId}:`, err)
-        failures.push(err)
-      }
-    }
+    const steps = new TeardownSteps(log)
+    const step = (what: string, run: () => void): void =>
+      steps.run(`${what} for rig ${this.rigId}`, run)
     for (const domain of Object.keys(this.cueHandlers) as NetCueMode[]) {
       const handler = this.cueHandlers[domain]
       if (!handler) continue
@@ -133,8 +128,6 @@ export class RigChain {
     step('shutting down sequencer', () => this.sequencer.shutdown())
     step('shutting down light state manager', () => this.lightStateManager.shutdown())
     step('shutting down dmx light manager', () => this.dmxLightManager.shutdown())
-    if (failures.length > 0) {
-      throw failures[0]
-    }
+    steps.rethrowFirst()
   }
 }

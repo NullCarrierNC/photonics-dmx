@@ -22,6 +22,8 @@ import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegist
 import { VirtualTime } from '../../../photonics-dmx/sim/VirtualTime'
 import { FrameDriver, type FrameState } from '../../../photonics-dmx/sim/FrameDriver'
 import { getCueTypeFromId } from '../../../photonics-dmx/cues/types/cueTypes'
+import { BaseNodeCue } from '../../../photonics-dmx/cues/node/runtime/BaseNodeCue'
+import { ProcessorManager } from '../../../photonics-dmx/processors/ProcessorManager'
 import {
   ConfigStrobeType,
   FixtureTypes,
@@ -247,4 +249,62 @@ describe('ListenerCoordinator disableYarg blackout', () => {
       }
     },
   )
+
+  it('leaves the rig dark and YARG off when a cue fails to stop, then throws', async () => {
+    const h = await harness()
+    await h.coordinator.enableYargInternal()
+    await runCue(h, 'Cool_Automatic', 2300)
+    expect(litLights(h).length).toBeGreaterThan(0)
+    const failure = new Error('cue failed to stop')
+    const stop = BaseNodeCue.prototype.onStop
+    const failingStop = jest
+      .spyOn(BaseNodeCue.prototype, 'onStop')
+      .mockImplementationOnce(function (this: BaseNodeCue) {
+        stop.call(this)
+        throw failure
+      })
+
+    try {
+      await expect(h.coordinator.disableYarg()).rejects.toThrow(failure)
+
+      expect(h.coordinator.getIsYargEnabled()).toBe(false)
+      expect(h.chain.cueHandlers.yarg).toBeNull()
+      for (let step = 0; step < 100; step++) {
+        await h.virtualTime.advance(20)
+        expect(litLights(h)).toEqual([])
+      }
+    } finally {
+      failingStop.mockRestore()
+    }
+  })
+})
+
+describe('ListenerCoordinator disableRb3', () => {
+  it('stops every RB3 cue handler and turns RB3 off when its processors fail to stop, then throws', async () => {
+    const h = await harness()
+    await h.coordinator.enableRb3Internal()
+    expect(h.coordinator.getIsRb3Enabled()).toBe(true)
+    expect(h.chain.rb3MenuCueHandler).not.toBeNull()
+    const failure = new Error('processor failed to stop')
+    const destroy = ProcessorManager.prototype.destroy
+    const failingDestroy = jest
+      .spyOn(ProcessorManager.prototype, 'destroy')
+      .mockImplementationOnce(function (this: ProcessorManager) {
+        destroy.call(this)
+        throw failure
+      })
+    const blackout = jest.spyOn(h.chain.sequencer, 'blackout')
+
+    try {
+      await expect(h.coordinator.disableRb3()).rejects.toThrow(failure)
+
+      expect(h.coordinator.getIsRb3Enabled()).toBe(false)
+      expect(h.chain.rb3MenuCueHandler).toBeNull()
+      expect(h.chain.cueHandlers.rb3).toBeNull()
+      expect(blackout).toHaveBeenCalledWith(0)
+    } finally {
+      failingDestroy.mockRestore()
+      blackout.mockRestore()
+    }
+  })
 })

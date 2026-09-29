@@ -17,7 +17,7 @@ import { playCueThatFailsToStop } from '../../../photonics-dmx/tests/helpers/cue
 import { stubbedManager, stubConfig } from './lifecycleStub'
 
 /** A graph built over no active rigs, which leaves it one real rig chain. */
-function builtGraph(): ControllerGraph {
+function builtGraph(chainFanout = new ChainFanout()): ControllerGraph {
   const config = stubConfig()
   const senderManager = new SenderManager({
     broadcaster: { emit: () => {} },
@@ -29,7 +29,7 @@ function builtGraph(): ControllerGraph {
     isYargEnabled: () => false,
     isAudioEnabled: () => false,
     getSenderManager: () => senderManager,
-    chainFanout: new ChainFanout(),
+    chainFanout,
     venueFrameProcessor: new VenueFrameProcessor(),
     masterOutput: new MasterOutputState(),
   })
@@ -62,12 +62,10 @@ describe('ControllerManager restart when teardown fails', () => {
     const [chain] = graph.getChains()
     const disposeFailure = new Error('cue failed to stop')
     await playCueThatFailsToStop(chain, disposeFailure)
-    const shutdownPublisher = jest.spyOn(graph, 'shutdownPublisher')
     const { manager, lifecycle, listeners, init } = stubbedManager({ graph })
 
     await expect(manager.restartControllers()).rejects.toThrow(/teardown failed/i)
     expect(listeners.yargRb3.disableRb3).toHaveBeenCalled()
-    expect(shutdownPublisher).not.toHaveBeenCalled()
     expect(entries).toContainEqual(
       expect.objectContaining({
         level: 'error',
@@ -78,5 +76,25 @@ describe('ControllerManager restart when teardown fails', () => {
     expect(init).not.toHaveBeenCalled()
     expect(lifecycle.phase).toBe('failed')
     expect(manager.getIsInitialized()).toBe(false)
+  })
+
+  it('blacks out the publisher, clears the strobe slot and stops the clock when a chain fails to dispose', async () => {
+    const chainFanout = new ChainFanout()
+    graph = builtGraph(chainFanout)
+    const [chain] = graph.getChains()
+    await playCueThatFailsToStop(chain, new Error('cue failed to stop'))
+    chainFanout.strobeState.setActive('fast', 'net')
+    const publisher = graph.getDmxPublisher()
+    if (!publisher) throw new Error('the built graph has no publisher')
+    const publisherShutdown = jest.spyOn(publisher, 'shutdown')
+    const destroyClock = jest.spyOn(graph, 'destroyClock')
+    const { manager, init } = stubbedManager({ graph })
+
+    await expect(manager.restartControllers()).rejects.toThrow(/teardown failed/i)
+
+    expect(publisherShutdown).toHaveBeenCalled()
+    expect(chainFanout.strobeState.getActive()).toBeNull()
+    expect(destroyClock).toHaveBeenCalled()
+    expect(init).not.toHaveBeenCalled()
   })
 })
