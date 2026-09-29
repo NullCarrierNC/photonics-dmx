@@ -20,6 +20,12 @@ const realWriteFile = jest.requireActual<typeof import('fs/promises')>('fs/promi
 
 const HISTORICAL = path.join(__dirname, '../../../historical')
 
+/** What a write to a read-only file fails with, which Windows reports as EPERM. */
+const READ_ONLY_CODE = process.platform === 'win32' ? 'EPERM' : 'EACCES'
+
+/** Windows ignores a folder's mode bits, so a folder cannot be made read-only there. */
+const itUnlessWin32 = process.platform === 'win32' ? it.skip : it
+
 /** A disk that fills partway through the next write: half the contents land, then it fails. */
 function fillDiskPartway(): void {
   writeFileMock.mockImplementationOnce(async (target, data) => {
@@ -161,7 +167,9 @@ describe('writing back cue and effect files a load brings forward', () => {
             migrations: [],
             unsaved: [
               expect.stringMatching(
-                /^user-alt1\.json: Could not save the update from an older version \(EACCES\), so each load updates it again: .*'sin-out'/,
+                new RegExp(
+                  `^user-alt1\\.json: Could not save the update from an older version \\(${READ_ONLY_CODE}\\), so each load updates it again: .*'sin-out'`,
+                ),
               ),
             ],
           }),
@@ -171,7 +179,7 @@ describe('writing back cue and effect files a load brings forward', () => {
       expect(yarg.getGroup('user-alt1')?.cues.size).toBe(24)
     })
 
-    it('reports an older effect file in a read-only folder as unsaved', async () => {
+    itUnlessWin32('reports an older effect file in a read-only folder as unsaved', async () => {
       const filePath = path.join(effectsDir, 'my-effects.json')
       fs.copyFileSync(path.join(HISTORICAL, 'f3f851db', 'my-effects.json'), filePath)
       fs.chmodSync(effectsDir, 0o555)
@@ -426,7 +434,7 @@ describe('writing back cue and effect files a load brings forward', () => {
       const loaded = fs.readFileSync(filePath, 'utf-8')
       fs.chmodSync(filePath, 0o444)
 
-      await expect(loader.saveFile('yarg', 'mine.json', content)).rejects.toThrow('EACCES')
+      await expect(loader.saveFile('yarg', 'mine.json', content)).rejects.toThrow(READ_ONLY_CODE)
 
       expect(fs.readFileSync(filePath, 'utf-8')).toBe(loaded)
     })
