@@ -1,3 +1,4 @@
-501
-Auto-generated: casts through unknown, any or never, and @ts-expect-error, @ts-ignore and @ts-nocheck directives, under src/ with the tests included.
-Lower this when removing type escapes. Do not raise it without a deliberate pass.
+escapes 501
+never-casts 389
+Auto-generated: escapes are casts through unknown, any or never, and @ts-expect-error, @ts-ignore and @ts-nocheck directives. never-casts are single casts to never. Both under src/ with the tests included.
+Lower these when removing type escapes or casts to never. Do not raise them without a deliberate pass.
