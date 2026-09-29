@@ -35,7 +35,7 @@ const Header: React.FC = () => {
         className="ml-auto flex items-center justify-center shrink-0 text-white font-bold hover:text-gray-300 focus:outline-none"
         style={{ width: MASTER_OUTPUT_SIDEBAR_WIDTH_PX }}
         aria-label="Help">
-        <a href="https://photonics.rocks/quickstart-guide/" target="_blank">
+        <a href="https://photonics.rocks/docs/" target="_blank">
           <FiHelpCircle size={32} className="text-white" />
         </a>
       </button>
