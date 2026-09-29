@@ -17,6 +17,7 @@ import {
   SET_EFFECT_UNBLOCKED_NAME,
   UPDATE_EFFECT,
   UPDATE_EFFECT_WAITING,
+  drawsOnBlackoutLayer,
   type SubmissionOutcome,
   type SubmissionPolicy,
 } from './effectSubmission'
@@ -286,9 +287,9 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * The single submission pipeline behind every public add/set/replace variant: blackout gate and
-   * transition validation in the policy's order, the duplicate-name gate, the 'set' clearing step,
-   * then grouping and the policy's apply path.
+   * The single submission pipeline behind every public add/set/replace variant: the blackout layer
+   * check, the blackout gate and transition validation in the policy's order, the duplicate-name
+   * gate, the 'set' clearing step, then grouping and the policy's apply path.
    */
   private submitEffect(
     name: string,
@@ -296,13 +297,17 @@ export class EffectManager implements IEffectManager {
     isPersistent: boolean,
     policy: SubmissionPolicy,
   ): SubmissionOutcome {
-    if (policy.blackoutFirst && !this.passBlackoutGate(name, effect, policy)) {
+    if (drawsOnBlackoutLayer(effect)) {
+      log.warn(`Effect "${name}" draws on the blackout's layer. Ignoring.`)
+      return 'refused'
+    }
+    if (policy.blackoutFirst && !this.passBlackoutGate(name, policy)) {
       return 'refused'
     }
     if (this.hasNoTransitions(name, effect)) {
       return 'refused'
     }
-    if (!policy.blackoutFirst && !this.passBlackoutGate(name, effect, policy)) {
+    if (!policy.blackoutFirst && !this.passBlackoutGate(name, policy)) {
       return 'refused'
     }
 
@@ -366,11 +371,8 @@ export class EffectManager implements IEffectManager {
    * cancels the blackout and proceeds or refuses the submission.
    * @returns True when the submission may proceed
    */
-  private passBlackoutGate(name: string, effect: Effect, policy: SubmissionPolicy): boolean {
+  private passBlackoutGate(name: string, policy: SubmissionPolicy): boolean {
     if (!this.systemEffects.isBlackoutActive()) {
-      return true
-    }
-    if (policy.blackoutBaseLayerOnly && !(effect.transitions[0].layer < 255)) {
       return true
     }
     if (policy.blackout === 'refuse') {

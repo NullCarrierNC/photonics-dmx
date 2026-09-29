@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals'
 import type { ILightingController } from '../../controllers/sequencer/interfaces'
 import type { Effect, RGBIO, TrackedLight } from '../../types'
 import { getEffectSingleColor } from '../../effects/effectSingleColor'
+import { BLACKOUT_LAYER, MAX_NODE_LAYER } from '../../constants/nodeConstants'
 import { completingLightingController } from './fakeLightingController'
 import { createSequencerHarness } from './sequencerHarness'
 import { createMockTrackedLight } from './testFixtures'
@@ -449,12 +450,33 @@ describe.each([
     })
   })
 
-  it('accepts an unblocked-name submission on the system layer while a blackout fades', () => {
+  it('refuses a submission on the blackout layer', () => {
+    withSubject((s) => {
+      const waiter = jest.fn()
+
+      expect(
+        s.controller.addEffectUnblockedName('overlay', s.effect({ layer: BLACKOUT_LAYER })),
+      ).toBe(false)
+      expect(
+        s.controller.addEffectUnblockedNameWithCallback(
+          'held',
+          s.effect({ layer: BLACKOUT_LAYER }),
+          waiter,
+        ),
+      ).toBe(false)
+      s.frame()
+      expect(waiter).not.toHaveBeenCalled()
+    })
+  })
+
+  it('refuses an unblocked-name submission on the top cue layer while a blackout fades', () => {
     withSubject((s) => {
       void s.controller.blackout(500)
       s.frame()
 
-      expect(s.controller.addEffectUnblockedName('overlay', s.effect({ layer: 255 }))).toBe(true)
+      expect(
+        s.controller.addEffectUnblockedName('overlay', s.effect({ layer: MAX_NODE_LAYER })),
+      ).toBe(false)
       expect(s.controller.isBlackoutActive()).toBe(true)
     })
   })

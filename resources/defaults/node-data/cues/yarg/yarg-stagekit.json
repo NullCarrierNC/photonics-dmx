@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 14,
+  "cueVersion": 15,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -7175,7 +7175,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -7430,7 +7430,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -7685,7 +7685,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -7940,7 +7940,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",

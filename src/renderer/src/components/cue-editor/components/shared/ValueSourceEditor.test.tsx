@@ -98,6 +98,22 @@ describe('ValueSourceEditor flags', () => {
     expect(select).toHaveAccessibleDescription("'Chorsu' is not a known value")
   })
 
+  it('flags a variable-mode field with no variable chosen', () => {
+    renderWithProviders(
+      <ValueSourceEditor
+        label="duration (number)"
+        value={{ source: 'variable', name: '' }}
+        onChange={jest.fn()}
+        expected="number"
+        availableVariables={[{ name: 'speed', type: 'number', scope: 'cue' }]}
+      />,
+    )
+
+    const select = screen.getByRole('combobox', { name: 'duration (number) variable' })
+    expect(select.getAttribute('aria-invalid')).toBe('true')
+    expect(select).toHaveAccessibleDescription('Select a variable')
+  })
+
   it('keeps a stored variable of another type selected and warns about it', () => {
     renderWithProviders(
       <ValueSourceEditor

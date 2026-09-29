@@ -1113,6 +1113,52 @@ describe('Node cue validation', () => {
       ])
     })
 
+    it('loads an action blend mode this version does not know and warns that it plays as replace', () => {
+      const action = setColorAction()
+      const result = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withNodes({
+            actions: [
+              {
+                ...action,
+                color: {
+                  name: { source: 'literal', value: 'red' },
+                  brightness: { source: 'literal', value: 'medium' },
+                  blendMode: { source: 'literal', value: 'glow' },
+                },
+              },
+            ],
+          }),
+        ],
+      })
+
+      expect(result.valid && result.warnings).toEqual([
+        "cue 'Test Cue': action 'action-1' color.blendMode 'glow' is not a known BlendMode and plays as replace.",
+      ])
+    })
+
+    it('loads an action field reading a variable with no name and warns about it', () => {
+      const action = setColorAction()
+      const result = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withNodes({
+            actions: [
+              {
+                ...action,
+                timing: { ...action.timing, duration: { source: 'variable', name: '' } },
+              },
+            ],
+          }),
+        ],
+      })
+
+      expect(result.valid && result.warnings).toEqual([
+        "cue 'Test Cue': action 'action-1' timing.duration names no variable.",
+      ])
+    })
+
     it('loads a palette colour this version does not know and warns that it is left out', () => {
       const result = validateNodeCueFile({
         ...validFile(),

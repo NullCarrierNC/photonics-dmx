@@ -188,6 +188,24 @@ describe('VariableRegistry', () => {
     expect(onVariablesChange).toHaveBeenCalledWith([{ ...section, description: 'Song part' }], [])
   })
 
+  it('keeps the former names of a variable it edits', () => {
+    const count: VariableDefinition = {
+      name: 'beat_count_2',
+      type: 'number',
+      scope: 'cue-group',
+      initialValue: 2,
+      formerNames: ['beat-count'],
+    }
+    const { onVariablesChange } = renderRegistry([count])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByPlaceholderText('What this variable is for'), {
+      target: { value: 'Beats' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onVariablesChange).toHaveBeenCalledWith([{ ...count, description: 'Beats' }], [])
+  })
+
   it('drops the valid values of a variable whose type changes', () => {
     const { onVariablesChange } = renderRegistry([
       {

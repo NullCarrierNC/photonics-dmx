@@ -84,14 +84,14 @@ interface ParityCase {
 
 const PARITY_CASES: ParityCase[] = [
   {
-    description: 'rejects a literal layer above the top layer',
-    action: { ...baseValidAction(), layer: { source: 'literal', value: 300 } },
-    expectedMessageMatch: /layer must be a number from 0 to 255/,
+    description: 'rejects a literal layer on the blackout layer',
+    action: { ...baseValidAction(), layer: { source: 'literal', value: 255 } },
+    expectedMessageMatch: /layer must be a number from 0 to 254/,
   },
   {
     description: 'rejects a negative literal layer',
     action: { ...baseValidAction(), layer: { source: 'literal', value: -1 } },
-    expectedMessageMatch: /layer must be a number from 0 to 255/,
+    expectedMessageMatch: /layer must be a number from 0 to 254/,
   },
   {
     description: 'rejects missing target.groups',
@@ -155,14 +155,6 @@ const PARITY_CASES: ParityCase[] = [
       color: baseColor({ brightness: { source: 'literal', value: 'bright' } }),
     },
     expectedMessageMatch: /color\.brightness 'bright' is not a known Brightness/,
-  },
-  {
-    description: 'rejects an unknown literal blend mode',
-    action: {
-      ...baseValidAction(),
-      color: baseColor({ blendMode: { source: 'literal', value: 'multiply' } }),
-    },
-    expectedMessageMatch: /color\.blendMode 'multiply' is not a known BlendMode/,
   },
   {
     description: 'rejects set-color without color',
@@ -275,6 +267,15 @@ describe('Cross-compiler action validation parity', () => {
       expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
     },
   )
+
+  it('compiles an action blend mode this version does not know in both compilers', () => {
+    const action: ActionNode = {
+      ...baseValidAction(),
+      color: baseColor({ blendMode: { source: 'literal', value: 'glow' } }),
+    }
+    expect(() => NodeCueCompiler.compileCue(buildCue(action), 'yarg')).not.toThrow()
+    expect(() => EffectCompiler.compileYargEffect(buildEffect(action))).not.toThrow()
+  })
 
   it('compiles an action colour this version does not know in both compilers', () => {
     const action: ActionNode = {

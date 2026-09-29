@@ -260,12 +260,15 @@ export function resolveBrightness(source: ValueSource, context: ExecutionContext
   return parseBrightness(resolveString(source, context))
 }
 
+/** A blend mode, or replace for text naming no mode, which warns. */
 export function resolveBlendMode(
   source: ValueSource | undefined,
   context: ExecutionContext,
 ): BlendMode | undefined {
   if (!source) return undefined
-  return parseBlendMode(resolveString(source, context))
+  const value = resolveString(source, context)
+  if (!isBlendMode(value)) context.unknownValues.report('blend mode', value, 'blending as replace')
+  return parseBlendMode(value)
 }
 
 /**

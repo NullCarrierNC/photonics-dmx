@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 6,
+  "cueVersion": 7,
   "mode": "rb3",
   "group": {
     "id": "rb3-stagekit",
@@ -54,7 +54,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -197,7 +197,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -340,7 +340,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",
@@ -483,7 +483,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 255
+                "value": 254
               },
               "color": {
                 "source": "literal",

@@ -1,7 +1,10 @@
+import type { Effect } from '../../types'
+import { BLACKOUT_LAYER } from '../../constants/nodeConstants'
+
 /**
  * The submission policy behind EffectManager's public add/set/replace variants. Every variant
- * runs the same pipeline (validate, blackout gate, duplicate-name gate, optional clear, group,
- * apply); the policy states where each variant differs.
+ * runs the same pipeline (blackout layer check, validate, blackout gate, duplicate-name gate,
+ * optional clear, group, apply), and the policy states where each variant differs.
  */
 export interface SubmissionPolicy {
   /**
@@ -15,8 +18,6 @@ export interface SubmissionPolicy {
   blockDuplicateName: boolean
   /** What an active blackout does to the submission. */
   blackout: 'cancel' | 'refuse'
-  /** Restrict the blackout interaction to effects below the system layer (255). */
-  blackoutBaseLayerOnly: boolean
   /** Run the blackout gate before transition validation (setEffect's historical order). */
   blackoutFirst: boolean
   /**
@@ -37,7 +38,6 @@ export const ADD_EFFECT: SubmissionPolicy = {
   mode: 'add',
   blockDuplicateName: false,
   blackout: 'cancel',
-  blackoutBaseLayerOnly: true,
   blackoutFirst: false,
   layer0RepeatQueues: false,
   verb: { imperative: 'add', progressive: 'adding' },
@@ -48,7 +48,6 @@ export const REPLACE_EFFECT: SubmissionPolicy = {
   mode: 'replace',
   blockDuplicateName: false,
   blackout: 'cancel',
-  blackoutBaseLayerOnly: true,
   blackoutFirst: false,
   layer0RepeatQueues: false,
   verb: { imperative: 'replace', progressive: 'replacing' },
@@ -59,7 +58,6 @@ export const UPDATE_EFFECT: SubmissionPolicy = {
   mode: 'update',
   blockDuplicateName: false,
   blackout: 'cancel',
-  blackoutBaseLayerOnly: true,
   blackoutFirst: false,
   layer0RepeatQueues: false,
   verb: { imperative: 'update', progressive: 'updating' },
@@ -76,7 +74,6 @@ export const SET_EFFECT: SubmissionPolicy = {
   mode: 'set',
   blockDuplicateName: false,
   blackout: 'cancel',
-  blackoutBaseLayerOnly: false,
   blackoutFirst: true,
   layer0RepeatQueues: true,
   verb: { imperative: 'set', progressive: 'setting' },
@@ -87,7 +84,6 @@ export const ADD_EFFECT_UNBLOCKED_NAME: SubmissionPolicy = {
   mode: 'add',
   blockDuplicateName: true,
   blackout: 'refuse',
-  blackoutBaseLayerOnly: true,
   blackoutFirst: false,
   layer0RepeatQueues: false,
   verb: { imperative: 'add', progressive: 'adding' },
@@ -98,7 +94,6 @@ export const SET_EFFECT_UNBLOCKED_NAME: SubmissionPolicy = {
   mode: 'set',
   blockDuplicateName: true,
   blackout: 'refuse',
-  blackoutBaseLayerOnly: true,
   blackoutFirst: false,
   layer0RepeatQueues: false,
   verb: { imperative: 'set', progressive: 'setting' },
@@ -110,3 +105,8 @@ export const SET_EFFECT_UNBLOCKED_NAME: SubmissionPolicy = {
  * is already running, or a gate refused it (a blackout, or an effect with no transitions).
  */
 export type SubmissionOutcome = 'applied' | 'duplicate-name' | 'refused'
+
+/** Whether an effect draws on the blackout's layer, which the sequencer keeps for the blackout. */
+export function drawsOnBlackoutLayer(effect: Effect): boolean {
+  return effect.transitions.some((transition) => transition.layer >= BLACKOUT_LAYER)
+}

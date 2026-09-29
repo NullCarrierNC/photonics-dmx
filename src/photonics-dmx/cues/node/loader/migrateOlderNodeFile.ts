@@ -2,14 +2,15 @@
  * Brings a parsed cue or effect file an older build wrote onto what this build accepts, before
  * validation: a cue with no kind reads as lighting, a retired blend mode as replace, an unknown
  * easing as the default, an unused wait count is dropped, a variable name the editor once accepted
- * is renamed with every use of it, an initial value other than a colour takes its type, and a light
- * array passed to an effect's group names passes the names of its groups. Values this build does
- * not know are noted apart from what an older build wrote.
+ * is renamed with every use of it, an initial value other than a colour takes its type, a light
+ * array passed to an effect's group names passes the names of its groups, and a layer above the
+ * top cue layer reads as that layer. Values this build does not know are noted apart from what an
+ * older build wrote.
  */
 import { VARIABLE_NAME_PATTERN, VARIABLE_TYPES, isVariableName } from '../../types/nodeCueTypes'
 import type { EffectDefinition, VariableType } from '../../types/nodeCueTypes'
 import { LOCATION_OPTIONS } from '../../../types'
-import { CONFIG_LIGHT_ARRAY_GROUPS } from '../../../constants/nodeConstants'
+import { CONFIG_LIGHT_ARRAY_GROUPS, MAX_NODE_LAYER } from '../../../constants/nodeConstants'
 import { renameExpressionVariables } from '../runtime/expressionEvaluator'
 import {
   DEFAULT_EASING,
@@ -148,27 +149,6 @@ function replaceUnknownEasings(
   return fromOlderBuild
     ? `Unknown easing ${where} now reads ${DEFAULT_EASING}.`
     : `Easing ${where} is not one this version knows and plays as ${DEFAULT_EASING}.`
-}
-
-/**
- * An action blend mode named in a literal this build does not know stays as it is, and the
- * compiler reports the action. The retired blend modes are older and read as replace.
- */
-function findUnknownBlendModes(graphs: readonly JsonObject[]): string | null {
-  const values = new Set<string>()
-  const found = new Set<string>()
-  for (const { action, graph } of actionsOf(graphs)) {
-    const source = isObject(action.color) ? action.color.blendMode : null
-    if (!isObject(source) || source.source !== 'literal') continue
-    const { value } = source
-    if (typeof value !== 'string' || value === '' || RETIRED_BLEND_MODES.has(value)) continue
-    if (literalIssue('blend-mode', value) === null) continue
-    values.add(`'${value}'`)
-    found.add(graph)
-  }
-  return found.size > 0
-    ? `Blend mode ${[...values].join(', ')} in ${[...found].join(', ')} is not one this version knows.`
-    : null
 }
 
 /** Each wait condition field, with the field that counts how many times it must fire. */
@@ -348,9 +328,21 @@ function declaredRenames(declarations: readonly JsonObject[]): Map<string, strin
   return renames
 }
 
-/** The renames {@link migrateOlderNodeFile} gives a parsed file's declared variable names. */
+/**
+ * The renames a parsed file's declared variable names take: those {@link migrateOlderNodeFile}
+ * gives them, and those an earlier load gave a parameter, which it keeps as its former names.
+ */
 export function variableRenamesOf(file: unknown): Map<string, string> {
-  return isObject(file) ? declaredRenames(declarationsOf(file, graphsOf(file))) : new Map()
+  if (!isObject(file)) return new Map()
+  const declarations = declarationsOf(file, graphsOf(file))
+  const renames = declaredRenames(declarations)
+  for (const { name, formerNames } of declarations) {
+    if (typeof name !== 'string' || !Array.isArray(formerNames)) continue
+    for (const former of formerNames) {
+      if (typeof former === 'string' && !renames.has(former)) renames.set(former, name)
+    }
+  }
+  return renames
 }
 
 function renameVariables(
@@ -363,9 +355,14 @@ function renameVariables(
 
   if (renames.size > 0) {
     for (const declaration of declarations) {
-      if (typeof declaration.name === 'string') {
-        declaration.name = renames.get(declaration.name) ?? declaration.name
+      const renamed = typeof declaration.name === 'string' && renames.get(declaration.name)
+      if (!renamed) continue
+      // A parameter keeps the name it had, so a raiser added on a later load still finds it.
+      if (declaration.isParameter === true) {
+        const formerNames = Array.isArray(declaration.formerNames) ? declaration.formerNames : []
+        declaration.formerNames = [...formerNames, declaration.name]
       }
+      declaration.name = renamed
     }
     for (const graph of graphs) renameUses(graph.nodes, renames)
   }
@@ -397,6 +394,27 @@ function renameVariables(
 
 /** The effect a cue's reference names, by effect file group id and effect id. */
 export type EffectLookup = (effectFileId: string, effectId: string) => EffectDefinition | undefined
+
+/** A cue's effect raisers. */
+function raisersOf(cue: JsonObject): JsonObject[] {
+  const raisers = isObject(cue.nodes) ? cue.nodes.effectRaisers : undefined
+  return Array.isArray(raisers) ? raisers.filter(isObject) : []
+}
+
+/** The effect `raiser` raises, found through the cue's reference to it. */
+function raisedEffect(
+  cue: JsonObject,
+  raiser: JsonObject,
+  effects: EffectLookup,
+): EffectDefinition | undefined {
+  const references = Array.isArray(cue.effects) ? cue.effects.filter(isObject) : []
+  const reference = references.find((ref) => ref.effectId === raiser.effectId)
+  return reference &&
+    typeof reference.effectFileId === 'string' &&
+    typeof raiser.effectId === 'string'
+    ? effects(reference.effectFileId, raiser.effectId)
+    : undefined
+}
 
 /** Logic node fields that read a variable without writing it. */
 const READ_ONLY_NAME_FIELDS: ReadonlySet<string> = new Set(['sourceVariable'])
@@ -452,17 +470,9 @@ function nameRaisedLightArrayGroups(file: JsonObject, effects: EffectLookup): st
   const cues = Array.isArray(file.cues) ? file.cues.filter(isObject) : []
   const changed: string[] = []
   for (const cue of cues) {
-    const raisers = isObject(cue.nodes) ? cue.nodes.effectRaisers : undefined
-    const references = Array.isArray(cue.effects) ? cue.effects.filter(isObject) : []
     const variables = variablesOf(file, cue)
-    for (const raiser of Array.isArray(raisers) ? raisers.filter(isObject) : []) {
-      const reference = references.find((ref) => ref.effectId === raiser.effectId)
-      const effect =
-        reference &&
-        typeof reference.effectFileId === 'string' &&
-        typeof raiser.effectId === 'string'
-          ? effects(reference.effectFileId, raiser.effectId)
-          : undefined
+    for (const raiser of raisersOf(cue)) {
+      const effect = raisedEffect(cue, raiser, effects)
       if (!effect || !isObject(raiser.parameterValues)) continue
       const effectActions = effect.nodes?.actions ?? []
       for (const [key, source] of Object.entries(raiser.parameterValues)) {
@@ -487,6 +497,44 @@ function nameRaisedLightArrayGroups(file: JsonObject, effects: EffectLookup): st
   return changed.length > 0
     ? `A light array passed where an effect takes group names now passes the names of its groups: ${changed.join(', ')}.`
     : null
+}
+
+/**
+ * Builds up to v0.7.0 shipped their strobes on layer 255, which is the blackout's alone. A literal
+ * layer above the top layer a cue draws on reads as that layer, in an action and, where the effect
+ * is found, in a raiser's value for a parameter that feeds an action's layer.
+ */
+function drawOnTopCueLayer(
+  file: JsonObject,
+  graphs: readonly JsonObject[],
+  effects: EffectLookup | undefined,
+): string | null {
+  const values = new Set<number>()
+  const changed = new Set<string>()
+  const lower = (source: unknown, graph: string): void => {
+    if (!isObject(source) || source.source !== 'literal') return
+    if (typeof source.value !== 'number' || !(source.value > MAX_NODE_LAYER)) return
+    values.add(source.value)
+    changed.add(graph)
+    source.value = MAX_NODE_LAYER
+  }
+  for (const { action, graph } of actionsOf(graphs)) lower(action.layer, graph)
+  const cues = Array.isArray(file.cues) ? file.cues.filter(isObject) : []
+  for (const cue of effects ? cues : []) {
+    for (const raiser of raisersOf(cue)) {
+      const effect = effects && raisedEffect(cue, raiser, effects)
+      if (!effect || !isObject(raiser.parameterValues)) continue
+      for (const [key, source] of Object.entries(raiser.parameterValues)) {
+        const parameter = effect.variables?.find((v) => v.isParameter && v.name === key)
+        if (parameter && parameterRules(parameter, effect.nodes?.actions ?? []).includes('layer')) {
+          lower(source, labelOf(cue))
+        }
+      }
+    }
+  }
+  if (changed.size === 0) return null
+  const layers = [...values].sort((a, b) => a - b).join(', ')
+  return `Layer ${layers} in ${[...changed].join(', ')} now reads ${MAX_NODE_LAYER}, the top layer a cue draws on.`
 }
 
 /**
@@ -518,7 +566,7 @@ export function migrateOlderNodeFile(
 ): NodeFileChanges {
   if (!isObject(file)) return { older: [], unknown: [] }
   const graphs = graphsOf(file)
-  const unknown = notesOf([replaceUnknownEasings(graphs, false), findUnknownBlendModes(graphs)])
+  const unknown = notesOf([replaceUnknownEasings(graphs, false)])
   const older = notesOf([
     defaultCueKinds(file),
     retireBlendModes(graphs),
@@ -527,6 +575,7 @@ export function migrateOlderNodeFile(
     ...renameVariables(file, graphs, effectFileRenames),
     conformInitialValues(declarationsOf(file, graphs)),
     effects ? nameRaisedLightArrayGroups(file, effects) : null,
+    drawOnTopCueLayer(file, graphs, effects),
   ])
   return { older, unknown }
 }

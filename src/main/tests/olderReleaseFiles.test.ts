@@ -142,6 +142,11 @@ const dischordGroupsIn = (file: string): string =>
   `${file}: A light array passed where an effect takes group names now passes the names of its groups: 'Dischord' raiser 'y1-dischord-blue' lights is now 'front,back'.`
 const dischordGroups = dischordGroupsIn('yarg-alt1.json')
 
+/** The note of a library whose strobes drew on the blackout's layer. */
+const strobeLayerIn = (file: string): string =>
+  `${file}: Layer 255 in 'Strobe Slow', 'Strobe Medium', 'Strobe Fast', 'Strobe Fastest' now reads 254, the top layer a cue draws on.`
+const yargStrobeLayers = [strobeLayerIn('yarg-alt1.json'), strobeLayerIn('yarg-stagekit.json')]
+
 /**
  * A dedicated strobe row the layout editor gave the channels of an RGB template. The layout reads
  * it as a strobe light, and the rig as its template's RGB light.
@@ -245,8 +250,10 @@ const EXPECTED: Record<string, Expected> = {
     cues: [
       noKind('yarg-alt1.json'),
       harmonyEasing,
+      strobeLayerIn('yarg-alt1.json'),
       noKind('yarg-stagekit.json'),
       "yarg-stagekit.json: A wait count below one on a wait with no condition in 'Default', 'Stomp' is dropped.",
+      strobeLayerIn('yarg-stagekit.json'),
       noKind('audio-70s-light-organs.json'),
       noKind('audio-disco.json'),
       noKind('audio-rock.json'),
@@ -270,11 +277,11 @@ const EXPECTED: Record<string, Expected> = {
         ],
       },
     },
-    cues: [harmonyEasing],
+    cues: [harmonyEasing, ...yargStrobeLayers],
     retired: ['audio-motion-fast.json', 'yarg-motion-fast.json'],
   },
   'v0.6.1-alpha.6': {
-    cues: [harmonyEasing, dischordGroups],
+    cues: [harmonyEasing, dischordGroups, ...yargStrobeLayers],
     // Seeded by these builds and shipped by none since, so startup retires it. Its action waits on
     // 'audio-trigger', which this build does not read as a wait condition.
     refused: [
@@ -290,10 +297,10 @@ const EXPECTED: Record<string, Expected> = {
     },
     retired: ['audio-motion-fast.json'],
     config: [...strobeRowRepairs.layout(false), strobeRowRepairs.rig],
-    cues: [harmonyEasing, dischordGroups],
+    cues: [harmonyEasing, dischordGroups, ...yargStrobeLayers],
   },
   'v0.6.2-alpha.6-user': {
-    cues: [harmonyEasing, dischordGroups],
+    cues: [harmonyEasing, dischordGroups, ...yargStrobeLayers],
     retired: ['audio-motion-fast.json'],
   },
   'v0.7.0-alpha.7': {
@@ -304,7 +311,7 @@ const EXPECTED: Record<string, Expected> = {
       layout: lightsFromV062,
       rigs: { Stage: lightsFromV062 },
     },
-    cues: [harmonyEasing, dischordGroups],
+    cues: [harmonyEasing, dischordGroups, ...yargStrobeLayers, strobeLayerIn('rb3-stagekit.json')],
   },
   'v0.7.0-alpha.7-user': {
     settings: { 'rb3Prefs.processingMode': 'cue' },
@@ -316,8 +323,11 @@ const EXPECTED: Record<string, Expected> = {
     cues: [
       "my-alt1.json: Unknown easing 'sin-out' in 'Harmony' now reads sinInOut.",
       dischordGroupsIn('my-alt1.json'),
+      strobeLayerIn('my-alt1.json'),
       harmonyEasing,
       dischordGroups,
+      ...yargStrobeLayers,
+      strobeLayerIn('rb3-stagekit.json'),
     ],
   },
   'f3f851db': {

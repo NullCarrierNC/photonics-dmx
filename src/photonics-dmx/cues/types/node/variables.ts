@@ -49,6 +49,11 @@ export interface VariableDefinition {
   isParameter?: boolean
   /** Constrained set of allowed literal values, driving a selector in the effect-raiser parameter UI */
   validValues?: string[]
+  /**
+   * The names a load renamed this parameter from. A raiser an older build wrote passes it by one of
+   * them, so the raiser's key takes this name.
+   */
+  formerNames?: string[]
 }
 
 export interface EventDefinition {

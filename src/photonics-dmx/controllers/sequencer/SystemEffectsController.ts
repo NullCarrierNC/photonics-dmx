@@ -2,6 +2,7 @@ import { RGBIO, Transition } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
 import { ILayerManager, ISystemEffectsController } from './interfaces'
 import { createLogger } from '../../../shared/logger'
+import { BLACKOUT_LAYER } from '../../constants/nodeConstants'
 const log = createLogger('SystemEffectsController')
 
 /**
@@ -12,7 +13,7 @@ export class SystemEffectsController implements ISystemEffectsController {
   private lightTransitionController: LightTransitionController
   private layerManager: ILayerManager
   private isBlackingOut: boolean = false
-  private _blackoutLayersUnder: number = 255
+  private _blackoutLayersUnder: number = BLACKOUT_LAYER
   /** Per-light fade timers of the in-flight blackout; cleared on cancel/dispose. */
   private pendingTimers: Set<NodeJS.Timeout> = new Set()
   /** Resolvers paired with {@link pendingTimers}, settled early on cancel so `blackout()` returns. */
@@ -72,8 +73,7 @@ export class SystemEffectsController implements ISystemEffectsController {
    * Initiates a blackout effect that visually fades out all lights.
    * If called, we set isBlackingOut and schedule a transition on layer 255,
    * then clear all active effects after the fade completes.
-   * As it's on layer 255 with a high priority, it will override all other effects below,
-   * including strobe effects on layer 200.
+   * Layer 255 is the blackout's alone, so it overrides every cue's effects, the strobes included.
    *
    * @param duration The duration of the blackout fade in milliseconds.
    * @returns A promise that resolves when the blackout is complete.
@@ -110,8 +110,6 @@ export class SystemEffectsController implements ISystemEffectsController {
       // Every light the rig publishes, which is the source the instant path takes through
       // immediateBlackout.
       const allLightIds = this.lightTransitionController.getLightStateManagerTrackedLights()
-      // Use maximum layer to override everything (including strobe on layer 200)
-      const blackoutLayer = 255
 
       // Set transitions for all lights
       const transitionPromises = allLightIds.map((lightId) => {
@@ -145,7 +143,7 @@ export class SystemEffectsController implements ISystemEffectsController {
               easing: 'linear',
               duration: duration,
             },
-            layer: blackoutLayer,
+            layer: BLACKOUT_LAYER,
           }
 
           // Fade from the light's current blended output, not its layer-0 state: a colour effect
@@ -153,7 +151,7 @@ export class SystemEffectsController implements ISystemEffectsController {
           // the start of the fade instead of dimming smoothly from what is actually on screen.
           this.lightTransitionController.setTransition(
             lightId,
-            blackoutLayer,
+            BLACKOUT_LAYER,
             currentLightState ?? this.lightTransitionController.getLightState(lightId, 0),
             blackoutTransition.transform.color,
             blackoutTransition.transform.duration,
@@ -208,7 +206,7 @@ export class SystemEffectsController implements ISystemEffectsController {
       // whatever follows the cancel cannot be wiped by the fade it replaced.
       this.generation++
       this.clearPendingBlackout()
-      this.lightTransitionController.removeTransitionsByLayer(255)
+      this.lightTransitionController.removeTransitionsByLayer(BLACKOUT_LAYER)
     }
   }
 

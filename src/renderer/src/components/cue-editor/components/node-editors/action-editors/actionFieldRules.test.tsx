@@ -164,6 +164,7 @@ const CASES: Array<[Field, string | number | undefined, NodeCueMode]> = [
   ['Wait Until Count', -1, 'audio'],
   ['Wait Until Count', undefined, 'yarg'],
   ['Layer', 0, 'yarg'],
+  ['Layer', 254, 'yarg'],
   ['Layer', 255, 'yarg'],
   ['Layer', 256, 'yarg'],
   ['Layer', -1, 'yarg'],

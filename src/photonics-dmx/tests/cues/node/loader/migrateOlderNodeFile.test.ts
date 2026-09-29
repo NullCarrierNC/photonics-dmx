@@ -337,7 +337,41 @@ describe('migrateOlderNodeFile', () => {
     ])
     expect(changes).toEqual({
       older: ["Retired blend mode multiply or overlay in 'Glow' now reads replace."],
-      unknown: ["Blend mode 'screen' in 'Glow' is not one this version knows."],
+      unknown: [],
+    })
+  })
+
+  it('draws an action layer above the top cue layer on the top cue layer', () => {
+    const layer = (value: unknown) => ({ source: 'literal', value })
+    const file = {
+      group: { id: 'g', name: 'G' },
+      effects: [
+        {
+          id: 'e1',
+          name: 'Flash',
+          nodes: {
+            actions: [
+              { id: 'a1', layer: layer(255) },
+              { id: 'a2', layer: layer(300) },
+              { id: 'a3', layer: layer(254) },
+              { id: 'a4', layer: read('lyr') },
+            ],
+          },
+        },
+      ],
+    }
+
+    const changes = migrateOlderNodeFile(file)
+
+    expect(file.effects[0].nodes.actions.map((action) => action.layer)).toEqual([
+      layer(254),
+      layer(254),
+      layer(254),
+      read('lyr'),
+    ])
+    expect(changes).toEqual({
+      older: ["Layer 255, 300 in 'Flash' now reads 254, the top layer a cue draws on."],
+      unknown: [],
     })
   })
 
@@ -525,6 +559,40 @@ describe('migrateOlderNodeFile', () => {
         older: [
           "A light array passed where an effect takes group names now passes the names of its groups: 'One' raiser 'r1' lights is now 'front,back', 'One' raiser 'r3' lights is now 'back'.",
         ],
+        unknown: [],
+      })
+    })
+
+    it('draws a raiser layer above the top cue layer on the top cue layer', () => {
+      const lit = (value: unknown) => ({ source: 'literal', value })
+      const file = {
+        group: { id: 'g', name: 'G' },
+        cues: [
+          {
+            id: 'c1',
+            name: 'Strobe',
+            kind: 'lighting',
+            effects: [{ effectId: 'effect-flash-color', effectFileId: 'yarg-core-effects' }],
+            nodes: {
+              events: [],
+              actions: [],
+              logic: [],
+              effectRaisers: [
+                raiser('r1', 'effect-flash-color', { layer: lit(255), holdTime: lit(255) }),
+                raiser('r2', 'effect-flash-color', { layer: lit(200) }),
+              ],
+            },
+          },
+        ],
+      }
+
+      const notes = migrateOlderNodeFile(file, undefined, effects)
+
+      const [r1, r2] = file.cues[0].nodes.effectRaisers
+      expect(r1.parameterValues).toEqual({ layer: lit(254), holdTime: lit(255) })
+      expect(r2.parameterValues).toEqual({ layer: lit(200) })
+      expect(notes).toEqual({
+        older: ["Layer 255 in 'Strobe' now reads 254, the top layer a cue draws on."],
         unknown: [],
       })
     })
