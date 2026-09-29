@@ -21,12 +21,13 @@ export function setupLifecycleHandlers(
 
   handleInvoke(ipcMain, LIFECYCLE.RETRY_INIT, log, async () => {
     try {
-      // A graph that never came up has nothing to tear down, so build it. One that is up gets the
-      // full restart, which is what picks up a configuration the user repaired in the meantime.
+      // A graph that never came up has nothing to tear down, so build it, once a fault response
+      // still stopping the inputs is done. One that is up gets the full restart, which is what
+      // picks up a configuration the user repaired in the meantime.
       if (controllerManager.getIsInitialized()) {
         await controllerManager.restartControllers()
       } else {
-        await controllerManager.init()
+        await controllerManager.init({ afterFaultResponse: true })
       }
       return ipcSuccess()
     } catch (error) {

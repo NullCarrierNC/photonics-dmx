@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals'
 
 jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test') },
+  ipcMain: { handle: jest.fn() },
 }))
 
 jest.mock('../../utils/copyDefaultData', () => ({ copyDefaultData: jest.fn(async () => {}) }))
@@ -12,7 +13,10 @@ jest.mock('../../utils/windowUtils', () => ({
   mainRuntimeBroadcaster: { emit: jest.fn() },
 }))
 
+import { ipcMain } from 'electron'
 import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import { setupLifecycleHandlers } from '../../ipc/lifecycle-handlers'
+import { LIFECYCLE } from '../../../shared/ipcChannels'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { FAULT_HELD_MESSAGE } from '../../controllers/ControllerLifecycle'
 import {
@@ -354,5 +358,60 @@ describe('a Retry restart asked for during the fault response', () => {
 
     expect(manager.getLifecyclePhase()).toBe('running')
     expect(on.yarg).toBe(false)
+  })
+})
+
+describe('a Retry of a graph that never came up, asked for during the fault response', () => {
+  /** Registry loaders whose first cue registry load fails, so the first init leaves no graph. */
+  function registryFailingOnce() {
+    let first = true
+    return {
+      initializeCueRegistry: jest.fn(async () => {
+        if (first) {
+          first = false
+          throw new Error('cue folder unreadable')
+        }
+      }),
+      initializeEffectLoader: jest.fn(async () => {}),
+      initializeNodeCueLoader: jest.fn(async () => {}),
+    }
+  }
+
+  it('builds the graph only once the fault response has stopped the inputs', async () => {
+    const stopping = barrier()
+    const { listeners, on } = statefulListeners()
+    on.yarg = true
+    listeners.yargRb3.disableYarg.mockImplementation(async () => {
+      await stopping.wait
+      on.yarg = false
+    })
+    const graph = restartGraph()
+    const manager = new ControllerManager({
+      config: initConfig(),
+      graph,
+      collaborators: {
+        registryInit: registryFailingOnce(),
+        senderLifecycle: senderLifecycleStub(),
+        listenerLifecycle: listeners,
+      } as never,
+    })
+    await expect(manager.init()).rejects.toThrow('cue folder unreadable')
+    setupLifecycleHandlers(ipcMain, manager)
+    const retry = jest
+      .mocked(ipcMain.handle)
+      .mock.calls.find(([channel]) => channel === LIFECYCLE.RETRY_INIT)?.[1]
+    if (!retry) throw new Error('no Retry handler')
+    const builtBefore = jest.mocked(graph.buildChains).mock.calls.length
+
+    manager.handleUncaughtException(new Error('watcher callback threw'))
+    await settle()
+    const retrying = retry({} as never)
+    await sleep(50)
+    const builtWhileStopping = jest.mocked(graph.buildChains).mock.calls.length
+    stopping.release()
+    await retrying
+
+    expect(builtWhileStopping).toBe(builtBefore)
+    expect(jest.mocked(graph.buildChains).mock.calls.length).toBeGreaterThan(builtBefore)
   })
 })

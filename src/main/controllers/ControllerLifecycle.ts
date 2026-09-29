@@ -29,11 +29,12 @@ export const FAULT_HELD_MESSAGE =
  * surface in the log instead of silently rewriting history.
  */
 const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
-  initializing: ['running', 'failed', 'shuttingDown'],
+  // A build that comes up with the DMX console held settles in console mode.
+  initializing: ['running', 'consoleMode', 'failed', 'shuttingDown'],
   running: ['restarting', 'consoleMode', 'failed', 'shuttingDown'],
-  restarting: ['running', 'failed', 'shuttingDown'],
+  restarting: ['running', 'consoleMode', 'failed', 'shuttingDown'],
   consoleMode: ['running', 'restarting', 'failed', 'shuttingDown'],
-  failed: ['running', 'restarting', 'shuttingDown'],
+  failed: ['running', 'consoleMode', 'restarting', 'shuttingDown'],
   shuttingDown: ['stopped'],
   stopped: [],
 }
@@ -334,7 +335,7 @@ export class ControllerLifecycle {
   }
 
   /** Wait for the fault response in progress to settle, and for any started while it ran. */
-  private async awaitFaultResponse(): Promise<void> {
+  public async awaitFaultResponse(): Promise<void> {
     while (this.faultResponse) {
       try {
         await this.faultResponse
