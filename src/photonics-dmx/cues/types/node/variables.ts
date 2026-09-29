@@ -35,9 +35,17 @@ export function isVariableName(name: string): boolean {
   return VARIABLE_NAME_PATTERN.test(name) && !RESERVED_VARIABLE_NAMES.includes(name)
 }
 
-/** A literal list is a palette's colour names, which may hold a name this build does not know. */
+/** A single value, written in the node or read from a variable. */
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean | string | string[] }
+  | { source: 'literal'; value: number | boolean | string }
+  | { source: 'variable'; name: string }
+
+/**
+ * A palette's colours: a literal list of colour names, which may hold a name this build does not
+ * know, or a color-array variable.
+ */
+export type ColorListValueSource =
+  | { source: 'literal'; value: string[] }
   | { source: 'variable'; name: string }
 
 export interface VariableDefinition {

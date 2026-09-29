@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ColorFromIndexLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
+import PaletteSourceEditor from '../../shared/PaletteSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 import VariableSelect from './VariableSelect'
 
@@ -15,12 +16,10 @@ const ColorFromIndexLogicEditor: React.FC<ColorFromIndexLogicEditorProps> = ({
 }) => {
   return (
     <div className="space-y-2 text-xs">
-      <ValueSourceEditor
+      <PaletteSourceEditor
         label="Palette (inline list or color-array variable)"
         value={node.colors}
         onChange={(next) => updateNode({ colors: next })}
-        expected="color-array"
-        listLiteral
         availableVariables={availableVariables}
       />
 

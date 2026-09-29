@@ -5,7 +5,6 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   choiceIssue,
-  colorListIssue,
   isNumberRule,
   literalChoices,
   literalDefault,
@@ -15,7 +14,7 @@ import {
 } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import type { ValueIssue, ValueRule } from '../../../../../../photonics-dmx/cues/node/cueValueRules'
 import { isVariableSource } from './nodeEditorUtils'
-import ColorListEditor from './ColorListEditor'
+import VariableSourceSelect, { SELECT_CLASS, type VariableOption } from './VariableSourceSelect'
 import FieldIssue, { issueAttributes } from './FieldIssue'
 import { AUDIO_EVENT_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
@@ -49,26 +48,14 @@ interface ValueSourceEditorProps {
   optional?: boolean
   /** An issue the caller judged from the cue value rules, shown in place of the field's own. */
   issue?: ValueIssue | null
-  /**
-   * A colour-array field that can hold an inline colour list. Only a colour-from-index palette can,
-   * so any other colour-array field takes a color-array variable.
-   */
-  listLiteral?: boolean
   validLiterals?: readonly string[]
   /** When set, constrained literal dropdown uses these labels instead of repeating the stored value as the label (takes precedence over {@link validLiterals}). */
   validLiteralOptions?: ReadonlyArray<{ value: string; label: string }>
-  availableVariables: {
-    name: string
-    type: string
-    scope: 'cue' | 'cue-group'
-    validValues?: string[]
-  }[]
+  availableVariables: VariableOption[]
   integerOnly?: boolean // For number fields that should only accept integers
   /** When set, enables built-in event-option fallback for expected="event" (yarg vs audio). */
   activeMode?: NodeCueMode
 }
-
-const SELECT_CLASS = 'rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700'
 
 const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   label,
@@ -78,7 +65,6 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   rule: namedRule,
   optional = false,
   issue: callerIssue,
-  listLiteral = false,
   validLiterals,
   validLiteralOptions,
   availableVariables,
@@ -134,7 +120,6 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     constrainedLiteralChoices?.some((opt) => opt.value === literalText) ?? false
   const literalProblem = ((): ValueIssue | null => {
     if (!isLiteral || isDefaulted) return null
-    if (isColorArray) return colorListIssue(source.value)
     if (rule && !validLiterals && !validLiteralOptions) {
       return literalIssue(rule, source.value, activeMode)
     }
@@ -156,36 +141,21 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     : variableIssue(selectedName, expected, availableVariables)
   const issue = callerIssue !== undefined ? callerIssue : isLiteral ? literalShown : variableProblem
 
-  /** The variable select, keeping a stored name the list leaves out as its selected entry. */
-  const variableSelect = (candidates: typeof availableVariables, placeholder: string) => {
-    const listed = candidates.some((v) => v.name === selectedName)
-    return (
-      <select
-        aria-label={`${label} variable`}
-        className={`mt-1 ${SELECT_CLASS}`}
-        value={selectedName}
-        onChange={(event) => onChange({ source: 'variable', name: event.target.value })}
-        {...issueAttributes(issue, issueId)}>
-        <option value="">{placeholder}</option>
-        {selectedName !== '' && !listed && (
-          <option value={selectedName} disabled>
-            {selectedName} (
-            {availableVariables.some((v) => v.name === selectedName)
-              ? 'wrong type'
-              : 'not declared'}
-            )
-          </option>
-        )}
-        {candidates.map((v) => (
-          <option key={v.name} value={v.name}>
-            {v.name} ({isLightArray || isColorArray ? v.scope : v.type})
-          </option>
-        ))}
-      </select>
-    )
-  }
+  const variableSelect = (candidates: readonly VariableOption[], placeholder: string) => (
+    <VariableSourceSelect
+      label={label}
+      selectedName={selectedName}
+      candidates={candidates}
+      availableVariables={availableVariables}
+      placeholder={placeholder}
+      listByScope={isLightArray || isColorArray}
+      onSelect={(name) => onChange({ source: 'variable', name })}
+      issue={issue}
+      issueId={issueId}
+    />
+  )
 
-  if (isLightArray || (isColorArray && !listLiteral)) {
+  if (isLightArray || isColorArray) {
     const arrayVars = availableVariables.filter((v) => v.type === expected)
 
     return (
@@ -203,45 +173,6 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
             ? 'Light arrays must be provided by variables.'
             : 'A colour list here must come from a color-array variable.'}
         </p>
-      </div>
-    )
-  }
-
-  if (isColorArray) {
-    const colorArrayVars = availableVariables.filter((v) => v.type === 'color-array')
-    const useVariable = isVariableSource(source)
-    const literalColors = !useVariable && Array.isArray(source.value) ? source.value : []
-
-    return (
-      <div className="space-y-1">
-        <label className="flex items-center justify-between font-medium text-xs">
-          <span>{label}</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-600 dark:text-gray-400">Use Variable</span>
-            <input
-              type="checkbox"
-              checked={useVariable}
-              onChange={(e) =>
-                e.target.checked
-                  ? onChange({ source: 'variable', name: selectedName })
-                  : onChange({ source: 'literal', value: literalColors })
-              }
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
-            />
-          </label>
-        </label>
-        {useVariable ? (
-          <label className="flex flex-col font-medium text-xs">
-            Variable
-            {variableSelect(colorArrayVars, '-- Select color-array --')}
-          </label>
-        ) : (
-          <ColorListEditor
-            colors={literalColors}
-            onColorsChange={(colors) => onChange({ source: 'literal', value: colors })}
-          />
-        )}
-        <FieldIssue issue={issue} id={issueId} />
       </div>
     )
   }

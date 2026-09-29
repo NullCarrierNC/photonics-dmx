@@ -18,7 +18,7 @@ import {
   isWaitCondition,
   WaitCondition,
 } from '../../../types'
-import { ValueSource, VariableType } from '../../types/nodeCueTypes'
+import { ColorListValueSource, ValueSource, VariableType } from '../../types/nodeCueTypes'
 import type { ExecutionContext } from './ExecutionContext'
 import type { VariableValue } from './executionTypes'
 import { createLogger } from '../../../../shared/logger'
@@ -114,7 +114,7 @@ function resolveLightArray(
 
 /** A colour list. A literal list plays without the names this build does not know. */
 export function resolveColorArray(
-  source: ValueSource | undefined,
+  source: ValueSource | ColorListValueSource | undefined,
   context: ExecutionContext,
   variableDefinitions?: VariableDefinitionsForScope,
 ): Color[] {

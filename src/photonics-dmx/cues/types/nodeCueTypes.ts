@@ -139,6 +139,7 @@ export {
 export type {
   EventDefinition,
   ValueSource,
+  ColorListValueSource,
   VariableDefinition,
   VariableType,
 } from './node/variables'

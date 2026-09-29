@@ -9,6 +9,7 @@ import {
   RESERVED_VARIABLE_NAMES,
   VARIABLE_NAME_PATTERN,
   ValueSource,
+  ColorListValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
 export const stringIdSchema: JSONSchemaType<string> = {
@@ -80,7 +81,7 @@ export const colorArrayValueSourceSchema = {
       },
     },
   ],
-} as unknown as JSONSchemaType<ValueSource>
+} as unknown as JSONSchemaType<ColorListValueSource>
 
 export const colorSchema: JSONSchemaType<{
   name: ValueSource

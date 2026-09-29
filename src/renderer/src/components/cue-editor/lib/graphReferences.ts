@@ -6,6 +6,7 @@ import type {
   EventRaiserNode,
   LogicNode,
   ValueSource,
+  ColorListValueSource,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { expressionVariables } from '../../../../../photonics-dmx/cues/node/runtime/expressionEvaluator'
 
@@ -23,7 +24,7 @@ export function collectVariableReferences(nodes: EditorNode[], varName: string):
     references.push(`${nodeType} ${nodeId}${labelSuffix}${detailSuffix}`)
   }
   const checkValueSource = (
-    source: ValueSource | undefined,
+    source: ValueSource | ColorListValueSource | undefined,
     nodeType: string,
     nodeId: string,
     nodeLabel: string | undefined,

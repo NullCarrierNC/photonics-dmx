@@ -1159,6 +1159,45 @@ describe('Node cue validation', () => {
       ])
     })
 
+    it('takes an inline colour list on a palette field only', () => {
+      const palette = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withLogic({
+            id: 'logic-1',
+            type: 'logic',
+            logicType: 'color-from-index',
+            colors: { source: 'literal', value: ['red', 'blue'] },
+            index: { source: 'literal', value: 0 },
+            assignTo: 'tint',
+          }),
+        ],
+      })
+      const action = setColorAction()
+      const scalar = validateNodeCueFile({
+        ...validFile(),
+        cues: [
+          withNodes({
+            actions: [
+              {
+                ...action,
+                timing: {
+                  ...action.timing,
+                  duration: { source: 'literal', value: ['red', 'blue'] },
+                },
+              },
+            ],
+          }),
+        ],
+      })
+
+      expect(palette.valid).toBe(true)
+      expect(scalar.valid).toBe(false)
+      expect(scalar.errors).toContain(
+        '/cues/0/nodes/actions/0/timing/duration/value: must be number,boolean,string,null',
+      )
+    })
+
     it('loads a palette colour this version does not know and warns that it is left out', () => {
       const result = validateNodeCueFile({
         ...validFile(),

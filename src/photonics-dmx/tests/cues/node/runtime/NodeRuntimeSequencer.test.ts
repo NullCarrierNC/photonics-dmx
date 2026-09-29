@@ -414,7 +414,7 @@ describe('Node runtime with real Sequencer', () => {
       mode: 'set',
       varName: 'palette',
       valueType: 'color-array',
-      value: { source: 'literal', value: ['red', 'green', 'blue'] as Color[] },
+      value: { source: 'variable', name: 'shipped' },
     }
 
     const configNode: LogicNode = {
@@ -444,6 +444,8 @@ describe('Node runtime with real Sequencer', () => {
     }
 
     const palette = ['red', 'green', 'blue'] as const
+    // The cue's session seeds each variable from its declared initial value.
+    cueLevelVarStore.set('shipped', { type: 'color-array', value: [...palette] })
 
     startCue(
       defineCue({
@@ -468,6 +470,12 @@ describe('Node runtime with real Sequencer', () => {
         ],
         variables: [
           { name: 'palette', type: 'color-array', scope: 'cue', initialValue: [] },
+          {
+            name: 'shipped',
+            type: 'color-array',
+            scope: 'cue',
+            initialValue: ['red', 'green', 'blue'],
+          },
           { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
           { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
           { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
@@ -482,26 +490,6 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('transforms color-array variables with reverse, concat, and shuffle', () => {
-    const setA: LogicNode = {
-      id: 'set-a',
-      type: 'logic',
-      logicType: 'variable',
-      mode: 'set',
-      varName: 'a',
-      valueType: 'color-array',
-      value: { source: 'literal', value: ['red', 'green', 'blue'] as Color[] },
-    }
-
-    const setB: LogicNode = {
-      id: 'set-b',
-      type: 'logic',
-      logicType: 'variable',
-      mode: 'set',
-      varName: 'b',
-      valueType: 'color-array',
-      value: { source: 'literal', value: ['yellow', 'orange'] as Color[] },
-    }
-
     const reverseNode: LogicNode = {
       id: 'rev',
       type: 'logic',
@@ -526,21 +514,23 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'shuffled',
     }
 
+    // The cue's session seeds each variable from its declared initial value.
+    cueLevelVarStore.set('a', { type: 'color-array', value: ['red', 'green', 'blue'] })
+    cueLevelVarStore.set('b', { type: 'color-array', value: ['yellow', 'orange'] })
+
     startCue(
       defineCue({
         id: 'color-transforms',
         name: 'Color Transforms',
-        nodes: { logic: [setA, setB, reverseNode, concatNode, shuffleNode] },
+        nodes: { logic: [reverseNode, concatNode, shuffleNode] },
         connections: [
-          { from: 'event-1', to: 'set-a' },
-          { from: 'set-a', to: 'set-b' },
-          { from: 'set-b', to: 'rev' },
+          { from: 'event-1', to: 'rev' },
           { from: 'rev', to: 'cat' },
           { from: 'cat', to: 'shuf' },
         ],
         variables: [
-          { name: 'a', type: 'color-array', scope: 'cue', initialValue: [] },
-          { name: 'b', type: 'color-array', scope: 'cue', initialValue: [] },
+          { name: 'a', type: 'color-array', scope: 'cue', initialValue: ['red', 'green', 'blue'] },
+          { name: 'b', type: 'color-array', scope: 'cue', initialValue: ['yellow', 'orange'] },
           { name: 'reversed', type: 'color-array', scope: 'cue', initialValue: [] },
           { name: 'combined', type: 'color-array', scope: 'cue', initialValue: [] },
           { name: 'shuffled', type: 'color-array', scope: 'cue', initialValue: [] },
