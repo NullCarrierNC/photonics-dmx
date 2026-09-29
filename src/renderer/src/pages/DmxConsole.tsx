@@ -5,6 +5,7 @@ import {
   DmxRig,
   LightingConfiguration,
   ConfigStrobeType,
+  isMovingHead,
 } from '../../../photonics-dmx/types'
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
 import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
@@ -42,7 +43,6 @@ import {
   getTemplateAlignedChannels,
   getTemplateAlignedExtraChannels,
   isLightModified,
-  isMovingHeadFixture,
   isPanTiltChannelName,
   lightOnChannel,
 } from './dmxConsoleChannels'
@@ -345,7 +345,7 @@ const DmxConsole: React.FC = () => {
             const channelInputModified = channelNumber !== baseChannels[channelName]
             const prevName = index > 0 ? sorted[index - 1][0] : null
             const showMhColourPanSeparator =
-              isMovingHeadFixture(light.fixture) &&
+              isMovingHead(light) &&
               isPanTiltChannelName(channelName) &&
               (prevName == null || !isPanTiltChannelName(prevName))
             return (

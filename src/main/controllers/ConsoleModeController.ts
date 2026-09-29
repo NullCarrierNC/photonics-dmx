@@ -5,8 +5,8 @@ import {
   DmxRig,
   DmxLight,
   DmxFixture,
-  FixtureTypes,
   FixtureConfig,
+  isMovingHead,
   clampMergeMovingHeadFixtureConfig,
   fixtureConfigFieldsOutOfRange,
   normalizeFixtureConfig,
@@ -233,7 +233,7 @@ export class ConsoleModeController {
     if (!light) {
       return { success: false, error: 'Light not found in rig' }
     }
-    if (light.fixture !== FixtureTypes.RGBMH) {
+    if (!isMovingHead(light)) {
       return { success: false, error: 'Light is not a moving head fixture' }
     }
     if (light.fixtureId !== fixtureId) {
@@ -248,7 +248,7 @@ export class ConsoleModeController {
     if (!fixture) {
       return { success: false, error: 'Fixture template not found in My Lights' }
     }
-    if (fixture.fixture !== FixtureTypes.RGBMH) {
+    if (!isMovingHead(fixture)) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
 

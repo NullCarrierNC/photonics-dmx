@@ -22,7 +22,6 @@ import {
   getTemplateAlignedChannels,
   getTemplateAlignedExtraChannels,
   isLightModified,
-  isMovingHeadFixture,
   isPanTiltChannelName,
   lightOnChannel,
 } from './dmxConsoleChannels'
@@ -403,13 +402,5 @@ describe('channel naming and kinds', () => {
     ['red', false],
   ])('reports %s as a pan/tilt channel: %s', (name, expected) => {
     expect(isPanTiltChannelName(name)).toBe(expected)
-  })
-
-  it.each([
-    [FixtureTypes.RGBMH, true],
-    [FixtureTypes.RGB, false],
-    [FixtureTypes.STROBE, false],
-  ])('reports %s as a moving head: %s', (fixture, expected) => {
-    expect(isMovingHeadFixture(fixture)).toBe(expected)
   })
 })

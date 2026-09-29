@@ -6,7 +6,6 @@
  * here without the light being re-picked. The numbers come from the derivation template sync uses.
  */
 import {
-  FixtureTypes,
   type ChannelView,
   type DmxFixture,
   type DmxLight,
@@ -180,8 +179,4 @@ export function channelLabel(name: string): string {
 
 export function isPanTiltChannelName(name: string): boolean {
   return name === 'pan' || name === 'tilt'
-}
-
-export function isMovingHeadFixture(fixture: FixtureTypes): boolean {
-  return fixture === FixtureTypes.RGBMH
 }
