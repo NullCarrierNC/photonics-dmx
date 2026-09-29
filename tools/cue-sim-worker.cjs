@@ -12,12 +12,20 @@ require('ts-node').register({
 const { CueSimulator } = require('../src/photonics-dmx/sim/CueSimulator')
 const { SETTINGS, SIMULATOR_OPTIONS, SCENARIOS, seededRandom } = require('./cueSimCore.cjs')
 
-/** @param {{ key: string, domain: 'yarg' | 'rb3' | 'audio', library: string, cue: string }} cue */
-async function simulate({ key, domain, library, cue }) {
+/**
+ * @param {{ key: string, domain: 'yarg' | 'rb3' | 'audio', library: string, cue: string,
+ *   motion?: { groupId: string, cueId: string } }} cue
+ */
+async function simulate({ key, domain, library, cue, motion }) {
   const realRandom = Math.random
   Math.random = seededRandom(key)
   try {
-    const sim = await CueSimulator.create({ library, domain, ...SIMULATOR_OPTIONS })
+    const sim = await CueSimulator.create({
+      library,
+      domain,
+      ...SIMULATOR_OPTIONS,
+      ...(motion ? { motion } : {}),
+    })
     try {
       sim.setCue(cue)
       sim.loadScenario(SCENARIOS[domain])

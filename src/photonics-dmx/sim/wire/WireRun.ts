@@ -17,6 +17,7 @@ import { Rb3StageKitCueProcessor } from '../../processors/Rb3StageKitCueProcesso
 import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectProcessor'
 import type { DmxRig } from '../../types'
 import type { WireClock } from './RealTimeClock'
+import { MANUAL_MOTION_TIMING, holdToLibrary, setManualMotion } from '../manualMotion'
 
 /** One buffer as it left the publisher for the wire, stamped with the virtual clock. */
 export interface WireSend {
@@ -96,10 +97,7 @@ export class WireRun {
     }
     const registry = getCueRegistry('yarg')
     const library = this.options.yargLibrary ?? 'yarg-stagekit'
-    registry.setEnabledGroups([library])
-    registry.setActiveGroups([library])
-    registry.setDefaultGroup(library)
-    registry.setStageKitPriority('never')
+    holdToLibrary(registry, library)
     const handler = this.netCueHandler(registry)
     this.chain.cueHandlers.yarg = handler
     this.yargHandler = handler
@@ -120,17 +118,9 @@ export class WireRun {
     registry.setEnabledGroups([library])
     const handler = new AudioCueHandler(this.chain.dmxLightManager, this.chain.sequencer, {
       strobeState: this.fanout.strobeState,
-      motionCoordinator: createAudioMotionCoordinator({
-        getMotionCueMinimumHoldMs: () => 0,
-        getMotionCueProbabilityPercent: () => 100,
-      }),
+      motionCoordinator: createAudioMotionCoordinator(MANUAL_MOTION_TIMING),
     })
-    const motion = this.options.motion ?? null
-    if (motion) {
-      registry.setEnabledMotionGroups([motion.groupId])
-      handler.setManualMotionRef(motion)
-    }
-    handler.setMotionEnabled(motion !== null)
+    setManualMotion(handler, registry, this.options.motion ?? null)
     this.chain.audioCueHandler = handler
     this.audioHandler = handler
     return handler
@@ -141,15 +131,9 @@ export class WireRun {
     const handler = new CueHandler(this.chain.dmxLightManager, this.chain.sequencer, {
       registry,
       strobeState: this.fanout.strobeState,
-      getMotionCueMinimumHoldMs: () => 0,
-      getMotionCueProbabilityPercent: () => 100,
+      ...MANUAL_MOTION_TIMING,
     })
-    const motion = this.options.motion ?? null
-    if (motion) {
-      registry.setEnabledMotionGroups([motion.groupId])
-      handler.setManualMotionRef(motion)
-    }
-    handler.setMotionEnabled(motion !== null)
+    setManualMotion(handler, registry, this.options.motion ?? null)
     return handler
   }
 

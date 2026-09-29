@@ -6,6 +6,7 @@ const {
   seededRandom,
   cuesInLibrary,
   listContent,
+  motionCuesInLibrary,
   reduceTimeline,
   fingerprintOf,
   renderList,
@@ -86,6 +87,30 @@ describe('list content', () => {
     expect(listContent(`${header}\n${a}\n${b}\n`)).toBe(listContent(`${header}\n\n${b} \n${a}`))
     expect(listContent(`${header}\n${a}\n`)).not.toBe(listContent(`${header}\n${b}\n`))
     expect(listContent(null)).toBeNull()
+  })
+})
+
+describe('motion cue listing', () => {
+  it('runs each motion cue beside a steady lighting cue of its domain', () => {
+    const library = {
+      group: { id: 'yarg-motion-default' },
+      cues: [{ id: 'motion-still' }, { id: 'motion-nod-slow' }],
+    }
+    expect(motionCuesInLibrary('yarg', 'yarg-motion-default.json', library)).toEqual([
+      {
+        key: 'yarg__yarg-motion-default__motion-still',
+        domain: 'yarg',
+        library: 'yarg-stagekit',
+        cue: 'Cool_Automatic',
+        motion: { groupId: 'yarg-motion-default', cueId: 'motion-still' },
+      },
+      expect.objectContaining({ key: 'yarg__yarg-motion-default__motion-nod-slow' }),
+    ])
+  })
+
+  it('lists nothing for a lighting library', () => {
+    const library = { group: { id: 'yarg-fade' }, cues: [{ cueType: 'Menu' }] }
+    expect(motionCuesInLibrary('yarg', 'yarg-fade.json', library)).toEqual([])
   })
 })
 

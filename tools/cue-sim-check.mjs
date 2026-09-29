@@ -1,9 +1,10 @@
 /**
- * Runs every bundled non-motion cue through the simulator and holds each timeline's fingerprint to
- * metrics/cue-sim-fingerprints.txt, and refuses a bundled cue or effect file changed without a
- * higher cueVersion or a merge that records fingerprints neither parent holds. The bases it
- * compares with are cueVersionBases' in cueSimCore.cjs: `--pushed` reads the refs of a push from
- * stdin, and CI names its base in `CUE_VERSION_BASE_REF`. `--write` rewrites the fingerprint list.
+ * Runs every bundled cue through the simulator, each motion cue beside a steady lighting cue on
+ * moving heads, and holds each timeline's fingerprint to metrics/cue-sim-fingerprints.txt, and
+ * refuses a bundled cue or effect file changed without a higher cueVersion or a merge that records
+ * fingerprints neither parent holds. The bases it compares with are cueVersionBases' in
+ * cueSimCore.cjs: `--pushed` reads the refs of a push from stdin, and CI names its base in
+ * `CUE_VERSION_BASE_REF`. `--write` rewrites the fingerprint list.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -15,6 +16,7 @@ const require = createRequire(import.meta.url)
 const {
   DOMAINS,
   cuesInLibrary,
+  motionCuesInLibrary,
   reduceTimeline,
   fingerprintOf,
   renderList,
@@ -133,9 +135,13 @@ function bundledCues() {
     return readdirSync(dir)
       .filter((file) => file.endsWith('.json'))
       .sort()
-      .flatMap((file) =>
-        cuesInLibrary(domain, file, JSON.parse(readFileSync(join(dir, file), 'utf8'))),
-      )
+      .flatMap((file) => {
+        const library = JSON.parse(readFileSync(join(dir, file), 'utf8'))
+        return [
+          ...cuesInLibrary(domain, file, library),
+          ...motionCuesInLibrary(domain, file, library),
+        ]
+      })
   })
 }
 
