@@ -242,8 +242,18 @@ function runCueFileValidation<T extends NodeCueFile>(
     }
   }
 
-  const semanticErrors: string[] = []
   const fileData = migrated as T
+  // A family's modes share one schema, so a file of the family's other mode passes it.
+  if (fileData.mode !== spec.mode) {
+    const message = `must be '${spec.mode}'`
+    return {
+      valid: false,
+      errors: [`/mode: ${message}`],
+      structuredErrors: [{ instancePath: '/mode', message }],
+    }
+  }
+
+  const semanticErrors: string[] = []
 
   // Check for duplicate group-level variable names
   const groupVariables = fileData.group.variables ?? []

@@ -111,13 +111,19 @@ describe('cue schema registry', () => {
     ).toThrow(/registered after/i)
   })
 
-  it('compiles one validator per mode and reuses it', () => {
+  it('compiles one validator per family, which takes any of its modes', () => {
     registerKindSchema('lighting', {
       net: kindSchema('lighting', 'cueType'),
       audio: kindSchema('lighting', 'cueTypeId'),
     })
-    expect(validatorFor('yarg')).toBe(validatorFor('yarg'))
-    expect(validatorFor('yarg')).not.toBe(validatorFor('rb3'))
+    expect(validatorFor('yarg')).toBe(validatorFor('rb3'))
+    expect(validatorFor('yarg')).not.toBe(validatorFor('audio'))
+    expect(
+      validatorFor('rb3')(file('yarg', [{ id: 'a', kind: 'lighting', cueType: 'Chorus' }])),
+    ).toBe(true)
+    expect(
+      validatorFor('audio')(file('yarg', [{ id: 'a', kind: 'lighting', cueTypeId: 'o' }])),
+    ).toBe(false)
   })
 
   it('refuses to build a validator with no kinds registered', () => {

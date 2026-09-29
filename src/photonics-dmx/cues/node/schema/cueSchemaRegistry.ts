@@ -1,10 +1,11 @@
 /**
  * Holds the cue-definition schema for each cue kind, per family, and compiles one file validator per
- * mode on demand.
+ * family on demand.
  *
- * A cue file's envelope is the same for every mode apart from its `mode` const and which cue
- * definitions it accepts, and the definitions it accepts are the registered kinds for that mode's
- * family. So a kind is a registration rather than an edit: `lighting` and `motion` register below,
+ * A cue file's envelope is the same for every mode apart from its `mode` and which cue definitions
+ * it accepts, and the definitions it accepts are the registered kinds for that mode's family. So the
+ * modes of a family share one validator, which takes any of them, and the caller checks the file's
+ * mode is the one it expects. So a kind is a registration rather than an edit: `lighting` and `motion` register below,
  * and a build that adds its own kind registers from an import-time module of its own.
  *
  * Compilation is deferred to the first {@link validatorFor} so a registration made while modules are
@@ -16,7 +17,7 @@
 
 import type { ValidateFunction } from 'ajv'
 import type { CueFamily } from '../../domains'
-import { getCueDomain } from '../../domains'
+import { CUE_DOMAIN_DESCRIPTORS, getCueDomain } from '../../domains'
 import type { NodeCueKind, NodeCueMode } from '../../types/nodeCueTypes'
 import { ajv } from './helpers'
 
@@ -24,7 +25,7 @@ import { ajv } from './helpers'
 export type KindSchemas = Record<CueFamily, unknown>
 
 const kindSchemas = new Map<string, KindSchemas>()
-const compiled = new Map<NodeCueMode, ValidateFunction>()
+const compiled = new Map<CueFamily, ValidateFunction>()
 
 /** The group metadata block, shared by every mode's envelope. */
 let groupSchema: unknown
@@ -42,14 +43,20 @@ export function registerKindSchema(kind: NodeCueKind | string, schemas: KindSche
   kindSchemas.set(kind, schemas)
 }
 
-/** Which kinds a mode may carry, as that family's variant of each registered kind. */
-function definitionsFor(mode: NodeCueMode): unknown[] {
-  const family = getCueDomain(mode).family
+/** Which kinds a family's files may carry, as that family's variant of each registered kind. */
+function definitionsFor(family: CueFamily): unknown[] {
   return Array.from(kindSchemas.values()).map((schemas) => schemas[family])
 }
 
-function buildFileSchema(mode: NodeCueMode): Record<string, unknown> {
-  const definitions = definitionsFor(mode)
+/** The modes a family's files may declare. */
+function familyModes(family: CueFamily): NodeCueMode[] {
+  return (Object.keys(CUE_DOMAIN_DESCRIPTORS) as NodeCueMode[]).filter(
+    (mode) => getCueDomain(mode).family === family,
+  )
+}
+
+function buildFileSchema(family: CueFamily): Record<string, unknown> {
+  const definitions = definitionsFor(family)
   if (definitions.length === 0) {
     throw new Error('No cue kinds registered, so no cue file could be validated.')
   }
@@ -59,7 +66,7 @@ function buildFileSchema(mode: NodeCueMode): Record<string, unknown> {
     additionalProperties: false,
     properties: {
       version: { type: 'integer', const: 1 },
-      mode: { type: 'string', const: mode },
+      mode: { type: 'string', enum: familyModes(family) },
       group: groupSchema,
       cues: {
         type: 'array',
@@ -73,11 +80,13 @@ function buildFileSchema(mode: NodeCueMode): Record<string, unknown> {
   }
 }
 
+/** The file validator of a mode's family, which every mode of that family shares. */
 export function validatorFor(mode: NodeCueMode): ValidateFunction {
-  const existing = compiled.get(mode)
+  const family = getCueDomain(mode).family
+  const existing = compiled.get(family)
   if (existing) return existing
-  const validate = ajv.compile(buildFileSchema(mode))
-  compiled.set(mode, validate)
+  const validate = ajv.compile(buildFileSchema(family))
+  compiled.set(family, validate)
   return validate
 }
 
