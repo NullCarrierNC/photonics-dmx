@@ -4,12 +4,14 @@ import * as path from 'path'
 /**
  * The path with every link in it followed, or null when the filesystem will not say. A path that
  * does not exist yet follows its nearest existing ancestor and keeps the rest, so a file about to
- * be written is judged by where it will land.
+ * be written is judged by where it will land. A link to something that does not exist gives null,
+ * since a write through it lands wherever the link points.
  */
 export function realPathOf(target: string): string | null {
   const missing: string[] = []
   let existing = target
   while (!fs.existsSync(existing)) {
+    if (fs.lstatSync(existing, { throwIfNoEntry: false })?.isSymbolicLink()) return null
     const parent = path.dirname(existing)
     if (parent === existing) return target
     missing.unshift(path.basename(existing))
