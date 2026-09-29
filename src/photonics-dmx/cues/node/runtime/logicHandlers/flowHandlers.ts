@@ -121,14 +121,12 @@ export const conditionalHandler: LogicHandler<'conditional'> = (logicNode, ctx) 
 export const frameGateHandler: LogicHandler<'frame-gate'> = (logicNode, ctx) => {
   const { nodeId, edges, context, variableDefinitions, cueLevelVarStore } = ctx
   // Fire the `true` port every `divisor`-th time this node is reached, `false` otherwise. The counter
-  // lives in an internal cue-store key (no `__`-prefixed collision with authored names) and is cleared
-  // with the cue-level vars on each activation, so the gate phase restarts per activation without an
-  // authored counter variable.
+  // lives in the cue store under `__framegate_<node id>` and is cleared with the cue-level vars on
+  // each activation, so the gate phase restarts per activation without an authored counter variable.
   const key = `__framegate_${nodeId}`
   const count = Number(cueLevelVarStore.get(key)?.value ?? 0) + 1
   cueLevelVarStore.set(key, { type: 'number', value: count })
-  // A non-finite divisor (e.g. an expression that produced NaN) would make `count % divisor` never 0
-  // and stick the gate on the false port, so it falls back to 1 (fire every frame).
+  // A divisor below 1 or an infinite one fires every frame. A value that is not a number reads as 0.
   const rawDivisor = resolveNumber(logicNode.divisor, context, variableDefinitions)
   const divisor = Number.isFinite(rawDivisor) ? Math.max(1, Math.round(rawDivisor)) : 1
   const branch = count % divisor === 0 ? 'true' : 'false'
@@ -140,8 +138,8 @@ export const tempoHandler: LogicHandler<'tempo'> = (logicNode, ctx) => {
   // Read the song tempo and write the derived timing vars in one node, replacing the per-cue
   // read/guard/clamp/multiply/band chain. A song reporting no tempo (bpm <= 0 on menus/practice) falls
   // back to fallbackBeatMs before clamping, so tempo-locked tweens still breathe at a sensible rate.
-  // numOr absorbs an absent (null/undefined) or non-numeric bound as the default rather than poisoning
-  // the whole derivation with NaN.
+  // numOr gives an absent bound its default. A bound that is not a number reads as 0, as every number
+  // field does, and an infinite one takes the default.
   const numOr = (vs: ValueSource | undefined, dflt: number): number => {
     if (vs == null) return dflt
     const n = resolveNumber(vs, context, variableDefinitions)
