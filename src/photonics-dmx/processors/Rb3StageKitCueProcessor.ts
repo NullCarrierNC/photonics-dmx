@@ -9,11 +9,12 @@ import {
   RB3_SONG_SELECT_SCREEN,
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
+import { RB3_STROBE_WATCHDOG_MS } from '../listeners/RB3/StageKitTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { isActiveGameplayPacket } from './rb3GameplayEvidence'
 import { Rb3GameModeManager, Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { createLogger } from '../../shared/logger'
-import { StrobeWatchdog, DEFAULT_STROBE_WATCHDOG_MS } from './strobeWatchdog'
+import { StrobeWatchdog } from './strobeWatchdog'
 
 const log = createLogger('rb3-cue')
 
@@ -126,7 +127,7 @@ export class Rb3StageKitCueProcessor {
     this.keepaliveMs =
       options.keepaliveMs === undefined ? DEFAULT_KEEPALIVE_MS : options.keepaliveMs
     this.strobeWatchdog = new StrobeWatchdog(
-      options.strobeWatchdogMs ?? DEFAULT_STROBE_WATCHDOG_MS,
+      options.strobeWatchdogMs ?? RB3_STROBE_WATCHDOG_MS,
       () => this.cutStrobe(),
     )
     this.menuDispatch = options.menuDispatch ?? null
