@@ -5,6 +5,7 @@ const {
   SETTINGS,
   seededRandom,
   cuesInLibrary,
+  listContent,
   reduceTimeline,
   fingerprintOf,
   renderList,
@@ -73,6 +74,18 @@ describe('cue listing', () => {
   it('skips motion libraries', () => {
     const library = { group: { id: 'yarg-motion-default' }, cues: [{ cueType: 'Menu' }] }
     expect(cuesInLibrary('yarg', 'yarg-motion-default.json', library)).toEqual([])
+  })
+})
+
+describe('list content', () => {
+  it('reads the same for lists holding the same fingerprints in another order and spacing', () => {
+    const header = 'duration 4000 bpm 120'
+    const a = 'yarg__x__Menu 0123456789ab 0a1b2c.3d4e5f 1a2b.3c4d'
+    const b = 'yarg__x__Verse ba9876543210 0a1b2c.3d4e5f 1a2b.3c4d'
+
+    expect(listContent(`${header}\n${a}\n${b}\n`)).toBe(listContent(`${header}\n\n${b} \n${a}`))
+    expect(listContent(`${header}\n${a}\n`)).not.toBe(listContent(`${header}\n${b}\n`))
+    expect(listContent(null)).toBeNull()
   })
 })
 

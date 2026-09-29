@@ -71,6 +71,34 @@ function check(options: { args?: string[]; stdin?: string; baseRef?: string } = 
   return { status: result.status, stderr: result.stderr }
 }
 
+const LIST = 'metrics/cue-sim-fingerprints.txt'
+
+/** Commits the fingerprint list with these lines, and returns the commit. */
+function commitList(lines: string[], message: string): string {
+  writeFileSync(join(repo, LIST), `${lines.join('\n')}\n`)
+  git('add', LIST)
+  git('commit', '--quiet', '--no-verify', '-m', message)
+  return git('rev-parse', 'HEAD')
+}
+
+/**
+ * Merges `feature` into development with the fingerprint list as `resolved`, committing the merge
+ * whether git merged the list itself or left it in conflict. Returns the merge.
+ */
+function mergeFeature(resolved?: string[]): string {
+  try {
+    git('merge', '--quiet', '--no-ff', '--no-edit', 'feature')
+  } catch {
+    // A conflict in the list, which the resolution below settles.
+  }
+  if (resolved) {
+    writeFileSync(join(repo, LIST), `${resolved.join('\n')}\n`)
+    git('add', LIST)
+    git('commit', '--quiet', '--no-verify', '--no-edit')
+  }
+  return git('rev-parse', 'HEAD')
+}
+
 const pushLine = (ref: string, local: string, remote: string): string =>
   `refs/heads/${ref} ${local} refs/heads/${ref} ${remote}\n`
 
@@ -209,5 +237,77 @@ describe('cueVersion guard without a base', () => {
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('the working tree: no commit where it meets')
+  })
+})
+
+describe('fingerprints recorded in merges', () => {
+  let remote: string
+
+  beforeEach(() => {
+    remote = commitList(['a 1', 'b 1', 'c 1'], 'List')
+    git('checkout', '--quiet', '-b', 'feature')
+  })
+
+  it('refuses a pushed merge that records fingerprints neither side recorded', () => {
+    commitList(['a 2', 'b 1', 'c 1'], 'Feature moves a')
+    git('checkout', '--quiet', 'development')
+    commitList(['a 3', 'b 1', 'c 1'], 'Development moves a')
+    const merge = mergeFeature(['a 4', 'b 1', 'c 1'])
+
+    const result = check({ args: ['--pushed'], stdin: pushLine('development', merge, remote) })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(
+      `refs/heads/development: merge ${merge.slice(0, 8)} records cue fingerprints neither parent holds`,
+    )
+  })
+
+  it('refuses the same merge in CI', () => {
+    commitList(['a 2', 'b 1', 'c 1'], 'Feature moves a')
+    git('checkout', '--quiet', 'development')
+    commitList(['a 3', 'b 1', 'c 1'], 'Development moves a')
+    const merge = mergeFeature(['a 4', 'b 1', 'c 1'])
+
+    const result = check({ baseRef: remote })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(`merge ${merge.slice(0, 8)} records cue fingerprints`)
+  })
+
+  it('accepts a merge git made of each side recording its own fingerprints', () => {
+    commitList(['a 2', 'b 1', 'c 1'], 'Feature moves a')
+    git('checkout', '--quiet', 'development')
+    commitList(['a 1', 'b 1', 'c 3'], 'Development moves c')
+    const merge = mergeFeature()
+
+    const result = check({ args: ['--pushed'], stdin: pushLine('development', merge, remote) })
+
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
+  })
+
+  it('accepts a merge that keeps a parent list in another order and spacing', () => {
+    commitList(['settings', 'a 2', 'b 1', 'c 1'], 'Feature moves a')
+    git('checkout', '--quiet', 'development')
+    commitList(['settings', 'a 3', 'b 1', 'c 1'], 'Development moves a')
+    const merge = mergeFeature(['settings', 'c 1', 'b 1 ', '', 'a 3'])
+
+    const result = check({ args: ['--pushed'], stdin: pushLine('development', merge, remote) })
+
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
+  })
+
+  it('accepts a conflicted merge that keeps a parent list, re-recorded after it', () => {
+    commitList(['a 2', 'b 1', 'c 1'], 'Feature moves a')
+    git('checkout', '--quiet', 'development')
+    commitList(['a 3', 'b 1', 'c 1'], 'Development moves a')
+    mergeFeature(['a 3', 'b 1', 'c 1'])
+    const after = commitList(['a 4', 'b 1', 'c 1'], 'Re-record a after the merge')
+
+    const result = check({ args: ['--pushed'], stdin: pushLine('development', after, remote) })
+
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
   })
 })
