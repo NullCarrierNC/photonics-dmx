@@ -1,0 +1,138 @@
+{
+  "name": "Check 5: yarg-stagekit Dischord on 5 lights per group",
+  "rig": {
+    "templates": [
+      {
+        "id": "par",
+        "fixture": "rgb",
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ],
+    "lights": [
+      {
+        "id": "F1",
+        "template": "par",
+        "group": "front",
+        "address": 1
+      },
+      {
+        "id": "F2",
+        "template": "par",
+        "group": "front",
+        "address": 5
+      },
+      {
+        "id": "F3",
+        "template": "par",
+        "group": "front",
+        "address": 9
+      },
+      {
+        "id": "F4",
+        "template": "par",
+        "group": "front",
+        "address": 13
+      },
+      {
+        "id": "F5",
+        "template": "par",
+        "group": "front",
+        "address": 17
+      },
+      {
+        "id": "B1",
+        "template": "par",
+        "group": "back",
+        "address": 21
+      },
+      {
+        "id": "B2",
+        "template": "par",
+        "group": "back",
+        "address": 25
+      },
+      {
+        "id": "B3",
+        "template": "par",
+        "group": "back",
+        "address": 29
+      },
+      {
+        "id": "B4",
+        "template": "par",
+        "group": "back",
+        "address": 33
+      },
+      {
+        "id": "B5",
+        "template": "par",
+        "group": "back",
+        "address": 37
+      }
+    ]
+  },
+  "yargLibrary": "yarg-stagekit",
+  "steps": [
+    {
+      "type": "yarg",
+      "cue": "Dischord",
+      "venue": "Small",
+      "durationMs": 4000,
+      "mark": "start"
+    }
+  ],
+  "channels": "1-40",
+  "t0": "mark:start",
+  "expect": {
+    "states": [
+      {
+        "label": "F3 takes the blue layer",
+        "ch": {
+          "9": 100,
+          "10": 0,
+          "11": 0,
+          "12": 255
+        }
+      },
+      {
+        "label": "F4 takes the blue layer",
+        "ch": {
+          "13": 100,
+          "14": 0,
+          "15": 0,
+          "16": 255
+        }
+      },
+      {
+        "label": "B3 takes the blue layer",
+        "ch": {
+          "29": 100,
+          "30": 0,
+          "31": 0,
+          "32": 255
+        }
+      },
+      {
+        "label": "B4 takes the blue layer",
+        "ch": {
+          "33": 100,
+          "34": 0,
+          "35": 0,
+          "36": 255
+        }
+      },
+      {
+        "label": "F5 stays dark",
+        "never": {
+          "17": 1
+        },
+        "fromMs": 0
+      }
+    ]
+  }
+}

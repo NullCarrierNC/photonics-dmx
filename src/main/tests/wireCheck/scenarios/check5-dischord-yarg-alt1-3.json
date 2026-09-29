@@ -1,0 +1,89 @@
+{
+  "name": "Check 5: yarg-alt1 Dischord on 3 lights per group",
+  "rig": {
+    "templates": [
+      {
+        "id": "par",
+        "fixture": "rgb",
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ],
+    "lights": [
+      {
+        "id": "F1",
+        "template": "par",
+        "group": "front",
+        "address": 1
+      },
+      {
+        "id": "F2",
+        "template": "par",
+        "group": "front",
+        "address": 5
+      },
+      {
+        "id": "F3",
+        "template": "par",
+        "group": "front",
+        "address": 9
+      },
+      {
+        "id": "B1",
+        "template": "par",
+        "group": "back",
+        "address": 13
+      },
+      {
+        "id": "B2",
+        "template": "par",
+        "group": "back",
+        "address": 17
+      },
+      {
+        "id": "B3",
+        "template": "par",
+        "group": "back",
+        "address": 21
+      }
+    ]
+  },
+  "yargLibrary": "yarg-alt1",
+  "steps": [
+    {
+      "type": "yarg",
+      "cue": "Dischord",
+      "venue": "Small",
+      "durationMs": 4000,
+      "mark": "start"
+    }
+  ],
+  "channels": "1-24",
+  "t0": "mark:start",
+  "expect": {
+    "states": [
+      {
+        "label": "F2 takes the blue layer",
+        "ch": {
+          "5": 100,
+          "6": 0,
+          "7": 0,
+          "8": 255
+        }
+      },
+      {
+        "label": "B2 takes the blue layer",
+        "ch": {
+          "17": 100,
+          "18": 0,
+          "19": 0,
+          "20": 255
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,257 @@
+{
+  "name": "Check 3: a Restart set-color fired on every third frame fades up and holds",
+  "rig": {
+    "templates": [
+      {
+        "id": "par",
+        "fixture": "rgb",
+        "channels": {
+          "masterDimmer": 1,
+          "red": 2,
+          "green": 3,
+          "blue": 4
+        }
+      }
+    ],
+    "lights": [
+      {
+        "id": "A",
+        "template": "par",
+        "group": "front",
+        "address": 1
+      }
+    ]
+  },
+  "cueFiles": {
+    "cues/audio/rig-check.json": {
+      "version": 1,
+      "mode": "audio",
+      "group": {
+        "id": "rig-check",
+        "name": "Rig check",
+        "description": ""
+      },
+      "cues": [
+        {
+          "kind": "lighting",
+          "id": "called-delay-max",
+          "cueTypeId": "called-delay-max",
+          "name": "called-delay-max",
+          "description": "",
+          "style": "primary",
+          "nodes": {
+            "events": [
+              {
+                "id": "ev",
+                "type": "event",
+                "eventType": "cue-called",
+                "triggerMode": "edge",
+                "executionPolicy": "restart"
+              }
+            ],
+            "actions": [
+              {
+                "id": "red",
+                "type": "action",
+                "effectType": "set-color",
+                "target": {
+                  "groups": {
+                    "source": "literal",
+                    "value": "front"
+                  },
+                  "filter": {
+                    "source": "literal",
+                    "value": "all"
+                  }
+                },
+                "color": {
+                  "name": {
+                    "source": "literal",
+                    "value": "red"
+                  },
+                  "brightness": {
+                    "source": "literal",
+                    "value": "max"
+                  }
+                },
+                "timing": {
+                  "waitForCondition": {
+                    "source": "literal",
+                    "value": "none"
+                  },
+                  "waitForTime": {
+                    "source": "literal",
+                    "value": 0
+                  },
+                  "duration": {
+                    "source": "literal",
+                    "value": 100
+                  },
+                  "waitUntilCondition": {
+                    "source": "literal",
+                    "value": "delay"
+                  },
+                  "waitUntilTime": {
+                    "source": "literal",
+                    "value": 1000
+                  }
+                },
+                "layer": {
+                  "source": "literal",
+                  "value": 1
+                }
+              }
+            ],
+            "logic": []
+          },
+          "connections": [
+            {
+              "from": "ev",
+              "to": "red"
+            }
+          ],
+          "layout": {
+            "nodePositions": {}
+          }
+        },
+        {
+          "kind": "lighting",
+          "id": "edge-delay-max",
+          "cueTypeId": "edge-delay-max",
+          "name": "edge-delay-max",
+          "description": "",
+          "style": "primary",
+          "nodes": {
+            "events": [
+              {
+                "id": "ev",
+                "type": "event",
+                "eventType": "audio-energy",
+                "triggerMode": "edge",
+                "threshold": 0.5,
+                "executionPolicy": "restart"
+              }
+            ],
+            "actions": [
+              {
+                "id": "red",
+                "type": "action",
+                "effectType": "set-color",
+                "target": {
+                  "groups": {
+                    "source": "literal",
+                    "value": "front"
+                  },
+                  "filter": {
+                    "source": "literal",
+                    "value": "all"
+                  }
+                },
+                "color": {
+                  "name": {
+                    "source": "literal",
+                    "value": "red"
+                  },
+                  "brightness": {
+                    "source": "literal",
+                    "value": "max"
+                  }
+                },
+                "timing": {
+                  "waitForCondition": {
+                    "source": "literal",
+                    "value": "none"
+                  },
+                  "waitForTime": {
+                    "source": "literal",
+                    "value": 0
+                  },
+                  "duration": {
+                    "source": "literal",
+                    "value": 100
+                  },
+                  "waitUntilCondition": {
+                    "source": "literal",
+                    "value": "delay"
+                  },
+                  "waitUntilTime": {
+                    "source": "literal",
+                    "value": 1000
+                  }
+                },
+                "layer": {
+                  "source": "literal",
+                  "value": 1
+                }
+              }
+            ],
+            "logic": []
+          },
+          "connections": [
+            {
+              "from": "ev",
+              "to": "red"
+            }
+          ],
+          "layout": {
+            "nodePositions": {}
+          }
+        }
+      ]
+    }
+  },
+  "audioLibrary": "rig-check",
+  "steps": [
+    {
+      "type": "audio",
+      "cue": "edge-delay-max",
+      "level": {
+        "every": 3,
+        "high": 0.8,
+        "low": 0
+      },
+      "durationMs": 2500,
+      "mark": "start"
+    }
+  ],
+  "channels": "1-4",
+  "t0": "mark:start",
+  "expect": {
+    "states": [
+      {
+        "label": "ramp",
+        "ch": {
+          "2": 11
+        },
+        "atMs": 32
+      },
+      {
+        "ch": {
+          "2": 63
+        },
+        "atMs": 54
+      },
+      {
+        "ch": {
+          "2": 160
+        },
+        "atMs": 76
+      },
+      {
+        "ch": {
+          "2": 243
+        },
+        "atMs": 98
+      },
+      {
+        "label": "full red, held",
+        "ch": {
+          "1": 255,
+          "2": 255
+        },
+        "atMs": 120,
+        "holdMs": 2300
+      }
+    ]
+  }
+}

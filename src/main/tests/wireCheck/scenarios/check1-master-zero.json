@@ -1,0 +1,138 @@
+{
+  "name": "Check 1: a master-0 template writes nothing until it has a master",
+  "files": {
+    "prefs.json": {},
+    "lights.json": {
+      "lights": [
+        {
+          "id": "tpl-par",
+          "position": 0,
+          "fixture": "rgb",
+          "label": "PAR",
+          "name": "PAR",
+          "isStrobeEnabled": false,
+          "channels": {
+            "masterDimmer": 0,
+            "red": 2,
+            "green": 3,
+            "blue": 4
+          }
+        }
+      ]
+    },
+    "dmxRigs.json": {
+      "schemaVersion": 8,
+      "rigs": [
+        {
+          "id": "rig-1",
+          "name": "Rig 1",
+          "active": true,
+          "config": {
+            "numLights": 2,
+            "lightLayout": {
+              "id": "front",
+              "label": "Front only"
+            },
+            "strobeType": "None",
+            "frontLights": [
+              {
+                "id": "A",
+                "fixtureId": "tpl-par",
+                "position": 1,
+                "fixture": "rgb",
+                "label": "PAR",
+                "name": "PAR",
+                "isStrobeEnabled": false,
+                "group": "front",
+                "universe": 1,
+                "mount": "floor",
+                "channels": {
+                  "masterDimmer": 1,
+                  "red": 3,
+                  "green": 4,
+                  "blue": 5
+                }
+              },
+              {
+                "id": "B",
+                "fixtureId": "tpl-par",
+                "position": 2,
+                "fixture": "rgb",
+                "label": "PAR",
+                "name": "PAR",
+                "isStrobeEnabled": false,
+                "group": "front",
+                "universe": 1,
+                "mount": "floor",
+                "channels": {
+                  "masterDimmer": 5,
+                  "red": 7,
+                  "green": 8,
+                  "blue": 9
+                }
+              }
+            ],
+            "backLights": [],
+            "strobeLights": []
+          }
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "type": "yarg",
+      "cue": "Flare_Slow",
+      "durationMs": 1000,
+      "mark": "master-0"
+    },
+    {
+      "type": "saveTemplates",
+      "templates": [
+        {
+          "id": "tpl-par",
+          "position": 0,
+          "fixture": "rgb",
+          "label": "PAR",
+          "name": "PAR",
+          "isStrobeEnabled": false,
+          "channels": {
+            "masterDimmer": 1,
+            "red": 2,
+            "green": 3,
+            "blue": 4
+          }
+        }
+      ],
+      "mark": "saved"
+    },
+    {
+      "type": "yarg",
+      "cue": "Flare_Slow",
+      "durationMs": 1000
+    }
+  ],
+  "channels": "1-12",
+  "t0": "mark:master-0",
+  "expect": {
+    "states": [
+      {
+        "label": "master 0: every channel stays 0",
+        "always": {
+          "1-12": 0
+        },
+        "fromMs": 0,
+        "toMs": 1000
+      },
+      {
+        "label": "master saved as 1: A on 1-4, B on 5-8",
+        "ch": {
+          "1-8": 255,
+          "9-12": 0
+        },
+        "atMs": 1010,
+        "holdMs": 900
+      }
+    ]
+  }
+}
