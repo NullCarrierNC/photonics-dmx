@@ -2,10 +2,9 @@ import * as nodePath from 'path'
 import { describe, expect, it, jest } from '@jest/globals'
 import { ConfigurationManager } from '../ConfigurationManager'
 import { DmxPublisher } from '../../../photonics-dmx/controllers/DmxPublisher'
-import { SenderManager } from '../../../photonics-dmx/controllers/SenderManager'
+import type { PublisherSenders } from '../../../photonics-dmx/controllers/SenderManager'
 import { StrobeStateManager } from '../../../photonics-dmx/controllers/StrobeStateManager'
 import { LightStateManager } from '../../../photonics-dmx/controllers/sequencer/LightStateManager'
-import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 import {
   loadRigExportFixtures,
   prepareImportedRig,
@@ -32,8 +31,7 @@ jest.mock('electron', () => ({
 /** The stored config file at a path, or null for a path the real disk serves. */
 let mockStoredFile: (path: string) => string | null = () => null
 
-// Only the config files are faked. Everything else reads the real disk, which the native sender
-// bindings need in order to load.
+// Only the config files are faked. Everything else reads the real disk.
 jest.mock('fs', () => {
   const actual = jest.requireActual<typeof import('fs')>('fs')
   return {
@@ -117,7 +115,7 @@ function readOlderReleaseSet(release: string): OlderReleaseSet {
 /** Boots a real manager over the given stored lights and rigs file texts. */
 function bootFiles(lightsText: string, rigsText: string): ConfigurationManager {
   mockStoredFile = (name) => {
-    if (!name.startsWith(APP_DATA)) return null
+    if (!nodePath.normalize(name).startsWith(nodePath.normalize(APP_DATA))) return null
     if (name.endsWith('prefs.json')) return JSON.stringify({ effectDebounce: 0 })
     if (name.endsWith('dmxRigs.json')) return rigsText
     if (name.endsWith('lights.json')) return lightsText
@@ -142,21 +140,17 @@ function rgbio(fields: Partial<RGBIO>): RGBIO {
 
 /** The first frame a real publisher sends for the given light states, or {} when it sends none. */
 function publishRaw(rig: DmxRig, states: Record<string, RGBIO>): Record<number, number> {
-  const senderManager = new SenderManager({
-    broadcaster: noopRuntimeBroadcaster(),
-    hasReceivers: () => false,
-  })
   const frames: Array<Record<number, number>> = []
-  jest.spyOn(senderManager, 'getEnabledWireSenders').mockReturnValue(['sacn'])
-  jest.spyOn(senderManager, 'send').mockImplementation((_wireId, buffer) => {
-    frames.push({ ...buffer })
-    return Promise.resolve(true)
-  })
-  const publisher = new DmxPublisher(
-    senderManager,
-    new LightStateManager(),
-    new StrobeStateManager(),
-  )
+  const senders: PublisherSenders = {
+    getEnabledWireSenders: () => ['sacn'],
+    isIpcEnabled: () => false,
+    send: (_wireId, buffer) => {
+      frames.push({ ...buffer })
+      return Promise.resolve(true)
+    },
+    sendIpc: () => {},
+  }
+  const publisher = new DmxPublisher(senders, new LightStateManager(), new StrobeStateManager())
   publisher.updateActiveRigs([rig])
   publisher.publish(new Map(Object.entries(states)))
   publisher.shutdown()

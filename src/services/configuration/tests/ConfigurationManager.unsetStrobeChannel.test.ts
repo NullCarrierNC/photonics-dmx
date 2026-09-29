@@ -1,3 +1,4 @@
+import * as nodePath from 'path'
 import { describe, expect, it, jest } from '@jest/globals'
 import { dialog } from 'electron'
 import { readFile } from 'fs/promises'
@@ -29,8 +30,7 @@ jest.mock('electron', () => ({
 /** The stored config file at a path, or null for a path the real disk serves. */
 let mockStoredFile: (path: string) => string | null = () => null
 
-// Only the config files are faked. Everything else reads the real disk, which the native sender
-// bindings need in order to load.
+// Only the config files are faked. Everything else reads the real disk.
 jest.mock('fs', () => {
   const actual = jest.requireActual<typeof import('fs')>('fs')
   return {
@@ -116,7 +116,7 @@ function rigData(strobeB: number): Record<string, unknown> {
 /** Boots a real manager over the stored lights and rigs files. */
 function boot(files: { lights: unknown; rigs: unknown }): ConfigurationManager {
   mockStoredFile = (name) => {
-    if (!name.startsWith(APP_DATA)) return null
+    if (!nodePath.normalize(name).startsWith(nodePath.normalize(APP_DATA))) return null
     if (name.endsWith('prefs.json')) return JSON.stringify({ effectDebounce: 0 })
     if (name.endsWith('dmxRigs.json')) return JSON.stringify(files.rigs)
     if (name.endsWith('lights.json')) return JSON.stringify(files.lights)
