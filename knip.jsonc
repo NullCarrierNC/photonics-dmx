@@ -1,0 +1,7 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // The Jest setup files, named here because knip's Jest plugin misses them on Windows: it expands
+  // `<rootDir>` to a `D:/...` path, reads that as a package name and drops it. Listed without `!`,
+  // so they are not production entries.
+  "entry": ["src/photonics-dmx/tests/jest.setup.ts", "src/renderer/src/tests/setup.ts"],
+}
