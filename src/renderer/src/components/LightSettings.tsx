@@ -15,20 +15,13 @@ import {
   normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
 import { isStorableBrightnessScale } from '../../../photonics-dmx/helpers/brightnessScaling'
-import { extraChannelDisplayLabel } from './lightChannelDisplay'
+import { STROBE_VALUE_FIELDS, extraChannelDisplayLabel } from './lightChannelDisplay'
 import { withChannelNumber, withFixtureType, withStrobeChannelOption } from './fixtureTemplateEdits'
 import { DraftNumberField } from './controls/DraftField'
 
 function isFixtureConfigKey(name: string): name is keyof FixtureConfig {
   return name in DEFAULT_MOVING_HEAD_FIXTURE_CONFIG
 }
-
-const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> = [
-  { key: 'slow', label: 'Strobe Slow' },
-  { key: 'medium', label: 'Strobe Medium' },
-  { key: 'fast', label: 'Strobe Fast' },
-  { key: 'fastest', label: 'Strobe Fastest' },
-]
 
 const BRIGHTNESS_SCALING_FIELDS: ReadonlyArray<{ key: keyof BrightnessScaling; label: string }> = [
   { key: 'red', label: 'Red' },
@@ -143,13 +136,11 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     setCurrentLight({ ...currentLight, extraChannels: nextExtras })
   }
 
-  const handleStrobeValueChange = (key: keyof StrobeChannelValues, raw: string) => {
-    const parsed = Number(raw)
-    const clamped = Math.max(0, Math.min(255, Number.isFinite(parsed) ? Math.round(parsed) : 0))
+  const handleStrobeValueChange = (key: keyof StrobeChannelValues, value: number) => {
     const base = currentLight.strobeValues ?? { ...DEFAULT_STROBE_CHANNEL_VALUES }
     setCurrentLight({
       ...currentLight,
-      strobeValues: { ...base, [key]: clamped },
+      strobeValues: { ...base, [key]: value },
     })
   }
 
@@ -295,13 +286,12 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
                   className="text-sm w-1/3 text-gray-700 dark:text-gray-300">
                   {label}:
                 </label>
-                <input
+                <DraftNumberField
                   id={`strobe-value-${key}`}
-                  type="number"
                   min={0}
                   max={255}
                   value={v}
-                  onChange={(e) => handleStrobeValueChange(key, e.target.value)}
+                  onCommit={(value) => handleStrobeValueChange(key, value)}
                   className="p-2 border border-gray-300 rounded w-[100px] text-black"
                 />
               </div>

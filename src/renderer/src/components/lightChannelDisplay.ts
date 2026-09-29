@@ -3,6 +3,7 @@ import {
   type DmxFixture,
   type ExtraChannelType,
   type LightingConfiguration,
+  type StrobeChannelValues,
 } from '../../../photonics-dmx/types'
 
 /**
@@ -10,6 +11,15 @@ import {
  * user-added `extraChannels`. DmxChannels, LightChannelsPreview and LightChannelsConfig all sort
  * and label channels from here, so a fixture reads the same way on every screen it appears on.
  */
+
+/** The strobe channel value an RGB+S fixture takes for each strobe cue speed, slowest first. */
+export const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> =
+  [
+    { key: 'slow', label: 'Strobe Slow' },
+    { key: 'medium', label: 'Strobe Medium' },
+    { key: 'fast', label: 'Strobe Fast' },
+    { key: 'fastest', label: 'Strobe Fastest' },
+  ]
 
 /** Canonical display order for the archetype channels. Unknown keys sort after, alphabetically. */
 export const BASE_CHANNEL_ORDER = [
