@@ -81,6 +81,9 @@ function checkCueVersions() {
     hasCommit: (sha) => git(['cat-file', '-e', `${sha}^{commit}`]) !== null,
     branchBase,
     mergeBase: (commit, other) => git(['merge-base', commit, other])?.trim() || null,
+    commitOf: (ref) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])?.trim() || null,
+    releaseBefore: () =>
+      git(['describe', '--tags', '--abbrev=0', '--match', 'v*', 'HEAD^'])?.trim() || null,
   })
   /** @type {string[]} */
   const versionProblems = []
