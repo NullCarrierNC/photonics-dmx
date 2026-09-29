@@ -1,6 +1,6 @@
 /**
- * The count budgets' rules: reading what a budget file records, holding the counts now to it, and
- * deciding what `--write` and `--init` may record. A budget of one count records it alone on line
+ * The count budgets' rules: reading what a budget file records, holding the counts now to it
+ * exactly, and deciding what `--write` and `--init` may record. A budget of one count records it alone on line
  * 1. A budget of several records one `<name> <count>` line each. ruleBudgetCore.mjs owns counting,
  * the file and the exit code.
  */
@@ -61,13 +61,24 @@ function unreadableBudget(names) {
  * @param {string | null} options.recordedText the budget file, or null when there is none
  * @param {boolean} options.write whether to lower the recorded budget to the counts
  * @param {boolean} [options.init] whether to create a missing budget file from the counts
+ * @param {boolean} [options.tracked] whether the last commit holds the budget file
  * @param {string} options.label what the count is called on screen, e.g. "Explicit any"
  * @param {string} options.file the budget file's path, for the messages
  * @param {string} options.counted what is counted, written into the budget file
  * @param {string} options.note how to lower the budget, written into the budget file
  * @returns {Verdict}
  */
-function budgetVerdict({ counts, recordedText, write, init = false, label, file, counted, note }) {
+function budgetVerdict({
+  counts,
+  recordedText,
+  write,
+  init = false,
+  tracked = false,
+  label,
+  file,
+  counted,
+  note,
+}) {
   const names = [...counts.keys()]
   const recorded = readBudget(recordedText, names)
   const title = (name) => (names.length === 1 ? label : `${label} ${name}`)
@@ -75,7 +86,16 @@ function budgetVerdict({ counts, recordedText, write, init = false, label, file,
   const listed = names.map((n) => `${title(n)} ${counts.get(n)}`).join(', ')
 
   if (init) {
-    // Creating a budget records any count, so it is its own flag and never replaces a file.
+    // Creating a budget records any count, so it is its own flag and never replaces a file, not
+    // even one deleted since the last commit.
+    if (tracked) {
+      return {
+        ok: false,
+        lines: [
+          `${file} is committed. --init only creates a new budget, so restore it from git and lower it with --write`,
+        ],
+      }
+    }
     if (recordedText !== null) {
       return {
         ok: false,
@@ -148,6 +168,20 @@ function budgetVerdict({ counts, recordedText, write, init = false, label, file,
             `${title(name)} count ${counts.get(name)} exceeds budget ${recorded.get(name)} (file ${file})`,
         ),
         `Fix the new reports. --write will not raise the budget, so edit ${where} by hand if the increase is intended.`,
+      ],
+    }
+  }
+  // A budget above its count would let reports come back unseen, so it is lowered as they go.
+  const slack = names.filter((name) => counts.get(name) < recorded.get(name))
+  if (slack.length > 0) {
+    return {
+      ok: false,
+      lines: [
+        ...slack.map(
+          (name) =>
+            `${title(name)} count ${counts.get(name)} is below budget ${recorded.get(name)} (file ${file})`,
+        ),
+        'The budget is out of date. Lower it by running the same command with --write',
       ],
     }
   }
