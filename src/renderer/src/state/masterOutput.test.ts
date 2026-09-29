@@ -8,32 +8,37 @@ import {
   toggleBlackoutAtom,
 } from './masterOutput'
 import { LIGHT } from '../../../shared/ipcChannels'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import type { MasterOutputSnapshot } from '../../../photonics-dmx/controllers/MasterOutputState'
+import {
+  installWindowApi,
+  type WindowApiAnswers,
+  type WindowApiStub,
+} from '@renderer/tests/helpers/windowApiStub'
 
-const invoke = jest.fn() as jest.MockedFunction<
-  (channel: string, data: unknown) => Promise<unknown>
->
-
-const FULL = { dimmerPercent: 100, blackout: false, strobeOutputEnabled: true }
-
-function mockInvoke(state = FULL) {
-  invoke.mockImplementation((channel: string, data: unknown) => {
-    if (channel === LIGHT.GET_MASTER_OUTPUT) return Promise.resolve(state)
-    if (channel === LIGHT.SET_MASTER_OUTPUT) {
-      return Promise.resolve({ success: true, state: { ...state, ...(data as object) } })
-    }
-    return Promise.resolve(undefined)
-  })
+const FULL: MasterOutputSnapshot = {
+  dimmerPercent: 100,
+  blackout: false,
+  strobeOutputEnabled: true,
 }
+
+let answers: WindowApiAnswers
+let api: WindowApiStub
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockInvoke()
-  installWindowApi(invoke)
+  answers = {
+    [LIGHT.GET_MASTER_OUTPUT]: () => FULL,
+    [LIGHT.SET_MASTER_OUTPUT]: (request) => ({ success: true, state: { ...FULL, ...request } }),
+  }
+  api = installWindowApi(answers)
 })
 
+function callsOn(channel: string): unknown[] {
+  return api.invoke.mock.calls.filter((c) => c[0] === channel).map((c) => c[1])
+}
+
 function setsMasterOutput(): unknown[] {
-  return invoke.mock.calls.filter((c) => c[0] === LIGHT.SET_MASTER_OUTPUT).map((c) => c[1])
+  return callsOn(LIGHT.SET_MASTER_OUTPUT)
 }
 
 describe('master output state', () => {
@@ -64,14 +69,10 @@ describe('master output state', () => {
 
   it('drops a broadcast that lands while our own write is in flight', async () => {
     let settle: (() => void) | undefined
-    invoke.mockImplementation((channel: string, data: unknown) => {
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return new Promise((resolve) => {
-          settle = () => resolve({ success: true, state: { ...FULL, ...(data as object) } })
-        })
-      }
-      return Promise.resolve(FULL)
-    })
+    answers[LIGHT.SET_MASTER_OUTPUT] = (request) =>
+      new Promise((resolve) => {
+        settle = () => resolve({ success: true, state: { ...FULL, ...request } })
+      })
 
     const store = createStore()
     store.set(toggleBlackoutAtom)
@@ -91,17 +92,12 @@ describe('master output state', () => {
   })
 
   it('re-reads main when a live update is refused', async () => {
-    invoke.mockImplementation((channel: string) => {
-      if (channel === LIGHT.SET_MASTER_OUTPUT) {
-        return Promise.resolve({ success: false, error: 'refused' })
-      }
-      return Promise.resolve(FULL)
-    })
+    answers[LIGHT.SET_MASTER_OUTPUT] = () => ({ success: false, error: 'refused' })
 
     const store = createStore()
     await store.set(applyMasterOutputAtom, { blackout: true })
     await Promise.resolve()
 
-    expect(invoke.mock.calls.filter((c) => c[0] === LIGHT.GET_MASTER_OUTPUT)).toHaveLength(1)
+    expect(callsOn(LIGHT.GET_MASTER_OUTPUT)).toHaveLength(1)
   })
 })

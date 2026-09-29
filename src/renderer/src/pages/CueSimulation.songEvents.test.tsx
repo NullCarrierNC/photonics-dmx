@@ -10,34 +10,32 @@ import {
   yargListenerEnabledAtom,
   previewRigIdAtom,
 } from '../atoms'
-import { LIGHT, CONFIG } from '../../../shared/ipcChannels'
+import { LIGHT } from '../../../shared/ipcChannels'
+import {
+  cueSimulationAnswers,
+  listingGroups,
+  offeringVerse,
+  storingSettings,
+  verseGroup,
+} from '@renderer/tests/helpers/cueSimulationAnswers'
 
 let simulateAnswer = true
 
-const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>(
-  async (channel: string) => {
-    if (channel === CONFIG.GET_PREFS) {
-      return { simulationSettings: { registryType: 'YARG', groupId: 'alpha', effectId: 'Verse' } }
-    }
-    if (channel === LIGHT.GET_CUE_GROUPS) {
-      return [{ id: 'alpha', name: 'Alpha', description: '', cueTypes: ['Verse'] }]
-    }
-    if (channel === CONFIG.GET_ENABLED_CUE_GROUPS) return ['alpha']
-    if (channel === LIGHT.GET_AVAILABLE_CUES) {
-      return [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
-    }
-    if (
-      channel === LIGHT.SIMULATE_BEAT ||
-      channel === LIGHT.SIMULATE_MEASURE ||
-      channel === LIGHT.SIMULATE_KEYFRAME
-    ) {
-      return simulateAnswer
-    }
-    if (channel.startsWith('get-')) return []
-    return undefined
-  },
-)
-installWindowApi(invoke)
+const answers = cueSimulationAnswers()
+listingGroups(answers, [verseGroup('alpha', 'Alpha')])
+offeringVerse(answers)
+storingSettings(answers, {
+  registryType: 'YARG',
+  groupId: 'alpha',
+  effectId: 'Verse',
+  venueSize: 'NoVenue',
+  bpm: 120,
+  instrument: 'guitar',
+})
+answers[LIGHT.SIMULATE_BEAT] = () => simulateAnswer
+answers[LIGHT.SIMULATE_MEASURE] = () => simulateAnswer
+answers[LIGHT.SIMULATE_KEYFRAME] = () => simulateAnswer
+const api = installWindowApi(answers)
 
 jest.mock('@renderer/hooks/useDmxPreview', () => ({
   useDmxPreview: () => ({ selectedRig: null, rigConfig: null }),
@@ -86,7 +84,7 @@ const KINDS = EVENTS.map(([kind]) => kind)
 describe('Cue Simulation song event lamps', () => {
   beforeEach(() => {
     simulateAnswer = true
-    invoke.mockClear()
+    api.invoke.mockClear()
   })
 
   afterEach(() => {
@@ -105,7 +103,7 @@ describe('Cue Simulation song event lamps', () => {
     await renderPage()
     fireEvent.click(screen.getByRole('button', { name: `Simulate ${kind}` }))
 
-    await waitFor(() => expect(invoke.mock.calls.map(([sent]) => sent)).toContain(channel))
+    await waitFor(() => expect(api.invoke.mock.calls.map(([sent]) => sent)).toContain(channel))
     await act(async () => {})
     expect(screen.getByRole('status').textContent).toBe('')
   })

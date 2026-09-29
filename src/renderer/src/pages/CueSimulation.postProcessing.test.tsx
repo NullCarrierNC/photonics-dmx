@@ -14,19 +14,12 @@ import {
   yargListenerEnabledAtom,
   previewRigIdAtom,
 } from '../atoms'
-import { LIGHT, CONFIG } from '../../../shared/ipcChannels'
+import { LIGHT } from '../../../shared/ipcChannels'
+import { cueSimulationAnswers } from '@renderer/tests/helpers/cueSimulationAnswers'
 
 // Stub the bridge rather than the ipcApi module, so every call the page and its children make
 // resolves instead of only the handful this file names.
-const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>(
-  async (channel: string) => {
-    if (channel.startsWith('get-')) return []
-    if (channel === LIGHT.SIMULATE_POST_PROCESSING) return true
-    if (channel === CONFIG.GET_PREFS) return {}
-    return undefined
-  },
-)
-installWindowApi(invoke)
+const api = installWindowApi(cueSimulationAnswers())
 
 jest.mock('@renderer/hooks/useDmxPreview', () => ({
   useDmxPreview: () => ({ selectedRig: null, rigConfig: null }),
@@ -56,7 +49,7 @@ function renderWith(prefs: Record<string, unknown>, options: { yargEnabled?: boo
 }
 
 function postProcessingCalls(): unknown[] {
-  return invoke.mock.calls
+  return api.invoke.mock.calls
     .filter((call) => call[0] === LIGHT.SIMULATE_POST_PROCESSING)
     .map((call) => (call[1] as { state?: unknown } | undefined)?.state)
 }

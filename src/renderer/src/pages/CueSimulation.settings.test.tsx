@@ -5,7 +5,12 @@
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { screen, cleanup, waitFor, fireEvent, act } from '@testing-library/react'
-import { installWindowApi, emitWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import {
+  installWindowApi,
+  emitWindowApi,
+  type WindowApiAnswers,
+  type WindowApiStub,
+} from '@renderer/tests/helpers/windowApiStub'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import {
   audioListenerEnabledAtom,
@@ -14,29 +19,21 @@ import {
   yargListenerEnabledAtom,
   previewRigIdAtom,
 } from '../atoms'
-import { LIGHT, CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import {
+  cueSimulationAnswers,
+  listingGroups,
+  offeringVerse,
+  storingSettings,
+  verseGroup,
+  type CueGroupListing,
+  type SimulationSettings,
+} from '@renderer/tests/helpers/cueSimulationAnswers'
 
-let savePrefsAnswer: unknown = undefined
-let prefsAnswer: unknown = {}
-let cueGroupsAnswer: unknown[] = []
-let availableCuesAnswer: unknown[] = []
-
-const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>(
-  async (channel: string) => {
-    if (channel === CONFIG.SAVE_PREFS) return savePrefsAnswer
-    if (channel === CONFIG.GET_PREFS) return prefsAnswer
-    if (channel === LIGHT.GET_CUE_GROUPS) return cueGroupsAnswer
-    if (channel === CONFIG.GET_ENABLED_CUE_GROUPS) {
-      return (cueGroupsAnswer as Array<{ id: string }>).map((g) => g.id)
-    }
-    if (channel === LIGHT.GET_AVAILABLE_CUES) return availableCuesAnswer
-    if (channel.startsWith('get-')) return []
-    if (channel === LIGHT.SIMULATE_POST_PROCESSING) return true
-    if (channel === CONFIG.GET_PREFS) return {}
-    return undefined
-  },
-)
-installWindowApi(invoke)
+// `ipcHelpers` subscribes to the bridge once per channel and keeps it across tests, so the bridge
+// stays installed and each test resets the answers in place.
+const answers: WindowApiAnswers = cueSimulationAnswers()
+const api: WindowApiStub = installWindowApi(answers)
 
 jest.mock('@renderer/hooks/useDmxPreview', () => ({
   useDmxPreview: () => ({ selectedRig: null, rigConfig: null }),
@@ -63,14 +60,14 @@ function renderPage() {
 
 /** The simulation settings each save-prefs call carried, in order. */
 function savedSettings(): Record<string, unknown>[] {
-  return invoke.mock.calls
+  return api.invoke.mock.calls
     .filter(([channel]) => channel === CONFIG.SAVE_PREFS)
     .map(([, payload]) => payload as { simulationSettings?: Record<string, unknown> })
     .filter((p) => p.simulationSettings !== undefined)
     .map((p) => p.simulationSettings as Record<string, unknown>)
 }
 
-const STORED = {
+const STORED: SimulationSettings = {
   registryType: 'YARG',
   groupId: 'zeta',
   effectId: 'Verse',
@@ -79,13 +76,13 @@ const STORED = {
   instrument: 'guitar',
 }
 
-const ALPHA = { id: 'alpha', name: 'Alpha', description: '', cueTypes: ['Verse'] }
-const ZETA = { id: 'zeta', name: 'Zeta', description: '', cueTypes: ['Verse'] }
+const ALPHA = verseGroup('alpha', 'Alpha')
+const ZETA = verseGroup('zeta', 'Zeta')
 
 const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function registryFills(groups: unknown[]): Promise<void> {
-  cueGroupsAnswer = groups
+async function registryFills(groups: CueGroupListing[]): Promise<void> {
+  listingGroups(answers, groups)
   await act(async () => {
     emitWindowApi(RENDERER_RECEIVE.NODE_CUES_CHANGED, {
       loaded: groups.length,
@@ -103,11 +100,8 @@ async function changeBpm(value: string): Promise<void> {
 
 describe('CueSimulation settings', () => {
   beforeEach(() => {
-    invoke.mockClear()
-    savePrefsAnswer = undefined
-    prefsAnswer = {}
-    cueGroupsAnswer = []
-    availableCuesAnswer = []
+    api.invoke.mockClear()
+    Object.assign(answers, cueSimulationAnswers())
   })
 
   afterEach(() => {
@@ -124,21 +118,9 @@ describe('CueSimulation settings', () => {
   })
 
   it('reopens on the saved group and writes nothing when nothing changed', async () => {
-    prefsAnswer = {
-      simulationSettings: {
-        registryType: 'YARG',
-        groupId: 'zeta',
-        effectId: 'Verse',
-        venueSize: 'Large',
-        bpm: 120,
-        instrument: 'guitar',
-      },
-    }
-    cueGroupsAnswer = [
-      { id: 'alpha', name: 'Alpha', description: '', cueTypes: ['Verse'] },
-      { id: 'zeta', name: 'Zeta', description: '', cueTypes: ['Verse'] },
-    ]
-    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    storingSettings(answers, STORED)
+    listingGroups(answers, [ALPHA, ZETA])
+    offeringVerse(answers)
     const view = renderPage()
 
     await screen.findByRole('option', { name: 'Zeta' })
@@ -150,8 +132,8 @@ describe('CueSimulation settings', () => {
   })
 
   it('keeps the stored group while the registry does not list it and selects it once listed', async () => {
-    prefsAnswer = { simulationSettings: STORED }
-    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    storingSettings(answers, STORED)
+    offeringVerse(answers)
     const view = renderPage()
 
     await settle(700)
@@ -166,9 +148,9 @@ describe('CueSimulation settings', () => {
   })
 
   it('shows the first group in place of an unlisted stored one without storing it', async () => {
-    prefsAnswer = { simulationSettings: STORED }
-    cueGroupsAnswer = [ALPHA]
-    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    storingSettings(answers, STORED)
+    listingGroups(answers, [ALPHA])
+    offeringVerse(answers)
     renderPage()
 
     await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('alpha'))
@@ -182,9 +164,9 @@ describe('CueSimulation settings', () => {
   })
 
   it('stores the shown group once the user picks a cue in it', async () => {
-    prefsAnswer = { simulationSettings: STORED }
-    cueGroupsAnswer = [ALPHA]
-    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    storingSettings(answers, STORED)
+    listingGroups(answers, [ALPHA])
+    offeringVerse(answers)
     renderPage()
 
     await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('alpha'))
@@ -197,8 +179,8 @@ describe('CueSimulation settings', () => {
   })
 
   it('writes nothing when the stored settings cannot be read', async () => {
-    prefsAnswer = { success: false, error: 'unreadable' }
-    cueGroupsAnswer = [ALPHA]
+    answers[CONFIG.GET_PREFS] = () => ({ success: false, error: 'unreadable' })
+    listingGroups(answers, [ALPHA])
     renderPage()
 
     await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('alpha'))
@@ -211,8 +193,8 @@ describe('CueSimulation settings', () => {
     [240, 240],
     [1000, 120],
   ])('reopens with a stored BPM of %s showing %s', async (bpm, shown) => {
-    prefsAnswer = { simulationSettings: { ...STORED, bpm } }
-    cueGroupsAnswer = [ALPHA, ZETA]
+    storingSettings(answers, { ...STORED, bpm })
+    listingGroups(answers, [ALPHA, ZETA])
     renderPage()
 
     await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('zeta'))
@@ -221,7 +203,7 @@ describe('CueSimulation settings', () => {
   })
 
   it('says so when the settings cannot be stored', async () => {
-    savePrefsAnswer = { success: false, error: 'read only' }
+    answers[CONFIG.SAVE_PREFS] = () => ({ success: false, error: 'read only' })
     renderPage()
 
     await changeBpm('140')

@@ -6,19 +6,30 @@ import { useMasterOutputSync } from './useMasterOutputSync'
 import { masterOutputAtom } from '../state/masterOutput'
 import { LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import {
+  installWindowApi,
+  type WindowApiAnswers,
+  type WindowApiStub,
+} from '@renderer/tests/helpers/windowApiStub'
+import type { MasterOutputSnapshot } from '../../../photonics-dmx/controllers/MasterOutputState'
 
-const invoke = jest.fn() as jest.MockedFunction<
-  (channel: string, data: unknown) => Promise<unknown>
->
+const FULL: MasterOutputSnapshot = {
+  dimmerPercent: 100,
+  blackout: false,
+  strobeOutputEnabled: true,
+}
 
-const FULL = { dimmerPercent: 100, blackout: false, strobeOutputEnabled: true }
+let answers: WindowApiAnswers
+let api: WindowApiStub
 
 beforeEach(() => {
   jest.clearAllMocks()
-  invoke.mockImplementation(() => Promise.resolve(FULL))
-  installWindowApi(invoke)
+  answers = { [LIGHT.GET_MASTER_OUTPUT]: () => FULL }
+  api = installWindowApi(answers)
 })
+
+const readsOfMain = (): number =>
+  api.invoke.mock.calls.filter((c) => c[0] === LIGHT.GET_MASTER_OUTPUT).length
 
 const Harness = () => {
   useMasterOutputSync()
@@ -50,9 +61,11 @@ function mount() {
 
 describe('useMasterOutputSync', () => {
   it('seeds this window from main on mount', async () => {
-    invoke.mockImplementation(() =>
-      Promise.resolve({ dimmerPercent: 45, blackout: true, strobeOutputEnabled: false }),
-    )
+    answers[LIGHT.GET_MASTER_OUTPUT] = () => ({
+      dimmerPercent: 45,
+      blackout: true,
+      strobeOutputEnabled: false,
+    })
     const { store } = mount()
 
     await waitFor(() => expect(store.get(masterOutputAtom).dimmerPercent).toBe(45))
@@ -74,15 +87,11 @@ describe('useMasterOutputSync', () => {
     const { handlers, spy } = captureListeners()
     mount()
     await waitFor(() => expect(handlers.has(RENDERER_RECEIVE.CONTROLLERS_RESTARTED)).toBe(true))
-    const before = invoke.mock.calls.filter((c) => c[0] === LIGHT.GET_MASTER_OUTPUT).length
+    const before = readsOfMain()
 
     handlers.get(RENDERER_RECEIVE.CONTROLLERS_RESTARTED)!(undefined as never)
 
-    await waitFor(() =>
-      expect(invoke.mock.calls.filter((c) => c[0] === LIGHT.GET_MASTER_OUTPUT).length).toBe(
-        before + 1,
-      ),
-    )
+    await waitFor(() => expect(readsOfMain()).toBe(before + 1))
     spy.mockRestore()
   })
 
