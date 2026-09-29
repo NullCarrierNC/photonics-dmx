@@ -9,18 +9,18 @@
  *  - STOP_MOTION_CUE_SIMULATION clears pan/tilt on every chain via the fanout.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { withCollaboratorGetters } from './managerFacades'
 
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
 }))
 
-import { setupSimulationHandlers } from '../../ipc/simulation-handlers'
+import { setupSimulationHandlers, type SimulationHost } from '../../ipc/simulation-handlers'
 import { LIGHT } from '../../../shared/ipcChannels'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { MotionCueSimulator } from '../../controllers/MotionCueSimulator'
 import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCueRegistry'
+import type { OutputSenderStateSnapshot } from '../../controllers/SenderLifecycleController'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
 type Handler = (...args: unknown[]) => Promise<unknown> | unknown
@@ -77,26 +77,9 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
   let chains: RigChain[]
   let fanout: ChainFanout
   let ipc: FakeIpcMain
-  let controllerManager: {
-    setOnConsoleEnter: jest.Mock
-    setOnSimulationPreempt: jest.Mock
-    ensureChainsHaveHandlersForSimulation: jest.Mock
-    getChainFanout: () => ChainFanout
-    getMotionCueSimulator: () => MotionCueSimulator
-    getIsInitialized: () => boolean
-    getIsRb3Enabled: () => boolean
-    getIsYargEnabled: () => boolean
-    getIsAudioEnabled: () => boolean
-    getDmxPublisher: () => null
-    getVenueFrameProcessor: () => { getVenuePostProcessing: () => 'Default' }
-    init: jest.Mock
-  }
-  // Cast for setupSimulationHandlers' parameter type — the IPC handlers exercise only a
-  // narrow ControllerManager surface; the stub is intentionally minimal.
-  const asControllerManager = (
-    cm: typeof controllerManager,
-  ): Parameters<typeof setupSimulationHandlers>[1] =>
-    cm as unknown as Parameters<typeof setupSimulationHandlers>[1]
+  let ensureChainsHaveHandlersForSimulation: jest.Mock<
+    SimulationHost['ensureChainsHaveHandlersForSimulation']
+  >
 
   beforeEach(() => {
     yargRegistry = CueRegistry.getInstance()
@@ -108,21 +91,31 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     fanout.setChains(chains)
     ipc = makeIpcMain()
     const motionCueSimulator = new MotionCueSimulator({ getChainFanout: () => fanout })
-    controllerManager = withCollaboratorGetters({
-      setOnConsoleEnter: jest.fn(),
-      setOnSimulationPreempt: jest.fn(),
-      ensureChainsHaveHandlersForSimulation: jest.fn(),
-      getChainFanout: () => fanout,
+    ensureChainsHaveHandlersForSimulation = jest.fn()
+    const controllerManager: SimulationHost = {
       getMotionCueSimulator: () => motionCueSimulator,
-      getIsInitialized: () => true,
+      setOnSimulationPreempt: jest.fn(),
       getIsRb3Enabled: () => false,
       getIsYargEnabled: () => false,
       getIsAudioEnabled: () => false,
-      getDmxPublisher: () => null,
-      getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
-      init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    })
-    setupSimulationHandlers(ipc as never, asControllerManager(controllerManager))
+      getLifecyclePhase: () => 'running',
+      getIsInitialized: () => true,
+      init: jest.fn<SimulationHost['init']>().mockResolvedValue(undefined),
+      stopTestEffect: jest.fn<SimulationHost['stopTestEffect']>().mockResolvedValue(undefined),
+      ensureChainsHaveHandlersForSimulation,
+      getChainFanout: () => fanout,
+      getConsoleModeController: () => ({ setOnConsoleEnter: jest.fn() }),
+      getVenueFrameProcessor: () => ({
+        getVenuePostProcessing: () => 'Default',
+        setVenuePostProcessing: jest.fn(),
+      }),
+      getTestEffectRunner: () => ({ startTestEffect: jest.fn(), setRb3LedState: jest.fn() }),
+      getListenerLifecycle: () => ({ yargRb3: { getRb3Mode: () => 'none' } }),
+      getSenderLifecycle: () => ({
+        getOutputSenderStatus: jest.fn<() => OutputSenderStateSnapshot>(),
+      }),
+    }
+    setupSimulationHandlers(ipc as never, controllerManager)
   })
 
   afterEach(() => {
@@ -135,7 +128,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     await handler({}, undefined)
     expect(chains[0].sequencer.onBeat).toHaveBeenCalledTimes(1)
     expect(chains[1].sequencer.onBeat).toHaveBeenCalledTimes(1)
-    expect(controllerManager.ensureChainsHaveHandlersForSimulation).toHaveBeenCalledTimes(1)
+    expect(ensureChainsHaveHandlersForSimulation).toHaveBeenCalledTimes(1)
   })
 
   it('SIMULATE_KEYFRAME calls onKeyframe on the fanout', async () => {

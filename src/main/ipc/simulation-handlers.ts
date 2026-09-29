@@ -1,6 +1,12 @@
 import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
-import { ControllerManager } from '../controllers/ControllerManager'
+import type { ControllerManager } from '../controllers/ControllerManager'
+import type { ConsoleModeController } from '../controllers/ConsoleModeController'
+import type { TestEffectRunner } from '../controllers/TestEffectRunner'
+import type { ListenerCoordinator } from '../controllers/ListenerCoordinator'
+import type { SenderLifecycleController } from '../controllers/SenderLifecycleController'
+import type { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import {
@@ -44,13 +50,37 @@ interface SimulatedMotionCue<TData> {
  * chain so secondary rigs see the same motion at the same time).
  */
 
+/** What the simulation handlers reach on the controller manager. */
+export type SimulationHost = Pick<
+  ControllerManager,
+  | 'getMotionCueSimulator'
+  | 'setOnSimulationPreempt'
+  | 'getIsRb3Enabled'
+  | 'getIsYargEnabled'
+  | 'getIsAudioEnabled'
+  | 'getLifecyclePhase'
+  | 'getIsInitialized'
+  | 'init'
+  | 'stopTestEffect'
+  | 'ensureChainsHaveHandlersForSimulation'
+  | 'getChainFanout'
+> & {
+  getConsoleModeController(): Pick<ConsoleModeController, 'setOnConsoleEnter'>
+  getVenueFrameProcessor(): Pick<
+    VenueFrameProcessor,
+    'getVenuePostProcessing' | 'setVenuePostProcessing'
+  >
+  getTestEffectRunner(
+    domain: NetCueMode,
+  ): Pick<TestEffectRunner, 'startTestEffect' | 'setRb3LedState'>
+  getListenerLifecycle(): { yargRb3: Pick<ListenerCoordinator, 'getRb3Mode'> }
+  getSenderLifecycle(): Pick<SenderLifecycleController, 'getOutputSenderStatus'>
+}
+
 /**
  * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, audio cues).
  */
-export function setupSimulationHandlers(
-  ipcMain: IpcMain,
-  controllerManager: ControllerManager,
-): void {
+export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: SimulationHost): void {
   const sim = controllerManager.getMotionCueSimulator()
 
   const stopMotionSimAndNotify = (): void => {

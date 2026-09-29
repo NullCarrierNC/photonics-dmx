@@ -16,64 +16,31 @@ jest.mock(
 const readNodeCueFile = jest.mocked(ipcApi.readNodeCueFile)
 
 import { useCueFileIO, type UseCueFileIOParams } from './useCueFileIO'
-import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
-import type {
-  NetNodeCueDefinition,
-  NetNodeCueFile,
-  NodeCueFile,
-  NodeCueKind,
-  YargEffectDefinition,
-  YargEffectFile,
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { CueType } from '../../../../../photonics-dmx/cues/types/cueTypes'
+import type { NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument, EditorMode } from '../lib/types'
 import { createDefaultEffectFile, createDefaultFile } from '../lib/cueDefaults'
+import {
+  cue,
+  cueFileOf,
+  cueSummary,
+  effect,
+  effectFileOf,
+} from '@renderer/tests/helpers/cueEditorFiles'
 
 const SAVED_PATH = '/cues/motion-cues.json'
 
-const fileSummary = (): NodeCueFileSummary =>
-  ({
-    path: SAVED_PATH,
-    groupId: 'motion-group',
-    mode: 'yarg',
-  }) as NodeCueFileSummary
-
-const cue = (id: string, kind: NodeCueKind, name: string): NetNodeCueDefinition => {
-  const graph = { id, name, nodes: { events: [], actions: [] }, connections: [] }
-  return kind === 'motion'
-    ? { ...graph, kind }
-    : { ...graph, kind, cueType: CueType.Chorus, style: 'primary' }
-}
-
-const effect = (id: string, name: string): YargEffectDefinition => ({
-  id,
-  name,
-  mode: 'yarg',
-  nodes: { events: [], actions: [] },
-  connections: [],
-})
-
-const cueFileOf = (...cues: NetNodeCueDefinition[]): NetNodeCueFile => ({
-  version: 1,
-  mode: 'yarg',
-  group: { id: 'g', name: 'Group' },
-  cues,
-})
+const fileSummary = () => cueSummary({ path: SAVED_PATH, groupId: 'motion-group', mode: 'yarg' })
 
 /** A file holding both kinds, with the lighting cue sorting first by name. */
-const mixedFile = (): NetNodeCueFile =>
+const mixedFile = () =>
   cueFileOf(
     cue('cue-motion-b', 'motion', 'Bravo Motion'),
     cue('cue-light', 'lighting', 'Alpha Lighting'),
     cue('cue-motion-a', 'motion', 'Alpha Motion'),
   )
 
-const effectFile = (): YargEffectFile => ({
-  version: 1,
-  mode: 'yarg',
-  group: { id: 'g', name: 'Group' },
-  effects: [effect('effect-b', 'Bravo Effect'), effect('effect-a', 'Alpha Effect')],
-})
+const effectFile = () =>
+  effectFileOf(effect('effect-b', 'Bravo Effect'), effect('effect-a', 'Alpha Effect'))
 
 /** A document open at the saved path, in the given mode, with the items `added` after its own. */
 const openAt = (mode: EditorMode, ...added: string[]): EditorDocument => {
@@ -608,16 +575,8 @@ describe('useCueFileIO with another file opened meanwhile', () => {
     path: `/cues/${id}.json`,
     file: cueFile(id),
   })
-  const summaryAt = (id: string): NodeCueFileSummary => ({
-    path: `/cues/${id}.json`,
-    groupId: id,
-    groupName: id,
-    cueCount: 0,
-    lightingCueCount: 0,
-    motionCueCount: 0,
-    mode: 'yarg',
-    updatedAt: 0,
-  })
+  const summaryAt = (id: string) =>
+    cueSummary({ path: `/cues/${id}.json`, groupId: id, mode: 'yarg' })
 
   /** The hook over real document and dirty state, as the editor holds them. */
   function useEditor(refreshFiles: () => Promise<void>) {

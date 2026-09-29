@@ -8,6 +8,7 @@ import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-libra
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { DEFAULT_AUDIO_CONFIG } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 jest.mock(
@@ -21,8 +22,11 @@ jest.mock(
 const getAudioConfig = jest.mocked(ipcApi.getAudioConfig)
 const saveAudioConfig = jest.mocked(ipcApi.saveAudioConfig)
 
-/** A stored config holding only the fields these panels read. */
-const storedConfig = (fields: Partial<AudioConfig>): AudioConfig => fields as AudioConfig
+/** The stored config, with `fields` changed from the defaults. */
+const storedConfig = (fields: Partial<AudioConfig>): AudioConfig => ({
+  ...DEFAULT_AUDIO_CONFIG,
+  ...fields,
+})
 
 jest.mock(
   '../utils/ipcHelpers',
@@ -75,12 +79,13 @@ describe('useAudioConfigFields', () => {
     expect(screen.getByTestId('noiseFloor').textContent).toBe('90')
   })
 
-  it('keeps a default the stored config does not carry', async () => {
-    getAudioConfig.mockImplementation(async () => storedConfig({ sensitivity: 1.5 }))
+  it('keeps the defaults while main holds no audio config', async () => {
+    getAudioConfig.mockImplementation(async () => undefined)
 
     render(<Panel />)
 
-    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+    await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+    expect(sensitivity()).toBe('2.5')
     expect(screen.getByTestId('noiseFloor').textContent).toBe('60')
   })
 
