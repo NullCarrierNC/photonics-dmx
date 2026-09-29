@@ -40,6 +40,11 @@ export interface EffectExecutionEngineOptions {
   callerMode: NodeCueMode
   /** The warnings of the cue that raised this effect, which report under that cue. */
   unknownValues: UnknownValueWarnings
+  /**
+   * The effects, by name and layer, that a cancelled run of the same raiser left showing. This
+   * engine's run draws over them from the look they show, and they are removed once it goes idle.
+   */
+  takeOver?: ReadonlyMap<string, number>
 }
 
 export class EffectExecutionEngine extends BaseNodeExecutionEngine {
@@ -58,13 +63,14 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   private readonly revisitPolicyValue: RevisitPolicy
   private readonly callerMode: NodeCueMode
   private readonly unknownValues: UnknownValueWarnings
+  /** Removes the effects taken over from a cancelled run, once this engine goes idle. */
+  private releaseTakenOver?: () => void
 
   private maybeFireIdle(): void {
-    if (
-      this.onIdleCallback &&
-      this.activeContexts.size === 0 &&
-      this.pendingCallbackEffects.size === 0
-    ) {
+    if (this.activeContexts.size > 0 || this.pendingCallbackEffects.size > 0) return
+    this.releaseTakenOver?.()
+    this.releaseTakenOver = undefined
+    if (this.onIdleCallback) {
       if (this.firingIdle) return
       this.firingIdle = true
       queueMicrotask(() => {
@@ -96,6 +102,9 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
       consumeInitialClearPolicy: options.consumeInitialClearPolicy,
     })
     this.instanceId = ++EffectExecutionEngine.nextInstanceId
+    if (options.takeOver) {
+      this.releaseTakenOver = this.awaitedEffects.holdForTakeOver(options.takeOver)
+    }
     this.compiledEffect = compiledEffect
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
@@ -365,9 +374,10 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   /**
    * Cancel every run as {@link cancelAll} with `skipEffectRemoval` does, and return the effects
    * left showing, by name and layer, for the caller to remove once their lights are taken over.
+   * Those still held for this engine's own runs are among them.
    */
   public cancelLeavingEffects(): Map<string, number> {
-    const showing = new Map(this.submittedEffects)
+    const showing = new Map([...this.awaitedEffects.held(), ...this.submittedEffects])
     this.cancelAll(true)
     return showing
   }

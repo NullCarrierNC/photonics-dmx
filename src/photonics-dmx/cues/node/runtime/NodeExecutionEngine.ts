@@ -446,6 +446,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     /** Release for this call's own hold, and for the hold of a run this call interrupted. */
     let releaseWaiter: (() => void) | undefined
     let releaseInterrupted: (() => void) | undefined
+    let takeOver: Map<string, number> | undefined
     try {
       const { effectId } = raiserNode
 
@@ -471,16 +472,13 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
             this.continueToNextNodes(raiserNode.id, context)
             return
           }
-          // Interruptible: cancel the in-flight effect so a fresh one restarts from the top.
-          // Removes its submitted effects from the sequencer and clears its idle callback. The
-          // cancelled run can no longer report idle, so its context is released only once the
+          // Interruptible: restart the in-flight effect from the top, drawing over the look it
+          // leaves. The cancelled run cannot report idle, so its context is released only once the
           // replacement is tracked: releasing before that can complete a cue-called context, which
           // dispatches the frame queued behind it and re-enters this method on the same key.
-          this.debugLog(
-            `Effect raiser ${raiserNode.id} interruptible: cancelling running effect to restart`,
-          )
+          this.debugLog(`Effect raiser ${raiserNode.id} interruptible: restarting its effect`)
           releaseInterrupted = existing.releaseWaiter
-          existing.engine.cancelAll()
+          takeOver = existing.engine.cancelLeavingEffects()
         } else {
           // Engine is idle - clean it up and allow new trigger. Its queued idle still runs and
           // carries the context that raised it forward, so no release here.
@@ -525,6 +523,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
           // The raising cue's mode, so cue-data inside the effect reads the frame that raised it.
           callerMode: this.mode,
           unknownValues: this.unknownValues,
+          takeOver,
         },
       )
 

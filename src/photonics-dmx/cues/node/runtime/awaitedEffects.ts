@@ -74,6 +74,21 @@ export class AwaitedEffects {
     if (endedWhileStarting) this.removeHeldFor(restart)
   }
 
+  /**
+   * Hold `showing`, the effects another engine's cancelled run left up, until the returned release
+   * removes them. Cleared with every other held effect when this engine is cancelled.
+   */
+  holdForTakeOver(showing: ReadonlyMap<string, number>): () => void {
+    const restart = {}
+    for (const [name, layer] of showing) this.handedOver.set(name, { layer, eventIds: [], restart })
+    return () => this.removeHeldFor(restart)
+  }
+
+  /** The effects held for a replacing run, by name and layer. */
+  held(): Map<string, number> {
+    return new Map([...this.handedOver].map(([name, { layer }]) => [name, layer]))
+  }
+
   /** Whether `name` was handed over, claiming it for the run submitting it again. */
   claim(name: string): boolean {
     return this.handedOver.delete(name)
