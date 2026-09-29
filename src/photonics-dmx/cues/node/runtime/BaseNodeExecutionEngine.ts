@@ -44,8 +44,6 @@ import {
   ResolvedActionTarget,
   ResolvedColorSetting,
   ResolvedActionTiming,
-  ResolvedPositionSetting,
-  buildSetPositionSubmissionFingerprint,
 } from '../compiler/ActionEffectFactory'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import {
@@ -54,13 +52,9 @@ import {
   resolveLocationGroups,
   resolveLightTarget,
 } from './valueResolver'
-import {
-  resolveActionColor,
-  resolveActionTiming,
-  resolveActionLayer,
-  resolveActionPosition,
-} from './actionResolver'
+import { resolveActionColor, resolveActionTiming, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
+import { buildSetPositionEffect, resolveSetPosition } from './setPositionSubmission'
 import {
   runContextBatch,
   buildActionChain,
@@ -1026,72 +1020,26 @@ export abstract class BaseNodeExecutionEngine {
    * state-target effect (immediate replace when non-blocking, callback-gated when blocking).
    */
   protected executeSetPositionAction(actionNode: ActionNode, context: ExecutionContext): void {
-    if (!actionNode.position) {
+    const resolved = resolveSetPosition(actionNode, context, this.lightManager, (varName) =>
+      this.lookupVar(varName, context),
+    )
+    if (resolved === 'no-position')
       log.warn(`set-position action ${actionNode.id} is missing position`)
+    if (typeof resolved === 'string') {
       this.continueToNextNodes(actionNode.id, context)
       return
     }
-
-    const resolvedTarget: ResolvedActionTarget = {
-      groups: resolveLocationGroups(actionNode.target.groups, context),
-      filter: resolveLightTarget(actionNode.target.filter, context),
-    }
-    const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
-      actionNode.position,
-      context,
-    )
-    const resolvedTiming = resolveActionTiming(actionNode.timing, context)
-    const resolvedLayer = resolveActionLayer(actionNode.layer, context)
-
-    const resolvedAction = {
-      ...actionNode,
-      target: resolvedTarget,
-      timing: resolvedTiming,
-      layer: resolvedLayer,
-    } as ActionNode & {
-      target: ResolvedActionTarget
-      timing: ResolvedActionTiming
-      layer: number
-    }
-
-    const lights = ActionEffectFactory.resolveLights(
-      this.lightManager,
-      actionNode.target,
-      context.unknownValues,
-      (varName: string) => this.lookupVar(varName, context),
-    )
-
-    if (!lights || lights.length === 0) {
-      this.continueToNextNodes(actionNode.id, context)
-      return
-    }
+    const { layer: resolvedLayer, timing: resolvedTiming, fingerprint: positionFp } = resolved
 
     const iterIdx = context.getForEachIterationIndex()
     const effectName = this.buildEffectName(actionNode.id, iterIdx)
-
-    const positionFp = buildSetPositionSubmissionFingerprint(
-      resolvedTarget,
-      resolvedPosition,
-      resolvedLayer,
-      resolvedTiming,
-    )
     if (this.setPositionSubmissionFingerprint.get(effectName) === positionFp) {
       this.emitNodeExecution('deactivated', actionNode.id)
       this.continueToNextNodes(actionNode.id, context)
       return
     }
 
-    const effect = ActionEffectFactory.buildEffect({
-      action: resolvedAction,
-      lights,
-      waitCondition: undefined,
-      waitTime: 0,
-      resolvedTarget,
-      resolvedTiming,
-      resolvedLayer,
-      resolvedPosition,
-    })
-
+    const effect = buildSetPositionEffect(resolved)
     if (!effect) {
       log.warn(`Failed to create set-position effect for action ${actionNode.id}`)
       this.emitNodeExecution('deactivated', actionNode.id)
