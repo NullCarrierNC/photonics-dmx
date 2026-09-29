@@ -28,17 +28,24 @@ function signingConfigProblems(yamlText) {
   return []
 }
 
+/** How a shell chains one command to the next: `&&`, `||`, `;` or a pipe. */
+const COMMAND_SEPARATOR = /&&|\|\||;|\|/
+
 /**
  * @param {Record<string, string>} scripts package.json scripts
  * @returns {string[]} one line per script command that runs electron-builder to package without
- *   turning identity discovery off. install-app-deps only rebuilds native modules, so it is exempt.
+ *   turning identity discovery off. A command that is `electron-builder install-app-deps` alone
+ *   only rebuilds native modules, so it is exempt.
  */
 function packagingScriptProblems(scripts) {
   const problems = []
   for (const [name, script] of Object.entries(scripts)) {
-    for (const command of script.split('&&').map((part) => part.trim())) {
-      if (!/\belectron-builder\b/.test(command) || /\binstall-app-deps\b/.test(command)) continue
-      if (!command.startsWith(DISCOVERY_OFF)) {
+    for (const command of script.split(COMMAND_SEPARATOR).map((part) => part.trim())) {
+      const runs = command.match(/\belectron-builder\b/g)?.length ?? 0
+      if (runs === 0) continue
+      const single = runs === 1
+      if (single && command.startsWith('electron-builder install-app-deps')) continue
+      if (!single || !command.startsWith(DISCOVERY_OFF)) {
         problems.push(`${name} runs "${command}" without CSC_IDENTITY_AUTO_DISCOVERY=false`)
       }
     }

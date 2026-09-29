@@ -58,6 +58,42 @@ describe('packagingScriptProblems', () => {
     ])
   })
 
+  it.each([
+    [
+      'a semicolon',
+      'electron-builder install-app-deps; electron-builder --mac',
+      'electron-builder --mac',
+    ],
+    [
+      'an or',
+      'electron-builder install-app-deps || electron-builder --dir',
+      'electron-builder --dir',
+    ],
+    [
+      'a pipe',
+      'electron-builder install-app-deps | electron-builder --dir',
+      'electron-builder --dir',
+    ],
+    [
+      'an or after a guarded command',
+      'cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir || electron-builder --mac',
+      'electron-builder --mac',
+    ],
+  ])('names a packaging command after %s', (_label, script, command) => {
+    expect(packagingScriptProblems({ pack: script })).toEqual([
+      `pack runs "${command}" without CSC_IDENTITY_AUTO_DISCOVERY=false`,
+    ])
+  })
+
+  it.each([
+    ['names install-app-deps as an argument', 'electron-builder --mac install-app-deps'],
+    ['runs a second electron-builder', 'electron-builder install-app-deps electron-builder --mac'],
+  ])('names a command that %s', (_label, script) => {
+    expect(packagingScriptProblems({ pack: script })).toEqual([
+      `pack runs "${script}" without CSC_IDENTITY_AUTO_DISCOVERY=false`,
+    ])
+  })
+
   it('holds every repository script that packages to identity discovery off', () => {
     const { scripts } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
     expect(packagingScriptProblems(scripts)).toEqual([])
