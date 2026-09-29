@@ -8,6 +8,7 @@ import {
   migratePrefsV6ToV7,
 } from './preferencesMigration'
 import {
+  healStoredAudioIdleLook,
   healStoredClockRate,
   healStoredSenderConfigs,
   repairCueDomains,
@@ -22,9 +23,9 @@ import { repairInvalidPreferenceFields } from './preferencesFieldRepair'
  * domains for files that predate them, and a one-time v6 → v7 move onto RB3 cue mode. On every
  * load, top-level keys the schema requires are seeded from the defaults and every cue domain is
  * completed, so a file short of one of them keeps the rest of its settings instead of being moved
- * aside. Stored values a driver or the engine cannot use, a sender configuration or the clock rate,
- * come back into range in the same pass. Last, any value the schema still rejects goes back to its
- * default, and the file is moved aside only when that is not enough.
+ * aside. Stored values a driver or the engine cannot use, a sender configuration, the clock rate
+ * or an audio idle look, come back into range in the same pass. Last, any value the schema still
+ * rejects goes back to its default, and the file is moved aside only when that is not enough.
  */
 export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
   constructor(hooks: ConfigFileHooks<AppPreferences> = {}) {
@@ -32,8 +33,11 @@ export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
       validate: validateAppPreferencesData,
       normalizeLoaded: (data, reportRepair) =>
         repairInvalidPreferenceFields(
-          healStoredClockRate(
-            healStoredSenderConfigs(repairCueDomains(seedMissingRequiredPrefs(data))),
+          healStoredAudioIdleLook(
+            healStoredClockRate(
+              healStoredSenderConfigs(repairCueDomains(seedMissingRequiredPrefs(data))),
+            ),
+            reportRepair,
           ),
           reportRepair,
         ),
