@@ -9,6 +9,7 @@ import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { CueType } from '../../cues/types/cueTypes'
+import { RB3_STROBE_WATCHDOG_MS } from '../../listeners/RB3/StageKitTypes'
 import type { CueData } from '../../cues/types/cueTypes'
 import { performance as perfHooks } from 'perf_hooks'
 
@@ -262,6 +263,38 @@ describe('Rb3StageKitCueProcessor', () => {
     proc.tick()
 
     expect(calls.some((c) => c.cueType === CueType.Strobe_Fast)).toBe(false)
+    expect(calls.some((c) => c.cueType === CueType.Strobe_Off)).toBe(true)
+    expect(runtime.stopActiveStrobe).toHaveBeenCalledTimes(1)
+
+    proc.stopListening()
+    nowSpy.mockRestore()
+  })
+
+  it('holds a strobe through a quiet stretch of a song by default', () => {
+    const { runtime, calls } = mockRuntime()
+    const emitter = new EventEmitter()
+    const proc = new Rb3StageKitCueProcessor(runtime, { keepaliveMs: null })
+    proc.startListening(emitter)
+    const nowSpy = jest.spyOn(perfHooks, 'now').mockReturnValue(0)
+
+    emitter.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      strobeEffect: 'fast',
+      rightChannel: 0x05,
+      timestamp: 0,
+    })
+
+    nowSpy.mockReturnValue(RB3_STROBE_WATCHDOG_MS - 500)
+    calls.length = 0
+    proc.tick()
+    expect(calls.some((c) => c.cueType === CueType.Strobe_Fast)).toBe(true)
+    expect(runtime.stopActiveStrobe).not.toHaveBeenCalled()
+
+    nowSpy.mockReturnValue(RB3_STROBE_WATCHDOG_MS)
+    calls.length = 0
+    proc.tick()
     expect(calls.some((c) => c.cueType === CueType.Strobe_Off)).toBe(true)
     expect(runtime.stopActiveStrobe).toHaveBeenCalledTimes(1)
 

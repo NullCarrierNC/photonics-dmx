@@ -17,10 +17,16 @@ export interface StageKitConfig {
 }
 
 /**
+ * RB3 strobe silence window. A song can hold a strobe for several seconds with no StageKit
+ * traffic, so the window outlasts those stretches.
+ */
+export const RB3_STROBE_WATCHDOG_MS = 12_500
+
+/**
  * Default StageKit configuration
  */
 export const DEFAULT_STAGEKIT_CONFIG: StageKitConfig = {
   enabled: true,
   debug: false,
-  strobeWatchdogMs: 2000,
+  strobeWatchdogMs: RB3_STROBE_WATCHDOG_MS,
 }
