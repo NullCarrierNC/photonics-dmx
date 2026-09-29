@@ -52,6 +52,9 @@ const FUNCTIONS: Record<string, { arity: number; fn: (a: number[]) => number }> 
   cos: { arity: 1, fn: ([a]) => Math.cos(a) },
 }
 
+/** Whether `name` is a built-in constant, not a name every object inherits. */
+const isConstant = (name: string): boolean => Object.hasOwn(CONSTANTS, name)
+
 /** The names an expression reads as its built-in functions and constants. */
 export const EXPRESSION_BUILTIN_NAMES: readonly string[] = [
   ...Object.keys(FUNCTIONS),
@@ -169,7 +172,7 @@ function parse(src: string): { ast: Node; variables: string[] } {
       const next = peek()
       if (next && next.t === 'op' && next.v === '(') {
         // function call
-        const fn = FUNCTIONS[tk.v]
+        const fn = Object.hasOwn(FUNCTIONS, tk.v) ? FUNCTIONS[tk.v] : undefined
         if (!fn) throw new ExpressionParseError(`unknown function '${tk.v}'`)
         eat('(')
         const args: Node[] = []
@@ -191,7 +194,7 @@ function parse(src: string): { ast: Node; variables: string[] } {
         }
         return { k: 'call', name: tk.v, args }
       }
-      if (tk.v in CONSTANTS) return { k: 'num', v: CONSTANTS[tk.v] }
+      if (isConstant(tk.v)) return { k: 'num', v: CONSTANTS[tk.v] }
       vars.add(tk.v)
       return { k: 'var', name: tk.v }
     }
@@ -287,7 +290,7 @@ export function renameExpressionVariables(
   let copied = 0
   toks.forEach((tk, index) => {
     const next = toks[index + 1]
-    if (tk.t !== 'id' || tk.v in CONSTANTS || (next?.t === 'op' && next.v === '(')) return
+    if (tk.t !== 'id' || isConstant(tk.v) || (next?.t === 'op' && next.v === '(')) return
     const name = renames.get(tk.v)
     if (name === undefined) return
     out += src.slice(copied, tk.at) + name
