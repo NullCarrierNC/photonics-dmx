@@ -630,11 +630,26 @@ describe('inputValidation', () => {
       })
 
       it('refuses a link under a root that points outside it', () => {
+        const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-outside-'))
         const link = path.join(root, 'escape')
-        fs.symlinkSync('/etc', link)
+        fs.symlinkSync(outside, link)
+        try {
+          expect(validatePathUnderAllowedRoots(link, [root]).ok).toBe(false)
+          expect(validatePathUnderAllowedRoots(path.join(link, 'hosts'), [root]).ok).toBe(false)
+        } finally {
+          fs.rmSync(outside, { recursive: true, force: true })
+        }
+      })
 
-        expect(validatePathUnderAllowedRoots(link, [root]).ok).toBe(false)
-        expect(validatePathUnderAllowedRoots(path.join(link, 'hosts'), [root]).ok).toBe(false)
+      it('refuses a link under a root whose target outside it does not exist yet', () => {
+        const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-outside-'))
+        const link = path.join(root, 'escape.json')
+        fs.symlinkSync(path.join(outside, 'missing.json'), link)
+        try {
+          expect(validatePathUnderAllowedRoots(link, [root]).ok).toBe(false)
+        } finally {
+          fs.rmSync(outside, { recursive: true, force: true })
+        }
       })
 
       it('accepts a file inside a root that is reached through a link', () => {
