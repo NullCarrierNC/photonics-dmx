@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "yarg",
   "group": {
     "id": "yarg-fade-effects",
@@ -860,18 +860,10 @@
           {
             "id": "rcw-num-groups",
             "type": "logic",
-            "logicType": "math",
-            "label": "numGroups = numLights / groupSize",
+            "logicType": "expression",
+            "label": "numGroups = floor(numLights / groupSize)",
             "outputs": [],
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "variable",
-              "name": "groupSize"
-            },
+            "expression": "floor(numLights / groupSize)",
             "assignTo": "numGroups"
           },
           {
@@ -1714,18 +1706,10 @@
           {
             "id": "rccw-num-groups",
             "type": "logic",
-            "logicType": "math",
-            "label": "numGroups = numLights / groupSize",
+            "logicType": "expression",
+            "label": "numGroups = floor(numLights / groupSize)",
             "outputs": [],
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "variable",
-              "name": "groupSize"
-            },
+            "expression": "floor(numLights / groupSize)",
             "assignTo": "numGroups"
           },
           {

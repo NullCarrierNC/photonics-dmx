@@ -98,6 +98,20 @@ describe('SongEventHandler reap after a song event', () => {
     expect(transitionEngine.reapCompletedEffects).toHaveBeenCalledTimes(1)
   })
 
+  it.each<WaitKind>(['waitFor', 'waitUntil'])(
+    'ends a %s counted 2.5 on the third event, as it would one counted 3',
+    (kind) => {
+      withActiveEffect(parkedEffect(kind, 2.5))
+
+      handler.onMeasure()
+      handler.onMeasure()
+      expect(transitionEngine.reapCompletedEffects).not.toHaveBeenCalled()
+      handler.onMeasure()
+
+      expect(transitionEngine.reapCompletedEffects).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it.each<WaitKind>(['waitFor', 'waitUntil'])('reaps an uncounted %s on its event', (kind) => {
     withActiveEffect(parkedEffect(kind))
 
