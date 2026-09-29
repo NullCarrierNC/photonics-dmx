@@ -24,6 +24,20 @@ function tallyKnipReport(report) {
 }
 
 /**
+ * @param {{ issues?: Array<Record<string, unknown>> }} report knip's `--reporter json` output
+ * @returns {string} the unused files knip names, one per line under a heading, or '' for none
+ */
+function unusedFilesReport(report) {
+  const names = []
+  for (const row of report.issues ?? []) {
+    if (Array.isArray(row.files)) names.push(...row.files.map((file) => file.name))
+  }
+  return names.length === 0
+    ? ''
+    : ['Knip unused files:', ...names.map((name) => `  ${name}`)].join('\n')
+}
+
+/**
  * @param {{ production: boolean }} options
  * @returns {string[]} the arguments knip runs with, `--production` leaving out tests and the
  *   development entries
@@ -49,4 +63,4 @@ function productionReportLine(counts) {
   return `Knip in production mode, reported only: ${listed}`
 }
 
-module.exports = { tallyKnipReport, knipArgs, productionReportLine }
+module.exports = { tallyKnipReport, unusedFilesReport, knipArgs, productionReportLine }

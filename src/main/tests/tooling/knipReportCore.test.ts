@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const {
   tallyKnipReport,
+  unusedFilesReport,
   knipArgs,
   productionReportLine,
 } = require('../../../../tools/knipReportCore.cjs')
@@ -43,6 +44,27 @@ describe('tallyKnipReport', () => {
   it('reads a report with no issues as zero of each', () => {
     expect([...tallyKnipReport({ issues: [] }).values()]).toEqual([0, 0, 0, 0])
     expect([...tallyKnipReport({}).values()]).toEqual([0, 0, 0, 0])
+  })
+})
+
+describe('unusedFilesReport', () => {
+  it('names each unused file knip reports, one per line', () => {
+    const report = {
+      issues: [
+        { file: 'src/a.css', files: [{ name: 'src/a.css' }], exports: [] },
+        { file: 'src/b.ts', files: [], exports: [{ name: 'one' }] },
+        { file: 'postcss.config.js', files: [{ name: 'postcss.config.js' }] },
+      ],
+    }
+
+    expect(unusedFilesReport(report)).toBe('Knip unused files:\n  src/a.css\n  postcss.config.js')
+  })
+
+  it('reports nothing when knip names no unused file', () => {
+    expect(unusedFilesReport({ issues: [{ file: 'src/b.ts', exports: [{ name: 'one' }] }] })).toBe(
+      '',
+    )
+    expect(unusedFilesReport({})).toBe('')
   })
 })
 
