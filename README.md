@@ -1,4 +1,4 @@
-# Photonics - DMX Lights for YARG, Rock Band 3 (Enhanced), and Music Visualization
+# Photonics DMX - Stage Lights for YARG, Rock Band 3 (Enhanced), and Music Visualization
 
 [https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22](https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22)
 
